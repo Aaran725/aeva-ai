@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect, createContext, useContext } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowUp, Zap, TrendingDown, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2 } from 'lucide-react'
+import { ArrowUp, Zap, TrendingDown, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical } from 'lucide-react'
 import { supabase } from './supabase'
 import { useArcadeStore } from './arcadeStore'
+import { useLabStore } from './labStore'
 import ArcadeHub from './ArcadeHub'
+import LabHub from './LabHub'
 import { ChaosEventBanner, MissionVitalsBar, DebateLogicFeed, ThemedChatBubble, MissionBadge } from './SimCockpit'
 import './index.css'
 
@@ -238,6 +240,7 @@ const gridCSS = `
     .bento-grid { grid-template-columns: repeat(4, 1fr); }
     .mission-card { grid-column: span 2; grid-row: span 2; }
     .skill-card   { grid-column: span 2; }
+    .lab-card     { grid-column: span 2; }
   }
   .chat-messages::-webkit-scrollbar { width: 0; }
 
@@ -313,7 +316,7 @@ function GlassCard({ children, className = '', style = {}, onClick }) {
 }
 
 /* ═══ AEVA ORB ════════════════════════════════════ */
-function AevaOrb({ size = 218, active = false }) {
+function AevaOrb({ size = 218, active = false, scanMode = false }) {
   const s = size / 218
   const shellW = Math.round(218 * s * 0.88)
   const shellH = Math.round(205 * s * 0.88)
@@ -326,8 +329,8 @@ function AevaOrb({ size = 218, active = false }) {
       filter: 'saturate(1.55) contrast(1.10)', flexShrink: 0,
     }}>
       <motion.div
-        animate={{ scale: active ? [1, 1.18, 1] : [1, 1.06, 1] }}
-        transition={{ duration: active ? 1.2 : 7, repeat: Infinity, ease: 'easeInOut' }}
+        animate={{ scale: scanMode ? [1, 1.03, 1] : active ? [1, 1.18, 1] : [1, 1.06, 1] }}
+        transition={{ duration: scanMode ? 3.5 : active ? 1.2 : 7, repeat: Infinity, ease: 'easeInOut' }}
         style={{
           position: 'absolute', inset: Math.round(-20 * s), borderRadius: '50%',
           background: 'radial-gradient(ellipse at 44% 52%, rgba(45,48,142,0.28) 0%, rgba(233,163,100,0.14) 52%, transparent 76%)',
@@ -349,11 +352,16 @@ function AevaOrb({ size = 218, active = false }) {
           position: 'relative', width: shellW, height: shellH,
           borderRadius: '56% 44% 40% 60% / 54% 44% 56% 46%',
           overflow: 'hidden',
-          boxShadow: 'inset 0 0 30px rgba(255,255,255,0.40), inset 0 2px 10px rgba(255,255,255,0.55)',
+          boxShadow: scanMode
+            ? 'inset 0 0 30px rgba(96,165,250,0.50), inset 0 2px 10px rgba(147,197,253,0.60), 0 0 24px rgba(59,130,246,0.35)'
+            : 'inset 0 0 30px rgba(255,255,255,0.40), inset 0 2px 10px rgba(255,255,255,0.55)',
           backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
         }}
       >
-        <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(122deg,#040622 0%,#090b38 7%,#141870 16%,#2D308E 27%,#4545aa 38%,#6a6ac0 48%,#9898d2 56%,#c0c6e8 63%,#dde2f6 68%,#eeeaf4 72%,#f4ede0 76%,#f0d4a0 80%,#E9A364 84%,#d08038 88%,#964e20 93%,#501808 97%,#1a0806 100%)` }} />
+        <div style={{ position: 'absolute', inset: 0, background: scanMode
+          ? 'linear-gradient(122deg,#020a1a 0%,#051430 8%,#0a2456 16%,#1240a0 26%,#1D4ED8 36%,#2563EB 46%,#3B82F6 54%,#60A5FA 62%,#93C5FD 68%,#BAE6FD 72%,#E0F2FE 76%,#BAE6FD 80%,#60A5FA 84%,#2563EB 88%,#1a3a8a 93%,#0d1f50 97%,#020a1a 100%)'
+          : 'linear-gradient(122deg,#040622 0%,#090b38 7%,#141870 16%,#2D308E 27%,#4545aa 38%,#6a6ac0 48%,#9898d2 56%,#c0c6e8 63%,#dde2f6 68%,#eeeaf4 72%,#f4ede0 76%,#f0d4a0 80%,#E9A364 84%,#d08038 88%,#964e20 93%,#501808 97%,#1a0806 100%)'
+        }} />
         <div style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', background: 'radial-gradient(ellipse at 50% 50%, transparent 46%, rgba(8,10,48,0.38) 62%, rgba(4,6,28,0.65) 76%, rgba(2,3,18,0.86) 90%, rgba(1,2,12,0.94) 100%)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', background: 'radial-gradient(ellipse at 72% 28%, rgba(4,5,30,0.72) 0%, rgba(8,10,50,0.50) 30%, transparent 62%)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', background: 'radial-gradient(ellipse at 80% 80%, rgba(3,4,22,0.55) 0%, rgba(6,8,40,0.30) 35%, transparent 60%)', pointerEvents: 'none' }} />
@@ -518,6 +526,48 @@ function MoodCard() {
   )
 }
 
+function TrainingLabCard() {
+  const { openLab } = useLabStore()
+  const drills = [
+    { emoji: '⚡', label: 'Flashcard Sprint', color: '#3B82F6' },
+    { emoji: '🎯', label: 'Mock Test',        color: '#06B6D4' },
+    { emoji: '🔗', label: 'Match Grid',       color: '#8B5CF6' },
+  ]
+  return (
+    <GlassCard className="lab-card" onClick={openLab} style={{ padding: '24px 26px', cursor: 'pointer', minHeight: 160 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <FlaskConical size={13} color="rgba(59,130,246,0.70)" />
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(59,130,246,0.70)', textTransform: 'uppercase' }}>Training Lab</span>
+        </div>
+        <motion.div
+          animate={{ opacity: [0.4, 1, 0.4], scale: [1, 1.15, 1] }}
+          transition={{ duration: 2.4, repeat: Infinity }}
+          style={{ width: 6, height: 6, borderRadius: '50%', background: '#3B82F6', boxShadow: '0 0 8px #3B82F6' }}
+        />
+      </div>
+      <h3 style={{ fontFamily: "'Inter', system-ui, sans-serif", fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.90)', margin: '0 0 6px', letterSpacing: '-0.02em' }}>
+        Drill &amp; Mastery Hub
+      </h3>
+      <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.38)', margin: '0 0 16px', lineHeight: 1.5 }}>
+        The Arcade creates the need. The Lab builds the skill.
+      </p>
+      <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+        {drills.map(d => (
+          <div key={d.label} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            padding: '4px 10px', borderRadius: 99,
+            background: `${d.color}14`, border: `1px solid ${d.color}35`,
+            fontSize: 11, fontWeight: 600, color: d.color,
+          }}>
+            {d.emoji} {d.label}
+          </div>
+        ))}
+      </div>
+    </GlassCard>
+  )
+}
+
 function SkillDecayCard() {
   return (
     <GlassCard className="skill-card" style={{ padding: '24px 28px' }}>
@@ -548,6 +598,7 @@ function SkillDecayCard() {
 /* ═══ DASHBOARD VIEW ══════════════════════════════ */
 function DashboardView({ onChatOpen, onSignOut }) {
   const { openArcade } = useArcadeStore()
+  const { openLab } = useLabStore()
 
   return (
     <motion.div
@@ -564,8 +615,9 @@ function DashboardView({ onChatOpen, onSignOut }) {
       <div aria-hidden style={{ position: 'absolute', top: '-5%', left: '15%', width: 700, height: 700, borderRadius: '50%', background: 'radial-gradient(circle, rgba(45,48,142,0.22) 0%, transparent 70%)', filter: 'blur(60px)', pointerEvents: 'none' }} />
       <div aria-hidden style={{ position: 'absolute', bottom: '5%', right: '5%', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle, rgba(233,163,100,0.13) 0%, transparent 70%)', filter: 'blur(55px)', pointerEvents: 'none' }} />
 
-      {/* Arcade Hub portal */}
+      {/* Portals */}
       <ArcadeHub />
+      <LabHub />
 
       <div style={{ position: 'relative' }}>
         <header style={{ padding: '26px 28px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', maxWidth: 1280, margin: '0 auto' }}>
@@ -576,6 +628,24 @@ function DashboardView({ onChatOpen, onSignOut }) {
             <span style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.88)', letterSpacing: '-0.02em' }}>aeva</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {/* Training Lab button */}
+            <motion.button
+              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+              onClick={openLab}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 7,
+                padding: '7px 16px', borderRadius: 99,
+                background: 'rgba(59,130,246,0.14)',
+                border: '1px solid rgba(59,130,246,0.35)',
+                color: 'rgba(255,255,255,0.80)',
+                fontFamily: "'Inter', system-ui, sans-serif",
+                fontSize: 12.5, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.01em',
+              }}
+            >
+              <FlaskConical size={13} />
+              The Lab
+            </motion.button>
+
             {/* UNLEASH ARCADE button */}
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -611,6 +681,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
           <ConstellationCard />
           <MoodCard />
           <SkillDecayCard />
+          <TrainingLabCard />
         </div>
 
         <div style={{ height: 48 }} />
@@ -706,6 +777,7 @@ function SessionBadge({ sessionState, criticism }) {
 function ChatView({ onBack }) {
   const { name } = useUser()
   const { activeMode, activeMission, processAIResponse, rewardPlayer, worldMemory, cleanText, interruptActive } = useArcadeStore()
+  const { labOpen, openLab, setLabSuggestion } = useLabStore()
   const isMission = !!activeMode
 
   const [input, setInput] = useState('')
@@ -881,8 +953,18 @@ function ChatView({ onBack }) {
       // Post-process for chaos/vitals/fallacy/interrupt
       if (isMission) {
         processAIResponse(rawResponse)
-        // Reward player if response has a substantive answer (heuristic: > 30 chars)
         if (userText.length > 30) rewardPlayer(3)
+
+        // Detect when AI suggests heading to The Lab
+        const labMatch = rawResponse.match(/[Hh]ead to [Tt]he [Ll]ab|[Ff]lashcard [Ss]print|[Ll]ab.*drill|go to the [Ll]ab/i)
+        const topicMatch = rawResponse.match(/struggling with ([^.!?\n]+)/i)
+        if (labMatch && !labOpen) {
+          setLabSuggestion({
+            topic: topicMatch?.[1]?.trim().slice(0, 40) || activeMission?.title || 'this concept',
+            drillType: 'flashcard',
+            reason: rawResponse.split('.').find(s => /lab|drill|sprint/i.test(s))?.trim() + '.' || 'Aeva thinks a quick drill would help here.',
+          })
+        }
       }
     } catch (err) {
       if (err.name !== 'AbortError') {
@@ -992,7 +1074,7 @@ function ChatView({ onBack }) {
                   transition={{ duration: 0.4 }}
                   style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 16 }}
                 >
-                  <AevaOrb size={218} active={isActive} />
+                  <AevaOrb size={218} active={isActive} scanMode={labOpen} />
                   <div style={{ textAlign: 'center', padding: '0 28px', marginTop: 8 }}>
                     <p style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 28, fontWeight: 400, color: headingColor, lineHeight: 1.3, letterSpacing: '0.01em', marginBottom: 2 }}>
                       Hey {name},
@@ -1008,7 +1090,7 @@ function ChatView({ onBack }) {
             {/* Mini orb + mastery (tutor mode active) */}
             {!isEmpty && !isMission && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 4, flexShrink: 0, gap: 6 }}>
-                <AevaOrb size={72} active={isThinking} />
+                <AevaOrb size={72} active={isThinking} scanMode={labOpen} />
                 {Object.keys(masteryMap).length > 0 && (
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', padding: '0 20px' }}>
                     {Object.entries(masteryMap).slice(0, 4).map(([topic, score]) => (
@@ -1022,10 +1104,10 @@ function ChatView({ onBack }) {
               </div>
             )}
 
-            {/* Mission thinking orb — red pulse on interrupt */}
+            {/* Mission thinking orb — red pulse on interrupt, blue in scan mode */}
             {isMission && isThinking && (
               <div className={interruptActive ? 'orb-interrupt' : ''} style={{ display: 'flex', justifyContent: 'center', paddingTop: 6, flexShrink: 0 }}>
-                <AevaOrb size={48} active />
+                <AevaOrb size={48} active={!labOpen} scanMode={labOpen} />
               </div>
             )}
 
