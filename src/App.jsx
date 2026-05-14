@@ -7,7 +7,7 @@ import { useLabStore } from './labStore'
 import { useNeuralStore } from './neuralStore'
 import ArcadeHub from './ArcadeHub'
 import LabHub from './LabHub'
-import { ChaosEventBanner, MissionVitalsBar, DebateLogicFeed, ThemedChatBubble, MissionBadge } from './SimCockpit'
+import { ChaosEventBanner, MissionVitalsBar, DebateLogicFeed, ThemedChatBubble, MissionBadge, ProTipBanner } from './SimCockpit'
 import LearningFingerprint from './LearningFingerprint'
 import MemoryPalace from './MemoryPalace'
 import BrainVsWorld from './BrainVsWorld'
@@ -1654,7 +1654,11 @@ function SessionBadge({ sessionState, criticism }) {
 /* ═══ CHAT VIEW / COCKPIT ═════════════════════════ */
 function ChatView({ onBack }) {
   const { name } = useUser()
-  const { activeMode, activeMission, processAIResponse, rewardPlayer, worldMemory, cleanText, interruptActive } = useArcadeStore()
+  const {
+    activeMode, activeMission, processAIResponse, rewardPlayer, worldMemory,
+    cleanText, interruptActive, quickActions, streakCount, missionExchanges,
+    applyTimeoutPenalty, clearQuickActions, proTip,
+  } = useArcadeStore()
   const { labOpen, openLab, setLabSuggestion } = useLabStore()
   const {
     orbPersonality,
@@ -1680,6 +1684,8 @@ function ChatView({ onBack }) {
   const [masteryMap, setMasteryMap] = useState({})
   const [deepDiveMap, setDeepDiveMap] = useState({})   // msgIndex → [{id, term, definition}]
   const [studyGuideOpen, setStudyGuideOpen] = useState(false)
+  const [countdown, setCountdown] = useState(null)
+  const countdownRef = useRef(null)
   const abortRef = useRef(null)
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
@@ -1700,12 +1706,45 @@ function ChatView({ onBack }) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // 30-second countdown timer for mission mode
+  useEffect(() => {
+    if (!isMission) { setCountdown(null); return }
+    const lastMsg = messages[messages.length - 1]
+    if (!lastMsg || lastMsg.role !== 'model' || lastMsg.streaming || isThinking) return
+
+    // Start countdown
+    setCountdown(30)
+    const interval = setInterval(() => {
+      setCountdown(prev => {
+        if (prev === null) return null
+        if (prev <= 1) {
+          clearInterval(interval)
+          applyTimeoutPenalty()
+          return null
+        }
+        return prev - 1
+      })
+    }, 1000)
+    countdownRef.current = interval
+    return () => { clearInterval(interval); countdownRef.current = null }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, isMission, isThinking])
+
+  // Clear countdown when user starts typing
+  useEffect(() => {
+    if (input.length > 0 && countdownRef.current) {
+      clearInterval(countdownRef.current)
+      countdownRef.current = null
+      setCountdown(null)
+    }
+  }, [input])
+
   // Per-mission opening opts (same shape as MISSION_OPTS in send())
   const MISSION_OPEN_OPTS = {
-    debate:    { temperature: 0.72, maxTokens: 160, frequencyPenalty: 0.70, presencePenalty: 0.50 },
-    startup:   { temperature: 0.68, maxTokens: 140, frequencyPenalty: 0.55, presencePenalty: 0.40 },
-    space:     { temperature: 0.78, maxTokens: 180, frequencyPenalty: 0.50, presencePenalty: 0.35 },
-    detective: { temperature: 0.80, maxTokens: 200, frequencyPenalty: 0.45, presencePenalty: 0.30 },
+    debate:    { temperature: 0.78, maxTokens: 100, frequencyPenalty: 0.70, presencePenalty: 0.55 },
+    startup:   { temperature: 0.72, maxTokens: 100, frequencyPenalty: 0.60, presencePenalty: 0.45 },
+    space:     { temperature: 0.80, maxTokens: 100, frequencyPenalty: 0.55, presencePenalty: 0.40 },
+    detective: { temperature: 0.82, maxTokens: 100, frequencyPenalty: 0.50, presencePenalty: 0.35 },
   }
 
   // Background theme for mission mode
@@ -1783,11 +1822,21 @@ function ChatView({ onBack }) {
     }
   }
 
-  const send = async () => {
-    if (!hasInput || isThinking) return
-    const userText = input.trim()
-    setInput('')
+  const sendWithText = async (overrideText) => {
+    const userText = overrideText || input.trim()
+    if (!userText || isThinking) return
+    if (!overrideText) setInput('')
     sendTimeRef.current = Date.now()
+
+    // Clear countdown on send
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current)
+      countdownRef.current = null
+      setCountdown(null)
+    }
+
+    // Clear quick actions on send
+    clearQuickActions()
 
     // Humor signal
     if (/lol|haha|😂|😄|lmao/i.test(userText)) bumpHumor()
@@ -1815,10 +1864,10 @@ function ChatView({ onBack }) {
 
       // Per-mission API options: penalise repetition, cap length
       const MISSION_OPTS = {
-        debate:    { temperature: 0.72, maxTokens: 180, frequencyPenalty: 0.70, presencePenalty: 0.50 },
-        startup:   { temperature: 0.68, maxTokens: 160, frequencyPenalty: 0.55, presencePenalty: 0.40 },
-        space:     { temperature: 0.78, maxTokens: 200, frequencyPenalty: 0.50, presencePenalty: 0.35 },
-        detective: { temperature: 0.80, maxTokens: 220, frequencyPenalty: 0.45, presencePenalty: 0.30 },
+        debate:    { temperature: 0.78, maxTokens: 100, frequencyPenalty: 0.70, presencePenalty: 0.55 },
+        startup:   { temperature: 0.72, maxTokens: 100, frequencyPenalty: 0.60, presencePenalty: 0.45 },
+        space:     { temperature: 0.80, maxTokens: 100, frequencyPenalty: 0.55, presencePenalty: 0.40 },
+        detective: { temperature: 0.82, maxTokens: 100, frequencyPenalty: 0.50, presencePenalty: 0.35 },
       }
 
       if (isMission && activeMission) {
@@ -1926,6 +1975,8 @@ function ChatView({ onBack }) {
     }
   }
 
+  const send = () => sendWithText()
+
   const isEmpty = messages.length === 0
 
   // Text colors adapt to mode
@@ -1993,6 +2044,46 @@ function ChatView({ onBack }) {
               : (!isEmpty && <SessionBadge sessionState={sessionState} criticism={criticism} />)
             }
           </div>
+
+          {/* Countdown timer */}
+          {isMission && countdown !== null && (
+            <motion.div
+              key={countdown}
+              initial={{ scale: 1.15 }}
+              animate={{ scale: 1 }}
+              style={{
+                position: 'absolute',
+                right: 80,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '4px 12px',
+                borderRadius: 99,
+                background: countdown <= 10 ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.06)',
+                border: `1px solid ${countdown <= 10 ? 'rgba(239,68,68,0.40)' : 'rgba(255,255,255,0.12)'}`,
+              }}
+            >
+              <motion.div
+                animate={countdown <= 10 ? { opacity: [1, 0.3, 1] } : {}}
+                transition={{ duration: 0.6, repeat: Infinity }}
+                style={{
+                  width: 5, height: 5, borderRadius: '50%',
+                  background: countdown <= 10 ? '#EF4444' : activeMission?.color || '#8B8FFF',
+                }}
+              />
+              <span style={{
+                fontSize: 13,
+                fontWeight: 800,
+                fontFamily: 'monospace',
+                color: countdown <= 10 ? '#EF4444' : 'rgba(255,255,255,0.55)',
+                letterSpacing: '-0.02em',
+              }}>
+                {countdown}s
+              </span>
+            </motion.div>
+          )}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
             {!isMission && (
@@ -2169,6 +2260,58 @@ function ChatView({ onBack }) {
                       <X size={12} />
                     </motion.button>
                   </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Quick-action buttons (mission mode) */}
+            <AnimatePresence>
+              {isMission && quickActions.length > 0 && !isThinking && (
+                <motion.div
+                  key={quickActions.join(',')}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 4 }}
+                  transition={{ duration: 0.22 }}
+                  style={{
+                    flexShrink: 0,
+                    padding: '0 16px 8px',
+                    display: 'flex',
+                    gap: 8,
+                    justifyContent: 'center',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  {quickActions.map((action, i) => (
+                    <motion.button
+                      key={action}
+                      initial={{ opacity: 0, scale: 0.88 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: i * 0.06, type: 'spring', stiffness: 400, damping: 26 }}
+                      whileHover={{ scale: 1.05, y: -1 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        clearQuickActions()
+                        sendWithText(action)
+                      }}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: 99,
+                        cursor: 'pointer',
+                        fontSize: 12.5,
+                        fontWeight: 700,
+                        background: activeMission ? activeMission.colorDim : 'rgba(255,255,255,0.08)',
+                        border: activeMission ? `1px solid ${activeMission.border}` : '1px solid rgba(255,255,255,0.15)',
+                        color: activeMission ? activeMission.color : 'rgba(255,255,255,0.75)',
+                        fontFamily: "'Inter', system-ui, sans-serif",
+                        backdropFilter: 'blur(12px)',
+                        WebkitBackdropFilter: 'blur(12px)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {action}
+                    </motion.button>
+                  ))}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -2424,6 +2567,7 @@ export default function App() {
       <style>{gridCSS}</style>
       {/* Global chaos banner */}
       <ChaosEventBanner />
+      <ProTipBanner />
       <AnimatePresence mode="wait" initial={false}>
         {view === 'dashboard'
           ? <DashboardView key="dashboard" onChatOpen={() => setView('chat')} onSignOut={() => supabase.auth.signOut()} />
