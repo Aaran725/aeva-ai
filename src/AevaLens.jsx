@@ -12,46 +12,49 @@ const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
 
-const ANALYSIS_PROMPT = `You are an expert tutor analyzing an image of a student's math or science work.
+const ANALYSIS_PROMPT = `You are an expert math tutor analyzing an image of a student's work.
 
-Do NOT solve it for them. Your role:
-1. Identify the concept being tested.
-2. Pinpoint the struggle point.
-3. Explain the rule with a clean pattern (syntaxCard).
-4. Give 3-4 modular steps with SHORT formulas.
-5. Extract actual numerical values from the image for variables (e.g. a=5, b=2). If a value cannot be read, use "?".
+Do NOT solve it. Your role:
+1. Identify the concept.
+2. Write a direct Expert Tip (NOT "The student is..." — use "Goal:", "Key insight:", or imperative voice).
+3. Build a syntaxCard with the general pattern.
+4. Give 3-4 modular steps.
+5. Extract ACTUAL numerical values from the image for variables.
 
 STRICT JSON RULES (violation causes crash):
-- Output ONLY a raw JSON object. Zero markdown, zero fences, zero text outside braces.
-- NO backslashes at all. Write sqrt(x) not \\sqrt{x}. Write x^2 not x^{2}. Write a/b not \\frac.
-- All string values are ONE LINE. No newlines inside strings.
-- ASCII only inside strings.
+- Output ONLY a raw JSON object. No markdown, no fences, no text outside braces.
+- NO backslashes. Write sqrt(x), x^2, a/b — never use backslashes.
+- All strings ONE LINE. ASCII only.
+
+HOTSPOT ANCHORING (critical): x and y are percentage coordinates FROM THE TOP-LEFT of the image.
+Visually locate each key mathematical term in the image and place the hotspot directly on it.
+Example: if the number "21" appears roughly 65% from the left edge and 38% from the top, use x:65, y:38.
+DO NOT guess random positions — anchor each hotspot to a specific visible symbol or number.
 
 Output EXACTLY this structure:
 {
   "topic": "short topic",
-  "coreInsight": "one sentence",
-  "strugglePoint": "one sentence on where they are stuck",
+  "coreInsight": "one crisp sentence",
+  "expertTip": "Goal: [direct instruction]. e.g. Goal: Find two numbers that multiply to 21 and add to 10.",
   "syntaxCard": {
-    "pattern": "the general form e.g. sqrt(a + b - 2*sqrt(a*b))",
-    "conditions": ["a + b = value", "a * b = value"]
+    "pattern": "sqrt(a + b - 2*sqrt(a*b)) = sqrt(a) - sqrt(b)",
+    "conditions": ["a + b = 10", "a * b = 21"]
   },
   "variables": [
-    { "symbol": "a", "value": "5", "meaning": "first term" },
-    { "symbol": "b", "value": "2", "meaning": "second term" }
+    { "symbol": "a", "value": "7", "meaning": "larger factor" },
+    { "symbol": "b", "value": "3", "meaning": "smaller factor" }
   ],
   "steps": [
     { "verb": "MATCH", "title": "Match the Pattern", "body": "one short sentence", "formula": "sqrt(a) - sqrt(b) = sqrt(a + b - 2*sqrt(a*b))", "proTip": "10 words max on WHY" },
-    { "verb": "EXPAND", "title": "Expand the Square", "body": "one short sentence", "formula": "(sqrt(a) - sqrt(b))^2 = a + b - 2*sqrt(a*b)", "proTip": "10 words max on WHY" }
+    { "verb": "SOLVE", "title": "Solve for a and b", "body": "one short sentence", "formula": "a + b = 10, a * b = 21", "proTip": "10 words max" }
   ],
   "hotspots": [
-    { "id": "h1", "x": 30, "y": 40, "label": "Struggle Point", "detail": "one sentence", "linkedVar": "a" },
-    { "id": "h2", "x": 60, "y": 55, "label": "Key Pattern", "detail": "one sentence", "linkedVar": "b" }
+    { "id": "h1", "x": 55, "y": 35, "label": "The Sum", "detail": "This is a + b. Identify which number this equals.", "linkedVar": "a" },
+    { "id": "h2", "x": 70, "y": 35, "label": "The Product", "detail": "This is a * b. Find its factor pairs.", "linkedVar": "b" }
   ]
 }
 
-variables.value must be the ACTUAL number seen in the image (e.g. "10", "21") — never a vague description.
-steps: 3-4 max. hotspots: 2-3 max. linkedVar must match a symbol in variables (or omit if no match).`
+variables.value: ACTUAL number from the image. steps: 3-4 max. hotspots: pin to VISIBLE terms in the image.`
 
 /* ─── Unicode math prettifier ─── */
 function mathify(text) {
@@ -339,9 +342,9 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
                 <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', lineHeight: 1.55 }}>{mathify(analysis.coreInsight)}</span>
               </InfoCard>
 
-              {/* Struggle point */}
-              <InfoCard color="rgba(239,68,68,0.08)" border="rgba(239,68,68,0.22)" label="Struggle Point" labelColor="rgba(252,165,165,0.65)">
-                <span style={{ fontSize: 13, color: 'rgba(255,200,200,0.85)', lineHeight: 1.55 }}>{mathify(analysis.strugglePoint)}</span>
+              {/* Expert Tip */}
+              <InfoCard color="rgba(239,68,68,0.08)" border="rgba(239,68,68,0.22)" label="Expert Tip" labelColor="rgba(252,165,165,0.65)">
+                <span style={{ fontSize: 13, color: 'rgba(255,200,200,0.90)', lineHeight: 1.55 }}>{mathify(analysis.expertTip || analysis.strugglePoint)}</span>
               </InfoCard>
 
               {/* Syntax pattern card */}
@@ -471,17 +474,72 @@ function SectionLabel({ children }) {
   return <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>{children}</div>
 }
 
+/* ─── CSS radical renderer ─── */
+function splitOnRadicals(text) {
+  const parts = []
+  let i = 0, start = 0
+  while (i < text.length) {
+    if (text[i] === '√' && text[i + 1] === '(') {
+      if (i > start) parts.push({ type: 'text', content: text.slice(start, i) })
+      let depth = 0, j = i + 1
+      while (j < text.length) {
+        if (text[j] === '(') depth++
+        else if (text[j] === ')') { depth--; if (depth === 0) break }
+        j++
+      }
+      parts.push({ type: 'radical', content: text.slice(i + 2, j) })
+      start = j + 1; i = j + 1
+    } else { i++ }
+  }
+  if (start < text.length) parts.push({ type: 'text', content: text.slice(start) })
+  return parts
+}
+
+function MathText({ children, style = {} }) {
+  if (!children) return null
+  const parts = splitOnRadicals(String(children))
+  return (
+    <span style={style}>
+      {parts.map((p, i) =>
+        p.type === 'text'
+          ? <span key={i}>{p.content}</span>
+          : (
+            <span key={i} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 0 }}>
+              <span style={{ fontSize: '1.05em', lineHeight: 1, marginRight: 1 }}>√</span>
+              <span style={{ borderTop: '1.5px solid currentColor', paddingTop: 1, paddingLeft: 2, paddingRight: 3, lineHeight: 1.25 }}>
+                <MathText>{p.content}</MathText>
+              </span>
+            </span>
+          )
+      )}
+    </span>
+  )
+}
+
+/* ─── Factor pairs for predictive variable HUD ─── */
+function getFactorPairs(val) {
+  const n = parseInt(val)
+  if (!n || n < 4 || n > 9999 || n === n * 1 && (n === 2 || n === 3)) return []
+  const pairs = []
+  for (let i = 2; i <= Math.sqrt(n); i++) {
+    if (n % i === 0 && i !== n / i) pairs.push([i, n / i])
+  }
+  return pairs
+}
+
 function SyntaxCard({ card }) {
   return (
     <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(0,200,255,0.06)', border: '1px solid rgba(0,200,255,0.20)' }}>
       <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(103,232,249,0.60)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Pattern</div>
-      <div style={{ fontFamily: 'monospace', fontSize: 14, color: '#67E8F9', textAlign: 'center', padding: '6px 0 10px', letterSpacing: '0.02em' }}>
-        {mathify(card.pattern)}
+      <div style={{ fontSize: 15, color: '#67E8F9', textAlign: 'center', padding: '6px 0 10px', letterSpacing: '0.02em' }}>
+        <MathText style={{ fontFamily: 'monospace' }}>{mathify(card.pattern)}</MathText>
       </div>
       {card.conditions?.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, justifyContent: 'center' }}>
           {card.conditions.map((c, i) => (
-            <div key={i} style={{ padding: '3px 9px', borderRadius: 99, background: 'rgba(0,200,255,0.10)', border: '1px solid rgba(0,200,255,0.22)', fontSize: 11.5, fontFamily: 'monospace', color: 'rgba(103,232,249,0.85)' }}>{mathify(c)}</div>
+            <div key={i} style={{ padding: '3px 9px', borderRadius: 99, background: 'rgba(0,200,255,0.10)', border: '1px solid rgba(0,200,255,0.22)', fontSize: 11.5, fontFamily: 'monospace', color: 'rgba(103,232,249,0.85)' }}>
+              <MathText>{mathify(c)}</MathText>
+            </div>
           ))}
         </div>
       )}
@@ -490,31 +548,45 @@ function SyntaxCard({ card }) {
 }
 
 function VariableRow({ v, index, total, highlighted, onClick }) {
+  const factorPairs = getFactorPairs(v.value)
   return (
     <motion.div
       onClick={onClick}
       animate={highlighted ? { backgroundColor: 'rgba(99,102,241,0.18)' } : { backgroundColor: index % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0)' }}
       transition={{ duration: 0.2 }}
       style={{
-        display: 'flex', gap: 12, padding: '8px 12px', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', cursor: 'pointer',
         borderBottom: index < total - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
         outline: highlighted ? '1px solid rgba(99,102,241,0.40)' : '1px solid transparent',
         borderRadius: index === 0 ? '10px 10px 0 0' : index === total - 1 ? '0 0 10px 10px' : 0,
         transition: 'outline 0.2s',
+        flexWrap: 'wrap',
       }}
     >
-      {/* Symbol = value in monospace */}
-      <div style={{ flexShrink: 0, minWidth: 52, display: 'flex', alignItems: 'center', gap: 4 }}>
+      {/* symbol = value */}
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4, minWidth: 60 }}>
         <code style={{ fontSize: 13, fontFamily: 'monospace', color: '#FBBF24', fontWeight: 800 }}>{v.symbol}</code>
-        {v.value && v.value !== '?' && (
-          <>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', fontWeight: 400 }}>=</span>
-            <code style={{ fontSize: 13, fontFamily: 'monospace', color: highlighted ? '#A5B4FC' : '#93C5FD', fontWeight: 700 }}>{v.value}</code>
-          </>
-        )}
-        {v.value === '?' && <code style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(255,255,255,0.30)', fontWeight: 400 }}>= ?</code>}
+        {v.value && v.value !== '?' && <>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>=</span>
+          <code style={{ fontSize: 13, fontFamily: 'monospace', color: highlighted ? '#A5B4FC' : '#93C5FD', fontWeight: 700 }}>{v.value}</code>
+        </>}
+        {(!v.value || v.value === '?') && <code style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(255,255,255,0.28)' }}>= ?</code>}
       </div>
-      <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.48)', lineHeight: 1.4, alignSelf: 'center' }}>{v.meaning}</span>
+
+      {/* meaning */}
+      <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4, flex: 1 }}>{v.meaning}</span>
+
+      {/* Factor pills */}
+      {factorPairs.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+          <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Factors</span>
+          {factorPairs.slice(0, 3).map(([a, b], i) => (
+            <div key={i} style={{ padding: '1px 6px', borderRadius: 99, background: 'rgba(251,191,36,0.10)', border: '1px solid rgba(251,191,36,0.25)', fontSize: 10.5, fontFamily: 'monospace', color: '#FCD34D', fontWeight: 700 }}>
+              {a}×{b}
+            </div>
+          ))}
+        </div>
+      )}
     </motion.div>
   )
 }
@@ -557,8 +629,8 @@ function StepCard({ step, index, revealed, onReveal }) {
             initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
             style={{ overflow: 'hidden' }}
           >
-            <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.25)', textAlign: 'center', fontFamily: 'monospace', fontSize: 13.5, color: '#C4B5FD', letterSpacing: '0.03em' }}>
-              {mathify(formula)}
+            <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.25)', textAlign: 'center', fontSize: 14, color: '#C4B5FD', letterSpacing: '0.03em' }}>
+              <MathText style={{ fontFamily: 'monospace' }}>{mathify(formula)}</MathText>
             </div>
             {proTip && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}
