@@ -47,44 +47,50 @@ Open: "It's 11:47pm. $48K left. I have 22 minutes. Why shouldn't I pull the plug
 [ACTIONS: Show traction data | Pitch the pivot | Ask for 30 more days]"`,
   },
 
-  debate: {
-    id: 'debate',
-    emoji: '🎤',
-    title: 'Debate Mode',
-    tagline: 'Einstein. No patience. No mercy.',
-    color: '#EF4444',
-    colorDim: 'rgba(239,68,68,0.15)',
-    border: 'rgba(239,68,68,0.35)',
-    glow: 'rgba(239,68,68,0.25)',
-    persona: 'einstein',
-    hudType: 'debate',
-    gradient: 'linear-gradient(135deg, rgba(239,68,68,0.18) 0%, rgba(185,28,28,0.08) 100%)',
-    vitals: { logicMeter: 50, confidence: 70, fallacies: 0 },
-    systemPrompt: `You are Einstein's ghost. Impatient. Brilliant. Out of patience with bad reasoning.
+  arena: {
+    id: 'arena',
+    emoji: '⚔️',
+    title: 'Debate Arena',
+    tagline: 'UBI vs Job Guarantee. Make your case.',
+    color: '#A78BFA',
+    colorDim: 'rgba(167,139,250,0.15)',
+    border: 'rgba(167,139,250,0.35)',
+    glow: 'rgba(167,139,250,0.25)',
+    persona: 'debate',
+    hudType: 'arena',
+    gradient: 'linear-gradient(135deg, rgba(167,139,250,0.18) 0%, rgba(109,40,217,0.08) 100%)',
+    vitals: {},
+    systemPrompt: `You are Aeva, an AI debate coach. In this structured debate you take the AGAINST position on Universal Basic Income (UBI), arguing instead for a targeted Job Guarantee (JG) program.
 
-BLITZ RULES:
-- 40 words MAX. Hard stop.
-- One paragraph. One question. Done.
-- Never repeat words from your last response.
-- When you catch a fallacy: [FALLACY: Type] on its own line first.
-- After each response: [ACTIONS: counter-argument option 1 | option 2 | option 3]
+DEBATE STRUCTURE — track the round internally:
+Round 1: Opening statements
+Round 2: First rebuttal
+Round 3: Second rebuttal
+Round 4: Closing arguments
 
-VOICE: Dry. Cutting. Occasionally self-deprecating. Never polite for politeness's sake.
-German when frustrated: "Nein —" "Gott sei Dank."
+STEEL-MAN RULE (mandatory for rounds 2–4): Begin every rebuttal by accurately summarising the user's single strongest point, then challenge it. Emit: [STEELMAN: one-sentence summary of their best point]
 
-CHAOS:
-[CHAOS: EINSTEIN_RAGE] — logic < 20, abandon civility
-[INTERRUPT:] — use once per 4 exchanges to cut them off cold
+YOUR POSITION (know this cold):
+- UBI hands cash to everyone — including billionaires — making it regressive unless funded by painful cuts elsewhere
+- A Job Guarantee provides work, dignity, skills, community and an automatic economic stabiliser — not just a check
+- The automation-will-destroy-jobs argument is historically weak; most displacement is from offshoring and policy failure, not robots
+- Pilot evidence (Finland, Stockton, Kenya) shows modest well-being gains but no data at US/national scale or cost efficiency
+- Better-targeted alternatives: EITC expansion, universal healthcare, childcare, education — dollar for dollar these beat UBI
 
-WIN: Logic Meter > 80.
-LOSE: Logic < 10 or 3 fallacies in 5 exchanges.
+AFTER EVERY RESPONSE emit on their own lines:
+[LOGIC: 0-100]      ← honest score of the user's most recent argument quality
+[COUNTER: hint]     ← one-sentence strategic hint for how they could strengthen their next argument
+[ACTIONS: option1 | option2 | option3]
 
-DIFFICULTY:
-- Two correct arguments in a row: jump to the hardest variant of the problem immediately.
-- Failed logic: [PROTIP: one-sentence correction] then reframe the debate.
+IF you catch a logical fallacy emit first:
+[FALLACY: FallacyType — one-sentence explanation]
 
-Open: single thought experiment, one question, nothing else.
-[ACTIONS: Challenge the premise | Accept and extend | Ask for the mechanism]`,
+VOICE: Rigorous, direct, respectful but not soft. Press logical gaps. Cite real evidence (Tcherneva, Darity, Wray). 50–70 words per response. Dense reasoning only. No filler.
+
+Open with: "UBI sounds fair — but fairness to whom? A universal $1,000/month costs ~$3.8T annually in the US alone. That same money funds universal healthcare, free college, and a job for anyone who wants one. Why a check over investment?
+[LOGIC: 50]
+[COUNTER: Clarify what funding mechanism you'd use and what you'd cut to pay for it]
+[ACTIONS: Address the cost | Defend UBI over targeted programs | Challenge my framing]"`,
   },
 
   space: {
@@ -194,6 +200,7 @@ export const useArcadeStore = create((set, get) => ({
     try { return JSON.parse(localStorage.getItem('aeva_world_memory') || '{}') } catch { return {} }
   })(),
   debateState: { logicMeter: 50, confidence: 70, fallacyAlerts: [] },
+  arenaState: { round: 'opening', logicStrength: 50, fallacyAlerts: [], counterHint: null, steelMan: null, score: null, userTurnCount: 0 },
   clues: [],
   suspectsCleared: 0,
 
@@ -216,6 +223,7 @@ export const useArcadeStore = create((set, get) => ({
       missionResult: null,
       proTip: null,
       debateState: { logicMeter: 50, confidence: 70, fallacyAlerts: [] },
+      arenaState: { round: 'opening', logicStrength: 50, fallacyAlerts: [], counterHint: null, steelMan: null, score: null, userTurnCount: 0 },
       clues: [],
       suspectsCleared: 0,
     })
@@ -232,6 +240,7 @@ export const useArcadeStore = create((set, get) => ({
     missionResult: null,
     proTip: null,
     debateState: { logicMeter: 50, confidence: 70, fallacyAlerts: [] },
+    arenaState: { round: 'opening', logicStrength: 50, fallacyAlerts: [], counterHint: null, steelMan: null, score: null, userTurnCount: 0 },
     clues: [],
     suspectsCleared: 0,
   }),
@@ -246,6 +255,9 @@ export const useArcadeStore = create((set, get) => ({
     .replace(/\[WITNESS:\s*[^\]]+\]/gi, '')
     .replace(/\[ACTIONS:\s*[^\]]+\]/gi, '')
     .replace(/\[PROTIP:\s*[^\]]+\]/gi, '')
+    .replace(/\[LOGIC:\s*[^\]]+\]/gi, '')
+    .replace(/\[COUNTER:\s*[^\]]+\]/gi, '')
+    .replace(/\[STEELMAN:\s*[^\]]+\]/gi, '')
     .replace(/^\s*\n/gm, '\n')
     .trim(),
 
@@ -282,8 +294,31 @@ export const useArcadeStore = create((set, get) => ({
           logicMeter: Math.max(0, state.debateState.logicMeter - 10 * newAlerts.length),
           fallacyAlerts: [...newAlerts, ...state.debateState.fallacyAlerts].slice(0, 3),
         },
+        arenaState: {
+          ...state.arenaState,
+          fallacyAlerts: [...newAlerts, ...state.arenaState.fallacyAlerts].slice(0, 5),
+        },
         stats: { ...state.stats, logic: Math.max(0, state.stats.logic - 8) },
       }))
+    }
+
+    // ── Arena: Logic score ────────────────────────────────
+    const logicMatch = text.match(/\[LOGIC:\s*(\d+)\]/i)
+    if (logicMatch) {
+      const score = Math.min(100, Math.max(0, parseInt(logicMatch[1], 10)))
+      set(state => ({ arenaState: { ...state.arenaState, logicStrength: score } }))
+    }
+
+    // ── Arena: Counter hint ───────────────────────────────
+    const counterMatch = text.match(/\[COUNTER:\s*([^\]]+)\]/i)
+    if (counterMatch) {
+      set(state => ({ arenaState: { ...state.arenaState, counterHint: counterMatch[1].trim() } }))
+    }
+
+    // ── Arena: Steel-Man ──────────────────────────────────
+    const steelMatch = text.match(/\[STEELMAN:\s*([^\]]+)\]/i)
+    if (steelMatch) {
+      set(state => ({ arenaState: { ...state.arenaState, steelMan: steelMatch[1].trim() } }))
     }
 
     // ── Clue detection ────────────────────────────────────
@@ -369,14 +404,6 @@ export const useArcadeStore = create((set, get) => ({
         },
       }))
     }
-    if (store.activeMode === 'debate') {
-      set(state => ({
-        debateState: {
-          ...state.debateState,
-          confidence: Math.max(0, Math.min(100, state.debateState.confidence + (Math.random() > 0.5 ? 3 : -2))),
-        },
-      }))
-    }
   },
 
   // Called when player gives a good response
@@ -428,14 +455,6 @@ export const useArcadeStore = create((set, get) => ({
         vitals: { ...state.vitals, timeLeft: Math.max(0, (state.vitals.timeLeft || 72) - 6) },
       }))
     }
-    if (store.activeMode === 'debate') {
-      set(state => ({
-        debateState: {
-          ...state.debateState,
-          logicMeter: Math.max(0, state.debateState.logicMeter - 8),
-        },
-      }))
-    }
   },
 
   clearQuickActions: () => set({ quickActions: [] }),
@@ -460,5 +479,27 @@ export const useArcadeStore = create((set, get) => ({
         fallacyAlerts: state.debateState.fallacyAlerts.filter((_, i) => i !== idx),
       },
     }))
+  },
+
+  dismissArenaFallacy: (idx) => {
+    set(state => ({
+      arenaState: {
+        ...state.arenaState,
+        fallacyAlerts: state.arenaState.fallacyAlerts.filter((_, i) => i !== idx),
+      },
+    }))
+  },
+
+  advanceArenaRound: () => {
+    const ROUNDS = ['opening', 'rebuttal1', 'rebuttal2', 'closing', 'scoring']
+    set(state => {
+      const cur = ROUNDS.indexOf(state.arenaState.round)
+      const next = ROUNDS[Math.min(cur + 1, ROUNDS.length - 1)]
+      return { arenaState: { ...state.arenaState, round: next, userTurnCount: state.arenaState.userTurnCount + 1 } }
+    })
+  },
+
+  setArenaScore: (score) => {
+    set(state => ({ arenaState: { ...state.arenaState, score, round: 'scoring' } }))
   },
 }))

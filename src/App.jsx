@@ -13,6 +13,7 @@ import MemoryPalace from './MemoryPalace'
 import PersonalProgress from './PersonalProgress'
 import { useSRStore } from './srStore'
 import AevaLens from './AevaLens'
+import DebateArena from './DebateArena'
 import './index.css'
 
 /* ─── Groq API ─── */
@@ -2876,7 +2877,9 @@ export default function App() {
       <AnimatePresence mode="wait" initial={false}>
         {view === 'dashboard'
           ? <DashboardView key="dashboard" onChatOpen={() => setView('chat')} onSignOut={() => supabase.auth.signOut()} />
-          : <ChatView key="chat" onBack={handleBack} />
+          : activeMode === 'arena'
+            ? <DebateArena key="arena" onBack={handleBack} />
+            : <ChatView key="chat" onBack={handleBack} />
         }
       </AnimatePresence>
     </UserContext.Provider>
