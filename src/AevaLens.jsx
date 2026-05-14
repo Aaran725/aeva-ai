@@ -19,28 +19,33 @@ Your job is NOT to solve it for them. Instead:
 3. Explain the underlying rule or principle that resolves the confusion.
 4. Identify 2-4 specific regions of the image that are worth explaining (for hotspots).
 
-Respond with ONLY valid JSON in this exact format:
+CRITICAL JSON RULES — you MUST follow these or the output will break:
+- Respond with ONLY a valid JSON object. No markdown, no code fences, no extra text.
+- Do NOT use LaTeX or backslashes anywhere. No \\sqrt, \\frac, \\times, etc.
+- Write all math using plain ASCII: sqrt(x), x/y, x^2, a*b, (a+b)^2.
+- Every string value must be on one line. No literal newlines inside strings.
+- Use only straight double quotes. No special characters that break JSON.
+
+Output this exact structure:
 {
-  "topic": "short topic name (e.g. 'Integration by Parts')",
-  "coreInsight": "One sentence on the central concept in this image.",
+  "topic": "short topic name e.g. Nested Surds",
+  "coreInsight": "One sentence on the central concept in plain text.",
   "strugglePoint": "One sentence on where the confusion likely is.",
-  "explanation": "2-3 sentences explaining the underlying rule. Use plain language.",
+  "explanation": "2-3 sentences on the underlying rule. Plain language, no LaTeX.",
   "variables": [
-    { "symbol": "x", "meaning": "the variable of integration" }
+    { "symbol": "a", "meaning": "what it represents" }
   ],
   "steps": [
-    "Step 1: ...",
-    "Step 2: ...",
-    "Step 3: ..."
+    "Step 1: describe in plain text",
+    "Step 2: describe in plain text"
   ],
   "hotspots": [
-    { "id": "h1", "x": 30, "y": 45, "label": "Struggle Point", "detail": "Explanation of this specific part of the image." },
-    { "id": "h2", "x": 60, "y": 20, "label": "Key Formula", "detail": "What this formula means and why it matters here." }
+    { "id": "h1", "x": 30, "y": 45, "label": "Struggle Point", "detail": "Plain text explanation." },
+    { "id": "h2", "x": 60, "y": 20, "label": "Key Rule", "detail": "Plain text explanation." }
   ]
 }
 
-Keep variables array empty [] if the image is not mathematical/scientific.
-Keep steps array to 3-5 concise steps. Hotspots should reference actual visible regions (use x,y as % of image width/height from top-left).`
+Keep variables [] if non-mathematical. Steps: 3-5 max. Hotspots: x,y as % from top-left of image.`
 
 /* ─── Main Component ─── */
 export default function AevaLens({ file, onClose, onInsightReady }) {
