@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, createContext, useContext } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowUp, Zap, TrendingDown, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers } from 'lucide-react'
+import { ArrowUp, Zap, TrendingDown, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera } from 'lucide-react'
 import { supabase } from './supabase'
 import { useArcadeStore } from './arcadeStore'
 import { useLabStore } from './labStore'
@@ -12,6 +12,7 @@ import LearningFingerprint from './LearningFingerprint'
 import MemoryPalace from './MemoryPalace'
 import PersonalProgress from './PersonalProgress'
 import { useSRStore } from './srStore'
+import AevaLens from './AevaLens'
 import './index.css'
 
 /* ─── Groq API ─── */
@@ -1564,7 +1565,7 @@ function DeepDiveCard({ term, definition, onClose }) {
 }
 
 /* ═══ STUDY GUIDE MODAL ═══════════════════════════ */
-function StudyGuideModal({ messages, onClose }) {
+function StudyGuideModal({ messages, visualInsights = [], onClose }) {
   const { name } = useUser()
   const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -1578,6 +1579,10 @@ function StudyGuideModal({ messages, onClose }) {
       .slice(-20)
       .map(m => `${m.role === 'user' ? name : 'Aeva'}: ${m.text}`)
       .join('\n\n')
+
+    const visualContext = visualInsights.length > 0
+      ? `\n\nVisual Insights from Aeva Lens:\n${visualInsights.map((v, i) => `${i + 1}. [${v.topic}] ${v.coreInsight} Struggle: ${v.strugglePoint}`).join('\n')}`
+      : ''
 
     const prompt = `Generate a clean, structured study guide from this tutoring session.
 
@@ -1604,7 +1609,7 @@ Use EXACTLY this format:
 Keep every section SHORT. Total length: under 300 words.
 
 Conversation:
-${conversationText}`
+${conversationText}${visualContext}`
 
     fetch(GROQ_URL, {
       method: 'POST',
@@ -1725,6 +1730,51 @@ ${conversationText}`
           {!loading && !summary && (
             <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.30)', fontSize: 14, padding: '40px 0' }}>
               No content to summarise yet. Chat with Aeva first.
+            </div>
+          )}
+
+          {/* Visual Insights from Aeva Lens */}
+          {visualInsights.length > 0 && (
+            <div style={{ marginTop: 20, borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
+                <span style={{ fontSize: 13 }}>🔭</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(103,232,249,0.75)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                  Visual Insights
+                </span>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', fontWeight: 500 }}>
+                  from Aeva Lens
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {visualInsights.map((v, i) => (
+                  <div key={i} style={{
+                    padding: '12px 14px', borderRadius: 12,
+                    background: 'rgba(0,200,255,0.06)', border: '1px solid rgba(0,200,255,0.18)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <div style={{ padding: '2px 8px', borderRadius: 99, background: 'rgba(0,200,255,0.12)', border: '1px solid rgba(0,200,255,0.25)', fontSize: 10.5, fontWeight: 700, color: '#67E8F9' }}>
+                        {v.topic}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 12.5, color: 'rgba(207,250,254,0.80)', lineHeight: 1.55, marginBottom: 4 }}>
+                      <strong style={{ color: 'rgba(255,255,255,0.70)', fontWeight: 600 }}>Insight: </strong>{v.coreInsight}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'rgba(252,165,165,0.72)', lineHeight: 1.5 }}>
+                      <strong style={{ fontWeight: 600 }}>Struggle: </strong>{v.strugglePoint}
+                    </div>
+                    {v.steps?.length > 0 && (
+                      <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        {v.steps.map((s, j) => (
+                          <div key={j} style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.45)', display: 'flex', gap: 6 }}>
+                            <span style={{ color: 'rgba(0,200,255,0.50)', fontWeight: 700 }}>{j + 1}.</span>
+                            {s}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -1859,6 +1909,9 @@ function ChatView({ onBack }) {
   const [masteryMap, setMasteryMap] = useState({})
   const [deepDiveMap, setDeepDiveMap] = useState({})   // msgIndex → [{id, term, definition}]
   const [studyGuideOpen, setStudyGuideOpen] = useState(false)
+  const [lensFile, setLensFile] = useState(null)
+  const [visualInsights, setVisualInsights] = useState([])
+  const lensInputRef = useRef(null)
   const [countdown, setCountdown] = useState(null)
   const countdownRef = useRef(null)
   const abortRef = useRef(null)
@@ -2523,7 +2576,37 @@ function ChatView({ onBack }) {
 
             {/* Input bar */}
             <div style={{ flexShrink: 0, padding: '0 20px', paddingBottom: 36 }}>
-              <div style={{ width: '100%', maxWidth: isMission ? 720 : 640, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 10px 10px 20px', backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)', borderRadius: 999, transition: 'border 0.3s, box-shadow 0.3s', ...inputBarStyle }}>
+              {/* Hidden file input for Aeva Lens */}
+              <input
+                ref={lensInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={e => {
+                  const f = e.target.files?.[0]
+                  if (f) setLensFile(f)
+                  e.target.value = ''
+                }}
+              />
+              <div style={{ width: '100%', maxWidth: isMission ? 720 : 640, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 10px 10px 16px', backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)', borderRadius: 999, transition: 'border 0.3s, box-shadow 0.3s', ...inputBarStyle }}>
+                {/* Lens camera button */}
+                {!isMission && (
+                  <motion.button
+                    whileHover={{ scale: 1.08 }}
+                    whileTap={{ scale: 0.90 }}
+                    onClick={() => lensInputRef.current?.click()}
+                    title="Aeva Lens — analyse an image"
+                    style={{
+                      flexShrink: 0, width: 32, height: 32, borderRadius: '50%',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'rgba(0,200,255,0.10)', border: '1.5px solid rgba(0,200,255,0.28)',
+                      cursor: 'pointer', color: 'rgba(0,200,255,0.70)',
+                      transition: 'background 0.2s, border 0.2s',
+                    }}
+                  >
+                    <Camera size={14} strokeWidth={2} />
+                  </motion.button>
+                )}
                 <input
                   ref={inputRef}
                   type="text"
@@ -2560,9 +2643,26 @@ function ChatView({ onBack }) {
         </div>
       </div>
 
+      {/* Aeva Lens Modal */}
+      <AnimatePresence>
+        {lensFile && (
+          <AevaLens
+            file={lensFile}
+            onClose={() => setLensFile(null)}
+            onInsightReady={insight => setVisualInsights(prev => [...prev, insight])}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Study Guide Modal */}
       <AnimatePresence>
-        {studyGuideOpen && <StudyGuideModal messages={messages} onClose={() => setStudyGuideOpen(false)} />}
+        {studyGuideOpen && (
+          <StudyGuideModal
+            messages={messages}
+            visualInsights={visualInsights}
+            onClose={() => setStudyGuideOpen(false)}
+          />
+        )}
       </AnimatePresence>
     </motion.div>
   )
