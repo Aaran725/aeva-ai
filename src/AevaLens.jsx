@@ -56,19 +56,37 @@ steps: 3-4 max. hotspots: 2-3 max. linkedVar must match a symbol in variables (o
 /* ─── Unicode math prettifier ─── */
 function mathify(text) {
   if (!text) return text
-  return text
-    .replace(/sqrt\(([^)]*)\)/g, '√($1)')
-    .replace(/\^10\b/g, '¹⁰')
-    .replace(/\^([0-9])/g, (_, n) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[n] ?? `^${n}`)
-    .replace(/\*/g, '×')
-    .replace(/\bpi\b/gi, 'π')
-    .replace(/\btheta\b/gi, 'θ')
-    .replace(/\balpha\b/gi, 'α')
-    .replace(/\bbeta\b/gi, 'β')
-    .replace(/\bdelta\b/gi, 'Δ')
-    .replace(/\binfinity\b/gi, '∞')
-    .replace(/<=/g, '≤').replace(/>=/g, '≥').replace(/!=/g, '≠')
-    .replace(/ - /g, ' − ')
+  let t = text
+
+  // 1. Strip LaTeX dollar wrappers
+  t = t.replace(/\$+/g, '')
+
+  // 2. Convert LaTeX commands → ASCII (innermost braces first, repeat for nesting)
+  let prev
+  do { prev = t; t = t.replace(/\\sqrt\{([^{}]*)\}/g, 'sqrt($1)') } while (t !== prev)
+  t = t
+    .replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, '($1)/($2)')
+    .replace(/\\cdot|\\times/g, '*')
+    .replace(/\\pm/g, '±')
+    .replace(/\\left|\\right/g, '')
+    .replace(/[\\{}]/g, '')  // strip remaining backslashes and braces
+
+  // 3. ASCII math → Unicode  (simple prefix swap handles all nesting naturally)
+  t = t.replace(/sqrt\(/g, '√(')
+
+  // Superscripts
+  t = t.replace(/\^10\b/g, '¹⁰')
+  t = t.replace(/\^([0-9])/g, (_, n) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[n] ?? `^${n}`)
+
+  // Operators & symbols
+  t = t.replace(/\*/g, '×')
+  t = t.replace(/\bpi\b/gi, 'π').replace(/\btheta\b/gi, 'θ')
+  t = t.replace(/\balpha\b/gi, 'α').replace(/\bbeta\b/gi, 'β')
+  t = t.replace(/\bdelta\b/gi, 'Δ').replace(/\binfinity\b/gi, '∞')
+  t = t.replace(/<=/g, '≤').replace(/>=/g, '≥').replace(/!=/g, '≠')
+  t = t.replace(/ - /g, ' − ')
+
+  return t
 }
 
 /* ─── Main Component ─── */
