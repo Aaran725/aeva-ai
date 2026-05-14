@@ -788,7 +788,7 @@ function ScoringScreen({ score, messages, config, onBack, onNew }) {
    MAIN COMPONENT
    ════════════════════════════════════════════════════════ */
 export default function DebateArena({ onBack }) {
-  const { arenaState, processAIResponse, advanceArenaRound, setArenaScore, dismissArenaFallacy } = useArcadeStore()
+  const { arenaState, processAIResponse, advanceArenaRound, setArenaScore, dismissArenaFallacy, resetArenaState } = useArcadeStore()
 
   // phase: 'setup' | 'debate' | 'scoring'
   const [phase, setPhase] = useState('setup')
@@ -802,6 +802,7 @@ export default function DebateArena({ onBack }) {
   const inputRef = useRef(null)
   const abortRef = useRef(null)
   const roundRef = useRef('opening')
+  const afterClosingRef = useRef(false)  // true when Aeva's closing response should trigger scoring
 
   const ROUNDS = ['opening', 'rebuttal1', 'rebuttal2', 'closing']
 
@@ -815,6 +816,8 @@ export default function DebateArena({ onBack }) {
 
   /* ── Start a new configured debate ─────────────────── */
   const handleStart = useCallback((cfg) => {
+    resetArenaState()
+    roundRef.current = 'opening'
     setConfig(cfg)
     setPhase('debate')
     setMessages([])
@@ -878,6 +881,21 @@ export default function DebateArena({ onBack }) {
       const actMatch = full.match(/\[ACTIONS:\s*([^\]]+)\]/i)
       setQuickActions(actMatch ? actMatch[1].split('|').map(a => a.trim()).filter(Boolean).slice(0, 3) : [])
 
+      // If this was Aeva's closing response, kick off scoring now
+      if (afterClosingRef.current) {
+        afterClosingRef.current = false
+        setPhase('scoring')
+        setMessages(prev => {
+          const finalMsgs = prev
+          scoreDebate(finalMsgs, cfg || config).then(result => {
+            setArenaScore(result)
+          }).catch(() => {
+            setArenaScore({ evidence: 'B', clarity: 'B', rhetoric: 'B', final: 'B', strengths: [], improvements: [], summary: 'Debate complete.' })
+          })
+          return finalMsgs
+        })
+      }
+
     } catch (e) {
       if (e.name !== 'AbortError') {
         setMessages(prev => [...prev, { id: Date.now(), role: 'assistant', content: 'Something went wrong. Please try again.', clean: 'Something went wrong.', round: roundRef.current }])
@@ -885,7 +903,7 @@ export default function DebateArena({ onBack }) {
     } finally {
       setIsThinking(false)
     }
-  }, [config, processAIResponse])
+  }, [config, processAIResponse, setArenaScore])
 
   /* ── User submits a turn ─────────────────────────────── */
   const handleSend = useCallback(async (text) => {
@@ -905,18 +923,11 @@ export default function DebateArena({ onBack }) {
     const isLastRound = curIdx >= ROUNDS.length - 1
 
     if (isLastRound) {
-      // Last user turn — move to scoring
-      setPhase('scoring')
-      try {
-        const result = await scoreDebate(nextMessages, config)
-        setArenaScore(result)
-      } catch {
-        setArenaScore({ evidence: 'B', clarity: 'B', rhetoric: 'B', final: 'B', strengths: [], improvements: [], summary: 'Debate complete.' })
-      }
-    } else {
-      await triggerAevaResponse(nextMessages)
+      // Let Aeva give her closing statement first, then score
+      afterClosingRef.current = true
     }
-  }, [input, isThinking, phase, messages, advanceArenaRound, config, setArenaScore, triggerAevaResponse])
+    await triggerAevaResponse(nextMessages)
+  }, [input, isThinking, phase, messages, advanceArenaRound, triggerAevaResponse])
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
@@ -967,7 +978,7 @@ export default function DebateArena({ onBack }) {
           messages={messages}
           config={config}
           onBack={onBack}
-          onNew={() => { setPhase('setup'); setMessages([]) }}
+          onNew={() => { resetArenaState(); roundRef.current = 'opening'; afterClosingRef.current = false; setPhase('setup'); setMessages([]) }}
         />
       </motion.div>
     )

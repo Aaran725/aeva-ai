@@ -502,4 +502,8 @@ export const useArcadeStore = create((set, get) => ({
   setArenaScore: (score) => {
     set(state => ({ arenaState: { ...state.arenaState, score, round: 'scoring' } }))
   },
+
+  resetArenaState: () => {
+    set({ arenaState: { round: 'opening', logicStrength: 50, fallacyAlerts: [], counterHint: null, steelMan: null, score: null, userTurnCount: 0 } })
+  },
 }))
