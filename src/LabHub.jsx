@@ -1,38 +1,64 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, FlaskConical, ChevronRight, RotateCcw, CheckCircle2, XCircle, ArrowRight } from 'lucide-react'
-import { DRILLS, useLabStore } from './labStore'
+import { X, FlaskConical, ChevronRight, RotateCcw, CheckCircle2, XCircle, ArrowRight, Settings, History, Zap } from 'lucide-react'
+import { DRILLS, DIFFICULTIES, useLabStore } from './labStore'
+import { useNeuralStore } from './neuralStore'
 
 const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 
 /* ─── AI content generator ─── */
-async function generateDrillContent(drillType, topic) {
+async function generateDrillContent(drillType, topic, difficulty = 'intermediate', questionCount = 8, focusMode = 'mixed') {
+  const diffInstr = DIFFICULTIES[difficulty]?.instruction || DIFFICULTIES.intermediate.instruction
+  const focusInstr = focusMode === 'theory' ? 'Focus on theoretical understanding and definitions.'
+    : focusMode === 'application' ? 'Focus on real-world application and problem-solving.'
+    : 'Mix theory and real-world application equally.'
+  const count = Math.min(Math.max(questionCount, 4), 20)
+
   const prompts = {
-    flashcard: `Generate exactly 8 flashcard pairs for a student studying "${topic}".
-Return ONLY valid JSON: {"cards":[{"front":"question","back":"concise answer (1-2 sentences)"}]}
-Make questions probe understanding, not just recall. Vary difficulty.`,
+    flashcard: `Generate exactly ${count} flashcard pairs for "${topic}".
+Difficulty: ${diffInstr}
+Focus: ${focusInstr}
+Return ONLY valid JSON: {"cards":[{"front":"question","back":"concise answer (1-2 sentences max)"}]}
+Make questions probe understanding, not just recall.`,
 
-    mocktest: `Generate exactly 6 multiple-choice questions about "${topic}".
-Return ONLY valid JSON: {"questions":[{"q":"question text","options":["A","B","C","D"],"correct":0,"explanation":"why correct"}]}
-"correct" is the 0-based index of the right answer. Make distractors plausible.`,
+    speedround: `Generate exactly ${Math.min(count, 10)} rapid-fire Q&A pairs for "${topic}".
+Difficulty: ${diffInstr}
+Return ONLY valid JSON: {"cards":[{"front":"short question","back":"answer in 1 sentence max"}]}
+Questions must be answerable in under 15 seconds. Crisp, unambiguous.`,
 
-    match: `Generate exactly 6 term-definition pairs about "${topic}".
-Return ONLY valid JSON: {"pairs":[{"term":"short term or concept","definition":"clear 1-sentence definition"}]}
-Terms should be distinct, definitions should not contain the term itself.`,
+    mocktest: `Generate exactly ${Math.min(count, 10)} multiple-choice questions about "${topic}".
+Difficulty: ${diffInstr}
+Focus: ${focusInstr}
+Return ONLY valid JSON: {"questions":[{"q":"question","options":["A","B","C","D"],"correct":0,"explanation":"why correct in 1 sentence"}]}
+"correct" is 0-based index. Make wrong options plausibly wrong.`,
+
+    feynman: `Generate a Feynman challenge for "${topic}".
+Difficulty: ${diffInstr}
+Return ONLY valid JSON: {
+  "prompt": "Explain [specific aspect of topic] as if teaching a curious 16-year-old with no background in this area.",
+  "keyPoints": ["point 1", "point 2", "point 3", "point 4", "point 5"],
+  "commonMistakes": ["mistake 1", "mistake 2", "mistake 3"]
+}
+keyPoints: the 5 things a good explanation MUST cover. commonMistakes: things people usually get wrong.`,
+
+    match: `Generate exactly ${Math.min(count, 8)} term-definition pairs about "${topic}".
+Difficulty: ${diffInstr}
+Return ONLY valid JSON: {"pairs":[{"term":"short term","definition":"clear 1-sentence definition"}]}
+Terms must be distinct. Definitions must not contain the term.`,
   }
 
   const res = await fetch(GROQ_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
+      model: 'llama-3.1-8b-instant',
       messages: [
-        { role: 'system', content: 'You are a precise educational content generator. Return ONLY the requested JSON, no markdown, no explanation.' },
+        { role: 'system', content: 'Educational content generator. Return ONLY the requested JSON. No markdown, no explanation, no extra text.' },
         { role: 'user', content: prompts[drillType] },
       ],
-      temperature: 0.5,
-      max_tokens: 900,
+      temperature: 0.45,
+      max_tokens: 1200,
       response_format: { type: 'json_object' },
     }),
   })
@@ -41,29 +67,197 @@ Terms should be distinct, definitions should not contain the term itself.`,
   return JSON.parse(json.choices[0].message.content)
 }
 
+async function generateDrillAnalysis(drillType, topic, wrongItems) {
+  if (!wrongItems || wrongItems.length === 0) return null
+  const itemText = wrongItems.map((w, i) => `${i + 1}. Q: "${w.q}" — Your answer was wrong. Correct: "${w.correct}"`).join('\n')
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
+    body: JSON.stringify({
+      model: 'llama-3.1-8b-instant',
+      messages: [
+        { role: 'system', content: 'You are a precise tutor. Give a short, specific analysis of what the student got wrong and why. Be direct and concise.' },
+        { role: 'user', content: `Student drilled "${topic}" (${drillType} format) and missed these:\n${itemText}\n\nIn 2-3 sentences: what is the pattern in their misunderstanding, and what should they review? Be specific, not generic.` },
+      ],
+      temperature: 0.3,
+      max_tokens: 150,
+    }),
+  })
+  const json = await res.json()
+  return json.choices?.[0]?.message?.content || null
+}
+
+async function gradeFeynmanExplanation(topic, userExplanation, keyPoints, commonMistakes) {
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
+    body: JSON.stringify({
+      model: 'llama-3.1-8b-instant',
+      messages: [
+        { role: 'system', content: 'You are a precise educational evaluator. Grade a student explanation and return ONLY JSON.' },
+        { role: 'user', content: `Topic: "${topic}"
+Key points a good explanation must cover: ${JSON.stringify(keyPoints)}
+Common mistakes to watch for: ${JSON.stringify(commonMistakes)}
+
+Student's explanation:
+"${userExplanation}"
+
+Return ONLY this JSON:
+{
+  "score": <0-100>,
+  "covered": [<list of key points they covered well>],
+  "missing": [<list of key points they missed or got wrong>],
+  "feedback": "<2 sentences: what was strong, what specific gap to address>",
+  "grade": "Mastery" | "Solid" | "Developing" | "Needs Work"
+}` },
+      ],
+      temperature: 0.2,
+      max_tokens: 400,
+      response_format: { type: 'json_object' },
+    }),
+  })
+  const json = await res.json()
+  return JSON.parse(json.choices[0].message.content)
+}
+
+/* ═══ DRILL COMPLETE SCREEN ══════════════════════════ */
+function DrillComplete({ score, wrongItems = [], onExit, onRetry, onGoHarder, topic, drillType }) {
+  const { difficulty, setDifficulty } = useLabStore()
+  const pct = Math.round((score.correct / score.total) * 100)
+  const grade = pct >= 90 ? { label: 'Mastery', color: '#4ADE80', emoji: '🏆' }
+    : pct >= 70 ? { label: 'Solid', color: '#60A5FA', emoji: '✅' }
+    : pct >= 50 ? { label: 'Developing', color: '#FBBF24', emoji: '📈' }
+    : { label: 'Needs Work', color: '#F87171', emoji: '🔁' }
+  const [analysis, setAnalysis] = useState(null)
+  const [loadingAnalysis, setLoadingAnalysis] = useState(false)
+
+  useEffect(() => {
+    if (wrongItems.length > 0 && pct < 90) {
+      setLoadingAnalysis(true)
+      generateDrillAnalysis(drillType, topic, wrongItems)
+        .then(a => { setAnalysis(a); setLoadingAnalysis(false) })
+        .catch(() => setLoadingAnalysis(false))
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const canGoHarder = pct >= 80
+  const difficultyKeys = ['beginner', 'intermediate', 'advanced', 'expert']
+  const currentDiffIdx = difficultyKeys.indexOf(difficulty)
+  const nextDifficulty = difficultyKeys[Math.min(currentDiffIdx + 1, 3)]
+
+  const handleGoHarder = () => {
+    setDifficulty(nextDifficulty)
+    if (onGoHarder) onGoHarder()
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0, scale: 0.93 }} animate={{ opacity: 1, scale: 1 }}
+      style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, overflowY: 'auto', paddingTop: 8 }}>
+      <div style={{ fontSize: 44 }}>{grade.emoji}</div>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 52, fontWeight: 800, color: grade.color, letterSpacing: '-0.04em', lineHeight: 1 }}>{pct}%</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: grade.color, marginTop: 5, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{grade.label}</div>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.38)', marginTop: 4 }}>{score.correct} / {score.total} correct</div>
+      </div>
+
+      {/* Post-drill analysis */}
+      {(loadingAnalysis || analysis) && (
+        <div style={{ width: '100%', padding: '12px 14px', borderRadius: 12, background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.22)' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(99,102,241,0.80)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 6 }}>Aeva's Analysis</div>
+          {loadingAnalysis ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }} style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(99,102,241,0.2)', borderTopColor: '#818CF8', flexShrink: 0 }} />
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)' }}>Analysing your mistakes…</span>
+            </div>
+          ) : (
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 1.60, margin: 0 }}>{analysis}</p>
+          )}
+        </div>
+      )}
+
+      {/* Adaptive difficulty */}
+      {canGoHarder && currentDiffIdx < 3 && onGoHarder && (
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+          style={{ width: '100%', padding: '12px 14px', borderRadius: 12, background: 'rgba(234,179,8,0.10)', border: '1px solid rgba(234,179,8,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#FCD34D' }}>⚡ You're ready for more</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.40)', marginTop: 2 }}>Try {DIFFICULTIES[nextDifficulty]?.label} difficulty?</div>
+          </div>
+          <button onClick={handleGoHarder} style={{ padding: '7px 14px', borderRadius: 99, background: 'rgba(234,179,8,0.18)', border: '1px solid rgba(234,179,8,0.38)', color: '#FCD34D', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            Go harder →
+          </button>
+        </motion.div>
+      )}
+
+      <div style={{ display: 'flex', gap: 10, width: '100%' }}>
+        <button onClick={onRetry} style={{ flex: 1, padding: '11px 16px', borderRadius: 13, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.65)', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          <RotateCcw size={13} /> Retry
+        </button>
+        <button onClick={onExit} style={{ flex: 1, padding: '11px 16px', borderRadius: 13, background: 'linear-gradient(135deg, rgba(59,130,246,0.28), rgba(6,182,212,0.20))', border: '1px solid rgba(59,130,246,0.40)', color: 'rgba(255,255,255,0.92)', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          Back to Lab <ChevronRight size={13} />
+        </button>
+      </div>
+    </motion.div>
+  )
+}
+
 /* ═══ FLASHCARD SPRINT ═══════════════════════════════ */
 function FlashcardDrill({ data, topic, onExit }) {
-  const { setDrillScore } = useLabStore()
+  const { setDrillScore, recordDrillResult, currentTopic } = useLabStore()
   const [idx, setIdx] = useState(0)
   const [flipped, setFlipped] = useState(false)
   const [results, setResults] = useState([]) // 'got' | 'missed'
   const [done, setDone] = useState(false)
+  const [wrongItems, setWrongItems] = useState([])
   const cards = data.cards || []
 
-  const handleResult = (result) => {
+  const handleResult = useCallback((result) => {
+    const card = cards[idx]
     const next = [...results, result]
+    const newWrong = result === 'missed' ? [...wrongItems, { q: card.front, correct: card.back }] : wrongItems
     setResults(next)
+    setWrongItems(newWrong)
     if (idx + 1 >= cards.length) {
       const correct = next.filter(r => r === 'got').length
       setDrillScore({ correct, total: cards.length })
+      recordDrillResult({ topic: currentTopic, drillType: 'flashcard', correct, total: cards.length })
       setDone(true)
     } else {
       setFlipped(false)
       setTimeout(() => setIdx(i => i + 1), 160)
     }
-  }
+  }, [results, wrongItems, idx, cards, currentTopic]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (done) return <DrillComplete score={{ correct: results.filter(r => r === 'got').length, total: cards.length }} onExit={onExit} onRetry={() => { setIdx(0); setFlipped(false); setResults([]); setDone(false) }} />
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault()
+        setFlipped(f => !f)
+      } else if (e.key === 'ArrowRight' && flipped) {
+        handleResult('got')
+      } else if (e.key === 'ArrowLeft' && flipped) {
+        handleResult('missed')
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [flipped, handleResult])
+
+  if (done) {
+    const correct = results.filter(r => r === 'got').length
+    return (
+      <DrillComplete
+        score={{ correct, total: cards.length }}
+        wrongItems={wrongItems}
+        topic={topic}
+        drillType="flashcard"
+        onExit={onExit}
+        onRetry={() => { setIdx(0); setFlipped(false); setResults([]); setWrongItems([]); setDone(false) }}
+        onGoHarder={onExit}
+      />
+    )
+  }
 
   const card = cards[idx]
   const progress = (idx / cards.length) * 100
@@ -92,20 +286,10 @@ function FlashcardDrill({ data, topic, onExit }) {
           onClick={() => setFlipped(f => !f)}
           animate={{ rotateY: flipped ? 180 : 0 }}
           transition={{ duration: 0.45, ease: 'easeInOut' }}
-          style={{
-            width: '100%', minHeight: 200,
-            position: 'relative', transformStyle: 'preserve-3d',
-            cursor: 'pointer',
-          }}
+          style={{ width: '100%', minHeight: 200, position: 'relative', transformStyle: 'preserve-3d', cursor: 'pointer' }}
         >
           {/* Front */}
-          <div style={{
-            position: 'absolute', inset: 0, backfaceVisibility: 'hidden',
-            background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.28)',
-            borderRadius: 20, padding: '28px 24px',
-            display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
-            textAlign: 'center', gap: 12,
-          }}>
+          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.28)', borderRadius: 20, padding: '28px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 12 }}>
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(59,130,246,0.70)', textTransform: 'uppercase' }}>Question</span>
             <p style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.92)', lineHeight: 1.55, margin: 0, fontFamily: "'Inter', system-ui, sans-serif" }}>
               {card?.front}
@@ -114,14 +298,7 @@ function FlashcardDrill({ data, topic, onExit }) {
           </div>
 
           {/* Back */}
-          <div style={{
-            position: 'absolute', inset: 0, backfaceVisibility: 'hidden',
-            transform: 'rotateY(180deg)',
-            background: 'rgba(6,182,212,0.10)', border: '1px solid rgba(6,182,212,0.30)',
-            borderRadius: 20, padding: '28px 24px',
-            display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
-            textAlign: 'center', gap: 12,
-          }}>
+          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: 'rgba(6,182,212,0.10)', border: '1px solid rgba(6,182,212,0.30)', borderRadius: 20, padding: '28px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 12 }}>
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(6,182,212,0.70)', textTransform: 'uppercase' }}>Answer</span>
             <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.88)', lineHeight: 1.65, margin: 0, fontFamily: "'Georgia', serif" }}>
               {card?.back}
@@ -130,23 +307,20 @@ function FlashcardDrill({ data, topic, onExit }) {
         </motion.div>
       </div>
 
-      {/* Actions — only visible once flipped */}
+      {/* Keyboard hint */}
+      <div style={{ textAlign: 'center', fontSize: 10.5, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.04em' }}>
+        ⌨ Space · ← Missed · → Got it
+      </div>
+
+      {/* Actions */}
       <AnimatePresence>
         {flipped && (
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
             style={{ display: 'flex', gap: 10 }}>
-            <button onClick={() => handleResult('missed')} style={{
-              flex: 1, padding: '13px', borderRadius: 14, border: '1px solid rgba(239,68,68,0.35)',
-              background: 'rgba(239,68,68,0.12)', color: '#FCA5A5',
-              fontSize: 13.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-            }}>
+            <button onClick={() => handleResult('missed')} style={{ flex: 1, padding: '13px', borderRadius: 14, border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.12)', color: '#FCA5A5', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
               <XCircle size={15} /> Missed it
             </button>
-            <button onClick={() => handleResult('got')} style={{
-              flex: 1, padding: '13px', borderRadius: 14, border: '1px solid rgba(74,222,128,0.35)',
-              background: 'rgba(74,222,128,0.12)', color: '#86EFAC',
-              fontSize: 13.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-            }}>
+            <button onClick={() => handleResult('got')} style={{ flex: 1, padding: '13px', borderRadius: 14, border: '1px solid rgba(74,222,128,0.35)', background: 'rgba(74,222,128,0.12)', color: '#86EFAC', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
               <CheckCircle2 size={15} /> Got it
             </button>
           </motion.div>
@@ -156,13 +330,138 @@ function FlashcardDrill({ data, topic, onExit }) {
   )
 }
 
+/* ═══ SPEED ROUND ════════════════════════════════════ */
+function SpeedRoundDrill({ data, topic, onExit }) {
+  const { setDrillScore, recordDrillResult, currentTopic } = useLabStore()
+  const cards = data.cards || []
+  const [idx, setIdx] = useState(0)
+  const [flipped, setFlipped] = useState(false)
+  const [timeLeft, setTimeLeft] = useState(15)
+  const [results, setResults] = useState([])
+  const [done, setDone] = useState(false)
+  const [timedOut, setTimedOut] = useState(false)
+  const timerRef = useRef(null)
+
+  const handleResult = useCallback((result) => {
+    clearInterval(timerRef.current)
+    const next = [...results, result]
+    setResults(next)
+    if (idx + 1 >= cards.length) {
+      const correct = next.filter(r => r === 'got').length
+      setDrillScore({ correct, total: cards.length })
+      recordDrillResult({ topic: currentTopic, drillType: 'speedround', correct, total: cards.length })
+      setDone(true)
+    } else {
+      setFlipped(false)
+      setTimedOut(false)
+      setTimeLeft(15)
+      setTimeout(() => setIdx(i => i + 1), 120)
+    }
+  }, [results, idx, cards.length, currentTopic]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Countdown timer
+  useEffect(() => {
+    if (done || flipped) return
+    timerRef.current = setInterval(() => {
+      setTimeLeft(t => {
+        if (t <= 1) {
+          clearInterval(timerRef.current)
+          setTimedOut(true)
+          setFlipped(true) // auto-reveal on timeout
+          return 0
+        }
+        return t - 1
+      })
+    }, 1000)
+    return () => clearInterval(timerRef.current)
+  }, [idx, done, flipped])
+
+  if (done) {
+    const correct = results.filter(r => r === 'got').length
+    return (
+      <DrillComplete
+        score={{ correct, total: cards.length }}
+        wrongItems={[]}
+        onExit={onExit}
+        onRetry={() => { setIdx(0); setFlipped(false); setResults([]); setDone(false); setTimeLeft(15) }}
+        topic={topic}
+        drillType="speedround"
+        onGoHarder={onExit}
+      />
+    )
+  }
+
+  const card = cards[idx]
+  const pct = (idx / cards.length) * 100
+  const timerColor = timeLeft > 10 ? '#F97316' : timeLeft > 5 ? '#FBBF24' : '#EF4444'
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, padding: '0 4px' }}>
+      {/* Header: progress + timer */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ flex: 1, height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.07)' }}>
+          <motion.div animate={{ width: `${pct}%` }} transition={{ duration: 0.3 }}
+            style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #F97316, #FB923C)' }} />
+        </div>
+        <motion.div
+          key={timeLeft}
+          animate={timeLeft <= 5 ? { scale: [1, 1.2, 1] } : {}}
+          transition={{ duration: 0.3 }}
+          style={{
+            minWidth: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: `${timerColor}18`, border: `1.5px solid ${timerColor}50`,
+            fontSize: 18, fontWeight: 800, color: timerColor, fontFamily: 'monospace', flexShrink: 0,
+          }}
+        >{timeLeft}</motion.div>
+      </div>
+
+      {/* Card */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', perspective: 1000 }}>
+        <motion.div
+          onClick={() => { if (!flipped) { clearInterval(timerRef.current); setFlipped(true) } }}
+          animate={{ rotateY: flipped ? 180 : 0 }}
+          transition={{ duration: 0.4, ease: 'easeInOut' }}
+          style={{ width: '100%', minHeight: 180, position: 'relative', transformStyle: 'preserve-3d', cursor: flipped ? 'default' : 'pointer' }}
+        >
+          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: timedOut ? 'rgba(239,68,68,0.10)' : 'rgba(249,115,22,0.10)', border: `1px solid ${timedOut ? 'rgba(239,68,68,0.30)' : 'rgba(249,115,22,0.28)'}`, borderRadius: 20, padding: '24px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 10 }}>
+            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(249,115,22,0.70)', textTransform: 'uppercase' }}>
+              {idx + 1} / {cards.length}
+            </span>
+            <p style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.92)', lineHeight: 1.55, margin: 0 }}>{card?.front}</p>
+            {!flipped && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)' }}>tap to reveal</span>}
+          </div>
+          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: 'rgba(6,182,212,0.10)', border: '1px solid rgba(6,182,212,0.28)', borderRadius: 20, padding: '24px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 10 }}>
+            {timedOut && <span style={{ fontSize: 10, fontWeight: 700, color: '#F87171', letterSpacing: '0.10em', textTransform: 'uppercase' }}>⏱ Time's up</span>}
+            <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.88)', lineHeight: 1.65, margin: 0 }}>{card?.back}</p>
+          </div>
+        </motion.div>
+      </div>
+
+      <AnimatePresence>
+        {flipped && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            style={{ display: 'flex', gap: 10 }}>
+            <button onClick={() => handleResult('missed')} style={{ flex: 1, padding: '12px', borderRadius: 14, border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.12)', color: '#FCA5A5', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <XCircle size={14} /> Missed
+            </button>
+            <button onClick={() => handleResult('got')} style={{ flex: 1, padding: '12px', borderRadius: 14, border: '1px solid rgba(74,222,128,0.35)', background: 'rgba(74,222,128,0.12)', color: '#86EFAC', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <CheckCircle2 size={14} /> Got it
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 /* ═══ MOCK TEST ══════════════════════════════════════ */
-function MockTestDrill({ data, onExit }) {
-  const { setDrillScore } = useLabStore()
+function MockTestDrill({ data, topic, onExit }) {
+  const { setDrillScore, recordDrillResult, currentTopic } = useLabStore()
   const [idx, setIdx] = useState(0)
   const [selected, setSelected] = useState(null)
   const [score, setScore] = useState(0)
   const [done, setDone] = useState(false)
+  const [wrongItems, setWrongItems] = useState([])
   const questions = data.questions || []
 
   const choose = (i) => {
@@ -171,10 +470,14 @@ function MockTestDrill({ data, onExit }) {
   }
 
   const next = () => {
-    const correct = selected === questions[idx].correct
+    const q = questions[idx]
+    const correct = selected === q.correct
     const newScore = correct ? score + 1 : score
+    const newWrong = !correct ? [...wrongItems, { q: q.q, correct: q.options[q.correct] }] : wrongItems
+    setWrongItems(newWrong)
     if (idx + 1 >= questions.length) {
       setDrillScore({ correct: newScore, total: questions.length })
+      recordDrillResult({ topic: currentTopic, drillType: 'mocktest', correct: newScore, total: questions.length })
       setScore(newScore)
       setDone(true)
     } else {
@@ -184,7 +487,17 @@ function MockTestDrill({ data, onExit }) {
     }
   }
 
-  if (done) return <DrillComplete score={{ correct: score, total: questions.length }} onExit={onExit} onRetry={() => { setIdx(0); setSelected(null); setScore(0); setDone(false) }} />
+  if (done) return (
+    <DrillComplete
+      score={{ correct: score, total: questions.length }}
+      wrongItems={wrongItems}
+      topic={topic}
+      drillType="mocktest"
+      onExit={onExit}
+      onRetry={() => { setIdx(0); setSelected(null); setScore(0); setWrongItems([]); setDone(false) }}
+      onGoHarder={onExit}
+    />
+  )
 
   const q = questions[idx]
   const progress = (idx / questions.length) * 100
@@ -246,13 +559,7 @@ function MockTestDrill({ data, onExit }) {
           <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.45)', marginBottom: 10, lineHeight: 1.55, fontStyle: 'italic' }}>
             {q?.explanation}
           </div>
-          <button onClick={next} style={{
-            width: '100%', padding: '13px', borderRadius: 13,
-            background: 'linear-gradient(135deg, rgba(6,182,212,0.25), rgba(59,130,246,0.20))',
-            border: '1px solid rgba(6,182,212,0.40)', color: 'rgba(255,255,255,0.92)',
-            fontSize: 14, fontWeight: 700, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-          }}>
+          <button onClick={next} style={{ width: '100%', padding: '13px', borderRadius: 13, background: 'linear-gradient(135deg, rgba(6,182,212,0.25), rgba(59,130,246,0.20))', border: '1px solid rgba(6,182,212,0.40)', color: 'rgba(255,255,255,0.92)', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
             {idx + 1 === questions.length ? 'See Results' : 'Next Question'}
             <ArrowRight size={14} />
           </button>
@@ -262,44 +569,163 @@ function MockTestDrill({ data, onExit }) {
   )
 }
 
+/* ═══ FEYNMAN TEST ═══════════════════════════════════ */
+function FeynmanDrill({ data, topic, onExit }) {
+  const { recordDrillResult, currentTopic } = useLabStore()
+  const [explanation, setExplanation] = useState('')
+  const [grading, setGrading] = useState(false)
+  const [result, setResult] = useState(null)
+  const textareaRef = useRef(null)
+  const wordCount = explanation.trim().split(/\s+/).filter(Boolean).length
+
+  const handleSubmit = async () => {
+    if (wordCount < 20) return
+    setGrading(true)
+    try {
+      const grade = await gradeFeynmanExplanation(topic, explanation, data.keyPoints, data.commonMistakes)
+      setResult(grade)
+      const correct = Math.round(grade.score / 100 * 5)
+      recordDrillResult({ topic: currentTopic, drillType: 'feynman', correct, total: 5 })
+    } catch {
+      setResult({ score: 0, covered: [], missing: data.keyPoints || [], feedback: 'Could not grade. Please try again.', grade: 'Needs Work' })
+    } finally {
+      setGrading(false)
+    }
+  }
+
+  if (result) {
+    const gradeColors = { Mastery: '#4ADE80', Solid: '#60A5FA', Developing: '#FBBF24', 'Needs Work': '#F87171' }
+    const gc = gradeColors[result.grade] || '#60A5FA'
+    return (
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+        style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto' }}>
+        {/* Score */}
+        <div style={{ textAlign: 'center', padding: '20px 0 10px' }}>
+          <div style={{ fontSize: 52, fontWeight: 800, color: gc, letterSpacing: '-0.04em', lineHeight: 1 }}>{result.score}</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 4, letterSpacing: '0.10em', textTransform: 'uppercase' }}>{result.grade}</div>
+        </div>
+        {/* Feedback */}
+        <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(139,92,246,0.10)', border: '1px solid rgba(139,92,246,0.22)', fontSize: 13.5, color: 'rgba(255,255,255,0.80)', lineHeight: 1.60 }}>
+          {result.feedback}
+        </div>
+        {/* Covered */}
+        {result.covered?.length > 0 && (
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#4ADE80', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 6 }}>✓ You covered</div>
+            {result.covered.map((p, i) => <div key={i} style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.65)', marginBottom: 4, paddingLeft: 10, borderLeft: '2px solid rgba(74,222,128,0.4)' }}>{p}</div>)}
+          </div>
+        )}
+        {/* Missing */}
+        {result.missing?.length > 0 && (
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#F87171', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 6 }}>✗ You missed</div>
+            {result.missing.map((p, i) => <div key={i} style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.65)', marginBottom: 4, paddingLeft: 10, borderLeft: '2px solid rgba(239,68,68,0.4)' }}>{p}</div>)}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 10, paddingTop: 8 }}>
+          <button onClick={() => { setResult(null); setExplanation('') }} style={{ flex: 1, padding: '12px', borderRadius: 13, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.65)', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <RotateCcw size={13} /> Try again
+          </button>
+          <button onClick={onExit} style={{ flex: 1, padding: '12px', borderRadius: 13, background: 'linear-gradient(135deg, rgba(139,92,246,0.28), rgba(59,130,246,0.20))', border: '1px solid rgba(139,92,246,0.40)', color: 'rgba(255,255,255,0.92)', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            Done <ChevronRight size={13} />
+          </button>
+        </div>
+      </motion.div>
+    )
+  }
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(139,92,246,0.10)', border: '1px solid rgba(139,92,246,0.22)' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(139,92,246,0.80)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 6 }}>Feynman Challenge</div>
+        <p style={{ fontSize: 14.5, fontWeight: 600, color: 'rgba(255,255,255,0.92)', lineHeight: 1.55, margin: 0 }}>{data.prompt}</p>
+      </div>
+      <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.38)', lineHeight: 1.5 }}>
+        Write as if teaching someone with zero background. Simple language, real examples, no jargon. Aeva will find the gaps.
+      </div>
+      <textarea
+        ref={textareaRef}
+        value={explanation}
+        onChange={e => setExplanation(e.target.value)}
+        placeholder="Start explaining..."
+        autoFocus
+        style={{
+          flex: 1, minHeight: 160, padding: '14px 16px', borderRadius: 14,
+          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(139,92,246,0.25)',
+          color: 'rgba(255,255,255,0.88)', fontSize: 14, lineHeight: 1.65,
+          fontFamily: "'Inter', system-ui, sans-serif", resize: 'none', outline: 'none',
+        }}
+      />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 11, color: wordCount < 20 ? 'rgba(255,255,255,0.28)' : 'rgba(139,92,246,0.70)', fontWeight: 500 }}>
+          {wordCount} words {wordCount < 20 ? `(${20 - wordCount} more to unlock)` : '— ready to grade'}
+        </span>
+        <motion.button
+          whileHover={wordCount >= 20 ? { scale: 1.04 } : {}}
+          whileTap={wordCount >= 20 ? { scale: 0.96 } : {}}
+          onClick={handleSubmit}
+          disabled={wordCount < 20 || grading}
+          style={{
+            padding: '10px 20px', borderRadius: 12,
+            background: wordCount >= 20 ? 'linear-gradient(135deg, rgba(139,92,246,0.35), rgba(99,102,241,0.25))' : 'rgba(255,255,255,0.05)',
+            border: `1px solid ${wordCount >= 20 ? 'rgba(139,92,246,0.45)' : 'rgba(255,255,255,0.08)'}`,
+            color: wordCount >= 20 ? '#C4B5FD' : 'rgba(255,255,255,0.25)',
+            fontSize: 13, fontWeight: 700, cursor: wordCount >= 20 ? 'pointer' : 'not-allowed',
+            display: 'flex', alignItems: 'center', gap: 7,
+          }}
+        >
+          {grading ? (
+            <><motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} style={{ width: 13, height: 13, borderRadius: '50%', border: '2px solid rgba(139,92,246,0.3)', borderTopColor: '#A78BFA' }} /> Grading…</>
+          ) : (<>Grade it <Zap size={13} /></>)}
+        </motion.button>
+      </div>
+    </div>
+  )
+}
+
 /* ═══ MATCH GRID ═════════════════════════════════════ */
-function MatchGridDrill({ data, onExit }) {
-  const { setDrillScore } = useLabStore()
+function MatchGridDrill({ data, topic, onExit }) {
+  const { setDrillScore, recordDrillResult, currentTopic } = useLabStore()
   const pairs = data.pairs || []
   const [terms] = useState(pairs.map(p => p.term))
   const [defs] = useState(() => [...pairs.map(p => p.definition)].sort(() => Math.random() - 0.5))
   const [selectedTerm, setSelectedTerm] = useState(null)
   const [selectedDef, setSelectedDef] = useState(null)
-  const [matched, setMatched] = useState([]) // array of term strings that are matched
-  const [wrong, setWrong] = useState(null)   // { term, def } briefly shown as wrong
+  const [matched, setMatched] = useState([])
+  const [wrong, setWrong] = useState(null)
   const [done, setDone] = useState(false)
 
   useEffect(() => {
     if (selectedTerm !== null && selectedDef !== null) {
       const termObj = pairs.find(p => p.term === terms[selectedTerm])
       if (termObj && termObj.definition === defs[selectedDef]) {
-        // Correct match
         const newMatched = [...matched, terms[selectedTerm]]
         setMatched(newMatched)
         setSelectedTerm(null)
         setSelectedDef(null)
         if (newMatched.length === pairs.length) {
           setDrillScore({ correct: pairs.length, total: pairs.length })
+          recordDrillResult({ topic: currentTopic, drillType: 'match', correct: pairs.length, total: pairs.length })
           setTimeout(() => setDone(true), 600)
         }
       } else {
-        // Wrong match
         setWrong({ term: selectedTerm, def: selectedDef })
-        setTimeout(() => {
-          setWrong(null)
-          setSelectedTerm(null)
-          setSelectedDef(null)
-        }, 700)
+        setTimeout(() => { setWrong(null); setSelectedTerm(null); setSelectedDef(null) }, 700)
       }
     }
-  }, [selectedTerm, selectedDef])
+  }, [selectedTerm, selectedDef]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (done) return <DrillComplete score={{ correct: pairs.length, total: pairs.length }} perfect onExit={onExit} onRetry={() => { setMatched([]); setSelectedTerm(null); setSelectedDef(null); setDone(false) }} />
+  if (done) return (
+    <DrillComplete
+      score={{ correct: pairs.length, total: pairs.length }}
+      wrongItems={[]}
+      topic={topic}
+      drillType="match"
+      onExit={onExit}
+      onRetry={() => { setMatched([]); setSelectedTerm(null); setSelectedDef(null); setDone(false) }}
+      onGoHarder={onExit}
+    />
+  )
 
   const progress = (matched.length / pairs.length) * 100
 
@@ -310,11 +736,11 @@ function MatchGridDrill({ data, onExit }) {
           <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.40)', letterSpacing: '0.08em' }}>
             {matched.length} / {pairs.length} matched
           </span>
-          <span style={{ fontSize: 11, color: '#8B5CF6', fontWeight: 700 }}>click a term, then its definition</span>
+          <span style={{ fontSize: 11, color: '#EC4899', fontWeight: 700 }}>click a term, then its definition</span>
         </div>
         <div style={{ height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.07)' }}>
           <motion.div animate={{ width: `${progress}%` }} transition={{ duration: 0.4 }}
-            style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #8B5CF6, #A78BFA)' }} />
+            style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #EC4899, #F472B6)' }} />
         </div>
       </div>
 
@@ -337,9 +763,9 @@ function MatchGridDrill({ data, onExit }) {
                   fontFamily: "'Inter', system-ui, sans-serif",
                   cursor: isMatched ? 'default' : 'pointer',
                   opacity: isMatched ? 0.45 : 1,
-                  background: isMatched ? 'rgba(74,222,128,0.12)' : isWrong_ ? 'rgba(239,68,68,0.18)' : isSel ? 'rgba(139,92,246,0.22)' : 'rgba(255,255,255,0.06)',
-                  border: isMatched ? '1px solid rgba(74,222,128,0.30)' : isWrong_ ? '1px solid rgba(239,68,68,0.45)' : isSel ? '1px solid rgba(139,92,246,0.55)' : '1px solid rgba(255,255,255,0.10)',
-                  color: isMatched ? '#86EFAC' : isSel ? '#C4B5FD' : 'rgba(255,255,255,0.82)',
+                  background: isMatched ? 'rgba(74,222,128,0.12)' : isWrong_ ? 'rgba(239,68,68,0.18)' : isSel ? 'rgba(236,72,153,0.22)' : 'rgba(255,255,255,0.06)',
+                  border: isMatched ? '1px solid rgba(74,222,128,0.30)' : isWrong_ ? '1px solid rgba(239,68,68,0.45)' : isSel ? '1px solid rgba(236,72,153,0.55)' : '1px solid rgba(255,255,255,0.10)',
+                  color: isMatched ? '#86EFAC' : isSel ? '#F9A8D4' : 'rgba(255,255,255,0.82)',
                   transition: 'all 0.15s',
                 }}
               >
@@ -368,9 +794,9 @@ function MatchGridDrill({ data, onExit }) {
                   fontFamily: "'Georgia', serif",
                   cursor: isMatched ? 'default' : 'pointer',
                   opacity: isMatched ? 0.45 : 1,
-                  background: isMatched ? 'rgba(74,222,128,0.08)' : isWrong_ ? 'rgba(239,68,68,0.14)' : isSel ? 'rgba(139,92,246,0.16)' : 'rgba(255,255,255,0.04)',
-                  border: isMatched ? '1px solid rgba(74,222,128,0.25)' : isWrong_ ? '1px solid rgba(239,68,68,0.40)' : isSel ? '1px solid rgba(139,92,246,0.48)' : '1px solid rgba(255,255,255,0.08)',
-                  color: isMatched ? '#86EFAC' : isSel ? '#C4B5FD' : 'rgba(255,255,255,0.65)',
+                  background: isMatched ? 'rgba(74,222,128,0.08)' : isWrong_ ? 'rgba(239,68,68,0.14)' : isSel ? 'rgba(236,72,153,0.16)' : 'rgba(255,255,255,0.04)',
+                  border: isMatched ? '1px solid rgba(74,222,128,0.25)' : isWrong_ ? '1px solid rgba(239,68,68,0.40)' : isSel ? '1px solid rgba(236,72,153,0.48)' : '1px solid rgba(255,255,255,0.08)',
+                  color: isMatched ? '#86EFAC' : isSel ? '#F9A8D4' : 'rgba(255,255,255,0.65)',
                   transition: 'all 0.15s',
                   flex: 1,
                 }}
@@ -382,54 +808,6 @@ function MatchGridDrill({ data, onExit }) {
         </div>
       </div>
     </div>
-  )
-}
-
-/* ═══ DRILL COMPLETE SCREEN ══════════════════════════ */
-function DrillComplete({ score, perfect, onExit, onRetry }) {
-  const pct = Math.round((score.correct / score.total) * 100)
-  const grade = pct >= 90 ? { label: 'Mastery', color: '#4ADE80', emoji: '🏆' }
-    : pct >= 70 ? { label: 'Solid', color: '#60A5FA', emoji: '✅' }
-    : pct >= 50 ? { label: 'Developing', color: '#FBBF24', emoji: '📈' }
-    : { label: 'Needs Work', color: '#F87171', emoji: '🔁' }
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }}
-      style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, textAlign: 'center' }}
-    >
-      <div style={{ fontSize: 48 }}>{grade.emoji}</div>
-      <div>
-        <div style={{ fontSize: 52, fontWeight: 800, color: grade.color, letterSpacing: '-0.04em', lineHeight: 1, fontFamily: "'Inter', system-ui, sans-serif" }}>
-          {pct}%
-        </div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: grade.color, marginTop: 6, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-          {grade.label}
-        </div>
-      </div>
-      <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)' }}>
-        {score.correct} / {score.total} correct
-      </div>
-      {perfect && <div style={{ fontSize: 13, color: '#4ADE80', fontWeight: 600 }}>Perfect score — flawless match!</div>}
-
-      <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-        <button onClick={onRetry} style={{
-          padding: '11px 20px', borderRadius: 13, border: '1px solid rgba(255,255,255,0.14)',
-          background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.65)',
-          fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-        }}>
-          <RotateCcw size={13} /> Try again
-        </button>
-        <button onClick={onExit} style={{
-          padding: '11px 20px', borderRadius: 13,
-          background: 'linear-gradient(135deg, rgba(59,130,246,0.28), rgba(6,182,212,0.20))',
-          border: '1px solid rgba(59,130,246,0.40)', color: 'rgba(255,255,255,0.92)',
-          fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-        }}>
-          Back to Lab <ChevronRight size={13} />
-        </button>
-      </div>
-    </motion.div>
   )
 }
 
@@ -451,7 +829,7 @@ function LabLoading({ topic }) {
 }
 
 /* ═══ DRILL CARD (in hub) ════════════════════════════ */
-function DrillCard({ drill, onStart, index }) {
+function DrillCard({ drill, onStart, index, personalBest }) {
   return (
     <motion.button
       initial={{ opacity: 0, x: -30 }}
@@ -469,17 +847,9 @@ function DrillCard({ drill, onStart, index }) {
         position: 'relative', overflow: 'hidden',
       }}
     >
-      <div aria-hidden style={{
-        position: 'absolute', top: -15, right: -15, width: 60, height: 60,
-        borderRadius: '50%', background: `radial-gradient(circle, ${drill.color}28 0%, transparent 70%)`,
-        filter: 'blur(12px)', pointerEvents: 'none',
-      }} />
+      <div aria-hidden style={{ position: 'absolute', top: -15, right: -15, width: 60, height: 60, borderRadius: '50%', background: `radial-gradient(circle, ${drill.color}28 0%, transparent 70%)`, filter: 'blur(12px)', pointerEvents: 'none' }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 13, position: 'relative', zIndex: 1 }}>
-        <div style={{
-          width: 40, height: 40, borderRadius: 12, fontSize: 18,
-          background: `rgba(0,0,0,0.22)`, border: `1px solid ${drill.border}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-        }}>
+        <div style={{ width: 40, height: 40, borderRadius: 12, fontSize: 18, background: 'rgba(0,0,0,0.22)', border: `1px solid ${drill.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           {drill.emoji}
         </div>
         <div style={{ flex: 1 }}>
@@ -490,11 +860,137 @@ function DrillCard({ drill, onStart, index }) {
             {drill.tagline}
           </div>
         </div>
-        <div style={{ fontSize: 11, fontWeight: 600, color: drill.color, opacity: 0.80, flexShrink: 0 }}>
-          {drill.duration}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: drill.color, opacity: 0.80 }}>
+            {drill.duration}
+          </div>
+          {personalBest !== null && (
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.30)', fontWeight: 500 }}>
+              best: {personalBest}%
+            </div>
+          )}
         </div>
       </div>
     </motion.button>
+  )
+}
+
+/* ═══ SETTINGS TAB ═══════════════════════════════════ */
+function SettingsTab() {
+  const { difficulty, setDifficulty, questionCount, setQuestionCount, focusMode, setFocusMode } = useLabStore()
+
+  const btnBase = { padding: '7px 14px', borderRadius: 99, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1px solid', transition: 'all 0.15s' }
+  const active = (color) => ({ ...btnBase, background: `${color}20`, borderColor: color, color })
+  const inactive = { ...btnBase, background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.42)' }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+      {/* Difficulty */}
+      <div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>Difficulty</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {Object.entries(DIFFICULTIES).map(([key, val]) => (
+            <button key={key} onClick={() => setDifficulty(key)}
+              style={difficulty === key ? active(val.color) : inactive}>
+              {val.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Question count */}
+      <div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>Questions</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {[5, 8, 12, 20].map(n => (
+            <button key={n} onClick={() => setQuestionCount(n)}
+              style={questionCount === n ? active('#60A5FA') : inactive}>
+              {n}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Focus mode */}
+      <div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>Focus</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {[
+            { key: 'theory', label: 'Theory' },
+            { key: 'mixed', label: 'Mixed' },
+            { key: 'application', label: 'Application' },
+          ].map(({ key, label }) => (
+            <button key={key} onClick={() => setFocusMode(key)}
+              style={focusMode === key ? active('#A78BFA') : inactive}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Current settings summary */}
+      <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', lineHeight: 1.7 }}>
+          <span style={{ color: DIFFICULTIES[difficulty]?.color, fontWeight: 600 }}>{DIFFICULTIES[difficulty]?.label}</span>
+          {' · '}
+          <span style={{ color: 'rgba(255,255,255,0.55)' }}>{questionCount} questions</span>
+          {' · '}
+          <span style={{ color: '#A78BFA' }}>{focusMode} focus</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ HISTORY TAB ════════════════════════════════════ */
+function HistoryTab() {
+  const { drillHistory } = useLabStore()
+  const recent = [...(drillHistory || [])].reverse().slice(0, 10)
+
+  if (recent.length === 0) {
+    return (
+      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.28)', lineHeight: 1.6, paddingTop: 8 }}>
+        No drills completed yet. Pick a drill and get started.
+      </div>
+    )
+  }
+
+  const drillColors = {
+    flashcard: '#3B82F6', speedround: '#F97316', mocktest: '#06B6D4',
+    feynman: '#8B5CF6', match: '#EC4899',
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {recent.map((entry, i) => {
+        const color = drillColors[entry.drillType] || '#60A5FA'
+        const date = new Date(entry.date)
+        const dateStr = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+        const gradeColor = entry.pct >= 90 ? '#4ADE80' : entry.pct >= 70 ? '#60A5FA' : entry.pct >= 50 ? '#FBBF24' : '#F87171'
+        return (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: i * 0.04 }}
+            style={{ padding: '10px 13px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', gap: 10 }}
+          >
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.80)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {entry.topic}
+              </div>
+              <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.30)', marginTop: 1 }}>
+                {entry.drillType} · {dateStr}
+              </div>
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: gradeColor, letterSpacing: '-0.02em', flexShrink: 0 }}>
+              {entry.pct}%
+            </div>
+          </motion.div>
+        )
+      })}
+    </div>
   )
 }
 
@@ -504,10 +1000,13 @@ export default function LabHub() {
     labOpen, closeLab, activeDrill, startDrill, exitDrill,
     currentTopic, drillData, drillLoading, setDrillData,
     labSuggestion, clearSuggestion,
+    difficulty, questionCount, focusMode,
+    drillHistory, getPersonalBest,
   } = useLabStore()
 
   const [topicInput, setTopicInput] = useState('')
   const [error, setError] = useState('')
+  const [activeTab, setActiveTab] = useState('drills') // 'drills' | 'settings' | 'history'
   const inputRef = useRef(null)
 
   // Pre-fill topic from lab suggestion
@@ -521,13 +1020,19 @@ export default function LabHub() {
     setError('')
     startDrill(drillId, topic)
     try {
-      const data = await generateDrillContent(drillId, topic)
+      const data = await generateDrillContent(drillId, topic, difficulty, questionCount, focusMode)
       setDrillData(data)
     } catch {
       setError('Failed to generate content. Try again.')
       exitDrill()
     }
   }
+
+  const tabs = [
+    { id: 'drills', label: 'Drills', icon: <FlaskConical size={12} /> },
+    { id: 'settings', label: 'Settings', icon: <Settings size={12} /> },
+    { id: 'history', label: 'History', icon: <History size={12} /> },
+  ]
 
   return (
     <AnimatePresence>
@@ -599,6 +1104,31 @@ export default function LabHub() {
               </div>
             </div>
 
+            {/* Tab bar — only show when not in active drill */}
+            {!activeDrill && (
+              <div style={{ display: 'flex', padding: '10px 18px 0', gap: 4, borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0, position: 'relative', zIndex: 1 }}>
+                {tabs.map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      padding: '7px 12px', borderRadius: '8px 8px 0 0',
+                      background: activeTab === tab.id ? 'rgba(59,130,246,0.12)' : 'transparent',
+                      borderBottom: activeTab === tab.id ? '2px solid #3B82F6' : '2px solid transparent',
+                      color: activeTab === tab.id ? '#60A5FA' : 'rgba(255,255,255,0.35)',
+                      fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      border: 'none', borderBottom: activeTab === tab.id ? '2px solid #3B82F6' : '2px solid transparent',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {tab.icon}
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Body */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '18px 18px 24px', display: 'flex', flexDirection: 'column', gap: 16, position: 'relative', zIndex: 1 }}>
 
@@ -632,15 +1162,17 @@ export default function LabHub() {
                     ? <LabLoading topic={currentTopic} />
                     : drillData
                       ? activeDrill === 'flashcard' ? <FlashcardDrill data={drillData} topic={currentTopic} onExit={exitDrill} />
-                        : activeDrill === 'mocktest' ? <MockTestDrill data={drillData} onExit={exitDrill} />
-                          : <MatchGridDrill data={drillData} onExit={exitDrill} />
+                        : activeDrill === 'speedround' ? <SpeedRoundDrill data={drillData} topic={currentTopic} onExit={exitDrill} />
+                          : activeDrill === 'mocktest' ? <MockTestDrill data={drillData} topic={currentTopic} onExit={exitDrill} />
+                            : activeDrill === 'feynman' ? <FeynmanDrill data={drillData} topic={currentTopic} onExit={exitDrill} />
+                              : <MatchGridDrill data={drillData} topic={currentTopic} onExit={exitDrill} />
                       : <LabLoading topic={currentTopic} />
                   }
                 </>
               )}
 
               {/* Hub — drill selection */}
-              {!activeDrill && (
+              {!activeDrill && activeTab === 'drills' && (
                 <>
                   {/* Topic input */}
                   <div>
@@ -667,12 +1199,18 @@ export default function LabHub() {
 
                   {/* Drill cards */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {Object.values(DRILLS).map((drill, i) => (
-                      <DrillCard key={drill.id} drill={drill} index={i} onStart={handleStart} />
-                    ))}
+                    {Object.values(DRILLS).map((drill, i) => {
+                      const best = topicInput.trim() ? getPersonalBest(topicInput.trim(), drill.id) : null
+                      return (
+                        <DrillCard key={drill.id} drill={drill} index={i} onStart={handleStart} personalBest={best} />
+                      )
+                    })}
                   </div>
                 </>
               )}
+
+              {!activeDrill && activeTab === 'settings' && <SettingsTab />}
+              {!activeDrill && activeTab === 'history' && <HistoryTab />}
             </div>
 
             {/* Footer */}

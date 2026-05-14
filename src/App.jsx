@@ -10,7 +10,7 @@ import LabHub from './LabHub'
 import { ChaosEventBanner, MissionVitalsBar, DebateLogicFeed, ThemedChatBubble, MissionBadge, ProTipBanner } from './SimCockpit'
 import LearningFingerprint from './LearningFingerprint'
 import MemoryPalace from './MemoryPalace'
-import BrainVsWorld from './BrainVsWorld'
+import PersonalProgress from './PersonalProgress'
 import './index.css'
 
 /* ─── Groq API ─── */
@@ -969,93 +969,11 @@ function MemoryPalaceCard({ onOpen }) {
   )
 }
 
-/* ═══ BRAIN VS WORLD BENTO CARD ════════════════════ */
-function BrainVsWorldCard() {
-  const [expanded, setExpanded] = useState(false)
-  const { struggleZones } = useNeuralStore()
-
-  const GLOBAL_RATES = {
-    'calculus': 58, 'integration': 66, 'derivatives': 48, 'probability': 54, 'statistics': 51,
-    'algebra': 34, 'geometry': 38, 'trigonometry': 52, 'limits': 61, 'vectors': 44,
-    'recursion': 67, 'pointers': 72, 'async': 64, 'closures': 59, 'algorithms': 55,
-    'data structures': 61, 'regex': 68, 'oop': 47, 'debugging': 39, 'functions': 28,
-    'quantum mechanics': 78, 'thermodynamics': 63, 'electromagnetism': 69, 'optics': 55,
-    'organic chemistry': 71, 'stoichiometry': 65, 'genetics': 48, 'evolution': 32,
-  }
-
-  const topStruggle = struggleZones[0]
-  const globalRate = topStruggle ? (GLOBAL_RATES[topStruggle.toLowerCase()] ?? 42) : null
-  const delta = globalRate !== null ? 80 - globalRate : null
-
+/* ═══ YOUR PROGRESS BENTO CARD ═════════════════════ */
+function PersonalProgressCard() {
   return (
     <GlassCard style={{ padding: '20px 20px', minHeight: 180 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase' }}>
-          Brain vs. World
-        </span>
-      </div>
-
-      {!topStruggle ? (
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.30)', lineHeight: 1.6 }}>
-          No struggle zones yet.
-        </div>
-      ) : (
-        <>
-          <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.55)', marginBottom: 10, lineHeight: 1.5 }}>
-            <span style={{ color: 'rgba(255,255,255,0.82)', fontWeight: 700, textTransform: 'capitalize' }}>{topStruggle}</span>
-            {delta && delta > 15
-              ? <span style={{ color: '#EF4444' }}> — unusual struggle ({globalRate}% global rate)</span>
-              : delta && delta < -15
-                ? <span style={{ color: '#10B981' }}> — above average</span>
-                : <span style={{ color: 'rgba(255,255,255,0.38)' }}> — common ({globalRate}% globally)</span>
-            }
-          </div>
-
-          {/* Inline bars */}
-          <div style={{ marginBottom: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-              <span style={{ fontSize: 9.5, fontWeight: 700, color: '#F59E0B' }}>YOU</span>
-              <span style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.30)' }}>80%</span>
-            </div>
-            <div style={{ height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 5 }}>
-              <motion.div initial={{ width: 0 }} animate={{ width: '80%' }} transition={{ duration: 0.9, ease: 'easeOut' }}
-                style={{ height: '100%', borderRadius: 99, background: '#F59E0B' }} />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-              <span style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.30)', fontWeight: 600 }}>GLOBAL</span>
-              <span style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.30)' }}>{globalRate}%</span>
-            </div>
-            <div style={{ height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-              <motion.div initial={{ width: 0 }} animate={{ width: `${globalRate}%` }} transition={{ duration: 0.9, ease: 'easeOut', delay: 0.1 }}
-                style={{ height: '100%', borderRadius: 99, background: 'rgba(255,255,255,0.20)' }} />
-            </div>
-          </div>
-
-          <AnimatePresence>
-            {expanded && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.3 }}
-                style={{ overflow: 'hidden' }}
-              >
-                <BrainVsWorld />
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <motion.button
-            whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-            onClick={() => setExpanded(e => !e)}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              padding: '5px 11px', borderRadius: 99, marginTop: 6,
-              background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)',
-              color: 'rgba(245,158,11,0.80)', fontSize: 11, fontWeight: 600, cursor: 'pointer',
-            }}>
-            {expanded ? 'Collapse' : 'View Full Analysis'}
-          </motion.button>
-        </>
-      )}
+      <PersonalProgress />
     </GlassCard>
   )
 }
@@ -1152,7 +1070,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
           <PerceptionCard />
           <FingerprintCard onOpen={() => setFingerprintOpen(true)} />
           <MemoryPalaceCard onOpen={() => setPalaceOpen(true)} />
-          <BrainVsWorldCard />
+          <PersonalProgressCard />
         </div>
 
         <div style={{ height: 48 }} />
