@@ -152,7 +152,8 @@ const DEFAULT = {
 
 /* ═══ STORE ══════════════════════════════════════════ */
 export const useNeuralStore = create((set, get) => ({
-  ...(load() || DEFAULT),
+  ...DEFAULT,
+  ...(load() || {}),
 
   /* ── Core updater ─────────────────────────────── */
   updateFromExchange: ({ userText, criticMode, understanding, responseTime }) => {
