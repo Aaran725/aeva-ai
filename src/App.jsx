@@ -1387,12 +1387,12 @@ function MarkdownRenderer({ text, streaming, cursorColor }) {
       const content = trimmed.replace(/^>\s*/, '')
       elements.push(
         <div key={`bq-${i}`} style={{
-          margin: '8px 0', padding: '10px 14px',
-          borderLeft: '3px solid rgba(139,143,255,0.7)',
-          background: 'rgba(139,143,255,0.07)',
-          borderRadius: '0 8px 8px 0',
-          fontSize: 14.5, color: 'rgba(220,222,255,0.92)',
-          fontStyle: 'italic', lineHeight: 1.65,
+          margin: '10px 0', padding: '12px 16px',
+          borderLeft: '3px solid #6366F1',
+          background: 'rgba(99,102,241,0.13)',
+          borderRadius: '0 10px 10px 0',
+          fontSize: 14.5, color: '#1e1852',
+          fontStyle: 'italic', fontWeight: 500, lineHeight: 1.70,
         }}>
           {parseInline(content)}
         </div>
@@ -1510,9 +1510,109 @@ function DeepDiveCard({ term, definition, onClose }) {
 /* ═══ STUDY GUIDE MODAL ═══════════════════════════ */
 function StudyGuideModal({ messages, onClose }) {
   const { name } = useUser()
-  const content = messages.filter(m => m.role === 'model' && m.text.length > 40)
+  const [summary, setSummary] = useState(null)
+  const [loading, setLoading] = useState(true)
 
-  const handlePrint = () => window.print()
+  // Generate an AI summary of the current session on mount
+  useEffect(() => {
+    const aiMessages = messages.filter(m => m.role === 'model' && m.text.length > 30)
+    if (aiMessages.length === 0) { setLoading(false); return }
+
+    const conversationText = messages
+      .slice(-20)
+      .map(m => `${m.role === 'user' ? name : 'Aeva'}: ${m.text}`)
+      .join('\n\n')
+
+    const prompt = `Generate a clean, structured study guide from this tutoring session.
+
+Use EXACTLY this format:
+## Core Insight
+> One sentence capturing the central idea of what was covered.
+
+## Key Concepts
+- **Term**: brief definition
+- **Term**: brief definition
+(3–5 bullet points max)
+
+## Visual Summary
+(Include a markdown comparison table if any comparisons were made. Otherwise omit this section.)
+
+## Formulas & Rules
+(Include only if formulas, equations, or rules were discussed. Otherwise omit.)
+
+## Next Steps
+1. First thing to study or practice
+2. Second thing
+3. Third thing
+
+Keep every section SHORT. Total length: under 300 words.
+
+Conversation:
+${conversationText}`
+
+    fetch(GROQ_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3,
+        max_tokens: 600,
+      }),
+    })
+      .then(r => r.json())
+      .then(json => {
+        setSummary(json.choices?.[0]?.message?.content || null)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // PDF export — opens a clean printable window
+  const handleExport = () => {
+    if (!summary) return
+    const mdToHtml = (md) => md
+      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
+      .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+      .replace(/^- \*\*(.+?)\*\*: (.+)$/gm, '<li><strong>$1</strong>: $2</li>')
+      .replace(/^- (.+)$/gm, '<li>$1</li>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/`(.+?)`/g, '<code>$1</code>')
+      .replace(/\n\n/g, '</p><p>')
+
+    const win = window.open('', '_blank', 'width=800,height=900')
+    win.document.write(`<!DOCTYPE html><html><head><title>Aeva Study Guide — ${name}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'Inter', sans-serif; max-width: 680px; margin: 48px auto; padding: 0 24px; color: #1a1a2e; line-height: 1.65; }
+  h1 { font-size: 26px; font-weight: 800; color: #2e27a0; margin-bottom: 4px; }
+  .meta { font-size: 12px; color: #888; margin-bottom: 36px; }
+  h2 { font-size: 16px; font-weight: 700; color: #3730a3; margin: 28px 0 10px; text-transform: uppercase; letter-spacing: 0.06em; }
+  h3 { font-size: 14px; font-weight: 600; color: #4338ca; margin: 18px 0 8px; }
+  p { margin: 8px 0; font-size: 14px; }
+  blockquote { border-left: 3px solid #6366F1; padding: 10px 16px; background: #eef0ff; border-radius: 0 8px 8px 0; font-style: italic; color: #312e81; margin: 12px 0; font-size: 14px; }
+  ul, ol { padding-left: 20px; margin: 8px 0; }
+  li { font-size: 14px; margin: 5px 0; }
+  strong { color: #1e1a3a; }
+  code { background: #f0f0f8; padding: 1px 5px; border-radius: 4px; font-family: monospace; font-size: 13px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  th { background: #eef0ff; color: #3730a3; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 12px; border: 1px solid #c7d2fe; text-align: left; }
+  td { padding: 8px 12px; border: 1px solid #e0e7ff; font-size: 13.5px; }
+  hr { border: none; border-top: 1px solid #e0e7ff; margin: 24px 0; }
+  @media print { body { margin: 20px auto; } }
+</style></head><body>
+<h1>Study Guide</h1>
+<div class="meta">Session with Aeva &middot; ${name} &middot; ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+<hr>
+<p>${mdToHtml(summary)}</p>
+</body></html>`)
+    win.document.close()
+    setTimeout(() => win.print(), 400)
+  }
 
   return (
     <motion.div
@@ -1533,28 +1633,42 @@ function StudyGuideModal({ messages, onClose }) {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div>
             <div style={{ fontSize: 16, fontWeight: 800, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.02em' }}>Study Guide</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)', marginTop: 2 }}>Session with Aeva · {name}</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)', marginTop: 2 }}>
+              {loading ? 'Generating summary…' : `Session with Aeva · ${name}`}
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={handlePrint} style={{
-              padding: '7px 14px', borderRadius: 99, cursor: 'pointer', fontSize: 12, fontWeight: 600,
-              background: 'rgba(139,143,255,0.15)', border: '1px solid rgba(139,143,255,0.30)',
-              color: '#A5B4FC', fontFamily: "'Inter', system-ui, sans-serif",
-            }}>⬇ Export PDF</button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {!loading && summary && (
+              <motion.button
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                onClick={handleExport}
+                style={{ padding: '7px 14px', borderRadius: 99, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                  background: 'rgba(139,143,255,0.15)', border: '1px solid rgba(139,143,255,0.30)',
+                  color: '#A5B4FC', fontFamily: "'Inter', system-ui, sans-serif" }}
+              >⬇ Export PDF</motion.button>
+            )}
             <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.30)', cursor: 'pointer', fontSize: 18, padding: '0 4px' }}>✕</button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="study-guide-content" style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {content.slice(-6).map((msg, idx) => (
-            <div key={idx} style={{ borderBottom: idx < content.slice(-6).length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none', paddingBottom: 16 }}>
-              <MarkdownRenderer text={msg.text} streaming={false} cursorColor="transparent" />
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+          {loading && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, gap: 16 }}>
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}
+                style={{ width: 28, height: 28, borderRadius: '50%', border: '2.5px solid rgba(139,143,255,0.15)', borderTopColor: '#A5B4FC' }}
+              />
+              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>Summarising your session…</span>
             </div>
-          ))}
-          {content.length === 0 && (
+          )}
+          {!loading && summary && (
+            <MarkdownRenderer text={summary} streaming={false} cursorColor="transparent" />
+          )}
+          {!loading && !summary && (
             <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.30)', fontSize: 14, padding: '40px 0' }}>
-              No content to compile yet. Chat with Aeva first.
+              No content to summarise yet. Chat with Aeva first.
             </div>
           )}
         </div>
