@@ -44,10 +44,10 @@ const STATE_CONFIG = {
 }
 
 const MODE_CONFIG = {
-  hype:      { label: 'Hype',      color: '#E9A364', instruction: 'They genuinely got it. One specific sentence acknowledging exactly what they got right (not "great job" — say WHY it\'s right). Then immediately one harder question.' },
-  coach:     { label: 'Coach',     color: '#8B8FFF', instruction: 'One Socratic question that moves them forward. No answer, no hints. Short.' },
-  challenge: { label: 'Challenge', color: '#FF8C6B', instruction: 'They gave a surface answer. Call out the specific gap in one sentence — be direct but not harsh. Then one question that forces them to go deeper. Nothing else.' },
-  redirect:  { label: 'Redirect',  color: '#7EC8E3', instruction: 'They\'re lost. Reset with a simpler version of the question or a brief concrete example. One question at the end.' },
+  hype:      { label: 'Momentum',  color: '#E9A364', instruction: 'They got it. Acknowledge precisely what they understood in one sentence ("That\'s exactly right — [specific thing they nailed]"). Then immediately raise the bar with one harder question. No celebration, just forward momentum.' },
+  coach:     { label: 'Coaching',  color: '#8B8FFF', instruction: 'Move them forward with one precise Socratic question. No hints, no partial answers. Make the question interesting enough that they actually want to think about it.' },
+  challenge: { label: 'Challenge', color: '#FF8C6B', instruction: 'Surface the gap in one surgical sentence. Then ask the question that makes the gap impossible to ignore. Nothing else. No softening.' },
+  redirect:  { label: 'Redirect',  color: '#7EC8E3', instruction: 'They\'re lost. Drop one concrete analogy or example that resets their mental model cleanly. Then one clarifying question. Keep it short — don\'t overwhelm.' },
 }
 
 /* ─── Student profile (persists across sessions) ─── */
@@ -148,40 +148,46 @@ function buildAevaPrompt(sessionState, criticism, userName, profile, memoryBlock
   const state = STATE_CONFIG[sessionState]
   const mode = MODE_CONFIG[criticism?.mode || 'coach']
 
-  const profileContext = profile ? `
-WHAT YOU KNOW ABOUT ${userName.toUpperCase()}:
-- Sessions together: ${profile.totalExchanges} exchanges
-${profile.strengths.length ? `- Demonstrated strengths: ${profile.strengths.join(', ')}` : ''}
-${profile.weaknesses.length ? `- Known weak spots: ${profile.weaknesses.join(', ')}` : ''}
-${profile.patterns.length ? `- Observed patterns: ${profile.patterns.join(', ')}` : ''}
-${profile.topicsExplored.length ? `- Topics explored: ${profile.topicsExplored.slice(-5).join(', ')}` : ''}
-${profile.style ? `- Communication style: ${profile.style} answers` : ''}
-Use this to make your response feel personal and specific — reference what you know when relevant.` : ''
+  return `You are Aeva — a world-class personal mentor for ${userName}. Think: the most precise professor you never had, minus the ego.
 
-  return `You are Aeva — a sharp, direct tutor who genuinely cares whether ${userName} actually learns, not just whether they feel good about the session.
+IDENTITY & VOICE:
+- Calm, direct, intellectually generous. Never excited, never corporate.
+- Use "we" and "let's" to signal partnership: "Let's see what this actually means."
+- No AI-isms. Never say: "Certainly!", "Great question!", "Absolutely!", "Delighted to help!", "Of course!"
+- If ${userName} is wrong, correct with a surgical question — not a lecture.
+- Short sentences. Maximum information density per word.
+- Sophisticated but plain vocabulary. Accessible to a sharp 16-year-old, satisfying to a PhD.
 
-YOUR VOICE:
-- Direct and specific. No filler, no hollow praise like "great question!" or "absolutely!"
-- Warm but not soft. You challenge because you believe they can handle it.
-- Concise: 2-3 sentences max. ONE question per response, never more.
-- You never force analogies. Only use one if it genuinely clarifies something — and make it fit the topic naturally.
-- You sound like a brilliant friend who happens to be an expert, not a corporate AI.
+RESPONSE FORMAT — follow this 3-part structure for every teaching response:
 
-WHAT YOU NEVER DO:
-- Give the answer before making them think
-- Ask multiple questions at once
-- Use business/startup metaphors unless the topic is literally about business
-- Say "Great!", "Excellent!", "Absolutely!", or any hollow filler
-- Give a lecture when a question would do
-${profileContext}
+**[Concept Name]**
+> One sentence capturing the essential "why" — the mechanism, not just the definition. Make it memorable.
+
+[A clean visual: numbered list for processes, Markdown table for comparisons, formula for math — choose what actually helps]
+
+*[One specific real-world example, or a Socratic question that makes them apply what they just learned.]*
+
+MARKDOWN RULES (non-negotiable):
+- Tables: always use proper GitHub Markdown format with a header row and \`| --- |\` separator row. Never ASCII art.
+- Blockquotes (\`>\`) only for key laws, definitions, and core insights.
+- Bold (\`**term**\`) when introducing a technical term for the first time.
+- Numbered lists for steps/sequences. Bullet lists for comparisons/features.
+- Inline code (\`backticks\`) for code, variables, formulas.
+
+SMART TAGS — always include these inline (the UI parses them silently):
+- When introducing a new technical term: \`[TERM: word | one-sentence definition]\`
+- Only 1–3 terms per response max. Don't tag common words.
+
+THE 80/20 RULE:
+- 20% theory. 80% real-world application.
+- Never write a 500-word essay. Give a 30-word insight + one beautiful visual + one sharp question.
+- Simple question → simple answer. Depth only when warranted.
+
 SESSION PHASE: ${sessionState} — ${state.instruction}
 
-CRITIC READ ON THEIR LAST MESSAGE:
-- Understanding: ${criticism?.understanding || 'unknown'} | Lazy thinking: ${criticism?.lazy_thinking ? 'YES' : 'no'} | Confidence: ${criticism?.confidence || 'unknown'}
-- Topic: ${criticism?.topic || 'general'}
-- Target: ${criticism?.note || 'move them forward'}
-
-MODE: ${(criticism?.mode || 'coach').toUpperCase()} — ${mode.instruction}
+READING ON ${userName.toUpperCase()}'S LAST MESSAGE:
+- Understanding: ${criticism?.understanding || 'unknown'} | Topic: ${criticism?.topic || 'general'}
+- Mode: ${(criticism?.mode || 'coach').toUpperCase()} — ${mode.instruction}
 ${memoryBlock}`
 }
 
@@ -332,7 +338,7 @@ const ORB_PULSES = {
   aggressive: { scale: [1, 1.22, 0.97, 1.20, 1], dur: 0.85 },
   academic:   { scale: [1, 1.03, 1],              dur: 9    },
   curious:    { scale: [1, 1.12, 1.04, 1.09, 1],  dur: 3.8  },
-  balanced:   { scale: [1, 1.06, 1],              dur: 7    },
+  balanced:   { scale: [1, 1.05, 1],              dur: 4.5  },
 }
 
 function AevaOrb({ size = 218, active = false, scanMode = false, personality = 'balanced' }) {
@@ -1200,47 +1206,409 @@ function DashboardView({ onChatOpen, onSignOut }) {
   )
 }
 
+/* ═══ MARKDOWN RENDERER ═══════════════════════════ */
+function parseInline(text) {
+  // Returns array of React elements for inline markdown
+  const parts = []
+  let remaining = text
+  let key = 0
+
+  while (remaining.length > 0) {
+    // Bold **text**
+    const boldMatch = remaining.match(/^(.*?)\*\*(.+?)\*\*/)
+    if (boldMatch) {
+      if (boldMatch[1]) parts.push(<span key={key++}>{boldMatch[1]}</span>)
+      parts.push(<strong key={key++} style={{ fontWeight: 700, color: 'inherit' }}>{boldMatch[2]}</strong>)
+      remaining = remaining.slice(boldMatch[0].length)
+      continue
+    }
+    // Italic *text* (not **)
+    const italicMatch = remaining.match(/^(.*?)(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/)
+    if (italicMatch) {
+      if (italicMatch[1]) parts.push(<span key={key++}>{italicMatch[1]}</span>)
+      parts.push(<em key={key++} style={{ opacity: 0.82, fontStyle: 'italic' }}>{italicMatch[2]}</em>)
+      remaining = remaining.slice(italicMatch[0].length)
+      continue
+    }
+    // Inline code `code`
+    const codeMatch = remaining.match(/^(.*?)`([^`]+)`/)
+    if (codeMatch) {
+      if (codeMatch[1]) parts.push(<span key={key++}>{codeMatch[1]}</span>)
+      parts.push(
+        <code key={key++} style={{
+          fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+          fontSize: '0.88em',
+          background: 'rgba(255,255,255,0.10)',
+          border: '1px solid rgba(255,255,255,0.14)',
+          borderRadius: 5,
+          padding: '1px 6px',
+          color: '#7DD3FC',
+        }}>{codeMatch[2]}</code>
+      )
+      remaining = remaining.slice(codeMatch[0].length)
+      continue
+    }
+    // No more patterns — render the rest
+    parts.push(<span key={key++}>{remaining}</span>)
+    break
+  }
+  return parts
+}
+
+function MarkdownTable({ lines }) {
+  // lines[0] = header row, lines[1] = separator, lines[2+] = data rows
+  const parseRow = (line) => line.split('|').map(c => c.trim()).filter((c, i, arr) => i > 0 && i < arr.length - 1)
+  const headers = parseRow(lines[0])
+  const rows = lines.slice(2).map(parseRow)
+
+  return (
+    <div style={{ overflowX: 'auto', margin: '10px 0', borderRadius: 10, border: '1px solid rgba(255,255,255,0.10)' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5, fontFamily: "'Inter', system-ui, sans-serif" }}>
+        <thead>
+          <tr style={{ background: 'rgba(255,255,255,0.07)' }}>
+            {headers.map((h, i) => (
+              <th key={i} style={{
+                padding: '9px 14px', textAlign: 'left',
+                color: 'rgba(255,255,255,0.85)', fontWeight: 700, fontSize: 12,
+                letterSpacing: '0.04em', textTransform: 'uppercase',
+                borderBottom: '1px solid rgba(255,255,255,0.10)',
+              }}>{parseInline(h)}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, ri) => (
+            <tr key={ri} style={{ background: ri % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.03)' }}>
+              {row.map((cell, ci) => (
+                <td key={ci} style={{
+                  padding: '8px 14px', color: 'rgba(255,255,255,0.75)', fontSize: 13.5,
+                  borderBottom: ri < rows.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                  lineHeight: 1.55,
+                }}>{parseInline(cell)}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function MarkdownRenderer({ text, streaming, cursorColor }) {
+  // Strip smart tags silently
+  const clean = text
+    .replace(/\[TERM:[^\]]*\]/g, '')
+    .replace(/\[SUMMARY:[^\]]*\]/g, '')
+
+  const lines = clean.split('\n')
+  const elements = []
+  let i = 0
+  let listItems = []
+  let listType = null // 'ul' | 'ol'
+
+  const flushList = () => {
+    if (listItems.length === 0) return
+    if (listType === 'ol') {
+      elements.push(
+        <ol key={`list-${elements.length}`} style={{ margin: '8px 0 8px 4px', paddingLeft: 22, display: 'flex', flexDirection: 'column', gap: 5 }}>
+          {listItems.map((item, idx) => (
+            <li key={idx} style={{ color: 'rgba(255,255,255,0.82)', fontSize: 14.5, lineHeight: 1.6 }}>{parseInline(item)}</li>
+          ))}
+        </ol>
+      )
+    } else {
+      elements.push(
+        <ul key={`list-${elements.length}`} style={{ margin: '8px 0 8px 4px', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4, listStyle: 'none' }}>
+          {listItems.map((item, idx) => (
+            <li key={idx} style={{ color: 'rgba(255,255,255,0.82)', fontSize: 14.5, lineHeight: 1.6, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <span style={{ color: 'rgba(139,143,255,0.8)', marginTop: 2, flexShrink: 0, fontSize: 11 }}>◆</span>
+              <span>{parseInline(item)}</span>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+    listItems = []
+    listType = null
+  }
+
+  while (i < lines.length) {
+    const line = lines[i]
+    const trimmed = line.trim()
+
+    // Empty line
+    if (trimmed === '') {
+      flushList()
+      elements.push(<div key={`gap-${i}`} style={{ height: 6 }} />)
+      i++; continue
+    }
+
+    // Table detection: current line is a table row AND next line is separator
+    if (/^\|/.test(trimmed) && i + 1 < lines.length && /^\|[\s\-:|]+\|/.test(lines[i + 1])) {
+      flushList()
+      const tableLines = []
+      while (i < lines.length && /^\|/.test(lines[i].trim())) {
+        tableLines.push(lines[i])
+        i++
+      }
+      if (tableLines.length >= 2) {
+        elements.push(<MarkdownTable key={`table-${elements.length}`} lines={tableLines} />)
+      }
+      continue
+    }
+
+    // H1
+    if (/^#\s/.test(trimmed)) {
+      flushList()
+      const content = trimmed.replace(/^#+\s/, '')
+      elements.push(
+        <div key={`h1-${i}`} style={{ fontSize: 16, fontWeight: 800, color: 'rgba(255,255,255,0.95)', margin: '12px 0 6px', letterSpacing: '-0.02em', lineHeight: 1.3 }}>
+          {parseInline(content)}
+        </div>
+      )
+      i++; continue
+    }
+
+    // H2/H3
+    if (/^##/.test(trimmed)) {
+      flushList()
+      const content = trimmed.replace(/^#+\s/, '')
+      elements.push(
+        <div key={`h2-${i}`} style={{ fontSize: 14.5, fontWeight: 700, color: 'rgba(255,255,255,0.90)', margin: '10px 0 4px', letterSpacing: '-0.01em' }}>
+          {parseInline(content)}
+        </div>
+      )
+      i++; continue
+    }
+
+    // Blockquote
+    if (/^>/.test(trimmed)) {
+      flushList()
+      const content = trimmed.replace(/^>\s*/, '')
+      elements.push(
+        <div key={`bq-${i}`} style={{
+          margin: '8px 0', padding: '10px 14px',
+          borderLeft: '3px solid rgba(139,143,255,0.7)',
+          background: 'rgba(139,143,255,0.07)',
+          borderRadius: '0 8px 8px 0',
+          fontSize: 14.5, color: 'rgba(220,222,255,0.92)',
+          fontStyle: 'italic', lineHeight: 1.65,
+        }}>
+          {parseInline(content)}
+        </div>
+      )
+      i++; continue
+    }
+
+    // Code block
+    if (/^```/.test(trimmed)) {
+      flushList()
+      const lang = trimmed.replace(/^```/, '').trim()
+      const codeLines = []
+      i++
+      while (i < lines.length && !/^```/.test(lines[i].trim())) {
+        codeLines.push(lines[i])
+        i++
+      }
+      i++ // skip closing ```
+      elements.push(
+        <div key={`code-${elements.length}`} style={{
+          margin: '10px 0', borderRadius: 10,
+          background: 'rgba(0,0,0,0.35)',
+          border: '1px solid rgba(255,255,255,0.10)',
+          overflow: 'hidden',
+        }}>
+          {lang && (
+            <div style={{ padding: '5px 12px', background: 'rgba(255,255,255,0.05)', fontSize: 10.5, color: 'rgba(255,255,255,0.35)', fontFamily: 'monospace', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{lang}</div>
+          )}
+          <pre style={{ margin: 0, padding: '12px 14px', fontFamily: '"JetBrains Mono", "Fira Code", monospace', fontSize: 13, color: '#93C5FD', lineHeight: 1.65, overflowX: 'auto', whiteSpace: 'pre' }}>
+            {codeLines.join('\n')}
+          </pre>
+        </div>
+      )
+      continue
+    }
+
+    // Ordered list
+    const olMatch = trimmed.match(/^(\d+)[.)]\s+(.*)/)
+    if (olMatch) {
+      if (listType !== 'ol') { flushList(); listType = 'ol' }
+      listItems.push(olMatch[2])
+      i++; continue
+    }
+
+    // Unordered list
+    const ulMatch = trimmed.match(/^[-*•]\s+(.*)/)
+    if (ulMatch) {
+      if (listType !== 'ul') { flushList(); listType = 'ul' }
+      listItems.push(ulMatch[1])
+      i++; continue
+    }
+
+    // Normal paragraph
+    flushList()
+    elements.push(
+      <p key={`p-${i}`} style={{ margin: '4px 0', fontSize: 14.5, color: 'rgba(255,255,255,0.85)', lineHeight: 1.68 }}>
+        {parseInline(trimmed)}
+      </p>
+    )
+    i++
+  }
+
+  flushList()
+
+  return (
+    <div style={{ minWidth: 0 }}>
+      {elements}
+      {streaming && (
+        <motion.span
+          animate={{ opacity: [1, 0, 1] }}
+          transition={{ duration: 0.75, repeat: Infinity }}
+          style={{ display: 'inline-block', width: 2, height: 14, background: cursorColor || 'rgba(255,255,255,0.6)', borderRadius: 1, marginLeft: 3, verticalAlign: 'middle' }}
+        />
+      )}
+    </div>
+  )
+}
+
+/* ═══ DEEP DIVE CARD ══════════════════════════════ */
+function DeepDiveCard({ term, definition, onClose }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.90, y: 8 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.88, y: 6 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 26 }}
+      style={{
+        padding: '12px 14px',
+        borderRadius: 14,
+        background: 'rgba(139,143,255,0.10)',
+        border: '1px solid rgba(139,143,255,0.28)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        position: 'relative',
+        maxWidth: 260,
+      }}
+    >
+      <button
+        onClick={onClose}
+        style={{ position: 'absolute', top: 8, right: 10, background: 'none', border: 'none', color: 'rgba(255,255,255,0.28)', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1 }}
+      >✕</button>
+      <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(139,143,255,0.85)', textTransform: 'uppercase', marginBottom: 5 }}>
+        KEY TERM
+      </div>
+      <div style={{ fontSize: 13.5, fontWeight: 700, color: 'rgba(255,255,255,0.92)', marginBottom: 5, paddingRight: 18 }}>
+        {term}
+      </div>
+      <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.60)', lineHeight: 1.55 }}>
+        {definition}
+      </div>
+    </motion.div>
+  )
+}
+
+/* ═══ STUDY GUIDE MODAL ═══════════════════════════ */
+function StudyGuideModal({ messages, onClose }) {
+  const { name } = useUser()
+  const content = messages.filter(m => m.role === 'model' && m.text.length > 40)
+
+  const handlePrint = () => window.print()
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 24, background: 'rgba(4,6,20,0.80)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <motion.div
+        initial={{ scale: 0.90, y: 24 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.90, y: 20 }}
+        transition={{ type: 'spring', stiffness: 340, damping: 28 }}
+        style={{ width: '100%', maxWidth: 580, maxHeight: '82vh', borderRadius: 28, overflow: 'hidden',
+          background: 'linear-gradient(160deg, #0a0c1e 0%, #0f1228 100%)',
+          border: '1px solid rgba(255,255,255,0.10)', display: 'flex', flexDirection: 'column' }}
+      >
+        {/* Header */}
+        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.02em' }}>Study Guide</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)', marginTop: 2 }}>Session with Aeva · {name}</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={handlePrint} style={{
+              padding: '7px 14px', borderRadius: 99, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+              background: 'rgba(139,143,255,0.15)', border: '1px solid rgba(139,143,255,0.30)',
+              color: '#A5B4FC', fontFamily: "'Inter', system-ui, sans-serif",
+            }}>⬇ Export PDF</button>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.30)', cursor: 'pointer', fontSize: 18, padding: '0 4px' }}>✕</button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="study-guide-content" style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {content.slice(-6).map((msg, idx) => (
+            <div key={idx} style={{ borderBottom: idx < content.slice(-6).length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none', paddingBottom: 16 }}>
+              <MarkdownRenderer text={msg.text} streaming={false} cursorColor="transparent" />
+            </div>
+          ))}
+          {content.length === 0 && (
+            <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.30)', fontSize: 14, padding: '40px 0' }}>
+              No content to compile yet. Chat with Aeva first.
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 /* ═══ CHAT BUBBLE ═════════════════════════════════ */
-function ChatBubble({ msg }) {
+function ChatBubble({ msg, deepDiveCards, onDismissCard }) {
   const isUser = msg.role === 'user'
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.28, ease: 'easeOut' }}
+      transition={{ duration: 0.26, ease: 'easeOut' }}
       style={{
         display: 'flex',
         justifyContent: isUser ? 'flex-end' : 'flex-start',
-        marginBottom: 10,
+        marginBottom: 12,
+        gap: 12,
+        alignItems: 'flex-start',
       }}
     >
       <div style={{
-        maxWidth: '78%',
-        padding: isUser ? '10px 16px' : '12px 18px',
+        maxWidth: 700,
+        width: isUser ? 'auto' : '100%',
+        padding: isUser ? '10px 16px' : '16px 20px',
         borderRadius: isUser ? '20px 20px 6px 20px' : '20px 20px 20px 6px',
-        background: isUser
-          ? 'rgba(139,143,255,0.25)'
-          : 'rgba(255,255,255,0.12)',
+        background: isUser ? 'rgba(139,143,255,0.22)' : 'rgba(255,255,255,0.08)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        border: isUser
-          ? '1px solid rgba(139,143,255,0.40)'
-          : '1px solid rgba(255,255,255,0.16)',
+        border: isUser ? '1px solid rgba(139,143,255,0.35)' : '1px solid rgba(255,255,255,0.12)',
         color: isUser ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.85)',
-        fontSize: 14.5,
-        lineHeight: 1.55,
         fontFamily: "'Inter', system-ui, sans-serif",
-        whiteSpace: 'pre-wrap',
       }}>
-        {msg.text}
-        {msg.streaming && (
-          <motion.span
-            animate={{ opacity: [1, 0, 1] }}
-            transition={{ duration: 0.8, repeat: Infinity }}
-            style={{ display: 'inline-block', width: 2, height: 14, background: 'rgba(255,255,255,0.6)', borderRadius: 1, marginLeft: 3, verticalAlign: 'middle' }}
-          />
+        {isUser ? (
+          <span style={{ fontSize: 14.5, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{msg.text}</span>
+        ) : (
+          <MarkdownRenderer text={msg.text} streaming={!!msg.streaming} cursorColor="rgba(139,143,255,0.9)" />
         )}
       </div>
+
+      {/* Deep dive cards — appear beside the AI bubble */}
+      {!isUser && deepDiveCards && deepDiveCards.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4, flexShrink: 0 }}>
+          <AnimatePresence>
+            {deepDiveCards.map((card, ci) => (
+              <DeepDiveCard key={card.id} term={card.term} definition={card.definition} onClose={() => onDismissCard(card.id)} />
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
     </motion.div>
   )
 }
@@ -1310,6 +1678,8 @@ function ChatView({ onBack }) {
   const [sessionState, setSessionState] = useState('DIAGNOSTIC')
   const [criticism, setCriticism] = useState(null)
   const [masteryMap, setMasteryMap] = useState({})
+  const [deepDiveMap, setDeepDiveMap] = useState({})   // msgIndex → [{id, term, definition}]
+  const [studyGuideOpen, setStudyGuideOpen] = useState(false)
   const abortRef = useRef(null)
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
@@ -1437,9 +1807,10 @@ function ChatView({ onBack }) {
     const controller = new AbortController()
     abortRef.current = controller
 
+    let rawResponse = ''
+
     try {
       let systemPrompt
-      let rawResponse = ''
       let criticResult = null
 
       // Per-mission API options: penalise repetition, cap length
@@ -1538,6 +1909,20 @@ function ChatView({ onBack }) {
       setIsThinking(false)
       setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, streaming: false } : m))
       inputRef.current?.focus()
+
+      // Parse TERM tags from completed response (tutor mode only)
+      if (!isMission) {
+        const termMatches = [...rawResponse.matchAll(/\[TERM:\s*([^|]+)\|\s*([^\]]+)\]/g)]
+        if (termMatches.length > 0) {
+          const cards = termMatches.map(m => ({ id: `${Date.now()}-${m[1].trim()}`, term: m[1].trim(), definition: m[2].trim() }))
+          setDeepDiveMap(prev => ({ ...prev, [history.length]: cards }))
+        }
+
+        // Detect study guide request
+        if (userText.toLowerCase().match(/summarize|study guide|summary|notes/)) {
+          setStudyGuideOpen(true)
+        }
+      }
     }
   }
 
@@ -1610,6 +1995,19 @@ function ChatView({ onBack }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            {!isMission && (
+              <button
+                onClick={() => setStudyGuideOpen(true)}
+                style={{
+                  padding: '5px 12px', borderRadius: 99, cursor: 'pointer',
+                  background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',
+                  color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: 600,
+                  fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: '0.04em',
+                }}
+              >
+                📋 Study Guide
+              </button>
+            )}
             <div style={{ width: 24, height: 24, borderRadius: 7, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Star size={11} color="white" fill="white" />
             </div>
@@ -1680,7 +2078,7 @@ function ChatView({ onBack }) {
                 {messages.map((msg, i) =>
                   isMission
                     ? <ThemedChatBubble key={i} msg={msg} mission={activeMission} />
-                    : <ChatBubble key={i} msg={msg} />
+                    : <ChatBubble key={i} msg={msg} deepDiveCards={deepDiveMap[i] || []} onDismissCard={(cardId) => setDeepDiveMap(prev => ({ ...prev, [i]: (prev[i] || []).filter(c => c.id !== cardId) }))} />
                 )}
                 <div ref={bottomRef} />
               </div>
@@ -1813,6 +2211,11 @@ function ChatView({ onBack }) {
           )}
         </div>
       </div>
+
+      {/* Study Guide Modal */}
+      <AnimatePresence>
+        {studyGuideOpen && <StudyGuideModal messages={messages} onClose={() => setStudyGuideOpen(false)} />}
+      </AnimatePresence>
     </motion.div>
   )
 }
