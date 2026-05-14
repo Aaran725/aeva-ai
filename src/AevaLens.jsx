@@ -107,7 +107,7 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
       const jsonMatch = raw.match(/\{[\s\S]*\}/)
       if (!jsonMatch) throw new Error('No JSON in response')
 
-      const parsed = JSON.parse(jsonMatch[0])
+      const parsed = safeParseJSON(jsonMatch[0])
       setAnalysis(parsed)
       setPhase('result')
     } catch (err) {
@@ -460,7 +460,7 @@ function HotspotDot({ hotspot, active, onClick }) {
   )
 }
 
-/* ─── Helper ─── */
+/* ─── Helpers ─── */
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -468,4 +468,22 @@ function fileToBase64(file) {
     reader.onerror = reject
     reader.readAsDataURL(file)
   })
+}
+
+// LLMs often emit bare backslashes in math/LaTeX inside JSON strings,
+// which makes JSON.parse throw. Fix by escaping lone backslashes, then parse.
+function safeParseJSON(str) {
+  try {
+    return JSON.parse(str)
+  } catch {
+    // Replace lone backslashes (not already doubled) with \\
+    const fixed = str.replace(/\\(?!["\\/bfnrtu])/g, '\\\\')
+    try {
+      return JSON.parse(fixed)
+    } catch {
+      // Last resort: strip everything outside the outermost braces and retry
+      const inner = fixed.replace(/[ -]/g, ' ')
+      return JSON.parse(inner)
+    }
+  }
 }
