@@ -45,6 +45,7 @@ Keep steps array to 3-5 concise steps. Hotspots should reference actual visible 
 export default function AevaLens({ file, onClose, onInsightReady }) {
   const [phase, setPhase] = useState('scanning') // scanning | result | error
   const [analysis, setAnalysis] = useState(null)
+  const [errorMsg, setErrorMsg] = useState('')
   const [activeHotspot, setActiveHotspot] = useState(null)
   const [imgDims, setImgDims] = useState({ w: 1, h: 1 })
   const imgRef = useRef(null)
@@ -67,7 +68,8 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
 
   const analyzeImage = useCallback(async () => {
     try {
-      // Convert file to base64
+      if (!GEMINI_KEY) throw new Error('VITE_GEMINI_API_KEY is not set')
+
       const base64 = await fileToBase64(file)
       const mimeType = file.type || 'image/jpeg'
 
@@ -86,6 +88,12 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
       })
 
       const json = await res.json()
+
+      if (!res.ok) {
+        const msg = json.error?.message || `HTTP ${res.status}`
+        throw new Error(msg)
+      }
+
       const raw = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
 
       // Extract JSON from response (Gemini sometimes wraps in markdown)
@@ -97,6 +105,7 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
       setPhase('result')
     } catch (err) {
       console.error('Aeva Lens error:', err)
+      setErrorMsg(err.message || 'Unknown error')
       setPhase('error')
     }
   }, [file])
@@ -366,8 +375,15 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
           <div style={{ padding: '32px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
             <span style={{ fontSize: 28 }}>⚠️</span>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.70)' }}>Couldn't analyse this image</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
-              Make sure the image is clear and the Gemini API key is configured correctly.
+            {errorMsg && (
+              <div style={{ fontSize: 11.5, color: 'rgba(239,68,68,0.75)', fontFamily: 'monospace', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 8, padding: '6px 12px', maxWidth: 320, wordBreak: 'break-word' }}>
+                {errorMsg}
+              </div>
+            )}
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.30)', lineHeight: 1.5 }}>
+              {errorMsg?.includes('API_KEY') || errorMsg?.includes('key')
+                ? 'Add VITE_GEMINI_API_KEY to your Vercel environment variables and redeploy.'
+                : 'Make sure the image is clear and try again.'}
             </div>
             <button
               onClick={onClose}
