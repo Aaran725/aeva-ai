@@ -1,14 +1,15 @@
 /**
  * Aeva Lens — Vision-to-Logic
- * Analyzes images (photos, screenshots, handwritten work) using Gemini vision.
+ * Analyzes images using Groq vision (Llama 4 Scout) — same key already in Vercel.
  * Shows a scanning animation, then overlays hotspots + a glass-morphism analysis panel.
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ZoomIn, Plus, CheckCircle, Loader } from 'lucide-react'
 
-const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`
+const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
+const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
 
 const ANALYSIS_PROMPT = `You are an expert tutor analyzing an image of a student's work or problem.
 
@@ -68,22 +69,28 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
 
   const analyzeImage = useCallback(async () => {
     try {
-      if (!GEMINI_KEY) throw new Error('VITE_GEMINI_API_KEY is not set')
+      if (!GROQ_KEY) throw new Error('VITE_GROQ_API_KEY is not set')
 
       const base64 = await fileToBase64(file)
       const mimeType = file.type || 'image/jpeg'
 
-      const res = await fetch(GEMINI_URL, {
+      const res = await fetch(GROQ_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${GROQ_KEY}`,
+        },
         body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: ANALYSIS_PROMPT },
-              { inline_data: { mime_type: mimeType, data: base64 } },
+          model: VISION_MODEL,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'text', text: ANALYSIS_PROMPT },
+              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
             ],
           }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 1200 },
+          temperature: 0.3,
+          max_tokens: 1200,
         }),
       })
 
@@ -94,9 +101,9 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
         throw new Error(msg)
       }
 
-      const raw = json.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      const raw = json.choices?.[0]?.message?.content || ''
 
-      // Extract JSON from response (Gemini sometimes wraps in markdown)
+      // Extract JSON — model sometimes wraps in markdown code fences
       const jsonMatch = raw.match(/\{[\s\S]*\}/)
       if (!jsonMatch) throw new Error('No JSON in response')
 
@@ -382,7 +389,7 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
             )}
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.30)', lineHeight: 1.5 }}>
               {errorMsg?.includes('API_KEY') || errorMsg?.includes('key')
-                ? 'Add VITE_GEMINI_API_KEY to your Vercel environment variables and redeploy.'
+                ? 'Check that VITE_GROQ_API_KEY is set in your Vercel environment variables.'
                 : 'Make sure the image is clear and try again.'}
             </div>
             <button
