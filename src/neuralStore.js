@@ -83,6 +83,31 @@ export function deriveOrbPersonality(s) {
   return 'balanced'
 }
 
+/* ─── Concept dependency chains ─── */
+export const CONCEPT_CHAINS = {
+  'derivatives': ['integration', 'chain rule', 'differential equations'],
+  'integration': ['multivariable calculus', 'series and sequences'],
+  'limits': ['derivatives', 'continuity', 'epsilon-delta proofs'],
+  'algebra': ['calculus', 'linear algebra', 'functions'],
+  'functions': ['recursion', 'closures', 'higher-order functions'],
+  'variables': ['scope', 'closures', 'data types'],
+  'loops': ['recursion', 'iterators', 'time complexity'],
+  'arrays': ['linked lists', 'hash maps', 'sorting algorithms'],
+  'recursion': ['dynamic programming', 'tree traversal', 'memoization'],
+  'oop': ['design patterns', 'inheritance', 'composition'],
+  'forces': ['momentum', 'energy conservation', 'torque'],
+  'kinematics': ['dynamics', 'rotational motion', 'wave mechanics'],
+  'probability': ['bayesian inference', 'statistics', 'distributions'],
+  'genetics': ['molecular biology', 'protein synthesis', 'evolution'],
+}
+
+const HARD_TOPICS = new Set([
+  'integration', 'differential equations', 'multivariable calculus', 'chain rule',
+  'epsilon-delta proofs', 'closures', 'higher-order functions', 'dynamic programming',
+  'tree traversal', 'bayesian inference', 'distributions', 'rotational motion',
+  'protein synthesis',
+])
+
 /* ─── Default state ─── */
 const DEFAULT = {
   // Personality metrics (all 0-100 except humorPreference)
@@ -108,6 +133,17 @@ const DEFAULT = {
   fastResponses:      0,
   longPauses:         0,
   recentModes:        [],       // last 10 critic modes
+
+  // Learning style fingerprint
+  learningStyle:      { analogical: 0, visual: 0, structural: 0, exampleFirst: 0, conceptual: 0 },
+  learningStyleTotal: 0,
+  learningStyleLocked: false,
+
+  // Concept map for Memory Palace
+  conceptMap:         [],  // [{ id, label, mastery, category, firstSeen, lastSeen, visits }]
+
+  // Predictive struggle
+  strugglePredictions: [],  // [{ concept, reason, confidence, id }]
 }
 
 /* ═══ STORE ══════════════════════════════════════════ */
@@ -217,6 +253,21 @@ export const useNeuralStore = create((set, get) => ({
   buildMemoryBlock: (userName) => {
     const s = get()
     if (s.totalExchanges < 2) return ''
+
+    const STYLE_INSTRUCTIONS = {
+      analogical:   'use analogies and comparisons for new concepts',
+      visual:       'use spatial language, mental maps, visual metaphors',
+      structural:   'front-load structure: numbered steps, clear sequence',
+      exampleFirst: 'lead with a concrete example before the abstraction',
+      conceptual:   "explain the 'why' mechanism before the 'what'",
+    }
+
+    let learningStyleLine = ''
+    if (s.learningStyleLocked) {
+      const dominant = Object.entries(s.learningStyle).sort((a, b) => b[1] - a[1])[0]?.[0] || 'conceptual'
+      learningStyleLine = `\n- Learning style: ${dominant} — ${STYLE_INSTRUCTIONS[dominant]}`
+    }
+
     return `
 NEURAL MEMORY — What you know about ${userName}:
 - Personality type: ${s.orbPersonality} | Humor preference: ${s.humorPreference}/10
@@ -226,7 +277,113 @@ NEURAL MEMORY — What you know about ${userName}:
 - Mastered: ${s.masteredTopics.slice(-4).join(', ') || 'nothing confirmed yet'}
 - Struggle zones: ${s.struggleZones.slice(-3).join(', ') || 'none identified'}
 - Key traits: ${s.traits.map(t => t.label).join(', ')}
-- Current vibe reading: ${s.currentVibe}
+- Current vibe reading: ${s.currentVibe}${learningStyleLine}
 Subtly adapt tone and examples to fit this profile. Do not mention the memory block.`
+  },
+
+  /* ── Learning style fingerprint ─────────── */
+  bumpLearningStyle: (dimension) => {
+    set(state => {
+      if (state.learningStyleLocked) return state
+      const newStyle = { ...state.learningStyle, [dimension]: (state.learningStyle[dimension] || 0) + 1 }
+      const newTotal = state.learningStyleTotal + 1
+      const shouldLock = newTotal >= 8
+
+      // Normalize each dimension to 0-100 based on max value
+      const maxVal = Math.max(...Object.values(newStyle), 1)
+      const normalized = Object.fromEntries(
+        Object.entries(newStyle).map(([k, v]) => [k, Math.round((v / maxVal) * 100)])
+      )
+
+      const updated = {
+        ...state,
+        learningStyle: newStyle,
+        learningStyleTotal: newTotal,
+        learningStyleLocked: shouldLock,
+        // store raw values; normalization is computed on read
+      }
+      save(updated)
+      return updated
+    })
+  },
+
+  /* ── Concept map (Memory Palace) ────────── */
+  touchConceptNode: (label, mastery) => {
+    if (!label) return
+    set(state => {
+      const norm = label.toLowerCase().trim()
+      const existing = state.conceptMap.find(c => c.label.toLowerCase() === norm)
+      let newMap
+      if (existing) {
+        newMap = state.conceptMap.map(c =>
+          c.label.toLowerCase() === norm
+            ? { ...c, mastery, lastSeen: Date.now(), visits: c.visits + 1 }
+            : c
+        )
+      } else {
+        const node = { id: Date.now(), label: norm, mastery, category: 'general', firstSeen: Date.now(), lastSeen: Date.now(), visits: 1 }
+        newMap = [...state.conceptMap, node]
+      }
+      // Keep max 40 concepts, trim oldest by firstSeen
+      if (newMap.length > 40) {
+        newMap = [...newMap].sort((a, b) => b.firstSeen - a.firstSeen).slice(0, 40)
+      }
+      const updated = { ...state, conceptMap: newMap }
+      save(updated)
+      return updated
+    })
+  },
+
+  /* ── Struggle predictions ────────────────── */
+  setPredictions: (preds) => {
+    set(state => {
+      const updated = { ...state, strugglePredictions: preds.slice(0, 2) }
+      save(updated)
+      return updated
+    })
+  },
+
+  dismissPrediction: (id) => {
+    set(state => {
+      const updated = { ...state, strugglePredictions: state.strugglePredictions.filter(p => p.id !== id) }
+      save(updated)
+      return updated
+    })
+  },
+
+  computePredictions: () => {
+    const s = get()
+    const recentMastered = s.masteredTopics.slice(-3)
+    const predictions = []
+
+    for (const topic of recentMastered) {
+      const chain = CONCEPT_CHAINS[topic.toLowerCase()]
+      if (!chain) continue
+      for (const candidate of chain) {
+        const alreadyMastered = s.masteredTopics.some(t => t.toLowerCase() === candidate.toLowerCase())
+        if (alreadyMastered) continue
+        if (predictions.some(p => p.concept === candidate)) continue
+
+        const isStruggle = s.struggleZones.some(z => z.toLowerCase() === candidate.toLowerCase())
+        const isHard = HARD_TOPICS.has(candidate.toLowerCase())
+        const confidence = isStruggle ? 85 : isHard ? 60 : 45
+
+        predictions.push({
+          id: Date.now() + predictions.length,
+          concept: candidate,
+          reason: topic,
+          confidence,
+        })
+      }
+    }
+
+    predictions.sort((a, b) => b.confidence - a.confidence)
+    const top2 = predictions.slice(0, 2)
+
+    set(state => {
+      const updated = { ...state, strugglePredictions: top2 }
+      save(updated)
+      return updated
+    })
   },
 }))
