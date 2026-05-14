@@ -13,49 +13,49 @@ const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
 
-const ANALYSIS_PROMPT = `You are an expert math tutor analyzing an image of a student's work.
+const ANALYSIS_PROMPT = `You are an expert math tutor analyzing an image of a student's work. Be thorough and genuinely helpful.
 
-Do NOT solve it. Your role:
-1. Identify the concept.
-2. Write a direct Expert Tip (NOT "The student is..." — use "Goal:", "Key insight:", or imperative voice).
-3. Build a syntaxCard with the general pattern.
-4. Give 3-4 modular steps.
-5. Extract ACTUAL numerical values from the image for variables.
+Do NOT just solve it — teach the method so the student can do it themselves next time.
 
 STRICT JSON RULES (violation causes crash):
 - Output ONLY a raw JSON object. No markdown, no fences, no text outside braces.
-- NO backslashes. Write sqrt(x), x^2, a/b — never use backslashes.
-- All strings ONE LINE. ASCII only.
+- NO backslashes anywhere. Write sqrt(x), x^2, a/b — never LaTeX.
+- All strings must be ONE LINE. ASCII only. No newlines inside strings.
 
-HOTSPOT ANCHORING (critical): x and y are percentage coordinates FROM THE TOP-LEFT of the image.
-Visually locate each key mathematical term in the image and place the hotspot directly on it.
-Example: if the number "21" appears roughly 65% from the left edge and 38% from the top, use x:65, y:38.
-DO NOT guess random positions — anchor each hotspot to a specific visible symbol or number.
+HOTSPOT ANCHORING: x and y are percentage coordinates from the top-left of the image.
+Visually locate each key term and anchor the hotspot directly on it. Do NOT guess.
 
 Output EXACTLY this structure:
 {
-  "topic": "short topic",
-  "coreInsight": "one crisp sentence",
-  "expertTip": "Goal: [direct instruction]. e.g. Goal: Find two numbers that multiply to 21 and add to 10.",
+  "topic": "2-4 word topic name",
+  "coreInsight": "One sentence capturing the key mathematical idea — the WHY, not just what to do.",
+  "expertTip": "Goal: [specific actionable instruction for this exact problem]. Name the technique and why it works here.",
   "syntaxCard": {
-    "pattern": "sqrt(a + b - 2*sqrt(a*b)) = sqrt(a) - sqrt(b)",
-    "conditions": ["a + b = 10", "a * b = 21"]
+    "pattern": "the general algebraic pattern, e.g. sqrt(a + b - 2*sqrt(a*b)) = sqrt(a) - sqrt(b)",
+    "conditions": ["condition 1 the pattern requires", "condition 2"]
   },
   "variables": [
-    { "symbol": "a", "value": "7", "meaning": "larger factor" },
-    { "symbol": "b", "value": "3", "meaning": "smaller factor" }
+    { "symbol": "a", "value": "7", "meaning": "what this variable represents in context" }
   ],
   "steps": [
-    { "verb": "MATCH", "title": "Match the Pattern", "body": "one short sentence", "formula": "sqrt(a) - sqrt(b) = sqrt(a + b - 2*sqrt(a*b))", "proTip": "10 words max on WHY" },
-    { "verb": "SOLVE", "title": "Solve for a and b", "body": "one short sentence", "formula": "a + b = 10, a * b = 21", "proTip": "10 words max" }
+    {
+      "verb": "IDENTIFY",
+      "title": "Identify the Structure",
+      "body": "2-3 sentences. Explain clearly what the student needs to recognise here and why. Connect to the general pattern.",
+      "formula": "the key formula or expression for this step",
+      "worked": "the actual calculation using the values from this image, e.g. a + b = 7 + 3 = 10",
+      "proTip": "Name the single most common mistake students make at this step and how to avoid it."
+    }
   ],
   "hotspots": [
-    { "id": "h1", "x": 55, "y": 35, "label": "The Sum", "detail": "This is a + b. Identify which number this equals.", "linkedVar": "a" },
-    { "id": "h2", "x": 70, "y": 35, "label": "The Product", "detail": "This is a * b. Find its factor pairs.", "linkedVar": "b" }
+    { "id": "h1", "x": 55, "y": 35, "label": "Short label", "detail": "2-3 sentences explaining what this term is, what role it plays, and what the student should do with it.", "linkedVar": "a" }
   ]
 }
 
-variables.value: ACTUAL number from the image. steps: 3-4 max. hotspots: pin to VISIBLE terms in the image.`
+Steps: give 4-5 steps. Each step body must be 2-3 sentences — genuinely explain the reasoning.
+The worked field must show the actual numbers from the image, not variables.
+variables.value: use the ACTUAL number visible in the image.
+hotspots: 2-3, pinned to specific visible symbols or numbers.`
 
 /* ─── Unicode math prettifier ─── */
 function mathify(text) {
@@ -176,7 +176,7 @@ export default function AevaLens({ file, onClose, onInsightReady, preloadedSessi
             { type: 'text', text: ANALYSIS_PROMPT },
             { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
           ]}],
-          temperature: 0.3, max_tokens: 1400,
+          temperature: 0.3, max_tokens: 2400,
         }),
       })
       const json = await res.json()
@@ -610,65 +610,118 @@ function VariableRow({ v, index, total, highlighted, onClick }) {
 
 function StepCard({ step, index, revealed, onReveal }) {
   const isString = typeof step === 'string'
-  const verb  = isString ? `STEP ${index + 1}` : step.verb?.toUpperCase()
-  const title = isString ? step : step.title
-  const body  = isString ? '' : step.body
+  const verb    = isString ? `STEP ${index + 1}` : (step.verb?.toUpperCase() || `STEP ${index + 1}`)
+  const title   = isString ? step : step.title
+  const body    = isString ? '' : step.body
   const formula = isString ? '' : step.formula
+  const worked  = isString ? '' : step.worked
   const proTip  = isString ? '' : step.proTip
+
+  // Verb colour cycles through accent palette
+  const VERB_COLORS = [
+    { bg: 'rgba(99,102,241,0.18)', border: 'rgba(99,102,241,0.40)', text: '#A5B4FC' },
+    { bg: 'rgba(0,200,255,0.12)',  border: 'rgba(0,200,255,0.32)',  text: '#67E8F9' },
+    { bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.32)', text: '#FCD34D' },
+    { bg: 'rgba(74,222,128,0.12)', border: 'rgba(74,222,128,0.28)', text: '#86EFAC' },
+    { bg: 'rgba(239,68,68,0.10)',  border: 'rgba(239,68,68,0.28)',  text: '#FCA5A5' },
+  ]
+  const vc = VERB_COLORS[index % VERB_COLORS.length]
 
   return (
     <motion.div
+      layout
       animate={{
-        background: revealed ? 'rgba(99,102,241,0.10)' : 'rgba(255,255,255,0.025)',
-        borderColor: revealed ? 'rgba(99,102,241,0.35)' : 'rgba(255,255,255,0.08)',
-        opacity: revealed ? 1 : 0.72,
+        background: revealed ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.03)',
+        borderColor: revealed ? 'rgba(99,102,241,0.30)' : 'rgba(255,255,255,0.08)',
       }}
-      transition={{ duration: 0.3 }}
-      style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', padding: '10px 12px', overflow: 'hidden' }}
+      transition={{ layout: { type: 'spring', stiffness: 400, damping: 32 }, duration: 0.25 }}
+      style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}
     >
-      {/* Verb header */}
-      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.10em', color: revealed ? '#A5B4FC' : 'rgba(255,255,255,0.35)', textTransform: 'uppercase', marginBottom: 3 }}>
-        {verb}
+      {/* Header row — always visible */}
+      <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        {/* Large verb pill */}
+        <div style={{
+          flexShrink: 0, padding: '4px 11px', borderRadius: 99,
+          background: vc.bg, border: `1px solid ${vc.border}`,
+          fontSize: 10, fontWeight: 900, letterSpacing: '0.12em',
+          color: vc.text, textTransform: 'uppercase', whiteSpace: 'nowrap',
+        }}>
+          {verb}
+        </div>
+
+        {/* Title */}
+        <div style={{ flex: 1, fontSize: 13.5, fontWeight: 700, color: 'rgba(255,255,255,0.88)', lineHeight: 1.35 }}>
+          {mathify(title)}
+        </div>
+
+        {/* Expand toggle */}
+        {!revealed && (
+          <motion.button
+            whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}
+            onClick={onReveal}
+            style={{
+              flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4,
+              padding: '5px 12px', borderRadius: 99,
+              background: vc.bg, border: `1px solid ${vc.border}`,
+              color: vc.text, fontSize: 11, fontWeight: 700,
+              cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif",
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Show Me <ChevronRight size={10} strokeWidth={2.5} />
+          </motion.button>
+        )}
       </div>
 
-      {/* Step title */}
-      <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4, marginBottom: body ? 4 : 0 }}>
-        {mathify(title)}
-      </div>
-
-      {/* Body */}
-      {body && <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.52)', lineHeight: 1.6 }}>{mathify(body)}</div>}
-
-      {/* Formula — revealed only */}
+      {/* Expanded content — springs open */}
       <AnimatePresence>
-        {revealed && formula && (
+        {revealed && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+            key="expanded"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
             style={{ overflow: 'hidden' }}
           >
-            <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.25)', textAlign: 'center', fontSize: 14, color: '#C4B5FD', letterSpacing: '0.03em' }}>
-              <MathText style={{ fontFamily: 'monospace' }}>{mathify(formula)}</MathText>
+            <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* Body explanation */}
+              {body && (
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.72)', lineHeight: 1.65 }}>
+                  {mathify(body)}
+                </div>
+              )}
+
+              {/* Formula */}
+              {formula && (
+                <div style={{ padding: '9px 14px', borderRadius: 10, background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.25)', textAlign: 'center', fontSize: 15, color: '#C4B5FD', letterSpacing: '0.03em' }}>
+                  <MathText style={{ fontFamily: 'monospace' }}>{mathify(formula)}</MathText>
+                </div>
+              )}
+
+              {/* Worked example with actual numbers */}
+              {worked && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
+                  style={{ padding: '8px 12px', borderRadius: 10, background: `${vc.bg}`, border: `1px solid ${vc.border}` }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: vc.text, opacity: 0.7, marginBottom: 4 }}>Worked</div>
+                  <div style={{ fontSize: 13, color: vc.text, fontFamily: 'monospace', letterSpacing: '0.02em' }}>
+                    <MathText>{mathify(worked)}</MathText>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Pro tip */}
+              {proTip && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.18 }}
+                  style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.45)', lineHeight: 1.55, display: 'flex', gap: 6 }}>
+                  <span style={{ flexShrink: 0 }}>⚠️</span>
+                  <span>{proTip}</span>
+                </motion.div>
+              )}
             </div>
-            {proTip && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}
-                style={{ marginTop: 6, fontSize: 10.5, color: 'rgba(165,180,252,0.65)', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: 4 }}>
-                💡 {proTip}
-              </motion.div>
-            )}
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Show Me button — only when not yet revealed */}
-      {!revealed && (
-        <motion.button
-          whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-          onClick={onReveal}
-          style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 99, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)', color: '#A5B4FC', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif" }}
-        >
-          <ChevronRight size={10} strokeWidth={2.5} />Show Me
-        </motion.button>
-      )}
     </motion.div>
   )
 }

@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ArrowRight, CheckCircle, BookOpen } from 'lucide-react'
+import { X, ArrowRight, CheckCircle, BookOpen, ChevronRight } from 'lucide-react'
 import { useLibraryStore } from './libraryStore'
 
 const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY
@@ -172,47 +172,62 @@ function VariableRow({ v, index, total, highlighted, onClick }) {
 }
 
 function StepCard({ step, index, revealed, onReveal }) {
-  const verb = step.verb || `STEP ${index + 1}`
-  const title = step.title || ''
-  const body = step.body || ''
+  const verb    = step.verb?.toUpperCase() || `STEP ${index + 1}`
+  const title   = step.title || ''
+  const body    = step.body || ''
   const formula = step.formula || ''
-  const proTip = step.proTip || ''
+  const worked  = step.worked || ''
+  const proTip  = step.proTip || ''
+
+  const VERB_COLORS = [
+    { bg: 'rgba(99,102,241,0.18)', border: 'rgba(99,102,241,0.40)', text: '#A5B4FC' },
+    { bg: 'rgba(0,200,255,0.12)',  border: 'rgba(0,200,255,0.32)',  text: '#67E8F9' },
+    { bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.32)', text: '#FCD34D' },
+    { bg: 'rgba(74,222,128,0.12)', border: 'rgba(74,222,128,0.28)', text: '#86EFAC' },
+    { bg: 'rgba(239,68,68,0.10)',  border: 'rgba(239,68,68,0.28)',  text: '#FCA5A5' },
+  ]
+  const vc = VERB_COLORS[index % VERB_COLORS.length]
 
   return (
     <motion.div
+      layout
       initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.04 }}
-      style={{
-        borderRadius: 14,
-        background: revealed ? 'rgba(99,102,241,0.10)' : 'rgba(255,255,255,0.04)',
-        border: `1px solid ${revealed ? 'rgba(99,102,241,0.28)' : 'rgba(255,255,255,0.08)'}`,
-        overflow: 'hidden', transition: 'all 0.2s',
-      }}
+      style={{ borderRadius: 14, background: revealed ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${revealed ? 'rgba(99,102,241,0.28)' : 'rgba(255,255,255,0.08)'}`, overflow: 'hidden' }}
     >
-      <div style={{ padding: '11px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-          <span style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: '0.10em', textTransform: 'uppercase', color: revealed ? '#A78BFA' : 'rgba(255,255,255,0.28)', flexShrink: 0 }}>{verb}</span>
-          <span style={{ fontSize: 12.5, fontWeight: 600, color: revealed ? 'rgba(255,255,255,0.88)' : 'rgba(255,255,255,0.52)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {mathify(title)}
-          </span>
+      <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ flexShrink: 0, padding: '4px 11px', borderRadius: 99, background: vc.bg, border: `1px solid ${vc.border}`, fontSize: 10, fontWeight: 900, letterSpacing: '0.12em', color: vc.text, textTransform: 'uppercase' }}>
+          {verb}
+        </div>
+        <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.88)', lineHeight: 1.35 }}>
+          {mathify(title)}
         </div>
         {!revealed && (
-          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onReveal}
-            style={{ padding: '4px 10px', borderRadius: 8, background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.28)', color: '#A78BFA', fontSize: 10, fontWeight: 700, cursor: 'pointer', flexShrink: 0, fontFamily: "'Inter', system-ui, sans-serif" }}>
-            Show Me
+          <motion.button whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }} onClick={onReveal}
+            style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 99, background: vc.bg, border: `1px solid ${vc.border}`, color: vc.text, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif" }}>
+            Show Me <ChevronRight size={10} strokeWidth={2.5} />
           </motion.button>
         )}
       </div>
       <AnimatePresence>
         {revealed && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-            style={{ overflow: 'hidden', paddingLeft: 14, paddingRight: 14, paddingBottom: 12 }}>
-            {body && <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6, marginBottom: formula ? 8 : 0 }}>{mathify(body)}</div>}
-            {formula && (
-              <div style={{ padding: '7px 10px', borderRadius: 9, background: 'rgba(139,143,255,0.12)', border: '1px solid rgba(139,143,255,0.22)', fontFamily: 'monospace', fontSize: 12.5, color: 'rgba(200,190,255,0.95)', fontWeight: 600, marginBottom: proTip ? 7 : 0 }}>
-                <MathText style={{ fontFamily: 'monospace' }}>{mathify(formula)}</MathText>
-              </div>
-            )}
-            {proTip && <div style={{ fontSize: 10.5, color: 'rgba(251,191,36,0.70)', fontStyle: 'italic' }}>💡 {mathify(proTip)}</div>}
+          <motion.div key="expanded" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            style={{ overflow: 'hidden' }}>
+            <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 9 }}>
+              {body && <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.70)', lineHeight: 1.65 }}>{mathify(body)}</div>}
+              {formula && (
+                <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(139,143,255,0.12)', border: '1px solid rgba(139,143,255,0.22)', fontFamily: 'monospace', fontSize: 13.5, color: 'rgba(200,190,255,0.95)', textAlign: 'center' }}>
+                  <MathText style={{ fontFamily: 'monospace' }}>{mathify(formula)}</MathText>
+                </div>
+              )}
+              {worked && (
+                <div style={{ padding: '7px 11px', borderRadius: 10, background: vc.bg, border: `1px solid ${vc.border}` }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: vc.text, opacity: 0.7, marginBottom: 3 }}>Worked</div>
+                  <div style={{ fontSize: 13, color: vc.text, fontFamily: 'monospace' }}><MathText>{mathify(worked)}</MathText></div>
+                </div>
+              )}
+              {proTip && <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.42)', lineHeight: 1.55, display: 'flex', gap: 6 }}><span>⚠️</span><span>{mathify(proTip)}</span></div>}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

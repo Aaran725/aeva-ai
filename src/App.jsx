@@ -1128,7 +1128,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
       style={{
         position: 'relative', minHeight: '100vh', width: '100%',
         overflowX: 'hidden', overflowY: 'auto',
-        background: 'linear-gradient(135deg, #08091a 0%, #0f1228 38%, #0c0e2c 68%, #07091a 100%)',
+        background: 'transparent',
         fontFamily: "'Inter', system-ui, sans-serif",
       }}
     >
@@ -2092,8 +2092,8 @@ function ChatView({ onBack }) {
 
   // Background theme for mission mode
   const missionBg = isMission
-    ? `linear-gradient(172deg, #05071a 0%, #080a20 40%, #0a0c25 100%)`
-    : 'linear-gradient(172deg, #BFC9D4 0%, #C7CFD9 22%, #D1D9E4 48%, #DADDE8 72%, #E4E7F0 100%)'
+    ? `linear-gradient(172deg, rgba(5,7,26,0.92) 0%, rgba(8,10,32,0.92) 40%, rgba(10,12,37,0.92) 100%)`
+    : 'linear-gradient(172deg, rgba(191,201,212,0.94) 0%, rgba(199,207,217,0.94) 22%, rgba(209,217,228,0.94) 48%, rgba(218,221,232,0.94) 72%, rgba(228,231,240,0.94) 100%)'
 
   const missionGlow = isMission && activeMission
     ? { position: 'absolute', top: 0, left: 0, right: 0, height: 320, background: `radial-gradient(ellipse at 50% 0%, ${activeMission.glow} 0%, transparent 70%)`, pointerEvents: 'none' }

@@ -10,10 +10,35 @@
 html, body {
   width: 100%;
   height: 100%;
-  background: #08091a;           /* dark navy — prevents white flash */
+  background: #07091a;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Animated mesh gradient — sits behind everything */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 70% 55% at 15% 25%, rgba(88,28,135,0.38) 0%, transparent 65%),
+    radial-gradient(ellipse 55% 45% at 85% 15%, rgba(49,46,129,0.32) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 65% 85%, rgba(30,27,75,0.40) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 35% at 45% 50%, rgba(109,40,217,0.12) 0%, transparent 55%);
+  background-size: 200% 200%;
+  animation: meshDrift 22s ease-in-out infinite alternate;
+}
+
+@keyframes meshDrift {
+  0%   { background-position: 0% 0%,   100% 0%,   0% 100%,  50% 50% }
+  33%  { background-position: 30% 60%,  70% 40%,   30% 70%,  20% 80% }
+  66%  { background-position: 70% 20%,  20% 70%,   80% 30%,  80% 20% }
+  100% { background-position: 100% 100%, 0% 100%, 100% 0%,   30% 70% }
+}
+
+#root { position: relative; z-index: 1; }
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
