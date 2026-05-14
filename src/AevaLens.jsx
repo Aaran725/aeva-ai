@@ -7,6 +7,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Plus, Crop, Scan, CheckCircle, ChevronRight } from 'lucide-react'
+import { useLibraryStore } from './libraryStore'
 
 const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
@@ -93,9 +94,10 @@ function mathify(text) {
 }
 
 /* ─── Main Component ─── */
-export default function AevaLens({ file, onClose, onInsightReady }) {
-  const [phase, setPhase] = useState('select')
-  const [analysis, setAnalysis] = useState(null)
+export default function AevaLens({ file, onClose, onInsightReady, preloadedSession = null }) {
+  const { saveSession } = useLibraryStore()
+  const [phase, setPhase] = useState(preloadedSession ? 'result' : 'select')
+  const [analysis, setAnalysis] = useState(preloadedSession?.analysis || null)
   const [errorMsg, setErrorMsg] = useState('')
 
   // Hotspot & variable linking
@@ -182,8 +184,23 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
       const raw = json.choices?.[0]?.message?.content || ''
       const jsonMatch = raw.match(/\{[\s\S]*\}/)
       if (!jsonMatch) throw new Error('No JSON in response')
-      setAnalysis(safeParseJSON(jsonMatch[0]))
+      const parsed = safeParseJSON(jsonMatch[0])
+      setAnalysis(parsed)
       setPhase('result')
+      // Auto-save to library
+      if (parsed) {
+        saveSession({
+          type: 'lens',
+          topic: parsed.topic || 'Aeva Lens',
+          coreInsight: parsed.coreInsight || '',
+          pattern: parsed.syntaxCard?.pattern || null,
+          variables: parsed.variables || [],
+          steps: parsed.steps || [],
+          imageData: croppedSrc || null,
+          rawText: null,
+          analysis: parsed,
+        })
+      }
     } catch (err) {
       console.error('Aeva Lens error:', err)
       setErrorMsg(err.message || 'Unknown error')

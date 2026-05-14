@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, createContext, useContext } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowUp, Zap, TrendingDown, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera } from 'lucide-react'
+import { ArrowUp, Zap, TrendingDown, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer } from 'lucide-react'
 import { supabase } from './supabase'
 import { useArcadeStore } from './arcadeStore'
 import { useLabStore } from './labStore'
@@ -14,6 +14,9 @@ import PersonalProgress from './PersonalProgress'
 import { useSRStore } from './srStore'
 import AevaLens from './AevaLens'
 import DebateArena from './DebateArena'
+import AevaLibrary from './AevaLibrary'
+import CustomDrill from './CustomDrill'
+import { useLibraryStore } from './libraryStore'
 import './index.css'
 
 /* ─── Groq API ─── */
@@ -1103,9 +1106,11 @@ function DashboardView({ onChatOpen, onSignOut }) {
   const { openArcade } = useArcadeStore()
   const { openLab } = useLabStore()
   const { getDueCount } = useSRStore()
+  const { sessions } = useLibraryStore()
   const srDueCount = getDueCount()
   const [fingerprintOpen, setFingerprintOpen] = useState(false)
   const [palaceOpen, setPalaceOpen] = useState(false)
+  const [libraryOpen, setLibraryOpen] = useState(false)
 
   return (
     <motion.div
@@ -1135,6 +1140,30 @@ function DashboardView({ onChatOpen, onSignOut }) {
             <span style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.88)', letterSpacing: '-0.02em' }}>aeva</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {/* Library button */}
+            <motion.button
+              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+              onClick={() => setLibraryOpen(true)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 7,
+                padding: '7px 16px', borderRadius: 99,
+                background: 'rgba(167,139,250,0.12)',
+                border: '1px solid rgba(167,139,250,0.30)',
+                color: 'rgba(255,255,255,0.75)',
+                fontFamily: "'Inter', system-ui, sans-serif",
+                fontSize: 12.5, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.01em',
+                position: 'relative',
+              }}
+            >
+              <BookOpen size={13} />
+              Library
+              {sessions.length > 0 && (
+                <span style={{ padding: '1px 6px', borderRadius: 99, background: 'rgba(167,139,250,0.25)', fontSize: 9.5, fontWeight: 800, color: '#A78BFA' }}>
+                  {sessions.length}
+                </span>
+              )}
+            </motion.button>
+
             {/* Training Lab button */}
             <motion.button
               whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
@@ -1259,6 +1288,22 @@ function DashboardView({ onChatOpen, onSignOut }) {
 
       <AnimatePresence>
         {palaceOpen && <MemoryPalace onClose={() => setPalaceOpen(false)} />}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {libraryOpen && (
+          <AevaLibrary
+            onClose={() => setLibraryOpen(false)}
+            onReopenLens={session => {
+              setLibraryOpen(false)
+              /* lens re-open handled via URL state — future enhancement */
+            }}
+            onReopenDrill={session => {
+              setLibraryOpen(false)
+              /* drill re-open handled via URL state — future enhancement */
+            }}
+          />
+        )}
       </AnimatePresence>
     </motion.div>
   )
@@ -1913,6 +1958,13 @@ function ChatView({ onBack }) {
   const [lensFile, setLensFile] = useState(null)
   const [visualInsights, setVisualInsights] = useState([])
   const lensInputRef = useRef(null)
+  const [drillOpen, setDrillOpen] = useState(false)
+  const [libraryOpen, setLibraryOpen] = useState(false)
+  const [lockInActive, setLockInActive] = useState(false)
+  const [lockInSecondsLeft, setLockInSecondsLeft] = useState(25 * 60)
+  const [lockInSummary, setLockInSummary] = useState(null)
+  const lockInStartExchangesRef = useRef(0)
+  const lockInTimerRef = useRef(null)
   const [countdown, setCountdown] = useState(null)
   const countdownRef = useRef(null)
   const abortRef = useRef(null)
@@ -1967,6 +2019,46 @@ function ChatView({ onBack }) {
       setCountdown(null)
     }
   }, [input])
+
+  // Lock-In timer
+  useEffect(() => {
+    if (!lockInActive) return
+    lockInTimerRef.current = setInterval(() => {
+      setLockInSecondsLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(lockInTimerRef.current)
+          const exchanges = exchangeCountRef.current - lockInStartExchangesRef.current
+          const focusScore = Math.min(100, Math.round((exchanges / 10) * 100))
+          setLockInSummary({ focusScore, exchanges, duration: 25 * 60 })
+          setLockInActive(false)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => clearInterval(lockInTimerRef.current)
+  }, [lockInActive])
+
+  const startLockIn = () => {
+    lockInStartExchangesRef.current = exchangeCountRef.current
+    setLockInSecondsLeft(25 * 60)
+    setLockInSummary(null)
+    setLockInActive(true)
+  }
+
+  const exitLockIn = () => {
+    clearInterval(lockInTimerRef.current)
+    const exchanges = exchangeCountRef.current - lockInStartExchangesRef.current
+    const elapsed = 25 * 60 - lockInSecondsLeft
+    const focusScore = Math.min(100, Math.round((exchanges / Math.max(1, elapsed / 150)) * 100))
+    setLockInSummary({ focusScore, exchanges, duration: elapsed })
+    setLockInActive(false)
+  }
+
+  const lockInMinutes = Math.floor(lockInSecondsLeft / 60)
+  const lockInSecs = lockInSecondsLeft % 60
+  const lockInDisplay = `${String(lockInMinutes).padStart(2,'0')}:${String(lockInSecs).padStart(2,'0')}`
+  const lockInUrgent = lockInActive && lockInSecondsLeft <= 60
 
   // Per-mission opening opts (same shape as MISSION_OPTS in send())
   const MISSION_OPEN_OPTS = {
@@ -2113,9 +2205,12 @@ function ChatView({ onBack }) {
         exchangeCountRef.current += 1
         advanceSessionState(exchangeCountRef.current, criticResult)
         systemPrompt = buildAevaPrompt(sessionState, criticResult, name, null, buildMemoryBlock(name))
+        if (lockInActive) {
+          systemPrompt += '\n\nLOCK-IN MODE: The student is in a deep-work Pomodoro session. Keep every response to 2 sentences maximum — surgical, no elaboration. Move them forward, not sideways.'
+        }
       }
 
-      const streamOpts = isMission ? (MISSION_OPTS[activeMode] || {}) : {}
+      const streamOpts = isMission ? (MISSION_OPTS[activeMode] || {}) : lockInActive ? { maxTokens: 80 } : {}
 
       await streamGroq(
         history,
@@ -2181,9 +2276,17 @@ function ChatView({ onBack }) {
       }
     } catch (err) {
       if (err.name !== 'AbortError') {
+        console.error('[Aeva send error]', err)
+        const friendly = err.message?.includes('429')
+          ? 'Rate limit hit — Groq is busy. Wait a few seconds and try again.'
+          : err.message?.includes('401') || err.message?.includes('403')
+          ? 'API key issue. Check your Groq key in settings.'
+          : err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')
+          ? 'No internet connection. Check your network and try again.'
+          : `Something went wrong (${err.message || 'unknown error'}). Try again.`
         setMessages(prev => {
           const copy = [...prev]
-          copy[copy.length - 1] = { role: 'model', text: 'Something went wrong. Please try again.', streaming: false }
+          copy[copy.length - 1] = { role: 'model', text: friendly, streaming: false }
           return copy
         })
       }
@@ -2346,17 +2449,52 @@ function ChatView({ onBack }) {
             })()}
 
             {!isMission && (
-              <button
-                onClick={() => setStudyGuideOpen(true)}
-                style={{
-                  padding: '5px 12px', borderRadius: 99, cursor: 'pointer',
-                  background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',
-                  color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: 600,
-                  fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: '0.04em',
-                }}
-              >
-                📋 Study Guide
-              </button>
+              <>
+                {/* Lock-In toggle */}
+                <motion.button
+                  whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                  onClick={lockInActive ? exitLockIn : startLockIn}
+                  animate={lockInUrgent ? { boxShadow: ['0 0 0px rgba(239,68,68,0)', '0 0 12px rgba(239,68,68,0.70)', '0 0 0px rgba(239,68,68,0)'] } : {}}
+                  transition={{ boxShadow: { duration: 0.8, repeat: Infinity } }}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                    padding: '5px 11px', borderRadius: 99, cursor: 'pointer',
+                    background: lockInActive ? (lockInUrgent ? 'rgba(239,68,68,0.15)' : 'rgba(74,222,128,0.12)') : 'rgba(255,255,255,0.07)',
+                    border: `1px solid ${lockInActive ? (lockInUrgent ? 'rgba(239,68,68,0.40)' : 'rgba(74,222,128,0.30)') : 'rgba(255,255,255,0.14)'}`,
+                    color: lockInActive ? (lockInUrgent ? '#F87171' : '#4ADE80') : 'rgba(255,255,255,0.50)',
+                    fontSize: 11, fontWeight: 700, fontFamily: "'Inter', system-ui, sans-serif",
+                  }}
+                >
+                  <Timer size={11} />
+                  {lockInActive ? lockInDisplay : 'Lock-In'}
+                </motion.button>
+
+                {/* Library */}
+                <motion.button
+                  whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                  onClick={() => setLibraryOpen(true)}
+                  style={{
+                    padding: '5px 11px', borderRadius: 99, cursor: 'pointer',
+                    background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.24)',
+                    color: 'rgba(167,139,250,0.80)', fontSize: 11, fontWeight: 600,
+                    fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', alignItems: 'center', gap: 5,
+                  }}
+                >
+                  <BookOpen size={11} /> Library
+                </motion.button>
+
+                <button
+                  onClick={() => setStudyGuideOpen(true)}
+                  style={{
+                    padding: '5px 12px', borderRadius: 99, cursor: 'pointer',
+                    background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',
+                    color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: 600,
+                    fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: '0.04em',
+                  }}
+                >
+                  📋 Study Guide
+                </button>
+              </>
             )}
             <div style={{ width: 24, height: 24, borderRadius: 7, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Star size={11} color="white" fill="white" />
@@ -2590,23 +2728,26 @@ function ChatView({ onBack }) {
                 }}
               />
               <div style={{ width: '100%', maxWidth: isMission ? 720 : 640, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 10px 10px 16px', backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)', borderRadius: 999, transition: 'border 0.3s, box-shadow 0.3s', ...inputBarStyle }}>
-                {/* Lens camera button */}
+                {/* Lens camera button + Custom Drill button */}
                 {!isMission && (
-                  <motion.button
-                    whileHover={{ scale: 1.08 }}
-                    whileTap={{ scale: 0.90 }}
-                    onClick={() => lensInputRef.current?.click()}
-                    title="Aeva Lens — analyse an image"
-                    style={{
-                      flexShrink: 0, width: 32, height: 32, borderRadius: '50%',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'rgba(0,200,255,0.10)', border: '1.5px solid rgba(0,200,255,0.28)',
-                      cursor: 'pointer', color: 'rgba(0,200,255,0.70)',
-                      transition: 'background 0.2s, border 0.2s',
-                    }}
-                  >
-                    <Camera size={14} strokeWidth={2} />
-                  </motion.button>
+                  <>
+                    <motion.button
+                      whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.90 }}
+                      onClick={() => lensInputRef.current?.click()}
+                      title="Aeva Lens — analyse an image"
+                      style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,200,255,0.10)', border: '1.5px solid rgba(0,200,255,0.28)', cursor: 'pointer', color: 'rgba(0,200,255,0.70)' }}
+                    >
+                      <Camera size={14} strokeWidth={2} />
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.90 }}
+                      onClick={() => setDrillOpen(true)}
+                      title="Custom Drill — paste notes to build a HUD"
+                      style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(167,139,250,0.10)', border: '1.5px solid rgba(167,139,250,0.28)', cursor: 'pointer', color: 'rgba(167,139,250,0.75)' }}
+                    >
+                      <PenLine size={14} strokeWidth={2} />
+                    </motion.button>
+                  </>
                 )}
                 <input
                   ref={inputRef}
@@ -2663,6 +2804,69 @@ function ChatView({ onBack }) {
             visualInsights={visualInsights}
             onClose={() => setStudyGuideOpen(false)}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Custom Drill Modal */}
+      <AnimatePresence>
+        {drillOpen && <CustomDrill onClose={() => setDrillOpen(false)} />}
+      </AnimatePresence>
+
+      {/* Library Modal */}
+      <AnimatePresence>
+        {libraryOpen && (
+          <AevaLibrary
+            onClose={() => setLibraryOpen(false)}
+            onReopenLens={() => setLibraryOpen(false)}
+            onReopenDrill={() => setLibraryOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Lock-In ambient overlay */}
+      <AnimatePresence>
+        {lockInActive && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 5,
+              background: 'radial-gradient(ellipse at 50% 100%, rgba(74,222,128,0.05) 0%, transparent 60%)',
+              borderTop: lockInUrgent ? '2px solid rgba(239,68,68,0.50)' : '2px solid rgba(74,222,128,0.25)',
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Lock-In Focus Summary */}
+      <AnimatePresence>
+        {lockInSummary && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, zIndex: 800, background: 'rgba(4,6,20,0.90)', backdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Inter', system-ui, sans-serif" }}
+            onClick={() => setLockInSummary(null)}>
+            <motion.div initial={{ scale: 0.88, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.88, y: 20 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 26 }}
+              onClick={e => e.stopPropagation()}
+              style={{ width: '100%', maxWidth: 380, borderRadius: 28, padding: '32px 28px', background: 'rgba(12,14,32,0.98)', border: '1px solid rgba(74,222,128,0.28)', boxShadow: '0 32px 80px rgba(0,0,0,0.70)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
+              <div style={{ fontSize: 36 }}>🎯</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.02em' }}>Focus Session Complete</div>
+              <div style={{ display: 'flex', gap: 12, width: '100%' }}>
+                {[
+                  { label: 'Focus Efficiency', value: `${lockInSummary.focusScore}%`, color: '#4ADE80' },
+                  { label: 'Exchanges', value: lockInSummary.exchanges, color: '#60A5FA' },
+                  { label: 'Duration', value: `${Math.round(lockInSummary.duration / 60)}m`, color: '#A78BFA' },
+                ].map(s => (
+                  <div key={s.label} style={{ flex: 1, padding: '14px 10px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', textAlign: 'center' }}>
+                    <div style={{ fontSize: 26, fontWeight: 900, color: s.color, letterSpacing: '-0.03em' }}>{s.value}</div>
+                    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.30)', marginTop: 4 }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+              <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                onClick={() => setLockInSummary(null)}
+                style={{ width: '100%', padding: '13px', borderRadius: 14, background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.28)', color: '#4ADE80', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif" }}>
+                Back to Learning
+              </motion.button>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </motion.div>
