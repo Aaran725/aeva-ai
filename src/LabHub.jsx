@@ -337,7 +337,7 @@ function FlashcardDrill({ data, topic, onExit }) {
 }
 
 /* ═══ SPACED REVIEW DRILL ════════════════════════════ */
-function ReviewDrill({ data, onExit }) {
+function ReviewDrill({ data, onExit, onNewDrill }) {
   const { recordCard } = useSRStore()
   const cards = data?.cards || []
   const [idx, setIdx]           = useState(0)
@@ -426,13 +426,23 @@ function ReviewDrill({ data, onExit }) {
           </div>
         </div>
 
-        <button onClick={onExit} style={{
-          padding: '12px', borderRadius: 14,
-          background: 'rgba(34,197,94,0.14)', border: '1px solid rgba(34,197,94,0.35)',
-          color: '#86EFAC', fontSize: 13.5, fontWeight: 700, cursor: 'pointer',
-        }}>
-          Done ✓
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={onExit} style={{
+            flex: 1, padding: '12px', borderRadius: 14,
+            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
+            color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+          }}>
+            Close
+          </button>
+          <button onClick={onNewDrill} style={{
+            flex: 2, padding: '12px', borderRadius: 14,
+            background: 'rgba(34,197,94,0.16)', border: '1px solid rgba(34,197,94,0.38)',
+            color: '#86EFAC', fontSize: 13.5, fontWeight: 700, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+          }}>
+            Drill new topic <ArrowRight size={14} />
+          </button>
+        </div>
       </motion.div>
     )
   }
@@ -1358,7 +1368,14 @@ export default function LabHub() {
                     ← back to drills
                   </button>
                   {activeDrill === 'review'
-                    ? (drillData ? <ReviewDrill data={drillData} onExit={exitDrill} /> : <LabLoading topic="Spaced Review" />)
+                    ? (drillData
+                        ? <ReviewDrill
+                            data={drillData}
+                            onExit={exitDrill}
+                            onNewDrill={() => { exitDrill(); setTimeout(() => inputRef.current?.focus(), 100) }}
+                          />
+                        : <LabLoading topic="Spaced Review" />
+                      )
                     : drillLoading
                       ? <LabLoading topic={currentTopic} />
                       : drillData
