@@ -75,15 +75,20 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
 
   // Region selection state
   const [imgSrc, setImgSrc] = useState(null)
-  const [selection, setSelection] = useState(null)   // { x1,y1,x2,y2 } as % of container
+  const [croppedSrc, setCroppedSrc] = useState(null)  // shown in result view
+  const [selection, setSelection] = useState(null)    // { x1,y1,x2,y2 } as % of container
   const [dragStart, setDragStart] = useState(null)
   const imgContainerRef = useRef(null)
   const imgRef = useRef(null)
+  const croppedUrlRef = useRef(null)
 
   useEffect(() => {
     const url = URL.createObjectURL(file)
     setImgSrc(url)
-    return () => URL.revokeObjectURL(url)
+    return () => {
+      URL.revokeObjectURL(url)
+      if (croppedUrlRef.current) URL.revokeObjectURL(croppedUrlRef.current)
+    }
   }, [file])
 
   /* ── Drag selection helpers ── */
@@ -135,7 +140,15 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
 
       let blob = file
       if (hasSelection && imgRef.current) {
-        blob = await cropImageBlob(file, selection, imgRef.current) || file
+        const cropped = await cropImageBlob(file, selection, imgRef.current)
+        if (cropped) {
+          blob = cropped
+          // Show the cropped region in the result view
+          if (croppedUrlRef.current) URL.revokeObjectURL(croppedUrlRef.current)
+          const url = URL.createObjectURL(cropped)
+          croppedUrlRef.current = url
+          setCroppedSrc(url)
+        }
       }
 
       const base64 = await fileToBase64(blob)
@@ -229,7 +242,15 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
             userSelect: 'none',
           }}
         >
-          {imgSrc && (
+          {/* In result view show cropped region; otherwise full image */}
+          {phase === 'result' && croppedSrc ? (
+            <img
+              src={croppedSrc}
+              alt="Selected region"
+              draggable={false}
+              style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', maxHeight: '92vh', pointerEvents: 'none' }}
+            />
+          ) : imgSrc && (
             <img
               ref={imgRef}
               src={imgSrc}
@@ -358,6 +379,25 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
               onClick={() => setActiveHotspot(prev => prev?.id === hs.id ? null : hs)}
             />
           ))}
+
+          {/* Result: "select another" pill at bottom of image */}
+          {phase === 'result' && (
+            <button
+              onClick={() => { setPhase('select'); setSelection(null); setCroppedSrc(null); setAnalysis(null); setActiveHotspot(null) }}
+              style={{
+                position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)',
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '6px 14px', borderRadius: 99,
+                background: 'rgba(0,0,0,0.60)', border: '1px solid rgba(255,255,255,0.16)',
+                color: 'rgba(255,255,255,0.55)', fontSize: 11.5, fontWeight: 600,
+                cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif",
+                backdropFilter: 'blur(8px)', whiteSpace: 'nowrap',
+              }}
+            >
+              <Crop size={11} strokeWidth={2.5} />
+              Select another question
+            </button>
+          )}
 
           {/* Close button */}
           <button
