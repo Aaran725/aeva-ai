@@ -1,55 +1,63 @@
 /**
  * Aeva Lens — Vision-to-Logic
- * Drag to select a region → Groq Llama 4 Scout analyses it.
+ * Drag-to-select region → Groq Llama 4 Scout analyses it.
+ * Features: modular step cards, Show Me expand, predictive variables,
+ *           syntax pattern card, hotspot↔variable linking, glassmorphism.
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Plus, Crop, Scan } from 'lucide-react'
+import { X, Plus, Crop, Scan, CheckCircle, ChevronRight } from 'lucide-react'
 
 const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
 
-const ANALYSIS_PROMPT = `You are an expert tutor analyzing an image of a student's work.
+const ANALYSIS_PROMPT = `You are an expert tutor analyzing an image of a student's math or science work.
 
-Your job is NOT to solve it. Instead:
-1. Identify the concept or skill being tested.
-2. Pinpoint the EXACT struggle point — where did they go wrong or get stuck?
-3. Explain the underlying rule that resolves the confusion.
-4. Identify 2-3 specific hotspot regions worth explaining.
+Do NOT solve it for them. Your role:
+1. Identify the concept being tested.
+2. Pinpoint the struggle point.
+3. Explain the rule with a clean pattern (syntaxCard).
+4. Give 3-4 modular steps with SHORT formulas.
+5. Extract actual numerical values from the image for variables (e.g. a=5, b=2). If a value cannot be read, use "?".
 
-STRICT JSON RULES — breaking these will cause errors:
-- Output ONLY a valid JSON object. No markdown fences, no extra text before or after.
-- NO LaTeX or backslashes. Write sqrt(x), x^2, x/y, a*b — never \\sqrt, \\frac.
-- All string values must be single-line. No literal newline characters inside strings.
-- Use only plain ASCII characters inside strings.
+STRICT JSON RULES (violation causes crash):
+- Output ONLY a raw JSON object. Zero markdown, zero fences, zero text outside braces.
+- NO backslashes at all. Write sqrt(x) not \\sqrt{x}. Write x^2 not x^{2}. Write a/b not \\frac.
+- All string values are ONE LINE. No newlines inside strings.
+- ASCII only inside strings.
 
-Output this exact structure (fill in the values):
+Output EXACTLY this structure:
 {
-  "topic": "topic name",
-  "coreInsight": "one sentence on the central concept",
-  "strugglePoint": "one sentence on where the confusion is",
-  "explanation": "2-3 sentences on the underlying rule in plain language",
+  "topic": "short topic",
+  "coreInsight": "one sentence",
+  "strugglePoint": "one sentence on where they are stuck",
+  "syntaxCard": {
+    "pattern": "the general form e.g. sqrt(a + b - 2*sqrt(a*b))",
+    "conditions": ["a + b = value", "a * b = value"]
+  },
   "variables": [
-    { "symbol": "a", "meaning": "what it represents" }
+    { "symbol": "a", "value": "5", "meaning": "first term" },
+    { "symbol": "b", "value": "2", "meaning": "second term" }
   ],
   "steps": [
-    "Step 1: ...",
-    "Step 2: ..."
+    { "verb": "MATCH", "title": "Match the Pattern", "body": "one short sentence", "formula": "sqrt(a) - sqrt(b) = sqrt(a + b - 2*sqrt(a*b))", "proTip": "10 words max on WHY" },
+    { "verb": "EXPAND", "title": "Expand the Square", "body": "one short sentence", "formula": "(sqrt(a) - sqrt(b))^2 = a + b - 2*sqrt(a*b)", "proTip": "10 words max on WHY" }
   ],
   "hotspots": [
-    { "id": "h1", "x": 25, "y": 35, "label": "Struggle Point", "detail": "plain text explanation" },
-    { "id": "h2", "x": 65, "y": 55, "label": "Key Rule", "detail": "plain text explanation" }
+    { "id": "h1", "x": 30, "y": 40, "label": "Struggle Point", "detail": "one sentence", "linkedVar": "a" },
+    { "id": "h2", "x": 60, "y": 55, "label": "Key Pattern", "detail": "one sentence", "linkedVar": "b" }
   ]
 }
 
-Variables: empty array [] if non-mathematical. Steps: 3-5 max. Hotspots x,y: percentage from top-left corner of the image.`
+variables.value must be the ACTUAL number seen in the image (e.g. "10", "21") — never a vague description.
+steps: 3-4 max. hotspots: 2-3 max. linkedVar must match a symbol in variables (or omit if no match).`
 
 /* ─── Unicode math prettifier ─── */
 function mathify(text) {
   if (!text) return text
   return text
-    .replace(/sqrt\(([^)]*)\)/g, '√($1)')    // sqrt(x) → √(x)
+    .replace(/sqrt\(([^)]*)\)/g, '√($1)')
     .replace(/\^10\b/g, '¹⁰')
     .replace(/\^([0-9])/g, (_, n) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[n] ?? `^${n}`)
     .replace(/\*/g, '×')
@@ -59,24 +67,30 @@ function mathify(text) {
     .replace(/\bbeta\b/gi, 'β')
     .replace(/\bdelta\b/gi, 'Δ')
     .replace(/\binfinity\b/gi, '∞')
-    .replace(/<=/g, '≤')
-    .replace(/>=/g, '≥')
-    .replace(/!=/g, '≠')
+    .replace(/<=/g, '≤').replace(/>=/g, '≥').replace(/!=/g, '≠')
     .replace(/ - /g, ' − ')
 }
 
 /* ─── Main Component ─── */
 export default function AevaLens({ file, onClose, onInsightReady }) {
-  // phases: select → scanning → result | error
   const [phase, setPhase] = useState('select')
   const [analysis, setAnalysis] = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
-  const [activeHotspot, setActiveHotspot] = useState(null)
 
-  // Region selection state
+  // Hotspot & variable linking
+  const [activeHotspot, setActiveHotspot] = useState(null)
+  const [highlightedVar, setHighlightedVar] = useState(null)
+
+  // Step interactivity
+  const [revealedSteps, setRevealedSteps] = useState(new Set())
+
+  // Add-to-guide animation state
+  const [addState, setAddState] = useState('idle') // idle | adding | done
+
+  // Image & selection
   const [imgSrc, setImgSrc] = useState(null)
-  const [croppedSrc, setCroppedSrc] = useState(null)  // shown in result view
-  const [selection, setSelection] = useState(null)    // { x1,y1,x2,y2 } as % of container
+  const [croppedSrc, setCroppedSrc] = useState(null)
+  const [selection, setSelection] = useState(null)
   const [dragStart, setDragStart] = useState(null)
   const imgContainerRef = useRef(null)
   const imgRef = useRef(null)
@@ -91,95 +105,63 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
     }
   }, [file])
 
-  /* ── Drag selection helpers ── */
+  /* ── Drag selection ── */
   const getRelPos = (e) => {
     const rect = imgContainerRef.current?.getBoundingClientRect()
     if (!rect) return { x: 0, y: 0 }
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    const cx = e.touches ? e.touches[0].clientX : e.clientX
+    const cy = e.touches ? e.touches[0].clientY : e.clientY
     return {
-      x: Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100)),
-      y: Math.max(0, Math.min(100, ((clientY - rect.top) / rect.height) * 100)),
+      x: Math.max(0, Math.min(100, ((cx - rect.left) / rect.width) * 100)),
+      y: Math.max(0, Math.min(100, ((cy - rect.top) / rect.height) * 100)),
     }
   }
-
-  const onDragStart = (e) => {
-    e.preventDefault()
-    const pos = getRelPos(e)
-    setDragStart(pos)
-    setSelection({ x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y })
-  }
-
-  const onDragMove = (e) => {
-    if (!dragStart) return
-    e.preventDefault()
-    const pos = getRelPos(e)
-    setSelection({ x1: dragStart.x, y1: dragStart.y, x2: pos.x, y2: pos.y })
-  }
-
-  const onDragEnd = () => {
-    setDragStart(null)
-  }
+  const onDragStart = (e) => { e.preventDefault(); const p = getRelPos(e); setDragStart(p); setSelection({ x1: p.x, y1: p.y, x2: p.x, y2: p.y }) }
+  const onDragMove  = (e) => { if (!dragStart) return; e.preventDefault(); const p = getRelPos(e); setSelection({ x1: dragStart.x, y1: dragStart.y, x2: p.x, y2: p.y }) }
+  const onDragEnd   = () => setDragStart(null)
 
   const selRect = selection ? {
-    left:   `${Math.min(selection.x1, selection.x2)}%`,
-    top:    `${Math.min(selection.y1, selection.y2)}%`,
-    width:  `${Math.abs(selection.x2 - selection.x1)}%`,
-    height: `${Math.abs(selection.y2 - selection.y1)}%`,
+    left: `${Math.min(selection.x1, selection.x2)}%`, top: `${Math.min(selection.y1, selection.y2)}%`,
+    width: `${Math.abs(selection.x2 - selection.x1)}%`, height: `${Math.abs(selection.y2 - selection.y1)}%`,
   } : null
+  const hasSelection = selection && Math.abs(selection.x2 - selection.x1) > 3 && Math.abs(selection.y2 - selection.y1) > 3
 
-  const hasSelection = selection &&
-    Math.abs(selection.x2 - selection.x1) > 3 &&
-    Math.abs(selection.y2 - selection.y1) > 3
-
-  /* ── Crop + analyse ── */
+  /* ── Analyse ── */
   const handleAnalyse = useCallback(async () => {
     setPhase('scanning')
     try {
       if (!GROQ_KEY) throw new Error('VITE_GROQ_API_KEY is not set')
-
       let blob = file
       if (hasSelection && imgRef.current) {
         const cropped = await cropImageBlob(file, selection, imgRef.current)
         if (cropped) {
           blob = cropped
-          // Show the cropped region in the result view
           if (croppedUrlRef.current) URL.revokeObjectURL(croppedUrlRef.current)
           const url = URL.createObjectURL(cropped)
           croppedUrlRef.current = url
           setCroppedSrc(url)
         }
       }
-
       const base64 = await fileToBase64(blob)
       const mimeType = blob.type || 'image/jpeg'
-
       const res = await fetch(GROQ_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
         body: JSON.stringify({
           model: VISION_MODEL,
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'text', text: ANALYSIS_PROMPT },
-              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
-            ],
-          }],
-          temperature: 0.3,
-          max_tokens: 1200,
+          messages: [{ role: 'user', content: [
+            { type: 'text', text: ANALYSIS_PROMPT },
+            { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
+          ]}],
+          temperature: 0.3, max_tokens: 1400,
         }),
       })
-
       const json = await res.json()
       if (!res.ok) throw new Error(json.error?.message || `HTTP ${res.status}`)
-
       const raw = json.choices?.[0]?.message?.content || ''
       const jsonMatch = raw.match(/\{[\s\S]*\}/)
       if (!jsonMatch) throw new Error('No JSON in response')
-
-      const parsed = safeParseJSON(jsonMatch[0])
-      setAnalysis(parsed)
+      setAnalysis(safeParseJSON(jsonMatch[0]))
       setPhase('result')
     } catch (err) {
       console.error('Aeva Lens error:', err)
@@ -188,42 +170,60 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
     }
   }, [file, hasSelection, selection])
 
+  /* ── Hotspot click → link to variable ── */
+  const handleHotspotClick = (hs) => {
+    const isActive = activeHotspot?.id === hs.id
+    setActiveHotspot(isActive ? null : hs)
+    setHighlightedVar(isActive ? null : (hs.linkedVar || null))
+  }
+
+  /* ── Add to Study Guide ── */
+  const handleAdd = () => {
+    if (addState !== 'idle') return
+    setAddState('adding')
+    setTimeout(() => {
+      onInsightReady({
+        topic: analysis.topic,
+        coreInsight: analysis.coreInsight,
+        strugglePoint: analysis.strugglePoint,
+        explanation: analysis.syntaxCard
+          ? `Pattern: ${analysis.syntaxCard.pattern}. Conditions: ${analysis.syntaxCard.conditions?.join(', ')}`
+          : '',
+        steps: (analysis.steps || []).map(s => typeof s === 'string' ? s : `${s.verb}: ${s.title} — ${s.body}`),
+        variables: analysis.variables || [],
+        timestamp: Date.now(),
+      })
+      setAddState('done')
+      setTimeout(onClose, 900)
+    }, 600)
+  }
+
+  /* ── Reset to select ── */
+  const resetToSelect = () => {
+    setPhase('select'); setSelection(null); setCroppedSrc(null)
+    setAnalysis(null); setActiveHotspot(null); setHighlightedVar(null)
+    setRevealedSteps(new Set()); setAddState('idle'); setErrorMsg('')
+  }
+
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 700,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 20,
-        background: 'rgba(2,4,18,0.90)',
-        backdropFilter: 'blur(18px)',
-        WebkitBackdropFilter: 'blur(18px)',
-        fontFamily: "'Inter', system-ui, sans-serif",
-      }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, background: 'rgba(2,4,18,0.90)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', fontFamily: "'Inter', system-ui, sans-serif" }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
       <motion.div
-        initial={{ scale: 0.88, y: 30 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.88, y: 20 }}
+        initial={{ scale: 0.88, y: 30 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.88, y: 20 }}
         transition={{ type: 'spring', stiffness: 320, damping: 26 }}
         style={{
-          width: '100%',
-          maxWidth: phase === 'result' ? 900 : 580,
-          maxHeight: '92vh',
-          borderRadius: 24,
-          overflow: 'hidden',
+          width: '100%', maxWidth: phase === 'result' ? 940 : 580, maxHeight: '92vh',
+          borderRadius: 24, overflow: 'hidden',
           background: 'linear-gradient(160deg, #07091c 0%, #0d0f26 100%)',
           border: '1px solid rgba(255,255,255,0.10)',
-          display: 'flex',
-          flexDirection: phase === 'result' ? 'row' : 'column',
+          display: 'flex', flexDirection: phase === 'result' ? 'row' : 'column',
           transition: 'max-width 0.5s cubic-bezier(0.22,1,0.36,1)',
         }}
       >
-
-        {/* ── Left: image + selection/hotspot overlay ── */}
+        {/* ── Left: image panel ── */}
         <div
           ref={imgContainerRef}
           onMouseDown={phase === 'select' ? onDragStart : undefined}
@@ -232,308 +232,190 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
           onTouchStart={phase === 'select' ? onDragStart : undefined}
           onTouchMove={phase === 'select' ? onDragMove : undefined}
           onTouchEnd={phase === 'select' ? onDragEnd : undefined}
-          style={{
-            position: 'relative',
-            flex: phase === 'result' ? '0 0 50%' : '1',
-            minHeight: 280,
-            overflow: 'hidden',
-            background: '#000',
-            cursor: phase === 'select' ? 'crosshair' : 'default',
-            userSelect: 'none',
-          }}
+          style={{ position: 'relative', flex: phase === 'result' ? '0 0 44%' : '1', minHeight: 280, overflow: 'hidden', background: '#000', cursor: phase === 'select' ? 'crosshair' : 'default', userSelect: 'none' }}
         >
-          {/* In result view show cropped region; otherwise full image */}
-          {phase === 'result' && croppedSrc ? (
-            <img
-              src={croppedSrc}
-              alt="Selected region"
-              draggable={false}
-              style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', maxHeight: '92vh', pointerEvents: 'none' }}
-            />
-          ) : imgSrc && (
-            <img
-              ref={imgRef}
-              src={imgSrc}
-              alt="Uploaded"
-              draggable={false}
-              style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', maxHeight: '92vh', pointerEvents: 'none' }}
-            />
-          )}
+          {/* Image: cropped in result, full otherwise */}
+          {(phase === 'result' && croppedSrc)
+            ? <img src={croppedSrc} alt="Selected region" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', maxHeight: '92vh', pointerEvents: 'none' }} />
+            : imgSrc && <img ref={imgRef} src={imgSrc} alt="Uploaded" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', maxHeight: '92vh', pointerEvents: 'none' }} />
+          }
 
-          {/* Select mode: instruction banner + drag box */}
-          {phase === 'select' && (
-            <>
-              <div style={{
-                position: 'absolute', top: 0, left: 0, right: 0,
-                padding: '8px 12px',
-                background: 'linear-gradient(180deg, rgba(7,9,28,0.85) 0%, transparent 100%)',
-                display: 'flex', alignItems: 'center', gap: 7,
-                pointerEvents: 'none',
-              }}>
-                <Crop size={12} color="rgba(0,200,255,0.75)" strokeWidth={2.5} />
-                <span style={{ fontSize: 11.5, color: 'rgba(0,200,255,0.80)', fontWeight: 600, letterSpacing: '0.04em' }}>
-                  Drag to select a question
-                </span>
-              </div>
-
-              {/* Selection rectangle */}
-              {selRect && (
-                <div style={{
-                  position: 'absolute',
-                  ...selRect,
-                  border: '2px solid #00C8FF',
-                  background: 'rgba(0,200,255,0.10)',
-                  boxShadow: '0 0 0 9999px rgba(0,0,0,0.40)',
-                  pointerEvents: 'none',
-                }} />
-              )}
-
-              {/* Analyse button — appears when selection is big enough */}
-              <AnimatePresence>
-                {hasSelection && (
-                  <motion.button
-                    initial={{ opacity: 0, scale: 0.85 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.85 }}
-                    onClick={e => { e.stopPropagation(); handleAnalyse() }}
-                    style={{
-                      position: 'absolute',
-                      bottom: 14, left: '50%', transform: 'translateX(-50%)',
-                      display: 'flex', alignItems: 'center', gap: 7,
-                      padding: '9px 18px', borderRadius: 99,
-                      background: '#00C8FF',
-                      border: 'none',
-                      color: '#07091c',
-                      fontSize: 12.5, fontWeight: 800,
-                      cursor: 'pointer',
-                      fontFamily: "'Inter', system-ui, sans-serif",
-                      boxShadow: '0 4px 20px rgba(0,200,255,0.45)',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    <Scan size={13} strokeWidth={2.5} />
-                    Analyse selection
-                  </motion.button>
-                )}
-              </AnimatePresence>
-
-              {/* Full image fallback */}
-              {!hasSelection && (
+          {/* SELECT mode UI */}
+          {phase === 'select' && (<>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '8px 12px', background: 'linear-gradient(180deg, rgba(7,9,28,0.85) 0%, transparent 100%)', display: 'flex', alignItems: 'center', gap: 7, pointerEvents: 'none' }}>
+              <Crop size={12} color="rgba(0,200,255,0.75)" strokeWidth={2.5} />
+              <span style={{ fontSize: 11.5, color: 'rgba(0,200,255,0.80)', fontWeight: 600, letterSpacing: '0.04em' }}>Drag to select a question</span>
+            </div>
+            {selRect && (
+              <div style={{ position: 'absolute', ...selRect, border: '2px solid #00C8FF', background: 'rgba(0,200,255,0.10)', boxShadow: '0 0 0 9999px rgba(0,0,0,0.40)', pointerEvents: 'none' }} />
+            )}
+            <AnimatePresence>
+              {hasSelection && (
                 <motion.button
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.8 }}
+                  initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }}
                   onClick={e => { e.stopPropagation(); handleAnalyse() }}
-                  style={{
-                    position: 'absolute',
-                    bottom: 14, left: '50%', transform: 'translateX(-50%)',
-                    padding: '7px 16px', borderRadius: 99,
-                    background: 'rgba(255,255,255,0.08)',
-                    border: '1px solid rgba(255,255,255,0.18)',
-                    color: 'rgba(255,255,255,0.45)',
-                    fontSize: 11.5, fontWeight: 600,
-                    cursor: 'pointer',
-                    fontFamily: "'Inter', system-ui, sans-serif",
-                    whiteSpace: 'nowrap',
-                  }}
+                  style={{ position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', borderRadius: 99, background: '#00C8FF', border: 'none', color: '#07091c', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif", boxShadow: '0 4px 20px rgba(0,200,255,0.45)', whiteSpace: 'nowrap' }}
                 >
-                  or analyse whole image
+                  <Scan size={13} strokeWidth={2.5} />Analyse selection
                 </motion.button>
               )}
-            </>
-          )}
+            </AnimatePresence>
+            {!hasSelection && (
+              <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }}
+                onClick={e => { e.stopPropagation(); handleAnalyse() }}
+                style={{ position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)', padding: '7px 16px', borderRadius: 99, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.18)', color: 'rgba(255,255,255,0.45)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif", whiteSpace: 'nowrap' }}
+              >or analyse whole image</motion.button>
+            )}
+          </>)}
 
-          {/* Scanning beam */}
-          {phase === 'scanning' && (
-            <>
-              <ScanBeam />
-              <div style={{
-                position: 'absolute', inset: 0,
-                background: 'rgba(0,100,255,0.03)',
-                pointerEvents: 'none',
-              }} />
-              <div style={{
-                position: 'absolute', bottom: 0, left: 0, right: 0,
-                padding: '20px 16px',
-                background: 'linear-gradient(0deg, rgba(7,9,28,0.95) 0%, transparent 100%)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-              }}>
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1.1, repeat: Infinity, ease: 'linear' }}
-                  style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(0,200,255,0.2)', borderTopColor: '#00C8FF' }}
-                />
-                <span style={{ fontSize: 12.5, color: 'rgba(0,200,255,0.80)', fontWeight: 600, letterSpacing: '0.06em' }}>
-                  ANALYSING…
-                </span>
-              </div>
-            </>
-          )}
+          {/* SCANNING beam */}
+          {phase === 'scanning' && (<>
+            <ScanBeam />
+            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,100,255,0.03)', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '20px 16px', background: 'linear-gradient(0deg, rgba(7,9,28,0.95) 0%, transparent 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+              <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.1, repeat: Infinity, ease: 'linear' }} style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(0,200,255,0.2)', borderTopColor: '#00C8FF' }} />
+              <span style={{ fontSize: 12.5, color: 'rgba(0,200,255,0.80)', fontWeight: 600, letterSpacing: '0.06em' }}>ANALYSING…</span>
+            </div>
+          </>)}
 
-          {/* Result: hotspot dots */}
+          {/* RESULT: hotspot dots */}
           {phase === 'result' && analysis?.hotspots?.map(hs => (
-            <HotspotDot
-              key={hs.id}
-              hotspot={hs}
-              active={activeHotspot?.id === hs.id}
-              onClick={() => setActiveHotspot(prev => prev?.id === hs.id ? null : hs)}
-            />
+            <HotspotDot key={hs.id} hotspot={hs} active={activeHotspot?.id === hs.id} linked={highlightedVar === hs.linkedVar && !!hs.linkedVar} onClick={() => handleHotspotClick(hs)} />
           ))}
 
-          {/* Result: "select another" pill at bottom of image */}
+          {/* RESULT: select-another pill */}
           {phase === 'result' && (
-            <button
-              onClick={() => { setPhase('select'); setSelection(null); setCroppedSrc(null); setAnalysis(null); setActiveHotspot(null) }}
-              style={{
-                position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)',
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '6px 14px', borderRadius: 99,
-                background: 'rgba(0,0,0,0.60)', border: '1px solid rgba(255,255,255,0.16)',
-                color: 'rgba(255,255,255,0.55)', fontSize: 11.5, fontWeight: 600,
-                cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif",
-                backdropFilter: 'blur(8px)', whiteSpace: 'nowrap',
-              }}
-            >
-              <Crop size={11} strokeWidth={2.5} />
-              Select another question
+            <button onClick={resetToSelect} style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 99, background: 'rgba(0,0,0,0.60)', border: '1px solid rgba(255,255,255,0.16)', color: 'rgba(255,255,255,0.55)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif", backdropFilter: 'blur(8px)', whiteSpace: 'nowrap' }}>
+              <Crop size={11} strokeWidth={2.5} />Select another question
             </button>
           )}
 
-          {/* Close button */}
-          <button
-            onClick={onClose}
-            style={{
-              position: 'absolute', top: 10, right: 10,
-              width: 26, height: 26, borderRadius: '50%',
-              background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)',
-              color: 'rgba(255,255,255,0.60)', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
+          {/* Close */}
+          <button onClick={onClose} style={{ position: 'absolute', top: 10, right: 10, width: 26, height: 26, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.60)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <X size={12} />
           </button>
         </div>
 
-        {/* ── Right: analysis panel ── */}
+        {/* ── Right: analysis panel (glassmorphism) ── */}
         <AnimatePresence>
           {phase === 'result' && analysis && (
             <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1, duration: 0.35 }}
+              initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1, duration: 0.35 }}
               style={{
-                flex: 1,
-                overflowY: 'auto',
-                padding: '22px 20px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 14,
+                flex: 1, overflowY: 'auto', padding: '20px 18px',
+                display: 'flex', flexDirection: 'column', gap: 12,
                 borderLeft: '1px solid rgba(255,255,255,0.07)',
+                background: 'rgba(7,9,28,0.60)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
               }}
             >
-              {/* Topic */}
+              {/* Topic badge */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ padding: '3px 10px', borderRadius: 99, background: 'rgba(0,200,255,0.10)', border: '1px solid rgba(0,200,255,0.25)', fontSize: 11, fontWeight: 700, color: '#67E8F9', letterSpacing: '0.05em' }}>
-                  {analysis.topic}
-                </div>
+                <div style={{ padding: '3px 10px', borderRadius: 99, background: 'rgba(0,200,255,0.10)', border: '1px solid rgba(0,200,255,0.25)', fontSize: 11, fontWeight: 700, color: '#67E8F9', letterSpacing: '0.05em' }}>{analysis.topic}</div>
                 <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Aeva Lens</span>
               </div>
 
               {/* Core insight */}
-              <div style={{ padding: '11px 13px', borderRadius: 12, background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.22)' }}>
-                <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(165,180,252,0.55)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>Core Insight</div>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', lineHeight: 1.55 }}>{mathify(analysis.coreInsight)}</div>
-              </div>
+              <InfoCard color="rgba(99,102,241,0.22)" border="rgba(99,102,241,0.28)" label="Core Insight" labelColor="rgba(165,180,252,0.65)">
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', lineHeight: 1.55 }}>{mathify(analysis.coreInsight)}</span>
+              </InfoCard>
 
               {/* Struggle point */}
-              <div style={{ padding: '11px 13px', borderRadius: 12, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.20)' }}>
-                <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(252,165,165,0.55)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>Struggle Point</div>
-                <div style={{ fontSize: 13, color: 'rgba(255,200,200,0.85)', lineHeight: 1.55 }}>{mathify(analysis.strugglePoint)}</div>
-              </div>
+              <InfoCard color="rgba(239,68,68,0.08)" border="rgba(239,68,68,0.22)" label="Struggle Point" labelColor="rgba(252,165,165,0.65)">
+                <span style={{ fontSize: 13, color: 'rgba(255,200,200,0.85)', lineHeight: 1.55 }}>{mathify(analysis.strugglePoint)}</span>
+              </InfoCard>
 
-              {/* The rule */}
-              <div>
-                <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>The Rule</div>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.70)', lineHeight: 1.65 }}>{mathify(analysis.explanation)}</div>
-              </div>
+              {/* Syntax pattern card */}
+              {analysis.syntaxCard && <SyntaxCard card={analysis.syntaxCard} />}
 
-              {/* Steps */}
-              {analysis.steps?.length > 0 && (
-                <div>
-                  <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>How to Approach It</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    {analysis.steps.map((step, i) => (
-                      <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                        <div style={{ flexShrink: 0, width: 17, height: 17, borderRadius: '50%', background: 'rgba(99,102,241,0.20)', border: '1px solid rgba(99,102,241,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: '#A5B4FC' }}>{i + 1}</div>
-                        <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.65)', lineHeight: 1.55 }}>{mathify(step)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Variables table */}
+              {/* Variables */}
               {analysis.variables?.length > 0 && (
                 <div>
-                  <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>Variables</div>
+                  <SectionLabel>Variables</SectionLabel>
                   <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
                     {analysis.variables.map((v, i) => (
-                      <div key={i} style={{ display: 'flex', gap: 12, padding: '7px 12px', background: i % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'transparent', borderBottom: i < analysis.variables.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
-                        <code style={{ flexShrink: 0, fontSize: 13, fontFamily: 'monospace', color: '#FBBF24', fontWeight: 700, minWidth: 28 }}>{mathify(v.symbol)}</code>
-                        <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.55)' }}>{mathify(v.meaning)}</span>
-                      </div>
+                      <VariableRow
+                        key={v.symbol}
+                        v={v} index={i}
+                        total={analysis.variables.length}
+                        highlighted={highlightedVar === v.symbol}
+                        onClick={() => {
+                          const next = highlightedVar === v.symbol ? null : v.symbol
+                          setHighlightedVar(next)
+                          // also light up the linked hotspot
+                          const hs = analysis.hotspots?.find(h => h.linkedVar === v.symbol)
+                          setActiveHotspot(hs && next ? hs : null)
+                        }}
+                      />
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Active hotspot detail */}
+              {/* Hotspot detail panel */}
               <AnimatePresence>
                 {activeHotspot && (
-                  <motion.div
-                    key={activeHotspot.id}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 2 }}
-                    style={{ padding: '11px 13px', borderRadius: 12, background: 'rgba(0,200,255,0.08)', border: '1px solid rgba(0,200,255,0.22)' }}
-                  >
-                    <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(103,232,249,0.60)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
-                      📍 {activeHotspot.label}
-                    </div>
+                  <motion.div key={activeHotspot.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 2 }}
+                    style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(0,200,255,0.08)', border: '1px solid rgba(0,200,255,0.22)' }}>
+                    <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(103,232,249,0.60)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>📍 {activeHotspot.label}</div>
                     <div style={{ fontSize: 12.5, color: 'rgba(207,250,254,0.80)', lineHeight: 1.55 }}>{mathify(activeHotspot.detail)}</div>
                   </motion.div>
                 )}
               </AnimatePresence>
 
+              {/* Interactive step cards */}
+              {analysis.steps?.length > 0 && (
+                <div>
+                  <SectionLabel>How to Approach It</SectionLabel>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {analysis.steps.map((step, i) => (
+                      <StepCard
+                        key={i} step={step} index={i}
+                        revealed={revealedSteps.has(i)}
+                        onReveal={() => setRevealedSteps(prev => new Set([...prev, i]))}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Add to Study Guide */}
               <motion.button
-                whileHover={{ scale: 1.02, y: -1 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => {
-                  onInsightReady({
-                    topic: analysis.topic,
-                    coreInsight: analysis.coreInsight,
-                    strugglePoint: analysis.strugglePoint,
-                    explanation: analysis.explanation,
-                    steps: analysis.steps || [],
-                    variables: analysis.variables || [],
-                    timestamp: Date.now(),
-                  })
-                  onClose()
-                }}
+                whileHover={addState === 'idle' ? { scale: 1.02, y: -1 } : {}}
+                whileTap={addState === 'idle' ? { scale: 0.97 } : {}}
+                onClick={handleAdd}
                 style={{
-                  marginTop: 'auto',
-                  padding: '11px 16px', borderRadius: 14, cursor: 'pointer',
+                  marginTop: 4, padding: '12px 16px', borderRadius: 14, cursor: addState === 'idle' ? 'pointer' : 'default',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  background: 'linear-gradient(135deg, rgba(99,102,241,0.25) 0%, rgba(139,92,246,0.18) 100%)',
-                  border: '1px solid rgba(139,143,255,0.32)',
-                  color: '#C4B5FD', fontSize: 13, fontWeight: 700,
+                  background: addState === 'done'
+                    ? 'linear-gradient(135deg, rgba(74,222,128,0.22) 0%, rgba(34,197,94,0.18) 100%)'
+                    : 'linear-gradient(135deg, rgba(99,102,241,0.25) 0%, rgba(139,92,246,0.18) 100%)',
+                  border: addState === 'done' ? '1px solid rgba(74,222,128,0.35)' : '1px solid rgba(139,143,255,0.32)',
+                  color: addState === 'done' ? '#86EFAC' : '#C4B5FD',
+                  fontSize: 13, fontWeight: 700,
                   fontFamily: "'Inter', system-ui, sans-serif",
-                  boxShadow: '0 4px 18px rgba(99,102,241,0.15)',
+                  transition: 'background 0.4s, border 0.4s, color 0.4s',
                 }}
               >
-                <Plus size={13} strokeWidth={2.5} />
-                Add to Study Guide
+                <AnimatePresence mode="wait">
+                  {addState === 'idle' && (
+                    <motion.span key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Plus size={13} strokeWidth={2.5} />Add to Study Guide
+                    </motion.span>
+                  )}
+                  {addState === 'adding' && (
+                    <motion.span key="adding" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <motion.div animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }} style={{ width: 13, height: 13, borderRadius: '50%', border: '2px solid rgba(196,181,253,0.2)', borderTopColor: '#C4B5FD' }} />
+                      Saving…
+                    </motion.span>
+                  )}
+                  {addState === 'done' && (
+                    <motion.span key="done" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <CheckCircle size={13} strokeWidth={2.5} />Added to Study Guide
+                    </motion.span>
+                  )}
+                </AnimatePresence>
               </motion.button>
             </motion.div>
           )}
@@ -544,20 +426,10 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
           <div style={{ padding: '32px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
             <span style={{ fontSize: 28 }}>⚠️</span>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.70)' }}>Couldn't analyse this image</div>
-            {errorMsg && (
-              <div style={{ fontSize: 11, color: 'rgba(239,68,68,0.75)', fontFamily: 'monospace', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 8, padding: '6px 12px', maxWidth: 320, wordBreak: 'break-word' }}>
-                {errorMsg}
-              </div>
-            )}
+            {errorMsg && <div style={{ fontSize: 11, color: 'rgba(239,68,68,0.75)', fontFamily: 'monospace', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 8, padding: '6px 12px', maxWidth: 320, wordBreak: 'break-word' }}>{errorMsg}</div>}
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => { setPhase('select'); setErrorMsg('') }}
-                style={{ padding: '9px 18px', borderRadius: 99, background: 'rgba(0,200,255,0.10)', border: '1px solid rgba(0,200,255,0.25)', color: '#67E8F9', fontSize: 12.5, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif", fontWeight: 600 }}>
-                Try again
-              </button>
-              <button onClick={onClose}
-                style={{ padding: '9px 18px', borderRadius: 99, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.45)', fontSize: 12.5, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif" }}>
-                Close
-              </button>
+              <button onClick={() => { setPhase('select'); setErrorMsg('') }} style={{ padding: '9px 18px', borderRadius: 99, background: 'rgba(0,200,255,0.10)', border: '1px solid rgba(0,200,255,0.25)', color: '#67E8F9', fontSize: 12.5, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif", fontWeight: 600 }}>Try again</button>
+              <button onClick={onClose} style={{ padding: '9px 18px', borderRadius: 99, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.45)', fontSize: 12.5, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif" }}>Close</button>
             </div>
           </div>
         )}
@@ -566,90 +438,191 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
   )
 }
 
-/* ─── Scanning beam ─── */
+/* ─── Sub-components ─── */
+
+function InfoCard({ color, border, label, labelColor, children }) {
+  return (
+    <div style={{ padding: '11px 13px', borderRadius: 12, background: color, border: `1px solid ${border}` }}>
+      <div style={{ fontSize: 9.5, fontWeight: 700, color: labelColor, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>{label}</div>
+      {children}
+    </div>
+  )
+}
+
+function SectionLabel({ children }) {
+  return <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>{children}</div>
+}
+
+function SyntaxCard({ card }) {
+  return (
+    <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(0,200,255,0.06)', border: '1px solid rgba(0,200,255,0.20)' }}>
+      <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(103,232,249,0.60)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Pattern</div>
+      <div style={{ fontFamily: 'monospace', fontSize: 14, color: '#67E8F9', textAlign: 'center', padding: '6px 0 10px', letterSpacing: '0.02em' }}>
+        {mathify(card.pattern)}
+      </div>
+      {card.conditions?.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, justifyContent: 'center' }}>
+          {card.conditions.map((c, i) => (
+            <div key={i} style={{ padding: '3px 9px', borderRadius: 99, background: 'rgba(0,200,255,0.10)', border: '1px solid rgba(0,200,255,0.22)', fontSize: 11.5, fontFamily: 'monospace', color: 'rgba(103,232,249,0.85)' }}>{mathify(c)}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function VariableRow({ v, index, total, highlighted, onClick }) {
+  return (
+    <motion.div
+      onClick={onClick}
+      animate={highlighted ? { backgroundColor: 'rgba(99,102,241,0.18)' } : { backgroundColor: index % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0)' }}
+      transition={{ duration: 0.2 }}
+      style={{
+        display: 'flex', gap: 12, padding: '8px 12px', cursor: 'pointer',
+        borderBottom: index < total - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+        outline: highlighted ? '1px solid rgba(99,102,241,0.40)' : '1px solid transparent',
+        borderRadius: index === 0 ? '10px 10px 0 0' : index === total - 1 ? '0 0 10px 10px' : 0,
+        transition: 'outline 0.2s',
+      }}
+    >
+      {/* Symbol = value in monospace */}
+      <div style={{ flexShrink: 0, minWidth: 52, display: 'flex', alignItems: 'center', gap: 4 }}>
+        <code style={{ fontSize: 13, fontFamily: 'monospace', color: '#FBBF24', fontWeight: 800 }}>{v.symbol}</code>
+        {v.value && v.value !== '?' && (
+          <>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', fontWeight: 400 }}>=</span>
+            <code style={{ fontSize: 13, fontFamily: 'monospace', color: highlighted ? '#A5B4FC' : '#93C5FD', fontWeight: 700 }}>{v.value}</code>
+          </>
+        )}
+        {v.value === '?' && <code style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(255,255,255,0.30)', fontWeight: 400 }}>= ?</code>}
+      </div>
+      <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.48)', lineHeight: 1.4, alignSelf: 'center' }}>{v.meaning}</span>
+    </motion.div>
+  )
+}
+
+function StepCard({ step, index, revealed, onReveal }) {
+  const isString = typeof step === 'string'
+  const verb  = isString ? `STEP ${index + 1}` : step.verb?.toUpperCase()
+  const title = isString ? step : step.title
+  const body  = isString ? '' : step.body
+  const formula = isString ? '' : step.formula
+  const proTip  = isString ? '' : step.proTip
+
+  return (
+    <motion.div
+      animate={{
+        background: revealed ? 'rgba(99,102,241,0.10)' : 'rgba(255,255,255,0.025)',
+        borderColor: revealed ? 'rgba(99,102,241,0.35)' : 'rgba(255,255,255,0.08)',
+        opacity: revealed ? 1 : 0.72,
+      }}
+      transition={{ duration: 0.3 }}
+      style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', padding: '10px 12px', overflow: 'hidden' }}
+    >
+      {/* Verb header */}
+      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.10em', color: revealed ? '#A5B4FC' : 'rgba(255,255,255,0.35)', textTransform: 'uppercase', marginBottom: 3 }}>
+        {verb}
+      </div>
+
+      {/* Step title */}
+      <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4, marginBottom: body ? 4 : 0 }}>
+        {mathify(title)}
+      </div>
+
+      {/* Body */}
+      {body && <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.52)', lineHeight: 1.6 }}>{mathify(body)}</div>}
+
+      {/* Formula — revealed only */}
+      <AnimatePresence>
+        {revealed && formula && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(99,102,241,0.25)', textAlign: 'center', fontFamily: 'monospace', fontSize: 13.5, color: '#C4B5FD', letterSpacing: '0.03em' }}>
+              {mathify(formula)}
+            </div>
+            {proTip && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}
+                style={{ marginTop: 6, fontSize: 10.5, color: 'rgba(165,180,252,0.65)', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: 4 }}>
+                💡 {proTip}
+              </motion.div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Show Me button — only when not yet revealed */}
+      {!revealed && (
+        <motion.button
+          whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+          onClick={onReveal}
+          style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 99, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)', color: '#A5B4FC', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif" }}
+        >
+          <ChevronRight size={10} strokeWidth={2.5} />Show Me
+        </motion.button>
+      )}
+    </motion.div>
+  )
+}
+
 function ScanBeam() {
   return (
     <motion.div
-      style={{
-        position: 'absolute', left: 0, right: 0, height: 2,
-        background: 'linear-gradient(90deg, transparent 0%, #00C8FF 40%, #0080FF 60%, transparent 100%)',
-        boxShadow: '0 0 16px 4px rgba(0,180,255,0.45)',
-        pointerEvents: 'none', zIndex: 10,
-      }}
+      style={{ position: 'absolute', left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, transparent 0%, #00C8FF 40%, #0080FF 60%, transparent 100%)', boxShadow: '0 0 16px 4px rgba(0,180,255,0.45)', pointerEvents: 'none', zIndex: 10 }}
       animate={{ top: ['0%', '100%', '0%'] }}
       transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
     />
   )
 }
 
-/* ─── Hotspot dot ─── */
-function HotspotDot({ hotspot, active, onClick }) {
+function HotspotDot({ hotspot, active, linked, onClick }) {
   return (
     <motion.button
       onClick={onClick}
-      whileHover={{ scale: 1.15 }}
-      whileTap={{ scale: 0.90 }}
+      whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.90 }}
       style={{
-        position: 'absolute',
-        left: `${hotspot.x}%`, top: `${hotspot.y}%`,
-        transform: 'translate(-50%, -50%)',
+        position: 'absolute', left: `${hotspot.x}%`, top: `${hotspot.y}%`, transform: 'translate(-50%, -50%)',
         width: 22, height: 22, borderRadius: '50%',
-        background: active ? 'rgba(0,200,255,0.30)' : 'rgba(0,200,255,0.15)',
-        border: `2px solid ${active ? '#00C8FF' : 'rgba(0,200,255,0.60)'}`,
-        cursor: 'pointer',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: active ? 'rgba(99,102,241,0.30)' : 'rgba(0,200,255,0.15)',
+        border: `2px solid ${active ? '#818CF8' : 'rgba(0,200,255,0.60)'}`,
+        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
         zIndex: 20, backdropFilter: 'blur(4px)',
       }}
-      animate={!active ? { boxShadow: ['0 0 0 0 rgba(0,200,255,0.5)', '0 0 0 8px rgba(0,200,255,0)', '0 0 0 0 rgba(0,200,255,0)'] } : {}}
+      animate={!active ? { boxShadow: ['0 0 0 0 rgba(0,200,255,0.5)', '0 0 0 8px rgba(0,200,255,0)', '0 0 0 0 rgba(0,200,255,0)'] } : { boxShadow: ['0 0 0 0 rgba(99,102,241,0.6)', '0 0 0 10px rgba(99,102,241,0)', '0 0 0 0 rgba(99,102,241,0)'] }}
       transition={{ duration: 1.8, repeat: Infinity }}
     >
-      <div style={{ width: 6, height: 6, borderRadius: '50%', background: active ? '#00C8FF' : 'rgba(0,200,255,0.80)' }} />
+      <div style={{ width: 6, height: 6, borderRadius: '50%', background: active ? '#818CF8' : 'rgba(0,200,255,0.80)' }} />
     </motion.button>
   )
 }
 
-/* ─── Crop image to selection ─── */
+/* ─── Canvas crop ─── */
 async function cropImageBlob(file, selection, imgEl) {
   return new Promise(resolve => {
     const canvas = document.createElement('canvas')
-    const natW = imgEl.naturalWidth
-    const natH = imgEl.naturalHeight
-    const dispW = imgEl.clientWidth
-    const dispH = imgEl.clientHeight
-
-    // The img uses object-fit:contain — compute actual rendered rect
+    const natW = imgEl.naturalWidth, natH = imgEl.naturalHeight
+    const dispW = imgEl.clientWidth,  dispH = imgEl.clientHeight
     const scale = Math.min(dispW / natW, dispH / natH)
-    const rendW = natW * scale
-    const rendH = natH * scale
-    const offX = (dispW - rendW) / 2
-    const offY = (dispH - rendH) / 2
-
-    // Convert % of container to pixel coords in natural image space
-    const x1pct = Math.min(selection.x1, selection.x2) / 100
-    const y1pct = Math.min(selection.y1, selection.y2) / 100
-    const x2pct = Math.max(selection.x1, selection.x2) / 100
-    const y2pct = Math.max(selection.y1, selection.y2) / 100
-
-    const sx = Math.max(0, ((x1pct * dispW) - offX) / scale)
-    const sy = Math.max(0, ((y1pct * dispH) - offY) / scale)
-    const sw = Math.min(natW - sx, ((x2pct - x1pct) * dispW) / scale)
-    const sh = Math.min(natH - sy, ((y2pct - y1pct) * dispH) / scale)
-
+    const rendW = natW * scale, rendH = natH * scale
+    const offX = (dispW - rendW) / 2, offY = (dispH - rendH) / 2
+    const x1p = Math.min(selection.x1, selection.x2) / 100
+    const y1p = Math.min(selection.y1, selection.y2) / 100
+    const x2p = Math.max(selection.x1, selection.x2) / 100
+    const y2p = Math.max(selection.y1, selection.y2) / 100
+    const sx = Math.max(0, ((x1p * dispW) - offX) / scale)
+    const sy = Math.max(0, ((y1p * dispH) - offY) / scale)
+    const sw = Math.min(natW - sx, ((x2p - x1p) * dispW) / scale)
+    const sh = Math.min(natH - sy, ((y2p - y1p) * dispH) / scale)
     if (sw <= 0 || sh <= 0) { resolve(null); return }
-
-    canvas.width = sw
-    canvas.height = sh
+    canvas.width = sw; canvas.height = sh
     const ctx = canvas.getContext('2d')
     const img = new Image()
-    img.onload = () => {
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh)
-      canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.95)
-    }
+    img.onload = () => { ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh); canvas.toBlob(b => resolve(b), 'image/jpeg', 0.95) }
     img.src = URL.createObjectURL(file)
   })
 }
 
-/* ─── JSON helpers ─── */
 function fileToBase64(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -662,8 +635,6 @@ function fileToBase64(blob) {
 function safeParseJSON(str) {
   try { return JSON.parse(str) } catch {
     const fixed = str.replace(/\\(?!["\\/bfnrtu])/g, '\\\\')
-    try { return JSON.parse(fixed) } catch {
-      throw new Error('Could not parse model response as JSON')
-    }
+    try { return JSON.parse(fixed) } catch { throw new Error('Could not parse model response as JSON') }
   }
 }
