@@ -143,7 +143,15 @@ hype=solid/mastery with genuine reasoning. challenge=vague/shallow/no reasoning.
     if (!res.ok) return CRITIC_FALLBACK
     const json = await res.json()
     const parsed = JSON.parse(json.choices?.[0]?.message?.content || '{}')
-    return { ...CRITIC_FALLBACK, ...parsed }
+    const merged = { ...CRITIC_FALLBACK, ...parsed }
+    // Sanitise: reject any mode/understanding the rest of the code doesn't know about
+    const VALID_MODES = ['hype', 'coach', 'challenge', 'redirect']
+    const VALID_UNDERSTANDING = ['none', 'partial', 'solid', 'mastery']
+    if (!VALID_MODES.includes(merged.mode)) merged.mode = 'coach'
+    if (!VALID_UNDERSTANDING.includes(merged.understanding)) merged.understanding = 'partial'
+    // Topic should be 1–3 words max; if the model hallucinated something long, fall back
+    if (!merged.topic || typeof merged.topic !== 'string' || merged.topic.split(' ').length > 4) merged.topic = 'general'
+    return merged
   } catch {
     return CRITIC_FALLBACK
   }
@@ -151,8 +159,8 @@ hype=solid/mastery with genuine reasoning. challenge=vague/shallow/no reasoning.
 
 /* ─── Step B: Build dynamic Aeva prompt ─── */
 function buildAevaPrompt(sessionState, criticism, userName, profile, memoryBlock = '') {
-  const state = STATE_CONFIG[sessionState]
-  const mode = MODE_CONFIG[criticism?.mode || 'coach']
+  const state = STATE_CONFIG[sessionState] || STATE_CONFIG.DIAGNOSTIC
+  const mode = MODE_CONFIG[criticism?.mode] || MODE_CONFIG.coach
 
   // Memory block goes FIRST — gives it highest attention weight in the model
   return `${memoryBlock}
@@ -1881,8 +1889,8 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard }) {
 
 /* ═══ SESSION MODE BADGE ══════════════════════════ */
 function SessionBadge({ sessionState, criticism }) {
-  const state = STATE_CONFIG[sessionState]
-  const mode = criticism ? MODE_CONFIG[criticism.mode] : null
+  const state = STATE_CONFIG[sessionState] || STATE_CONFIG.DIAGNOSTIC
+  const mode = criticism ? (MODE_CONFIG[criticism.mode] || null) : null
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       <motion.div
