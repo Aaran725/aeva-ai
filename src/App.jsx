@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, createContext, useContext } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowUp, Zap, TrendingDown, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical } from 'lucide-react'
+import { ArrowUp, Zap, TrendingDown, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X } from 'lucide-react'
 import { supabase } from './supabase'
 import { useArcadeStore } from './arcadeStore'
 import { useLabStore } from './labStore'
+import { useNeuralStore } from './neuralStore'
 import ArcadeHub from './ArcadeHub'
 import LabHub from './LabHub'
 import { ChaosEventBanner, MissionVitalsBar, DebateLogicFeed, ThemedChatBubble, MissionBadge } from './SimCockpit'
@@ -140,7 +141,7 @@ hype=solid/mastery with genuine reasoning. challenge=vague/shallow/no reasoning.
 }
 
 /* ─── Step B: Build dynamic Aeva prompt ─── */
-function buildAevaPrompt(sessionState, criticism, userName, profile) {
+function buildAevaPrompt(sessionState, criticism, userName, profile, memoryBlock = '') {
   const state = STATE_CONFIG[sessionState]
   const mode = MODE_CONFIG[criticism?.mode || 'coach']
 
@@ -177,7 +178,8 @@ CRITIC READ ON THEIR LAST MESSAGE:
 - Topic: ${criticism?.topic || 'general'}
 - Target: ${criticism?.note || 'move them forward'}
 
-MODE: ${(criticism?.mode || 'coach').toUpperCase()} — ${mode.instruction}`
+MODE: ${(criticism?.mode || 'coach').toUpperCase()} — ${mode.instruction}
+${memoryBlock}`
 }
 
 /* ─── Stream Aeva response ─── */
@@ -271,6 +273,12 @@ const gridCSS = `
     100% { box-shadow: 0 0 0px rgba(239,68,68,0); }
   }
   .orb-interrupt { animation: orb-interrupt 1.2s ease-out forwards; }
+
+  /* ── Profile share card (print / screenshot) ── */
+  @media print {
+    body > * { display: none !important; }
+    .share-card-print { display: flex !important; position: fixed; inset: 0; z-index: 99999; }
+  }
 `
 
 /* ═══ USER CONTEXT ═══════════════════════════════ */
@@ -316,10 +324,19 @@ function GlassCard({ children, className = '', style = {}, onClick }) {
 }
 
 /* ═══ AEVA ORB ════════════════════════════════════ */
-function AevaOrb({ size = 218, active = false, scanMode = false }) {
+/* ─── Orb pulse variants per personality ─── */
+const ORB_PULSES = {
+  aggressive: { scale: [1, 1.22, 0.97, 1.20, 1], dur: 0.85 },
+  academic:   { scale: [1, 1.03, 1],              dur: 9    },
+  curious:    { scale: [1, 1.12, 1.04, 1.09, 1],  dur: 3.8  },
+  balanced:   { scale: [1, 1.06, 1],              dur: 7    },
+}
+
+function AevaOrb({ size = 218, active = false, scanMode = false, personality = 'balanced' }) {
   const s = size / 218
   const shellW = Math.round(218 * s * 0.88)
   const shellH = Math.round(205 * s * 0.88)
+  const pulse = ORB_PULSES[personality] || ORB_PULSES.balanced
 
   return (
     <div style={{
@@ -329,8 +346,8 @@ function AevaOrb({ size = 218, active = false, scanMode = false }) {
       filter: 'saturate(1.55) contrast(1.10)', flexShrink: 0,
     }}>
       <motion.div
-        animate={{ scale: scanMode ? [1, 1.03, 1] : active ? [1, 1.18, 1] : [1, 1.06, 1] }}
-        transition={{ duration: scanMode ? 3.5 : active ? 1.2 : 7, repeat: Infinity, ease: 'easeInOut' }}
+        animate={{ scale: scanMode ? [1, 1.03, 1] : active ? [1, 1.18, 1] : pulse.scale }}
+        transition={{ duration: scanMode ? 3.5 : active ? 1.2 : pulse.dur, repeat: Infinity, ease: 'easeInOut' }}
         style={{
           position: 'absolute', inset: Math.round(-20 * s), borderRadius: '50%',
           background: 'radial-gradient(ellipse at 44% 52%, rgba(45,48,142,0.28) 0%, rgba(233,163,100,0.14) 52%, transparent 76%)',
@@ -446,11 +463,12 @@ const SKILLS = [
 
 function MissionCard({ onChatOpen }) {
   const { name } = useUser()
+  const { orbPersonality } = useNeuralStore()
   return (
     <GlassCard className="mission-card" style={{ padding: 32, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 300 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase' }}>Mission Briefing</span>
-        <AevaOrb size={96} />
+        <AevaOrb size={96} personality={orbPersonality} />
       </div>
       <div style={{ marginTop: 8 }}>
         <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 'clamp(20px, 3vw, 30px)', fontWeight: 400, color: 'rgba(255,255,255,0.92)', lineHeight: 1.22, marginBottom: 12 }}>
@@ -568,6 +586,187 @@ function TrainingLabCard() {
   )
 }
 
+/* ─── Share Profile Modal ─── */
+function ShareProfileModal({ onClose }) {
+  const { name } = useUser()
+  const { profileTitle, rank, traits, currentVibe, masteredTopics, totalExchanges, orbPersonality } = useNeuralStore()
+  const [copied, setCopied] = useState(false)
+
+  const VIBE_COLORS = { Proud:'#4ADE80', Skeptical:'#F87171', Engaged:'#60A5FA', Impressed:'#FBBF24', Concerned:'#F97316', Focused:'#A78BFA' }
+  const ORB_COLORS  = { aggressive:'#EF4444', academic:'#3B82F6', curious:'#F59E0B', balanced:'#8B8FFF' }
+  const vibeColor   = VIBE_COLORS[currentVibe] || '#A78BFA'
+  const orbColor    = ORB_COLORS[orbPersonality] || '#8B8FFF'
+
+  const copyText = `🧠 My Aeva Neural Profile\n\n"${profileTitle}"\nRanked ${rank} in Logic Battles\n\nTraits: ${traits.map(t => `${t.icon} ${t.label}`).join(' · ')}\nMastered: ${masteredTopics.slice(0,3).join(', ') || 'Exploring'}\nSessions: ${totalExchanges}\n\nPowered by aeva-ai.vercel.app`
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(copyText).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2200) })
+  }
+
+  const handleShare = () => {
+    if (navigator.share) {
+      navigator.share({ title: 'My Aeva Profile', text: copyText, url: 'https://aeva-ai-d8i7.vercel.app' }).catch(() => {})
+    } else { handleCopy() }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+        background: 'rgba(4,6,20,0.75)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <motion.div
+        initial={{ scale: 0.88, y: 24 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.88, y: 24 }}
+        transition={{ type: 'spring', stiffness: 340, damping: 28 }}
+        style={{ width: '100%', maxWidth: 420, borderRadius: 32, overflow: 'hidden', position: 'relative' }}
+      >
+        {/* The shareable card */}
+        <div className="share-card-print" style={{
+          background: 'linear-gradient(160deg, #08091a 0%, #0f1228 50%, #0c0e2c 100%)',
+          border: '1px solid rgba(255,255,255,0.12)', padding: '36px 32px 28px',
+          display: 'flex', flexDirection: 'column', gap: 20,
+          fontFamily: "'Inter', system-ui, sans-serif",
+          position: 'relative', overflow: 'hidden',
+        }}>
+          {/* Background glow */}
+          <div aria-hidden style={{ position: 'absolute', top: -60, left: -60, width: 280, height: 280, borderRadius: '50%', background: `radial-gradient(circle, ${orbColor}22 0%, transparent 70%)`, filter: 'blur(40px)', pointerEvents: 'none' }} />
+          <div aria-hidden style={{ position: 'absolute', bottom: -40, right: -40, width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle, rgba(233,163,100,0.12) 0%, transparent 70%)', filter: 'blur(35px)', pointerEvents: 'none' }} />
+
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 26, height: 26, borderRadius: 8, background: 'linear-gradient(135deg, #2D308E, #E9A364)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Star size={11} color="white" fill="white" />
+              </div>
+              <span style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.80)', letterSpacing: '-0.02em' }}>aeva</span>
+            </div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Neural Profile</div>
+          </div>
+
+          {/* Rank pill */}
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 99, background: `${orbColor}18`, border: `1px solid ${orbColor}40`, marginBottom: 12 }}>
+              <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.8, repeat: Infinity }}
+                style={{ width: 5, height: 5, borderRadius: '50%', background: orbColor, boxShadow: `0 0 6px ${orbColor}` }} />
+              <span style={{ fontSize: 10, fontWeight: 700, color: orbColor, letterSpacing: '0.10em', textTransform: 'uppercase' }}>
+                {rank} in Logic Battles
+              </span>
+            </div>
+            <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 28, fontWeight: 400, color: 'rgba(255,255,255,0.96)', lineHeight: 1.2, margin: '0 0 4px' }}>
+              {profileTitle}
+            </h2>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.38)', margin: 0 }}>
+              {name} · {totalExchanges} sessions · Vibe: <span style={{ color: vibeColor, fontWeight: 600 }}>{currentVibe}</span>
+            </p>
+          </div>
+
+          {/* Traits */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, position: 'relative', zIndex: 1 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>Identified Traits</div>
+            <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+              {traits.map(t => (
+                <div key={t.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 99, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.14)', fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.80)' }}>
+                  {t.icon} {t.label}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Mastered */}
+          {masteredTopics.length > 0 && (
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>Mastered</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {masteredTopics.slice(0, 4).map(t => (
+                  <div key={t} style={{ padding: '4px 10px', borderRadius: 99, background: 'rgba(74,222,128,0.10)', border: '1px solid rgba(74,222,128,0.28)', fontSize: 11, fontWeight: 600, color: '#86EFAC' }}>
+                    ✓ {t}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Footer */}
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.18)', position: 'relative', zIndex: 1 }}>
+            aeva-ai.vercel.app — Your AI learns you.
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div style={{ background: 'rgba(10,12,30,0.95)', padding: '16px 24px', display: 'flex', gap: 10, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={handleShare}
+            style={{ flex: 1, padding: '12px', borderRadius: 13, background: 'linear-gradient(135deg, rgba(139,143,255,0.25), rgba(233,163,100,0.15))', border: '1px solid rgba(139,143,255,0.40)', color: 'rgba(255,255,255,0.92)', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontFamily: "'Inter', system-ui, sans-serif" }}>
+            <Share2 size={14} />
+            {copied ? 'Copied!' : 'Share Profile'}
+          </motion.button>
+          <motion.button whileHover={{ scale: 1.06, rotate: 90 }} whileTap={{ scale: 0.94 }} onClick={onClose}
+            style={{ width: 46, borderRadius: 13, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.45)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <X size={15} />
+          </motion.button>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+/* ─── Aeva's Perception Card ─── */
+function PerceptionCard() {
+  const { traits, currentVibe, profileTitle, orbPersonality } = useNeuralStore()
+  const [showShare, setShowShare] = useState(false)
+
+  const VIBE_COLORS = { Proud:'#4ADE80', Skeptical:'#F87171', Engaged:'#60A5FA', Impressed:'#FBBF24', Concerned:'#F97316', Focused:'#A78BFA' }
+  const ORB_LABELS  = { aggressive:'Relentless', academic:'Scholarly', curious:'Exploratory', balanced:'Balanced' }
+  const vibeColor   = VIBE_COLORS[currentVibe] || '#A78BFA'
+
+  return (
+    <>
+      <GlassCard style={{ padding: '22px 22px', minHeight: 180 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase' }}>Aeva's Perception</span>
+          {/* Vibe indicator */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 99, background: `${vibeColor}15`, border: `1px solid ${vibeColor}35` }}>
+            <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.6, repeat: Infinity }}
+              style={{ width: 5, height: 5, borderRadius: '50%', background: vibeColor, boxShadow: `0 0 5px ${vibeColor}` }} />
+            <span style={{ fontSize: 10, fontWeight: 700, color: vibeColor }}>{currentVibe}</span>
+          </div>
+        </div>
+
+        {/* Profile title */}
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.70)', marginBottom: 12, fontStyle: 'italic', letterSpacing: '-0.01em' }}>
+          "{profileTitle}"
+        </div>
+
+        {/* Traits */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 16 }}>
+          {traits.map((trait, i) => (
+            <motion.div
+              key={trait.label}
+              initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.08 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'rgba(255,255,255,0.72)', fontWeight: 500 }}
+            >
+              <span style={{ fontSize: 14 }}>{trait.icon}</span>
+              {trait.label}
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Share button */}
+        <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+          onClick={() => setShowShare(true)}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 13px', borderRadius: 99, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.14)', color: 'rgba(255,255,255,0.50)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+          <Share2 size={11} /> Share My Profile
+        </motion.button>
+      </GlassCard>
+
+      <AnimatePresence>
+        {showShare && <ShareProfileModal onClose={() => setShowShare(false)} />}
+      </AnimatePresence>
+    </>
+  )
+}
+
 function SkillDecayCard() {
   return (
     <GlassCard className="skill-card" style={{ padding: '24px 28px' }}>
@@ -682,6 +881,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
           <MoodCard />
           <SkillDecayCard />
           <TrainingLabCard />
+          <PerceptionCard />
         </div>
 
         <div style={{ height: 48 }} />
@@ -778,7 +978,9 @@ function ChatView({ onBack }) {
   const { name } = useUser()
   const { activeMode, activeMission, processAIResponse, rewardPlayer, worldMemory, cleanText, interruptActive } = useArcadeStore()
   const { labOpen, openLab, setLabSuggestion } = useLabStore()
+  const { orbPersonality, updateFromExchange, addMastered, addStruggle, buildMemoryBlock, bumpHumor } = useNeuralStore()
   const isMission = !!activeMode
+  const sendTimeRef = useRef(null)
 
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState([])
@@ -893,6 +1095,10 @@ function ChatView({ onBack }) {
     if (!hasInput || isThinking) return
     const userText = input.trim()
     setInput('')
+    sendTimeRef.current = Date.now()
+
+    // Humor signal
+    if (/lol|haha|😂|😄|lmao/i.test(userText)) bumpHumor()
 
     const userMsg = { role: 'user', text: userText }
     const history = [...messages, userMsg]
@@ -905,6 +1111,7 @@ function ChatView({ onBack }) {
     try {
       let systemPrompt
       let rawResponse = ''
+      let criticResult = null
 
       // Per-mission API options: penalise repetition, cap length
       const MISSION_OPTS = {
@@ -915,19 +1122,19 @@ function ChatView({ onBack }) {
       }
 
       if (isMission && activeMission) {
-        // Mission mode: use persona system prompt
+        // Mission mode: use persona system prompt + neural memory
         const memoryStr = Object.keys(worldMemory).length
           ? `\n\nWORLD MEMORY: ${JSON.stringify(worldMemory)}`
           : ''
-        systemPrompt = activeMission.systemPrompt + memoryStr
+        systemPrompt = activeMission.systemPrompt + memoryStr + buildMemoryBlock(name)
       } else {
         // Standard tutor mode
-        const criticResult = await runCritic(messages, userText)
+        criticResult = await runCritic(messages, userText)
         setCriticism(criticResult)
         updateMastery(criticResult)
         exchangeCountRef.current += 1
         advanceSessionState(exchangeCountRef.current, criticResult)
-        systemPrompt = buildAevaPrompt(sessionState, criticResult, name)
+        systemPrompt = buildAevaPrompt(sessionState, criticResult, name, null, buildMemoryBlock(name))
       }
 
       const streamOpts = isMission ? (MISSION_OPTS[activeMode] || {}) : {}
@@ -964,6 +1171,23 @@ function ChatView({ onBack }) {
             drillType: 'flashcard',
             reason: rawResponse.split('.').find(s => /lab|drill|sprint/i.test(s))?.trim() + '.' || 'Aeva thinks a quick drill would help here.',
           })
+        }
+      }
+
+      // Neural profile tracking (tutor mode only)
+      if (!isMission && criticResult) {
+        const responseTime = Date.now() - (sendTimeRef.current || Date.now())
+        updateFromExchange({
+          userText,
+          criticMode: criticResult.mode,
+          understanding: criticResult.understanding,
+          responseTime,
+        })
+        const understanding = criticResult.understanding
+        if (understanding === 'mastery' || understanding === 'solid') {
+          addMastered(criticResult.topic)
+        } else if (understanding === 'none') {
+          addStruggle(criticResult.topic)
         }
       }
     } catch (err) {
