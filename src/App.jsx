@@ -148,7 +148,10 @@ function buildAevaPrompt(sessionState, criticism, userName, profile, memoryBlock
   const state = STATE_CONFIG[sessionState]
   const mode = MODE_CONFIG[criticism?.mode || 'coach']
 
-  return `You are Aeva — a world-class personal mentor for ${userName}. Think: the most precise professor you never had, minus the ego.
+  // Memory block goes FIRST — gives it highest attention weight in the model
+  return `${memoryBlock}
+
+You are Aeva — a world-class personal mentor for ${userName}. Think: the most precise professor you never had, minus the ego.
 
 IDENTITY & VOICE:
 - Calm, direct, intellectually generous. Never excited, never corporate.
@@ -187,8 +190,7 @@ SESSION PHASE: ${sessionState} — ${state.instruction}
 
 READING ON ${userName.toUpperCase()}'S LAST MESSAGE:
 - Understanding: ${criticism?.understanding || 'unknown'} | Topic: ${criticism?.topic || 'general'}
-- Mode: ${(criticism?.mode || 'coach').toUpperCase()} — ${mode.instruction}
-${memoryBlock}`
+- Mode: ${(criticism?.mode || 'coach').toUpperCase()} — ${mode.instruction}`
 }
 
 /* ─── Stream Aeva response ─── */
@@ -464,11 +466,7 @@ const NODES = [
   { x: 70, y: 44, r: 2.2, color: '#A8E6CF' },
 ]
 const EDGES = [[0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [1, 6], [2, 7], [3, 4], [5, 4], [6, 7]]
-const SKILLS = [
-  { name: 'Economics', value: 76, color: '#8B8FFF' },
-  { name: 'Logic', value: 52, color: '#E9A364' },
-  { name: 'Physics', value: 31, color: '#7EC8E3' },
-]
+// SKILLS is now derived from real conceptMap data — see SkillDecayCard
 
 function MissionCard({ onChatOpen }) {
   const { name } = useUser()
@@ -721,12 +719,19 @@ function ShareProfileModal({ onClose }) {
 
 /* ─── Aeva's Perception Card ─── */
 function PerceptionCard() {
-  const { traits, currentVibe, profileTitle, orbPersonality } = useNeuralStore()
+  const { traits, currentVibe, profileTitle, orbPersonality, learningStyle, learningStyleTotal, learningStyleLocked, dominantTopics } = useNeuralStore()
   const [showShare, setShowShare] = useState(false)
 
   const VIBE_COLORS = { Proud:'#4ADE80', Skeptical:'#F87171', Engaged:'#60A5FA', Impressed:'#FBBF24', Concerned:'#F97316', Focused:'#A78BFA' }
-  const ORB_LABELS  = { aggressive:'Relentless', academic:'Scholarly', curious:'Exploratory', balanced:'Balanced' }
-  const vibeColor   = VIBE_COLORS[currentVibe] || '#A78BFA'
+  const STYLE_TITLES = { analogical:'Analogy-first', visual:'Visual-spatial', structural:'Structure-first', exampleFirst:'Example-first', conceptual:'Concept-driven' }
+  const STYLE_COLORS = { analogical:'#A78BFA', visual:'#60A5FA', structural:'#34D399', exampleFirst:'#FBBF24', conceptual:'#F87171' }
+  const vibeColor = VIBE_COLORS[currentVibe] || '#A78BFA'
+
+  const LOCK_THRESHOLD = 15
+  const confidence = Math.min(100, Math.round((learningStyleTotal / LOCK_THRESHOLD) * 100))
+  const DIMS = ['analogical', 'visual', 'structural', 'exampleFirst', 'conceptual']
+  const dominant = DIMS.reduce((best, d) => (learningStyle[d] > (learningStyle[best] || 0) ? d : best), DIMS[0])
+  const showStyleAdaptation = confidence >= 30 && learningStyle[dominant] > 0
 
   return (
     <>
@@ -747,7 +752,7 @@ function PerceptionCard() {
         </div>
 
         {/* Traits */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 14 }}>
           {traits.map((trait, i) => (
             <motion.div
               key={trait.label}
@@ -760,6 +765,50 @@ function PerceptionCard() {
             </motion.div>
           ))}
         </div>
+
+        {/* Live adaptation indicator */}
+        {showStyleAdaptation && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '8px 11px', borderRadius: 10,
+              background: `${STYLE_COLORS[dominant]}10`,
+              border: `1px solid ${STYLE_COLORS[dominant]}28`,
+              marginBottom: 12,
+            }}
+          >
+            <motion.div
+              animate={{ scale: [1, 1.3, 1], opacity: [0.6, 1, 0.6] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              style={{ width: 6, height: 6, borderRadius: '50%', background: STYLE_COLORS[dominant], flexShrink: 0 }}
+            />
+            <div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: STYLE_COLORS[dominant], letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 1 }}>
+                Adapting now
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', lineHeight: 1.3 }}>
+                {STYLE_TITLES[dominant]} approach {learningStyleLocked ? '(confirmed)' : `(${confidence}% confident)`}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Core interests */}
+        {(dominantTopics || []).length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 5 }}>
+              Core interests
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {(dominantTopics || []).slice(0, 4).map(t => (
+                <div key={t} style={{ padding: '2px 8px', borderRadius: 99, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.22)', fontSize: 10.5, color: '#A5B4FC', fontWeight: 500 }}>
+                  {t}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Share button */}
         <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
@@ -777,28 +826,62 @@ function PerceptionCard() {
 }
 
 function SkillDecayCard() {
+  const { conceptMap } = useNeuralStore()
+
+  // Build real skill list from concept map, sorted by mastery desc
+  const skills = [...conceptMap]
+    .filter(c => c.mastery >= 25)
+    .sort((a, b) => b.mastery - a.mastery)
+    .slice(0, 5)
+    .map(c => {
+      // Retention decay: 2% per day since last seen, floor at 20
+      const daysSince = (Date.now() - (c.lastSeen || Date.now())) / (1000 * 60 * 60 * 24)
+      const retained = Math.max(20, Math.round(c.mastery - daysSince * 2))
+      const color = retained >= 70 ? '#4ADE80' : retained >= 45 ? '#FBBF24' : '#F87171'
+      return { name: c.label, value: retained, color }
+    })
+
   return (
     <GlassCard className="skill-card" style={{ padding: '24px 28px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase' }}>Skill Decay</span>
+        <div>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase' }}>Skill Retention</span>
+          <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.22)', marginTop: 3 }}>Live decay from last practice</div>
+        </div>
         <TrendingDown size={13} color="rgba(255,255,255,0.28)" />
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {SKILLS.map((skill, i) => (
-          <div key={skill.name}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: 12.5, fontWeight: 500, color: 'rgba(255,255,255,0.72)' }}>{skill.name}</span>
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.36)', fontVariantNumeric: 'tabular-nums' }}>{skill.value}%</span>
+
+      {skills.length === 0 ? (
+        <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.28)', lineHeight: 1.65, paddingTop: 6 }}>
+          Chat with Aeva — concepts you explore appear here with live retention tracking. Skills decay over time without practice.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {skills.map((skill, i) => (
+            <div key={skill.name}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 500, color: 'rgba(255,255,255,0.72)', textTransform: 'capitalize' }}>{skill.name}</span>
+                <span style={{
+                  fontSize: 11, fontVariantNumeric: 'tabular-nums',
+                  color: skill.value < 45 ? '#F87171' : 'rgba(255,255,255,0.36)',
+                  fontWeight: skill.value < 45 ? 700 : 400,
+                }}>
+                  {skill.value}%{skill.value < 45 ? ' ⚠' : ''}
+                </span>
+              </div>
+              <div style={{ height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                <motion.div initial={{ width: 0 }} animate={{ width: `${skill.value}%` }}
+                  transition={{ duration: 1.1 + i * 0.25, ease: 'easeOut', delay: 0.5 + i * 0.15 }}
+                  style={{ height: '100%', borderRadius: 99, background: `linear-gradient(90deg, ${skill.color} 0%, ${skill.color}88 55%, transparent 100%)` }}
+                />
+              </div>
             </div>
-            <div style={{ height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
-              <motion.div initial={{ width: 0 }} animate={{ width: `${skill.value}%` }}
-                transition={{ duration: 1.1 + i * 0.25, ease: 'easeOut', delay: 0.5 + i * 0.15 }}
-                style={{ height: '100%', borderRadius: 99, background: `linear-gradient(90deg, ${skill.color} 0%, ${skill.color}90 55%, transparent 100%)` }}
-              />
-            </div>
+          ))}
+          <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.20)', marginTop: 4 }}>
+            Drill in The Lab to stop decay →
           </div>
-        ))}
-      </div>
+        </div>
+      )}
     </GlassCard>
   )
 }
@@ -808,12 +891,13 @@ function FingerprintCard({ onOpen }) {
   const { learningStyle, learningStyleTotal, learningStyleLocked } = useNeuralStore()
 
   const DIMENSIONS = ['analogical', 'visual', 'structural', 'exampleFirst', 'conceptual']
-  const LABELS = { analogical: 'Analogical', visual: 'Visual', structural: 'Structural', exampleFirst: 'Example-First', conceptual: 'Conceptual' }
   const STYLE_TITLES = {
     analogical: 'Analogy Thinker', visual: 'Spatial Reasoner', structural: 'Systems Builder',
     exampleFirst: 'Concrete Learner', conceptual: 'Principle Seeker',
   }
-  const cx = 60, cy = 60, radius = 44
+  const STYLE_COLORS = { analogical: '#A78BFA', visual: '#60A5FA', structural: '#34D399', exampleFirst: '#FBBF24', conceptual: '#F87171' }
+  const cx = 60, cy = 60, radius = 42
+  const LOCK_THRESHOLD = 15
 
   function pentagonPoint(index, total, r, offsetAngle = -Math.PI / 2) {
     const angle = offsetAngle + (2 * Math.PI * index) / total
@@ -822,6 +906,8 @@ function FingerprintCard({ onOpen }) {
 
   const rawValues = DIMENSIONS.map(d => learningStyle[d] || 0)
   const maxVal = Math.max(...rawValues, 1)
+  const hasAnyData = learningStyleTotal > 0
+  const confidence = Math.min(100, Math.round((learningStyleTotal / LOCK_THRESHOLD) * 100))
 
   const dominant = DIMENSIONS.reduce((best, d) => (learningStyle[d] > (learningStyle[best] || 0) ? d : best), DIMENSIONS[0])
 
@@ -836,19 +922,33 @@ function FingerprintCard({ onOpen }) {
     return `${i === 0 ? 'M' : 'L'}${pt.x.toFixed(1)},${pt.y.toFixed(1)}`
   }).join(' ') + ' Z'
 
+  const dominantColor = STYLE_COLORS[dominant] || '#8B8FFF'
+  const fillOpacity = hasAnyData ? 0.10 + (confidence / 100) * 0.22 : 0
+  const strokeOpacity = hasAnyData ? 0.22 + (confidence / 100) * 0.55 : 0
+
   return (
     <GlassCard style={{ padding: '20px 20px', minHeight: 180, cursor: 'pointer' }} onClick={onOpen}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(139,143,255,0.70)', textTransform: 'uppercase' }}>
           Learning Fingerprint
         </span>
-        <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 2, repeat: Infinity }}
-          style={{ width: 6, height: 6, borderRadius: '50%', background: learningStyleLocked ? '#8B8FFF' : 'rgba(139,143,255,0.40)', boxShadow: learningStyleLocked ? '0 0 8px #8B8FFF' : 'none' }} />
+        {learningStyleLocked ? (
+          <div style={{ fontSize: 9, fontWeight: 700, color: '#8B8FFF', letterSpacing: '0.08em', padding: '2px 7px', borderRadius: 99, background: 'rgba(139,143,255,0.12)', border: '1px solid rgba(139,143,255,0.25)' }}>
+            CALIBRATED
+          </div>
+        ) : hasAnyData ? (
+          <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.38)', letterSpacing: '0.06em' }}>
+            {confidence}%
+          </div>
+        ) : (
+          <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 2, repeat: Infinity }}
+            style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgba(139,143,255,0.35)' }} />
+        )}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        {/* Mini radar */}
-        <svg viewBox="0 0 120 120" width={100} height={100} style={{ flexShrink: 0 }}>
+        {/* Mini radar — always rendered */}
+        <svg viewBox="0 0 120 120" width={96} height={96} style={{ flexShrink: 0 }}>
           {[0.33, 0.66, 1].map((f, ri) => (
             <path key={ri} d={ringPath(f)} fill="none" stroke={f === 1 ? 'rgba(139,143,255,0.18)' : 'rgba(255,255,255,0.06)'} strokeWidth={f === 1 ? 0.8 : 0.4} />
           ))}
@@ -856,44 +956,61 @@ function FingerprintCard({ onOpen }) {
             const pt = pentagonPoint(i, 5, radius)
             return <line key={i} x1={cx} y1={cy} x2={pt.x.toFixed(1)} y2={pt.y.toFixed(1)} stroke="rgba(255,255,255,0.06)" strokeWidth={0.4} />
           })}
-          {learningStyleLocked ? (
-            <path d={filledPath} fill="rgba(139,143,255,0.28)" stroke="#8B8FFF" strokeWidth={1} strokeLinejoin="round" />
+          {hasAnyData ? (
+            <path
+              d={filledPath}
+              fill={`rgba(139,143,255,${fillOpacity.toFixed(2)})`}
+              stroke={`rgba(139,143,255,${strokeOpacity.toFixed(2)})`}
+              strokeWidth={1}
+              strokeLinejoin="round"
+            />
           ) : (
             DIMENSIONS.map((_, i) => {
-              const pt = pentagonPoint(i, 5, radius * 0.35)
+              const pt = pentagonPoint(i, 5, radius * 0.28)
               return (
-                <motion.circle key={i} cx={pt.x} cy={pt.y} r={2}
-                  fill="#8B8FFF"
-                  animate={{ r: [1.5, 3, 1.5], opacity: [0.25, 0.65, 0.25] }}
-                  transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}
+                <motion.circle key={i} cx={pt.x} cy={pt.y} r={1.8}
+                  fill="rgba(139,143,255,0.20)"
+                  animate={{ opacity: [0.15, 0.40, 0.15] }}
+                  transition={{ duration: 2.5, repeat: Infinity, delay: i * 0.3 }}
                 />
               )
             })
           )}
         </svg>
 
-        {/* Label */}
-        <div>
-          {learningStyleLocked ? (
+        {/* Label side */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {hasAnyData ? (
             <>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.88)', letterSpacing: '-0.02em', marginBottom: 3 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: dominantColor, letterSpacing: '-0.01em', marginBottom: 2 }}>
                 {STYLE_TITLES[dominant]}
               </div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.40)', lineHeight: 1.4 }}>
-                {LABELS[dominant]} dominant
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', lineHeight: 1.45 }}>
+                {learningStyleLocked ? 'Confirmed style' : `${confidence}% calibrated`}
               </div>
+              {/* Mini calibration bar */}
+              {!learningStyleLocked && (
+                <div style={{ marginTop: 8, height: 2, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden', width: '90%' }}>
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${confidence}%` }}
+                    transition={{ duration: 0.7 }}
+                    style={{ height: '100%', borderRadius: 99, background: 'rgba(139,143,255,0.60)' }}
+                  />
+                </div>
+              )}
             </>
           ) : (
             <>
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.55)', marginBottom: 3 }}>
-                Building…
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.45)', marginBottom: 3 }}>
+                Reading your style…
               </div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', lineHeight: 1.4 }}>
-                {learningStyleTotal}/8 signals
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', lineHeight: 1.45 }}>
+                Chat to calibrate
               </div>
             </>
           )}
-          <div style={{ marginTop: 8, fontSize: 10.5, color: 'rgba(139,143,255,0.65)', fontWeight: 600 }}>
+          <div style={{ marginTop: hasAnyData ? 9 : 8, fontSize: 10.5, color: 'rgba(139,143,255,0.60)', fontWeight: 600 }}>
             Tap to explore →
           </div>
         </div>
@@ -1700,10 +1817,15 @@ function ChatView({ onBack }) {
     buildMemoryBlock,
     bumpHumor,
     bumpLearningStyle,
+    bumpTopicInterest,
     touchConceptNode,
     computePredictions,
     strugglePredictions,
     dismissPrediction,
+    learningStyle,
+    learningStyleTotal,
+    learningStyleLocked,
+    dominantTopics,
   } = useNeuralStore()
   const isMission = !!activeMode
   const sendTimeRef = useRef(null)
@@ -1964,6 +2086,10 @@ function ChatView({ onBack }) {
           understanding: criticResult.understanding,
           responseTime,
         })
+
+        // Track topic interest (bumps dominantTopics after 3+ visits)
+        bumpTopicInterest(criticResult.topic)
+
         const understanding = criticResult.understanding
         if (understanding === 'mastery' || understanding === 'solid') {
           addMastered(criticResult.topic)
@@ -2118,6 +2244,32 @@ function ChatView({ onBack }) {
           )}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            {/* Live adaptation pill (tutor mode) */}
+            {!isMission && (() => {
+              const DIMS = ['analogical', 'visual', 'structural', 'exampleFirst', 'conceptual']
+              const confidence = Math.min(100, Math.round((learningStyleTotal / 15) * 100))
+              const dom = DIMS.reduce((best, d) => (learningStyle[d] > (learningStyle[best] || 0) ? d : best), DIMS[0])
+              const STYLE_SHORT = { analogical:'Analogy', visual:'Visual', structural:'Structure', exampleFirst:'Examples', conceptual:'Concepts' }
+              const STYLE_COL = { analogical:'#A78BFA', visual:'#60A5FA', structural:'#34D399', exampleFirst:'#FBBF24', conceptual:'#F87171' }
+              if (confidence < 30 || !learningStyle[dom]) return null
+              const col = STYLE_COL[dom]
+              return (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '4px 10px', borderRadius: 99,
+                  background: `${col}12`, border: `1px solid ${col}30`,
+                  fontSize: 10.5, fontWeight: 700, color: col,
+                  letterSpacing: '0.04em',
+                }}>
+                  <motion.div
+                    animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 2, repeat: Infinity }}
+                    style={{ width: 4, height: 4, borderRadius: '50%', background: col }}
+                  />
+                  {STYLE_SHORT[dom]}
+                </div>
+              )
+            })()}
+
             {!isMission && (
               <button
                 onClick={() => setStudyGuideOpen(true)}

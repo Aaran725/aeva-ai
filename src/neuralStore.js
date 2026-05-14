@@ -137,7 +137,11 @@ const DEFAULT = {
   // Learning style fingerprint
   learningStyle:      { analogical: 0, visual: 0, structural: 0, exampleFirst: 0, conceptual: 0 },
   learningStyleTotal: 0,
-  learningStyleLocked: false,
+  learningStyleLocked: false,   // true when total >= 15
+
+  // Topic interest map — counts per topic for example domain targeting
+  topicInterest:      {},       // { [topic]: count }
+  dominantTopics:     [],       // topics with count >= 3, sorted by count
 
   // Concept map for Memory Palace
   conceptMap:         [],  // [{ id, label, mastery, category, firstSeen, lastSeen, visits }]
@@ -254,31 +258,57 @@ export const useNeuralStore = create((set, get) => ({
     const s = get()
     if (s.totalExchanges < 2) return ''
 
-    const STYLE_INSTRUCTIONS = {
-      analogical:   'use analogies and comparisons for new concepts',
-      visual:       'use spatial language, mental maps, visual metaphors',
-      structural:   'front-load structure: numbered steps, clear sequence',
-      exampleFirst: 'lead with a concrete example before the abstraction',
-      conceptual:   "explain the 'why' mechanism before the 'what'",
+    const STYLE_HOW = {
+      analogical:   'lead every explanation with a familiar comparison or parallel — analogy FIRST, then the definition. Use phrases like "think of it like…" or "it\'s similar to…"',
+      visual:       'use spatial language and word-pictures before abstract definitions. Describe WHERE things are, how they FLOW, what they LOOK like mentally.',
+      structural:   'give a numbered framework or scaffold FIRST, then fill in the detail. Never explain without structure.',
+      exampleFirst: 'show a concrete example BEFORE defining anything. Show → then name. Never the reverse.',
+      conceptual:   'explain the WHY causal chain first: what causes what, and why it matters. Mechanism before terminology.',
     }
 
-    let learningStyleLine = ''
-    if (s.learningStyleLocked) {
-      const dominant = Object.entries(s.learningStyle).sort((a, b) => b[1] - a[1])[0]?.[0] || 'conceptual'
-      learningStyleLine = `\n- Learning style: ${dominant} — ${STYLE_INSTRUCTIONS[dominant]}`
-    }
+    const confidence = Math.min(100, Math.round((s.learningStyleTotal / 15) * 100))
+    const dominant = s.learningStyleTotal > 0
+      ? Object.entries(s.learningStyle).sort((a, b) => b[1] - a[1])[0]?.[0]
+      : null
+    const hasStyle = confidence >= 30 && dominant && s.learningStyle[dominant] > 0
 
-    return `
-NEURAL MEMORY — What you know about ${userName}:
-- Personality type: ${s.orbPersonality} | Humor preference: ${s.humorPreference}/10
-- Competitiveness: ${s.competitiveness}/100 | Analytical depth: ${s.depth}/100
-- Frustration level: ${s.frustrationScore}/100 — ${s.frustrationScore > 60 ? 'gets impatient fast, be efficient' : 'patient, can handle nuance'}
-- Communication style: ${s.avgResponseLength < 45 ? 'very concise — mirror this, no lectures' : s.avgResponseLength > 100 ? 'elaborate — can handle depth' : 'balanced'}
-- Mastered: ${s.masteredTopics.slice(-4).join(', ') || 'nothing confirmed yet'}
-- Struggle zones: ${s.struggleZones.slice(-3).join(', ') || 'none identified'}
-- Key traits: ${s.traits.map(t => t.label).join(', ')}
-- Current vibe reading: ${s.currentVibe}${learningStyleLine}
-Subtly adapt tone and examples to fit this profile. Do not mention the memory block.`
+    // Interest domains — use as analogy targets
+    const interests = (s.dominantTopics || []).slice(0, 3)
+    const domainLine = interests.length > 0
+      ? `\n- ${userName} repeatedly explores: ${interests.join(', ')} — weave these as analogy domains when possible`
+      : ''
+
+    // Cognitive load signal
+    const avgLen = s.avgResponseLength || 50
+    const overloaded = avgLen < 22 && s.totalExchanges > 6
+    const cogLine = overloaded
+      ? `\n- ⚠ COGNITIVE LOAD: ${userName}'s replies are very short — simplify language, one concept at a time, no walls of text`
+      : ''
+
+    // Depth preference
+    const depthLine = avgLen > 120
+      ? `\n- Depth preference: HIGH — ${userName} writes long thoughtful replies, can handle nuance and layered ideas`
+      : avgLen < 35
+      ? `\n- Depth preference: LOW — ${userName} gives brief replies, mirror this with short focused responses`
+      : ''
+
+    // Style block — MANDATORY when confidence >= 30%
+    const styleBlock = hasStyle ? `
+╔══ LEARNING STYLE ADAPTATION — ${confidence}% calibrated — THIS IS MANDATORY ══╗
+  ${userName}'s dominant style: ${dominant.toUpperCase()}
+  How to apply it: ${STYLE_HOW[dominant]}
+  Structure YOUR NEXT RESPONSE around this. Not as a footnote — as the primary format.
+╚═══════════════════════════════════════════════════════════════════════════════╝
+` : ''
+
+    return `${styleBlock}
+┌── ${userName.toUpperCase()}'S NEURAL PROFILE ──────────────────────────────────────────┐
+│ Personality: ${s.orbPersonality} | Humor: ${s.humorPreference}/10 | Competitiveness: ${s.competitiveness}/100 | Depth: ${s.depth}/100
+│ Frustration: ${s.frustrationScore}/100${s.frustrationScore > 60 ? ' ← impatient: be direct & efficient' : ' ← patient: nuance OK'}${depthLine}
+│ Mastered: ${s.masteredTopics.slice(-4).join(', ') || 'none yet'} | Struggles: ${s.struggleZones.slice(-3).join(', ') || 'none'}
+│ Traits: ${s.traits.map(t => t.label).join(', ')}${domainLine}${cogLine}
+└──────────────────────────────────────────────────────────────────────────────┘
+Do not reference this profile to ${userName}.`
   },
 
   /* ── Learning style fingerprint ─────────── */
@@ -287,21 +317,33 @@ Subtly adapt tone and examples to fit this profile. Do not mention the memory bl
       if (state.learningStyleLocked) return state
       const newStyle = { ...state.learningStyle, [dimension]: (state.learningStyle[dimension] || 0) + 1 }
       const newTotal = state.learningStyleTotal + 1
-      const shouldLock = newTotal >= 8
-
-      // Normalize each dimension to 0-100 based on max value
-      const maxVal = Math.max(...Object.values(newStyle), 1)
-      const normalized = Object.fromEntries(
-        Object.entries(newStyle).map(([k, v]) => [k, Math.round((v / maxVal) * 100)])
-      )
+      // Lock at 15 signals — enough data to be meaningful
+      const shouldLock = newTotal >= 15
 
       const updated = {
         ...state,
         learningStyle: newStyle,
         learningStyleTotal: newTotal,
         learningStyleLocked: shouldLock,
-        // store raw values; normalization is computed on read
       }
+      save(updated)
+      return updated
+    })
+  },
+
+  /* ── Topic interest tracking ──────────── */
+  bumpTopicInterest: (topic) => {
+    if (!topic || topic === 'general') return
+    set(state => {
+      const norm = topic.toLowerCase().trim()
+      const newInterest = { ...state.topicInterest, [norm]: (state.topicInterest[norm] || 0) + 1 }
+      // Dominant: topics with 3+ visits, sorted by count, top 5
+      const dominant = Object.entries(newInterest)
+        .filter(([, count]) => count >= 3)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([t]) => t)
+      const updated = { ...state, topicInterest: newInterest, dominantTopics: dominant }
       save(updated)
       return updated
     })

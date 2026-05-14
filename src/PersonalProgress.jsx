@@ -3,7 +3,7 @@ import { useNeuralStore } from './neuralStore'
 import { useLabStore } from './labStore'
 
 export default function PersonalProgress() {
-  const { masteredTopics, struggleZones, totalExchanges, depth, conceptMap } = useNeuralStore()
+  const { masteredTopics, struggleZones, totalExchanges, depth, conceptMap, dominantTopics, topicInterest } = useNeuralStore()
   const { drillHistory } = useLabStore()
 
   // Personal bests from drill history
@@ -89,6 +89,29 @@ export default function PersonalProgress() {
             <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.22)' }}>
               <div style={{ fontSize: 11, color: '#A5B4FC', fontWeight: 600 }}>
                 📈 Improving on {improvedTopics.length} topic{improvedTopics.length > 1 ? 's' : ''} through repeated drilling
+              </div>
+            </div>
+          )}
+
+          {/* Core interests */}
+          {(dominantTopics || []).length > 0 && (
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.30)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 6 }}>
+                Core Interests
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                {(dominantTopics || []).map(t => {
+                  const count = topicInterest?.[t] || 0
+                  return (
+                    <div key={t} style={{ padding: '3px 9px', borderRadius: 99, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.24)', fontSize: 11, color: '#A5B4FC', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {t}
+                      <span style={{ fontSize: 9, color: 'rgba(165,180,252,0.55)', fontWeight: 600 }}>×{count}</span>
+                    </div>
+                  )
+                })}
+              </div>
+              <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.20)', marginTop: 5 }}>
+                Aeva uses these as example domains
               </div>
             </div>
           )}
