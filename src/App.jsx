@@ -1869,7 +1869,15 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard }) {
         {isUser ? (
           <span style={{ fontSize: 14.5, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{msg.text}</span>
         ) : (
-          <MarkdownRenderer text={msg.text} streaming={!!msg.streaming} cursorColor="rgba(139,143,255,0.9)" />
+          <>
+            {msg.lockIn && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}>
+                <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#4ADE80', boxShadow: '0 0 6px #4ADE80' }} />
+                <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#4ADE80', opacity: 0.8 }}>Lock-In</span>
+              </div>
+            )}
+            <MarkdownRenderer text={msg.text} streaming={!!msg.streaming} cursorColor="rgba(139,143,255,0.9)" />
+          </>
         )}
       </div>
 
@@ -2052,6 +2060,12 @@ function ChatView({ onBack }) {
     setLockInSecondsLeft(25 * 60)
     setLockInSummary(null)
     setLockInActive(true)
+    setMessages(prev => [...prev, {
+      role: 'model',
+      text: `Locked in. 25 minutes. I'll keep every answer to 2 sentences — no tangents, no fluff. What are we working on?`,
+      streaming: false,
+      lockIn: true,
+    }])
   }
 
   const exitLockIn = () => {
@@ -2179,7 +2193,7 @@ function ChatView({ onBack }) {
 
     const userMsg = { role: 'user', text: userText }
     const history = [...messages, userMsg]
-    setMessages([...history, { role: 'model', text: '', streaming: true }])
+    setMessages([...history, { role: 'model', text: '', streaming: true, lockIn: !!lockInActive }])
     setIsThinking(true)
 
     const controller = new AbortController()
@@ -2462,46 +2476,55 @@ function ChatView({ onBack }) {
                 <motion.button
                   whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
                   onClick={lockInActive ? exitLockIn : startLockIn}
-                  animate={lockInUrgent ? { boxShadow: ['0 0 0px rgba(239,68,68,0)', '0 0 12px rgba(239,68,68,0.70)', '0 0 0px rgba(239,68,68,0)'] } : {}}
-                  transition={{ boxShadow: { duration: 0.8, repeat: Infinity } }}
+                  animate={lockInActive
+                    ? lockInUrgent
+                      ? { boxShadow: ['0 0 0px rgba(239,68,68,0)', '0 0 16px rgba(239,68,68,0.80)', '0 0 0px rgba(239,68,68,0)'] }
+                      : { boxShadow: ['0 0 0px rgba(74,222,128,0)', '0 0 10px rgba(74,222,128,0.45)', '0 0 0px rgba(74,222,128,0)'] }
+                    : {}}
+                  transition={{ boxShadow: { duration: lockInUrgent ? 0.7 : 2, repeat: Infinity } }}
                   style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 5,
-                    padding: '5px 11px', borderRadius: 99, cursor: 'pointer',
-                    background: lockInActive ? (lockInUrgent ? 'rgba(239,68,68,0.15)' : 'rgba(74,222,128,0.12)') : 'rgba(255,255,255,0.07)',
-                    border: `1px solid ${lockInActive ? (lockInUrgent ? 'rgba(239,68,68,0.40)' : 'rgba(74,222,128,0.30)') : 'rgba(255,255,255,0.14)'}`,
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    padding: lockInActive ? '6px 14px' : '5px 11px', borderRadius: 99, cursor: 'pointer',
+                    background: lockInActive ? (lockInUrgent ? 'rgba(239,68,68,0.18)' : 'rgba(74,222,128,0.14)') : 'rgba(255,255,255,0.07)',
+                    border: `1.5px solid ${lockInActive ? (lockInUrgent ? 'rgba(239,68,68,0.55)' : 'rgba(74,222,128,0.45)') : 'rgba(255,255,255,0.14)'}`,
                     color: lockInActive ? (lockInUrgent ? '#F87171' : '#4ADE80') : 'rgba(255,255,255,0.50)',
-                    fontSize: 11, fontWeight: 700, fontFamily: "'Inter', system-ui, sans-serif",
+                    fontSize: lockInActive ? 12 : 11, fontWeight: 700, fontFamily: "'Inter', system-ui, sans-serif",
+                    transition: 'padding 0.2s, font-size 0.2s, background 0.2s',
                   }}
                 >
-                  <Timer size={11} />
+                  <Timer size={lockInActive ? 13 : 11} />
                   {lockInActive ? lockInDisplay : 'Lock-In'}
                 </motion.button>
 
-                {/* Library */}
+                {/* Library — dimmed during Lock-In */}
                 <motion.button
                   whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
                   onClick={() => setLibraryOpen(true)}
+                  animate={{ opacity: lockInActive ? 0.3 : 1 }}
                   style={{
                     padding: '5px 11px', borderRadius: 99, cursor: 'pointer',
                     background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.24)',
                     color: 'rgba(167,139,250,0.80)', fontSize: 11, fontWeight: 600,
                     fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', alignItems: 'center', gap: 5,
+                    pointerEvents: lockInActive ? 'none' : 'auto',
                   }}
                 >
                   <BookOpen size={11} /> Library
                 </motion.button>
 
-                <button
+                <motion.button
                   onClick={() => setStudyGuideOpen(true)}
+                  animate={{ opacity: lockInActive ? 0.3 : 1 }}
                   style={{
                     padding: '5px 12px', borderRadius: 99, cursor: 'pointer',
                     background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',
                     color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: 600,
                     fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: '0.04em',
+                    pointerEvents: lockInActive ? 'none' : 'auto',
                   }}
                 >
                   📋 Study Guide
-                </button>
+                </motion.button>
               </>
             )}
             <div style={{ width: 24, height: 24, borderRadius: 7, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -2836,11 +2859,62 @@ function ChatView({ onBack }) {
         {lockInActive && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 5,
-              background: 'radial-gradient(ellipse at 50% 100%, rgba(74,222,128,0.05) 0%, transparent 60%)',
-              borderTop: lockInUrgent ? '2px solid rgba(239,68,68,0.50)' : '2px solid rgba(74,222,128,0.25)',
+            style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 5 }}
+          >
+            {/* Screen tint */}
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: lockInUrgent
+                ? 'radial-gradient(ellipse at 50% 100%, rgba(239,68,68,0.08) 0%, transparent 65%)'
+                : 'radial-gradient(ellipse at 50% 100%, rgba(74,222,128,0.07) 0%, transparent 65%)',
+            }} />
+            {/* Border frame */}
+            <div style={{
+              position: 'absolute', inset: 0,
+              border: lockInUrgent ? '2px solid rgba(239,68,68,0.45)' : '2px solid rgba(74,222,128,0.30)',
+              borderRadius: 0,
+              pointerEvents: 'none',
+            }} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Lock-In floating timer bar (above input) */}
+      <AnimatePresence>
+        {lockInActive && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }}
+            style={{
+              position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)',
+              zIndex: 20, pointerEvents: 'none',
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '8px 18px', borderRadius: 99,
+              background: lockInUrgent ? 'rgba(239,68,68,0.14)' : 'rgba(74,222,128,0.10)',
+              border: `1px solid ${lockInUrgent ? 'rgba(239,68,68,0.40)' : 'rgba(74,222,128,0.30)'}`,
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              boxShadow: lockInUrgent ? '0 4px 24px rgba(239,68,68,0.20)' : '0 4px 24px rgba(74,222,128,0.12)',
+              fontFamily: "'Inter', system-ui, sans-serif",
             }}
-          />
+          >
+            {/* Progress bar */}
+            <div style={{ width: 80, height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
+              <motion.div
+                style={{
+                  height: '100%', borderRadius: 99,
+                  background: lockInUrgent ? '#F87171' : '#4ADE80',
+                  width: `${(lockInSecondsLeft / (25 * 60)) * 100}%`,
+                  transition: 'width 1s linear, background 0.3s',
+                }}
+              />
+            </div>
+            <span style={{ fontSize: 13, fontWeight: 800, color: lockInUrgent ? '#F87171' : '#4ADE80', letterSpacing: '0.02em', fontVariantNumeric: 'tabular-nums' }}>
+              {lockInDisplay}
+            </span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: lockInUrgent ? 'rgba(248,113,113,0.70)' : 'rgba(74,222,128,0.60)', letterSpacing: '0.10em', textTransform: 'uppercase' }}>
+              {lockInUrgent ? 'Almost done' : 'Focus'}
+            </span>
+          </motion.div>
         )}
       </AnimatePresence>
 
