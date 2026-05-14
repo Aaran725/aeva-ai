@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, FlaskConical, ChevronRight, RotateCcw, CheckCircle2, XCircle, ArrowRight, Settings, History, Zap } from 'lucide-react'
+import { X, FlaskConical, ChevronRight, RotateCcw, CheckCircle2, XCircle, ArrowRight, Settings, History, Zap, RefreshCw } from 'lucide-react'
 import { DRILLS, DIFFICULTIES, useLabStore } from './labStore'
 import { useNeuralStore } from './neuralStore'
+import { useSRStore } from './srStore'
 
 const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
@@ -204,6 +205,7 @@ function DrillComplete({ score, wrongItems = [], onExit, onRetry, onGoHarder, to
 /* ═══ FLASHCARD SPRINT ═══════════════════════════════ */
 function FlashcardDrill({ data, topic, onExit }) {
   const { setDrillScore, recordDrillResult, currentTopic } = useLabStore()
+  const { recordCard } = useSRStore()
   const [idx, setIdx] = useState(0)
   const [flipped, setFlipped] = useState(false)
   const [results, setResults] = useState([]) // 'got' | 'missed'
@@ -217,6 +219,10 @@ function FlashcardDrill({ data, topic, onExit }) {
     const newWrong = result === 'missed' ? [...wrongItems, { q: card.front, correct: card.back }] : wrongItems
     setResults(next)
     setWrongItems(newWrong)
+
+    // Save to spaced repetition queue — card will resurface based on SM-2 schedule
+    recordCard(currentTopic, card.front, card.back, result)
+
     if (idx + 1 >= cards.length) {
       const correct = next.filter(r => r === 'got').length
       setDrillScore({ correct, total: cards.length })
@@ -226,7 +232,7 @@ function FlashcardDrill({ data, topic, onExit }) {
       setFlipped(false)
       setTimeout(() => setIdx(i => i + 1), 160)
     }
-  }, [results, wrongItems, idx, cards, currentTopic]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [results, wrongItems, idx, cards, currentTopic, recordCard]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -319,6 +325,185 @@ function FlashcardDrill({ data, topic, onExit }) {
             style={{ display: 'flex', gap: 10 }}>
             <button onClick={() => handleResult('missed')} style={{ flex: 1, padding: '13px', borderRadius: 14, border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.12)', color: '#FCA5A5', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
               <XCircle size={15} /> Missed it
+            </button>
+            <button onClick={() => handleResult('got')} style={{ flex: 1, padding: '13px', borderRadius: 14, border: '1px solid rgba(74,222,128,0.35)', background: 'rgba(74,222,128,0.12)', color: '#86EFAC', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+              <CheckCircle2 size={15} /> Got it
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+/* ═══ SPACED REVIEW DRILL ════════════════════════════ */
+function ReviewDrill({ data, onExit }) {
+  const { recordCard } = useSRStore()
+  const cards = data?.cards || []
+  const [idx, setIdx]           = useState(0)
+  const [flipped, setFlipped]   = useState(false)
+  const [results, setResults]   = useState([])
+  const [done, setDone]         = useState(false)
+  const [schedule, setSchedule] = useState([]) // { front, result, days }
+
+  const handleResult = useCallback((result) => {
+    const card = cards[idx]
+
+    // Reschedule in SR store
+    recordCard(card.topic || 'review', card.front, card.back, result)
+
+    // Estimate next interval for the completion display
+    const DAY = 24 * 60 * 60 * 1000
+    const updatedCard = useSRStore.getState().cards.find(c => c.front === card.front && c.topic === (card.topic || 'review'))
+    const daysUntil = updatedCard
+      ? Math.max(1, Math.round((updatedCard.dueDate - Date.now()) / DAY))
+      : (result === 'got' ? 3 : 1)
+
+    setSchedule(prev => [...prev, {
+      front: card.front.length > 50 ? card.front.slice(0, 48) + '…' : card.front,
+      result,
+      days: daysUntil,
+    }])
+
+    const next = [...results, result]
+    setResults(next)
+    if (idx + 1 >= cards.length) {
+      setDone(true)
+    } else {
+      setFlipped(false)
+      setTimeout(() => setIdx(i => i + 1), 160)
+    }
+  }, [results, idx, cards, recordCard]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); setFlipped(f => !f) }
+      else if (e.key === 'ArrowRight' && flipped) handleResult('got')
+      else if (e.key === 'ArrowLeft'  && flipped) handleResult('missed')
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [flipped, handleResult])
+
+  /* ── Completion screen ── */
+  if (done) {
+    const correct = results.filter(r => r === 'got').length
+    const pct = Math.round((correct / cards.length) * 100)
+    const gradeEmoji = pct >= 80 ? '🧠' : pct >= 60 ? '📈' : '🔁'
+    const gradeColor = pct >= 80 ? '#4ADE80' : pct >= 60 ? '#60A5FA' : '#FBBF24'
+
+    return (
+      <motion.div initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }}
+        style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto' }}>
+        <div style={{ textAlign: 'center', paddingTop: 8 }}>
+          <div style={{ fontSize: 40 }}>{gradeEmoji}</div>
+          <div style={{ fontSize: 50, fontWeight: 800, color: gradeColor, letterSpacing: '-0.04em', lineHeight: 1 }}>{pct}%</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.40)', marginTop: 5 }}>
+            {correct}/{cards.length} recalled correctly
+          </div>
+        </div>
+
+        {/* Rescheduled cards */}
+        <div style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.20)' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#4ADE80', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 10 }}>
+            Cards rescheduled
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {schedule.map((s, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.55)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {s.front}
+                </span>
+                <span style={{
+                  fontSize: 11, fontWeight: 700, flexShrink: 0, letterSpacing: '0.02em',
+                  color: s.result === 'got' ? '#4ADE80' : '#F87171',
+                }}>
+                  {s.result === 'got' ? `+${s.days}d` : 'Tomorrow'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <button onClick={onExit} style={{
+          padding: '12px', borderRadius: 14,
+          background: 'rgba(34,197,94,0.14)', border: '1px solid rgba(34,197,94,0.35)',
+          color: '#86EFAC', fontSize: 13.5, fontWeight: 700, cursor: 'pointer',
+        }}>
+          Done ✓
+        </button>
+      </motion.div>
+    )
+  }
+
+  /* ── Card ── */
+  const card = cards[idx]
+  const progress = (idx / cards.length) * 100
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 18, padding: '0 4px' }}>
+      {/* Progress row */}
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.38)', letterSpacing: '0.08em' }}>
+            {idx + 1} / {cards.length}
+          </span>
+          <span style={{ fontSize: 11, fontWeight: 700 }}>
+            <span style={{ color: '#4ADE80' }}>✓ {results.filter(r => r === 'got').length}</span>
+            {'  '}
+            <span style={{ color: '#F87171' }}>✗ {results.filter(r => r === 'missed').length}</span>
+          </span>
+        </div>
+        <div style={{ height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.07)' }}>
+          <motion.div animate={{ width: `${progress}%` }} transition={{ duration: 0.4 }}
+            style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #4ADE80, #22D3EE)' }} />
+        </div>
+      </div>
+
+      {/* Topic tag */}
+      {card?.topic && (
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(74,222,128,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+          {card.topic}
+        </div>
+      )}
+
+      {/* Card */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', perspective: 1000 }}>
+        <motion.div
+          onClick={() => setFlipped(f => !f)}
+          animate={{ rotateY: flipped ? 180 : 0 }}
+          transition={{ duration: 0.45, ease: 'easeInOut' }}
+          style={{ width: '100%', minHeight: 200, position: 'relative', transformStyle: 'preserve-3d', cursor: 'pointer' }}
+        >
+          {/* Front */}
+          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: 20, padding: '28px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 12 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(34,197,94,0.65)', textTransform: 'uppercase' }}>Due for Review</span>
+            <p style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.92)', lineHeight: 1.55, margin: 0, fontFamily: "'Inter', system-ui, sans-serif" }}>
+              {card?.front}
+            </p>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', marginTop: 6 }}>tap to reveal</span>
+          </div>
+          {/* Back */}
+          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.32)', borderRadius: 20, padding: '28px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 12 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(34,197,94,0.65)', textTransform: 'uppercase' }}>Answer</span>
+            <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.88)', lineHeight: 1.65, margin: 0, fontFamily: "'Georgia', serif" }}>
+              {card?.back}
+            </p>
+          </div>
+        </motion.div>
+      </div>
+
+      <div style={{ textAlign: 'center', fontSize: 10.5, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.04em' }}>
+        ⌨ Space · ← Missed · → Got it
+      </div>
+
+      <AnimatePresence>
+        {flipped && (
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            style={{ display: 'flex', gap: 10 }}>
+            <button onClick={() => handleResult('missed')} style={{ flex: 1, padding: '13px', borderRadius: 14, border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.12)', color: '#FCA5A5', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+              <XCircle size={15} /> Missed
             </button>
             <button onClick={() => handleResult('got')} style={{ flex: 1, padding: '13px', borderRadius: 14, border: '1px solid rgba(74,222,128,0.35)', background: 'rgba(74,222,128,0.12)', color: '#86EFAC', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
               <CheckCircle2 size={15} /> Got it
@@ -1004,10 +1189,16 @@ export default function LabHub() {
     drillHistory, getPersonalBest,
   } = useLabStore()
 
+  const { getDueCards, getDueCount, getUpcomingCount, getTotalCards } = useSRStore()
+
   const [topicInput, setTopicInput] = useState('')
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState('drills') // 'drills' | 'settings' | 'history'
   const inputRef = useRef(null)
+
+  const dueCount      = getDueCount()
+  const upcomingCount = getUpcomingCount(7)
+  const totalSRCards  = getTotalCards()
 
   // Pre-fill topic from lab suggestion
   useEffect(() => {
@@ -1026,6 +1217,14 @@ export default function LabHub() {
       setError('Failed to generate content. Try again.')
       exitDrill()
     }
+  }
+
+  // Launch review mode — no AI needed, uses saved SR cards
+  const handleReview = () => {
+    const due = getDueCards()
+    if (due.length === 0) return
+    startDrill('review', 'Spaced Review')
+    setDrillData({ cards: due }) // immediate, no async
   }
 
   const tabs = [
@@ -1158,15 +1357,17 @@ export default function LabHub() {
                   <button onClick={exitDrill} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: 12, cursor: 'pointer', padding: 0, alignSelf: 'flex-start' }}>
                     ← back to drills
                   </button>
-                  {drillLoading
-                    ? <LabLoading topic={currentTopic} />
-                    : drillData
-                      ? activeDrill === 'flashcard' ? <FlashcardDrill data={drillData} topic={currentTopic} onExit={exitDrill} />
-                        : activeDrill === 'speedround' ? <SpeedRoundDrill data={drillData} topic={currentTopic} onExit={exitDrill} />
-                          : activeDrill === 'mocktest' ? <MockTestDrill data={drillData} topic={currentTopic} onExit={exitDrill} />
-                            : activeDrill === 'feynman' ? <FeynmanDrill data={drillData} topic={currentTopic} onExit={exitDrill} />
-                              : <MatchGridDrill data={drillData} topic={currentTopic} onExit={exitDrill} />
-                      : <LabLoading topic={currentTopic} />
+                  {activeDrill === 'review'
+                    ? (drillData ? <ReviewDrill data={drillData} onExit={exitDrill} /> : <LabLoading topic="Spaced Review" />)
+                    : drillLoading
+                      ? <LabLoading topic={currentTopic} />
+                      : drillData
+                        ? activeDrill === 'flashcard'  ? <FlashcardDrill  data={drillData} topic={currentTopic} onExit={exitDrill} />
+                          : activeDrill === 'speedround' ? <SpeedRoundDrill data={drillData} topic={currentTopic} onExit={exitDrill} />
+                            : activeDrill === 'mocktest'  ? <MockTestDrill   data={drillData} topic={currentTopic} onExit={exitDrill} />
+                              : activeDrill === 'feynman'  ? <FeynmanDrill    data={drillData} topic={currentTopic} onExit={exitDrill} />
+                                : <MatchGridDrill data={drillData} topic={currentTopic} onExit={exitDrill} />
+                        : <LabLoading topic={currentTopic} />
                   }
                 </>
               )}
@@ -1174,6 +1375,61 @@ export default function LabHub() {
               {/* Hub — drill selection */}
               {!activeDrill && activeTab === 'drills' && (
                 <>
+                  {/* ── Spaced Review Banner ── */}
+                  {dueCount > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+                      style={{ padding: '16px 18px', borderRadius: 16, background: 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.30)', position: 'relative', overflow: 'hidden' }}
+                    >
+                      <div aria-hidden style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: 'radial-gradient(circle, rgba(34,197,94,0.20) 0%, transparent 70%)', filter: 'blur(20px)', pointerEvents: 'none' }} />
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, position: 'relative', zIndex: 1 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 5 }}>
+                            <motion.div
+                              animate={{ rotate: [0, -15, 15, 0] }}
+                              transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 3 }}
+                            >
+                              <RefreshCw size={14} color="#4ADE80" />
+                            </motion.div>
+                            <span style={{ fontSize: 12, fontWeight: 800, color: '#4ADE80', letterSpacing: '0.02em' }}>
+                              {dueCount} card{dueCount !== 1 ? 's' : ''} due for review
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', lineHeight: 1.45 }}>
+                            {dueCount === 1 ? 'One card is overdue' : `These cards are ready to resurface based on your last performance`}.
+                            {upcomingCount > 0 && ` ${upcomingCount} more due this week.`}
+                          </div>
+                        </div>
+                        <motion.button
+                          whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }}
+                          onClick={handleReview}
+                          style={{
+                            padding: '10px 18px', borderRadius: 12, flexShrink: 0,
+                            background: 'rgba(34,197,94,0.22)', border: '1px solid rgba(34,197,94,0.45)',
+                            color: '#86EFAC', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Review now
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* SR stats (only when has cards but nothing due) */}
+                  {dueCount === 0 && totalSRCards > 0 && (
+                    <div style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.40)' }}>
+                        🧠 {totalSRCards} card{totalSRCards !== 1 ? 's' : ''} in your memory bank
+                      </div>
+                      {upcomingCount > 0 && (
+                        <div style={{ fontSize: 11, color: 'rgba(74,222,128,0.60)', fontWeight: 600 }}>
+                          {upcomingCount} due this week
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Topic input */}
                   <div>
                     <label style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.12em', textTransform: 'uppercase', display: 'block', marginBottom: 7 }}>

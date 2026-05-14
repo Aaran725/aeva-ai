@@ -11,6 +11,7 @@ import { ChaosEventBanner, MissionVitalsBar, DebateLogicFeed, ThemedChatBubble, 
 import LearningFingerprint from './LearningFingerprint'
 import MemoryPalace from './MemoryPalace'
 import PersonalProgress from './PersonalProgress'
+import { useSRStore } from './srStore'
 import './index.css'
 
 /* ─── Groq API ─── */
@@ -1099,6 +1100,8 @@ function PersonalProgressCard() {
 function DashboardView({ onChatOpen, onSignOut }) {
   const { openArcade } = useArcadeStore()
   const { openLab } = useLabStore()
+  const { getDueCount } = useSRStore()
+  const srDueCount = getDueCount()
   const [fingerprintOpen, setFingerprintOpen] = useState(false)
   const [palaceOpen, setPalaceOpen] = useState(false)
 
@@ -1142,10 +1145,28 @@ function DashboardView({ onChatOpen, onSignOut }) {
                 color: 'rgba(255,255,255,0.80)',
                 fontFamily: "'Inter', system-ui, sans-serif",
                 fontSize: 12.5, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.01em',
+                position: 'relative',
               }}
             >
               <FlaskConical size={13} />
               The Lab
+              {srDueCount > 0 && (
+                <motion.div
+                  initial={{ scale: 0 }} animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 400 }}
+                  style={{
+                    position: 'absolute', top: -5, right: -5,
+                    minWidth: 17, height: 17, borderRadius: 99,
+                    background: '#4ADE80',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 9.5, fontWeight: 800, color: '#0a160a',
+                    padding: '0 4px',
+                    boxShadow: '0 0 8px rgba(74,222,128,0.60)',
+                  }}
+                >
+                  {srDueCount}
+                </motion.div>
+              )}
             </motion.button>
 
             {/* UNLEASH ARCADE button */}
