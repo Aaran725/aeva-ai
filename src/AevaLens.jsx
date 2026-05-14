@@ -1,90 +1,149 @@
 /**
  * Aeva Lens — Vision-to-Logic
- * Analyzes images using Groq vision (Llama 4 Scout) — same key already in Vercel.
- * Shows a scanning animation, then overlays hotspots + a glass-morphism analysis panel.
+ * Drag to select a region → Groq Llama 4 Scout analyses it.
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ZoomIn, Plus, CheckCircle, Loader } from 'lucide-react'
+import { X, Plus, Crop, Scan } from 'lucide-react'
 
 const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
 
-const ANALYSIS_PROMPT = `You are an expert tutor analyzing an image of a student's work or problem.
+const ANALYSIS_PROMPT = `You are an expert tutor analyzing an image of a student's work.
 
-Your job is NOT to solve it for them. Instead:
-1. Identify what concept, topic, or skill is being tested.
-2. Pinpoint the EXACT struggle point — where did they go wrong or get confused?
-3. Explain the underlying rule or principle that resolves the confusion.
-4. Identify 2-4 specific regions of the image that are worth explaining (for hotspots).
+Your job is NOT to solve it. Instead:
+1. Identify the concept or skill being tested.
+2. Pinpoint the EXACT struggle point — where did they go wrong or get stuck?
+3. Explain the underlying rule that resolves the confusion.
+4. Identify 2-3 specific hotspot regions worth explaining.
 
-CRITICAL JSON RULES — you MUST follow these or the output will break:
-- Respond with ONLY a valid JSON object. No markdown, no code fences, no extra text.
-- Do NOT use LaTeX or backslashes anywhere. No \\sqrt, \\frac, \\times, etc.
-- Write all math using plain ASCII: sqrt(x), x/y, x^2, a*b, (a+b)^2.
-- Every string value must be on one line. No literal newlines inside strings.
-- Use only straight double quotes. No special characters that break JSON.
+STRICT JSON RULES — breaking these will cause errors:
+- Output ONLY a valid JSON object. No markdown fences, no extra text before or after.
+- NO LaTeX or backslashes. Write sqrt(x), x^2, x/y, a*b — never \\sqrt, \\frac.
+- All string values must be single-line. No literal newline characters inside strings.
+- Use only plain ASCII characters inside strings.
 
-Output this exact structure:
+Output this exact structure (fill in the values):
 {
-  "topic": "short topic name e.g. Nested Surds",
-  "coreInsight": "One sentence on the central concept in plain text.",
-  "strugglePoint": "One sentence on where the confusion likely is.",
-  "explanation": "2-3 sentences on the underlying rule. Plain language, no LaTeX.",
+  "topic": "topic name",
+  "coreInsight": "one sentence on the central concept",
+  "strugglePoint": "one sentence on where the confusion is",
+  "explanation": "2-3 sentences on the underlying rule in plain language",
   "variables": [
     { "symbol": "a", "meaning": "what it represents" }
   ],
   "steps": [
-    "Step 1: describe in plain text",
-    "Step 2: describe in plain text"
+    "Step 1: ...",
+    "Step 2: ..."
   ],
   "hotspots": [
-    { "id": "h1", "x": 30, "y": 45, "label": "Struggle Point", "detail": "Plain text explanation." },
-    { "id": "h2", "x": 60, "y": 20, "label": "Key Rule", "detail": "Plain text explanation." }
+    { "id": "h1", "x": 25, "y": 35, "label": "Struggle Point", "detail": "plain text explanation" },
+    { "id": "h2", "x": 65, "y": 55, "label": "Key Rule", "detail": "plain text explanation" }
   ]
 }
 
-Keep variables [] if non-mathematical. Steps: 3-5 max. Hotspots: x,y as % from top-left of image.`
+Variables: empty array [] if non-mathematical. Steps: 3-5 max. Hotspots x,y: percentage from top-left corner of the image.`
+
+/* ─── Unicode math prettifier ─── */
+function mathify(text) {
+  if (!text) return text
+  return text
+    .replace(/sqrt\(([^)]*)\)/g, '√($1)')    // sqrt(x) → √(x)
+    .replace(/\^10\b/g, '¹⁰')
+    .replace(/\^([0-9])/g, (_, n) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[n] ?? `^${n}`)
+    .replace(/\*/g, '×')
+    .replace(/\bpi\b/gi, 'π')
+    .replace(/\btheta\b/gi, 'θ')
+    .replace(/\balpha\b/gi, 'α')
+    .replace(/\bbeta\b/gi, 'β')
+    .replace(/\bdelta\b/gi, 'Δ')
+    .replace(/\binfinity\b/gi, '∞')
+    .replace(/<=/g, '≤')
+    .replace(/>=/g, '≥')
+    .replace(/!=/g, '≠')
+    .replace(/ - /g, ' − ')
+}
 
 /* ─── Main Component ─── */
 export default function AevaLens({ file, onClose, onInsightReady }) {
-  const [phase, setPhase] = useState('scanning') // scanning | result | error
+  // phases: select → scanning → result | error
+  const [phase, setPhase] = useState('select')
   const [analysis, setAnalysis] = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
   const [activeHotspot, setActiveHotspot] = useState(null)
-  const [imgDims, setImgDims] = useState({ w: 1, h: 1 })
-  const imgRef = useRef(null)
-  const objectUrl = useRef(null)
 
-  // Create stable object URL
+  // Region selection state
   const [imgSrc, setImgSrc] = useState(null)
+  const [selection, setSelection] = useState(null)   // { x1,y1,x2,y2 } as % of container
+  const [dragStart, setDragStart] = useState(null)
+  const imgContainerRef = useRef(null)
+  const imgRef = useRef(null)
+
   useEffect(() => {
     const url = URL.createObjectURL(file)
-    objectUrl.current = url
     setImgSrc(url)
     return () => URL.revokeObjectURL(url)
   }, [file])
 
-  // Kick off Gemini analysis once we have the src
-  useEffect(() => {
-    if (!imgSrc) return
-    analyzeImage()
-  }, [imgSrc])
+  /* ── Drag selection helpers ── */
+  const getRelPos = (e) => {
+    const rect = imgContainerRef.current?.getBoundingClientRect()
+    if (!rect) return { x: 0, y: 0 }
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    return {
+      x: Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100)),
+      y: Math.max(0, Math.min(100, ((clientY - rect.top) / rect.height) * 100)),
+    }
+  }
 
-  const analyzeImage = useCallback(async () => {
+  const onDragStart = (e) => {
+    e.preventDefault()
+    const pos = getRelPos(e)
+    setDragStart(pos)
+    setSelection({ x1: pos.x, y1: pos.y, x2: pos.x, y2: pos.y })
+  }
+
+  const onDragMove = (e) => {
+    if (!dragStart) return
+    e.preventDefault()
+    const pos = getRelPos(e)
+    setSelection({ x1: dragStart.x, y1: dragStart.y, x2: pos.x, y2: pos.y })
+  }
+
+  const onDragEnd = () => {
+    setDragStart(null)
+  }
+
+  const selRect = selection ? {
+    left:   `${Math.min(selection.x1, selection.x2)}%`,
+    top:    `${Math.min(selection.y1, selection.y2)}%`,
+    width:  `${Math.abs(selection.x2 - selection.x1)}%`,
+    height: `${Math.abs(selection.y2 - selection.y1)}%`,
+  } : null
+
+  const hasSelection = selection &&
+    Math.abs(selection.x2 - selection.x1) > 3 &&
+    Math.abs(selection.y2 - selection.y1) > 3
+
+  /* ── Crop + analyse ── */
+  const handleAnalyse = useCallback(async () => {
+    setPhase('scanning')
     try {
       if (!GROQ_KEY) throw new Error('VITE_GROQ_API_KEY is not set')
 
-      const base64 = await fileToBase64(file)
-      const mimeType = file.type || 'image/jpeg'
+      let blob = file
+      if (hasSelection && imgRef.current) {
+        blob = await cropImageBlob(file, selection, imgRef.current) || file
+      }
+
+      const base64 = await fileToBase64(blob)
+      const mimeType = blob.type || 'image/jpeg'
 
       const res = await fetch(GROQ_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${GROQ_KEY}`,
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
         body: JSON.stringify({
           model: VISION_MODEL,
           messages: [{
@@ -100,15 +159,9 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
       })
 
       const json = await res.json()
-
-      if (!res.ok) {
-        const msg = json.error?.message || `HTTP ${res.status}`
-        throw new Error(msg)
-      }
+      if (!res.ok) throw new Error(json.error?.message || `HTTP ${res.status}`)
 
       const raw = json.choices?.[0]?.message?.content || ''
-
-      // Extract JSON — model sometimes wraps in markdown code fences
       const jsonMatch = raw.match(/\{[\s\S]*\}/)
       if (!jsonMatch) throw new Error('No JSON in response')
 
@@ -120,22 +173,7 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
       setErrorMsg(err.message || 'Unknown error')
       setPhase('error')
     }
-  }, [file])
-
-  const handleAddToGuide = () => {
-    if (!analysis) return
-    onInsightReady({
-      topic: analysis.topic,
-      coreInsight: analysis.coreInsight,
-      strugglePoint: analysis.strugglePoint,
-      explanation: analysis.explanation,
-      steps: analysis.steps || [],
-      variables: analysis.variables || [],
-      imageFile: file,
-      timestamp: Date.now(),
-    })
-    onClose()
-  }
+  }, [file, hasSelection, selection])
 
   return (
     <motion.div
@@ -146,7 +184,7 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
         position: 'fixed', inset: 0, zIndex: 700,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: 20,
-        background: 'rgba(2,4,18,0.88)',
+        background: 'rgba(2,4,18,0.90)',
         backdropFilter: 'blur(18px)',
         WebkitBackdropFilter: 'blur(18px)',
         fontFamily: "'Inter', system-ui, sans-serif",
@@ -160,8 +198,8 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
         transition={{ type: 'spring', stiffness: 320, damping: 26 }}
         style={{
           width: '100%',
-          maxWidth: phase === 'result' ? 880 : 560,
-          maxHeight: '90vh',
+          maxWidth: phase === 'result' ? 900 : 580,
+          maxHeight: '92vh',
           borderRadius: 24,
           overflow: 'hidden',
           background: 'linear-gradient(160deg, #07091c 0%, #0d0f26 100%)',
@@ -171,31 +209,126 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
           transition: 'max-width 0.5s cubic-bezier(0.22,1,0.36,1)',
         }}
       >
-        {/* Left: image + hotspots */}
-        <div style={{
-          position: 'relative',
-          flex: phase === 'result' ? '0 0 50%' : '1',
-          minHeight: phase === 'scanning' ? 320 : 'auto',
-          overflow: 'hidden',
-          background: '#000',
-        }}>
+
+        {/* ── Left: image + selection/hotspot overlay ── */}
+        <div
+          ref={imgContainerRef}
+          onMouseDown={phase === 'select' ? onDragStart : undefined}
+          onMouseMove={phase === 'select' ? onDragMove : undefined}
+          onMouseUp={phase === 'select' ? onDragEnd : undefined}
+          onTouchStart={phase === 'select' ? onDragStart : undefined}
+          onTouchMove={phase === 'select' ? onDragMove : undefined}
+          onTouchEnd={phase === 'select' ? onDragEnd : undefined}
+          style={{
+            position: 'relative',
+            flex: phase === 'result' ? '0 0 50%' : '1',
+            minHeight: 280,
+            overflow: 'hidden',
+            background: '#000',
+            cursor: phase === 'select' ? 'crosshair' : 'default',
+            userSelect: 'none',
+          }}
+        >
           {imgSrc && (
             <img
               ref={imgRef}
               src={imgSrc}
               alt="Uploaded"
-              onLoad={e => setImgDims({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
-              style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', maxHeight: '90vh' }}
+              draggable={false}
+              style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', maxHeight: '92vh', pointerEvents: 'none' }}
             />
           )}
 
-          {/* Scanning beam animation */}
+          {/* Select mode: instruction banner + drag box */}
+          {phase === 'select' && (
+            <>
+              <div style={{
+                position: 'absolute', top: 0, left: 0, right: 0,
+                padding: '8px 12px',
+                background: 'linear-gradient(180deg, rgba(7,9,28,0.85) 0%, transparent 100%)',
+                display: 'flex', alignItems: 'center', gap: 7,
+                pointerEvents: 'none',
+              }}>
+                <Crop size={12} color="rgba(0,200,255,0.75)" strokeWidth={2.5} />
+                <span style={{ fontSize: 11.5, color: 'rgba(0,200,255,0.80)', fontWeight: 600, letterSpacing: '0.04em' }}>
+                  Drag to select a question
+                </span>
+              </div>
+
+              {/* Selection rectangle */}
+              {selRect && (
+                <div style={{
+                  position: 'absolute',
+                  ...selRect,
+                  border: '2px solid #00C8FF',
+                  background: 'rgba(0,200,255,0.10)',
+                  boxShadow: '0 0 0 9999px rgba(0,0,0,0.40)',
+                  pointerEvents: 'none',
+                }} />
+              )}
+
+              {/* Analyse button — appears when selection is big enough */}
+              <AnimatePresence>
+                {hasSelection && (
+                  <motion.button
+                    initial={{ opacity: 0, scale: 0.85 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.85 }}
+                    onClick={e => { e.stopPropagation(); handleAnalyse() }}
+                    style={{
+                      position: 'absolute',
+                      bottom: 14, left: '50%', transform: 'translateX(-50%)',
+                      display: 'flex', alignItems: 'center', gap: 7,
+                      padding: '9px 18px', borderRadius: 99,
+                      background: '#00C8FF',
+                      border: 'none',
+                      color: '#07091c',
+                      fontSize: 12.5, fontWeight: 800,
+                      cursor: 'pointer',
+                      fontFamily: "'Inter', system-ui, sans-serif",
+                      boxShadow: '0 4px 20px rgba(0,200,255,0.45)',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    <Scan size={13} strokeWidth={2.5} />
+                    Analyse selection
+                  </motion.button>
+                )}
+              </AnimatePresence>
+
+              {/* Full image fallback */}
+              {!hasSelection && (
+                <motion.button
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.8 }}
+                  onClick={e => { e.stopPropagation(); handleAnalyse() }}
+                  style={{
+                    position: 'absolute',
+                    bottom: 14, left: '50%', transform: 'translateX(-50%)',
+                    padding: '7px 16px', borderRadius: 99,
+                    background: 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(255,255,255,0.18)',
+                    color: 'rgba(255,255,255,0.45)',
+                    fontSize: 11.5, fontWeight: 600,
+                    cursor: 'pointer',
+                    fontFamily: "'Inter', system-ui, sans-serif",
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  or analyse whole image
+                </motion.button>
+              )}
+            </>
+          )}
+
+          {/* Scanning beam */}
           {phase === 'scanning' && (
             <>
               <ScanBeam />
               <div style={{
                 position: 'absolute', inset: 0,
-                background: 'linear-gradient(180deg, rgba(0,200,255,0.04) 0%, rgba(0,100,255,0.02) 100%)',
+                background: 'rgba(0,100,255,0.03)',
                 pointerEvents: 'none',
               }} />
               <div style={{
@@ -210,13 +343,13 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
                   style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(0,200,255,0.2)', borderTopColor: '#00C8FF' }}
                 />
                 <span style={{ fontSize: 12.5, color: 'rgba(0,200,255,0.80)', fontWeight: 600, letterSpacing: '0.06em' }}>
-                  ANALYSING IMAGE…
+                  ANALYSING…
                 </span>
               </div>
             </>
           )}
 
-          {/* Hotspot dots */}
+          {/* Result: hotspot dots */}
           {phase === 'result' && analysis?.hotspots?.map(hs => (
             <HotspotDot
               key={hs.id}
@@ -230,86 +363,69 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
           <button
             onClick={onClose}
             style={{
-              position: 'absolute', top: 12, right: 12,
-              width: 28, height: 28, borderRadius: '50%',
+              position: 'absolute', top: 10, right: 10,
+              width: 26, height: 26, borderRadius: '50%',
               background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)',
               color: 'rgba(255,255,255,0.60)', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
-            <X size={13} />
+            <X size={12} />
           </button>
         </div>
 
-        {/* Right: analysis panel */}
+        {/* ── Right: analysis panel ── */}
         <AnimatePresence>
           {phase === 'result' && analysis && (
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.12, duration: 0.4 }}
+              transition={{ delay: 0.1, duration: 0.35 }}
               style={{
                 flex: 1,
                 overflowY: 'auto',
-                padding: '24px 22px',
+                padding: '22px 20px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 16,
+                gap: 14,
                 borderLeft: '1px solid rgba(255,255,255,0.07)',
               }}
             >
-              {/* Topic badge */}
+              {/* Topic */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{
-                  padding: '3px 10px', borderRadius: 99,
-                  background: 'rgba(0,200,255,0.10)', border: '1px solid rgba(0,200,255,0.25)',
-                  fontSize: 11, fontWeight: 700, color: '#67E8F9', letterSpacing: '0.05em',
-                }}>
+                <div style={{ padding: '3px 10px', borderRadius: 99, background: 'rgba(0,200,255,0.10)', border: '1px solid rgba(0,200,255,0.25)', fontSize: 11, fontWeight: 700, color: '#67E8F9', letterSpacing: '0.05em' }}>
                   {analysis.topic}
                 </div>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                  Aeva Lens
-                </span>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Aeva Lens</span>
               </div>
 
               {/* Core insight */}
-              <div style={{
-                padding: '12px 14px', borderRadius: 12,
-                background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.22)',
-              }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(165,180,252,0.60)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>Core Insight</div>
-                <div style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.85)', lineHeight: 1.55 }}>{analysis.coreInsight}</div>
+              <div style={{ padding: '11px 13px', borderRadius: 12, background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.22)' }}>
+                <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(165,180,252,0.55)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>Core Insight</div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', lineHeight: 1.55 }}>{mathify(analysis.coreInsight)}</div>
               </div>
 
               {/* Struggle point */}
-              <div style={{
-                padding: '12px 14px', borderRadius: 12,
-                background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.20)',
-              }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(252,165,165,0.60)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>Struggle Point</div>
-                <div style={{ fontSize: 13, color: 'rgba(255,200,200,0.85)', lineHeight: 1.55 }}>{analysis.strugglePoint}</div>
+              <div style={{ padding: '11px 13px', borderRadius: 12, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.20)' }}>
+                <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(252,165,165,0.55)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>Struggle Point</div>
+                <div style={{ fontSize: 13, color: 'rgba(255,200,200,0.85)', lineHeight: 1.55 }}>{mathify(analysis.strugglePoint)}</div>
               </div>
 
-              {/* Explanation */}
+              {/* The rule */}
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.30)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>The Rule</div>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.72)', lineHeight: 1.65 }}>{analysis.explanation}</div>
+                <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>The Rule</div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.70)', lineHeight: 1.65 }}>{mathify(analysis.explanation)}</div>
               </div>
 
               {/* Steps */}
               {analysis.steps?.length > 0 && (
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.30)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>How to Approach It</div>
+                  <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>How to Approach It</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                     {analysis.steps.map((step, i) => (
                       <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                        <div style={{
-                          flexShrink: 0, width: 18, height: 18, borderRadius: '50%',
-                          background: 'rgba(99,102,241,0.20)', border: '1px solid rgba(99,102,241,0.35)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 9.5, fontWeight: 800, color: '#A5B4FC',
-                        }}>{i + 1}</div>
-                        <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.68)', lineHeight: 1.55 }}>{step}</span>
+                        <div style={{ flexShrink: 0, width: 17, height: 17, borderRadius: '50%', background: 'rgba(99,102,241,0.20)', border: '1px solid rgba(99,102,241,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: '#A5B4FC' }}>{i + 1}</div>
+                        <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.65)', lineHeight: 1.55 }}>{mathify(step)}</span>
                       </div>
                     ))}
                   </div>
@@ -319,23 +435,19 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
               {/* Variables table */}
               {analysis.variables?.length > 0 && (
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.30)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>Variables</div>
+                  <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>Variables</div>
                   <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
                     {analysis.variables.map((v, i) => (
-                      <div key={i} style={{
-                        display: 'flex', gap: 12, padding: '7px 12px',
-                        background: i % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'transparent',
-                        borderBottom: i < analysis.variables.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
-                      }}>
-                        <code style={{ flexShrink: 0, fontSize: 13, fontFamily: 'monospace', color: '#FBBF24', fontWeight: 700, minWidth: 28 }}>{v.symbol}</code>
-                        <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.58)' }}>{v.meaning}</span>
+                      <div key={i} style={{ display: 'flex', gap: 12, padding: '7px 12px', background: i % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'transparent', borderBottom: i < analysis.variables.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+                        <code style={{ flexShrink: 0, fontSize: 13, fontFamily: 'monospace', color: '#FBBF24', fontWeight: 700, minWidth: 28 }}>{mathify(v.symbol)}</code>
+                        <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.55)' }}>{mathify(v.meaning)}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Hotspot tooltip */}
+              {/* Active hotspot detail */}
               <AnimatePresence>
                 {activeHotspot && (
                   <motion.div
@@ -343,39 +455,44 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
                     initial={{ opacity: 0, y: 4 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 2 }}
-                    style={{
-                      padding: '12px 14px', borderRadius: 12,
-                      background: 'rgba(0,200,255,0.08)', border: '1px solid rgba(0,200,255,0.22)',
-                    }}
+                    style={{ padding: '11px 13px', borderRadius: 12, background: 'rgba(0,200,255,0.08)', border: '1px solid rgba(0,200,255,0.22)' }}
                   >
-                    <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(103,232,249,0.65)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
+                    <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(103,232,249,0.60)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
                       📍 {activeHotspot.label}
                     </div>
-                    <div style={{ fontSize: 12.5, color: 'rgba(207,250,254,0.80)', lineHeight: 1.55 }}>{activeHotspot.detail}</div>
+                    <div style={{ fontSize: 12.5, color: 'rgba(207,250,254,0.80)', lineHeight: 1.55 }}>{mathify(activeHotspot.detail)}</div>
                   </motion.div>
                 )}
               </AnimatePresence>
 
-              {/* Add to Study Guide button */}
+              {/* Add to Study Guide */}
               <motion.button
                 whileHover={{ scale: 1.02, y: -1 }}
                 whileTap={{ scale: 0.97 }}
-                onClick={handleAddToGuide}
+                onClick={() => {
+                  onInsightReady({
+                    topic: analysis.topic,
+                    coreInsight: analysis.coreInsight,
+                    strugglePoint: analysis.strugglePoint,
+                    explanation: analysis.explanation,
+                    steps: analysis.steps || [],
+                    variables: analysis.variables || [],
+                    timestamp: Date.now(),
+                  })
+                  onClose()
+                }}
                 style={{
                   marginTop: 'auto',
-                  padding: '12px 18px',
-                  borderRadius: 14,
-                  cursor: 'pointer',
+                  padding: '11px 16px', borderRadius: 14, cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  background: 'linear-gradient(135deg, rgba(99,102,241,0.25) 0%, rgba(139,92,246,0.20) 100%)',
-                  border: '1px solid rgba(139,143,255,0.35)',
-                  color: '#C4B5FD',
-                  fontSize: 13, fontWeight: 700,
+                  background: 'linear-gradient(135deg, rgba(99,102,241,0.25) 0%, rgba(139,92,246,0.18) 100%)',
+                  border: '1px solid rgba(139,143,255,0.32)',
+                  color: '#C4B5FD', fontSize: 13, fontWeight: 700,
                   fontFamily: "'Inter', system-ui, sans-serif",
-                  boxShadow: '0 4px 20px rgba(99,102,241,0.15)',
+                  boxShadow: '0 4px 18px rgba(99,102,241,0.15)',
                 }}
               >
-                <Plus size={14} strokeWidth={2.5} />
+                <Plus size={13} strokeWidth={2.5} />
                 Add to Study Guide
               </motion.button>
             </motion.div>
@@ -388,26 +505,20 @@ export default function AevaLens({ file, onClose, onInsightReady }) {
             <span style={{ fontSize: 28 }}>⚠️</span>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.70)' }}>Couldn't analyse this image</div>
             {errorMsg && (
-              <div style={{ fontSize: 11.5, color: 'rgba(239,68,68,0.75)', fontFamily: 'monospace', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 8, padding: '6px 12px', maxWidth: 320, wordBreak: 'break-word' }}>
+              <div style={{ fontSize: 11, color: 'rgba(239,68,68,0.75)', fontFamily: 'monospace', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 8, padding: '6px 12px', maxWidth: 320, wordBreak: 'break-word' }}>
                 {errorMsg}
               </div>
             )}
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.30)', lineHeight: 1.5 }}>
-              {errorMsg?.includes('API_KEY') || errorMsg?.includes('key')
-                ? 'Check that VITE_GROQ_API_KEY is set in your Vercel environment variables.'
-                : 'Make sure the image is clear and try again.'}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => { setPhase('select'); setErrorMsg('') }}
+                style={{ padding: '9px 18px', borderRadius: 99, background: 'rgba(0,200,255,0.10)', border: '1px solid rgba(0,200,255,0.25)', color: '#67E8F9', fontSize: 12.5, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif", fontWeight: 600 }}>
+                Try again
+              </button>
+              <button onClick={onClose}
+                style={{ padding: '9px 18px', borderRadius: 99, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.45)', fontSize: 12.5, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif" }}>
+                Close
+              </button>
             </div>
-            <button
-              onClick={onClose}
-              style={{
-                marginTop: 8, padding: '9px 20px', borderRadius: 99,
-                background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)',
-                color: 'rgba(255,255,255,0.55)', fontSize: 13, cursor: 'pointer',
-                fontFamily: "'Inter', system-ui, sans-serif",
-              }}
-            >
-              Close
-            </button>
           </div>
         )}
       </motion.div>
@@ -420,13 +531,10 @@ function ScanBeam() {
   return (
     <motion.div
       style={{
-        position: 'absolute',
-        left: 0, right: 0,
-        height: 2,
+        position: 'absolute', left: 0, right: 0, height: 2,
         background: 'linear-gradient(90deg, transparent 0%, #00C8FF 40%, #0080FF 60%, transparent 100%)',
         boxShadow: '0 0 16px 4px rgba(0,180,255,0.45)',
-        pointerEvents: 'none',
-        zIndex: 10,
+        pointerEvents: 'none', zIndex: 10,
       }}
       animate={{ top: ['0%', '100%', '0%'] }}
       transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
@@ -443,21 +551,16 @@ function HotspotDot({ hotspot, active, onClick }) {
       whileTap={{ scale: 0.90 }}
       style={{
         position: 'absolute',
-        left: `${hotspot.x}%`,
-        top: `${hotspot.y}%`,
+        left: `${hotspot.x}%`, top: `${hotspot.y}%`,
         transform: 'translate(-50%, -50%)',
-        width: 22, height: 22,
-        borderRadius: '50%',
+        width: 22, height: 22, borderRadius: '50%',
         background: active ? 'rgba(0,200,255,0.30)' : 'rgba(0,200,255,0.15)',
         border: `2px solid ${active ? '#00C8FF' : 'rgba(0,200,255,0.60)'}`,
         cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 20,
-        backdropFilter: 'blur(4px)',
+        zIndex: 20, backdropFilter: 'blur(4px)',
       }}
-      animate={!active ? {
-        boxShadow: ['0 0 0 0 rgba(0,200,255,0.5)', '0 0 0 8px rgba(0,200,255,0)', '0 0 0 0 rgba(0,200,255,0)'],
-      } : {}}
+      animate={!active ? { boxShadow: ['0 0 0 0 rgba(0,200,255,0.5)', '0 0 0 8px rgba(0,200,255,0)', '0 0 0 0 rgba(0,200,255,0)'] } : {}}
       transition={{ duration: 1.8, repeat: Infinity }}
     >
       <div style={{ width: 6, height: 6, borderRadius: '50%', background: active ? '#00C8FF' : 'rgba(0,200,255,0.80)' }} />
@@ -465,30 +568,62 @@ function HotspotDot({ hotspot, active, onClick }) {
   )
 }
 
-/* ─── Helpers ─── */
-function fileToBase64(file) {
+/* ─── Crop image to selection ─── */
+async function cropImageBlob(file, selection, imgEl) {
+  return new Promise(resolve => {
+    const canvas = document.createElement('canvas')
+    const natW = imgEl.naturalWidth
+    const natH = imgEl.naturalHeight
+    const dispW = imgEl.clientWidth
+    const dispH = imgEl.clientHeight
+
+    // The img uses object-fit:contain — compute actual rendered rect
+    const scale = Math.min(dispW / natW, dispH / natH)
+    const rendW = natW * scale
+    const rendH = natH * scale
+    const offX = (dispW - rendW) / 2
+    const offY = (dispH - rendH) / 2
+
+    // Convert % of container to pixel coords in natural image space
+    const x1pct = Math.min(selection.x1, selection.x2) / 100
+    const y1pct = Math.min(selection.y1, selection.y2) / 100
+    const x2pct = Math.max(selection.x1, selection.x2) / 100
+    const y2pct = Math.max(selection.y1, selection.y2) / 100
+
+    const sx = Math.max(0, ((x1pct * dispW) - offX) / scale)
+    const sy = Math.max(0, ((y1pct * dispH) - offY) / scale)
+    const sw = Math.min(natW - sx, ((x2pct - x1pct) * dispW) / scale)
+    const sh = Math.min(natH - sy, ((y2pct - y1pct) * dispH) / scale)
+
+    if (sw <= 0 || sh <= 0) { resolve(null); return }
+
+    canvas.width = sw
+    canvas.height = sh
+    const ctx = canvas.getContext('2d')
+    const img = new Image()
+    img.onload = () => {
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh)
+      canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.95)
+    }
+    img.src = URL.createObjectURL(file)
+  })
+}
+
+/* ─── JSON helpers ─── */
+function fileToBase64(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(reader.result.split(',')[1])
     reader.onerror = reject
-    reader.readAsDataURL(file)
+    reader.readAsDataURL(blob)
   })
 }
 
-// LLMs often emit bare backslashes in math/LaTeX inside JSON strings,
-// which makes JSON.parse throw. Fix by escaping lone backslashes, then parse.
 function safeParseJSON(str) {
-  try {
-    return JSON.parse(str)
-  } catch {
-    // Replace lone backslashes (not already doubled) with \\
+  try { return JSON.parse(str) } catch {
     const fixed = str.replace(/\\(?!["\\/bfnrtu])/g, '\\\\')
-    try {
-      return JSON.parse(fixed)
-    } catch {
-      // Last resort: strip everything outside the outermost braces and retry
-      const inner = fixed.replace(/[ -]/g, ' ')
-      return JSON.parse(inner)
+    try { return JSON.parse(fixed) } catch {
+      throw new Error('Could not parse model response as JSON')
     }
   }
 }
