@@ -108,7 +108,7 @@ const CRITIC_FALLBACK = { understanding: 'partial', lazy_thinking: false, mode: 
 
 async function runCritic(history, userMessage) {
   try {
-    const context = history.slice(-6).map(m => ({
+    const context = history.slice(-4).map(m => ({
       role: m.role === 'model' ? 'assistant' : 'user',
       content: m.text,
     }))
@@ -117,7 +117,7 @@ async function runCritic(history, userMessage) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: 'llama-3.1-8b-instant',
         messages: [
           {
             role: 'system',
