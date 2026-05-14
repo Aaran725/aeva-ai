@@ -118,18 +118,22 @@ The user argued ${config.userPosition} and Aeva argued ${config.aevaPosition}.
 TRANSCRIPT:
 ${transcript}
 
-Score the USER's performance only. Return ONLY valid JSON, no markdown:
+Score the USER's performance and decide the overall debate winner. Return ONLY valid JSON, no markdown:
 {
   "evidence": "B+",
   "clarity": "A-",
   "rhetoric": "B",
   "final": "B+",
+  "verdict": "You win",
+  "verdictReason": "one sentence explaining the decisive moment or argument that swung the debate",
   "strengths": ["specific strength 1", "specific strength 2"],
   "improvements": ["specific improvement 1", "specific improvement 2"],
   "summary": "2-3 sentence critique of the user's overall performance, referencing specific moments from the debate"
 }
 
-Grades: A+/A/A-/B+/B/B-/C+/C/C-/D/F. Be specific and honest.`
+Grades: A+/A/A-/B+/B/B-/C+/C/C-/D/F.
+verdict must be exactly one of: "You win", "Aeva wins", "Draw".
+Be specific, honest, and reference actual arguments made.`
 
   const res = await fetch(GROQ_URL, {
     method: 'POST',
@@ -449,6 +453,19 @@ function exportPDF(messages, score, config) {
   ${score ? `
   <div class="section-heading" style="margin-top:40px">Scorecard</div>
   <div class="scorecard">
+    ${score.verdict ? (() => {
+      const win = score.verdict === 'You win'
+      const draw = score.verdict === 'Draw'
+      const bg  = win ? '#f0fdf4' : draw ? '#fffbeb' : '#fef2f2'
+      const col = win ? '#16a34a' : draw ? '#d97706' : '#dc2626'
+      const bdr = win ? '#bbf7d0' : draw ? '#fde68a' : '#fecaca'
+      const icon = win ? '🏆' : draw ? '🤝' : '🛡️'
+      return `<div style="padding:16px 20px;border-radius:12px;background:${bg};border:1.5px solid ${bdr};margin-bottom:20px;text-align:center;">
+        <div style="font-size:22px;margin-bottom:6px">${icon}</div>
+        <div style="font-size:20px;font-weight:900;color:${col};letter-spacing:-0.03em;margin-bottom:4px">${score.verdict}</div>
+        ${score.verdictReason ? `<div style="font-size:12px;color:#6b7280;line-height:1.5">${score.verdictReason}</div>` : ''}
+      </div>`
+    })() : ''}
     <div class="grades-row">
       ${[['Evidence', score.evidence], ['Clarity', score.clarity], ['Rhetoric', score.rhetoric]].map(([lbl, val]) => `
         <div class="grade-box">
@@ -670,6 +687,30 @@ function ScoringScreen({ score, messages, config, onBack, onNew }) {
       style={{ flex: 1, overflow: 'auto', padding: '28px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
 
       <div style={{ width: '100%', maxWidth: 580, display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        {/* Verdict banner */}
+        {score.verdict && (() => {
+          const win = score.verdict === 'You win'
+          const draw = score.verdict === 'Draw'
+          const bg    = win ? 'rgba(74,222,128,0.10)'  : draw ? 'rgba(251,191,36,0.10)'  : 'rgba(239,68,68,0.10)'
+          const border= win ? 'rgba(74,222,128,0.28)'  : draw ? 'rgba(251,191,36,0.28)'  : 'rgba(239,68,68,0.28)'
+          const col   = win ? '#4ADE80'                : draw ? '#FBBF24'                : '#F87171'
+          const icon  = win ? '🏆'                     : draw ? '🤝'                     : '🛡️'
+          return (
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}
+              style={{ padding: '18px 22px', borderRadius: 16, background: bg, border: `1.5px solid ${border}`, textAlign: 'center' }}>
+              <div style={{ fontSize: 28, marginBottom: 6 }}>{icon}</div>
+              <div style={{ fontSize: 22, fontWeight: 900, color: col, letterSpacing: '-0.03em', marginBottom: 4 }}>
+                {score.verdict}
+              </div>
+              {score.verdictReason && (
+                <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
+                  {score.verdictReason}
+                </div>
+              )}
+            </motion.div>
+          )
+        })()}
 
         {/* Topic + result header */}
         <div style={{ textAlign: 'center', marginBottom: 4 }}>
