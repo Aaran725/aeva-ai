@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -10,12 +10,17 @@
 html, body {
   width: 100%;
   height: 100%;
-  background: #07091a;
+  background: #050610;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Animated mesh gradient — sits behind everything */
+::selection {
+  background: rgba(139,143,255,0.35);
+  color: rgba(255,255,255,0.95);
+}
+
+/* ── Animated mesh gradient ── */
 body::before {
   content: '';
   position: fixed;
@@ -23,28 +28,88 @@ body::before {
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 70% 55% at 15% 25%, rgba(88,28,135,0.38) 0%, transparent 65%),
-    radial-gradient(ellipse 55% 45% at 85% 15%, rgba(49,46,129,0.32) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 50% at 65% 85%, rgba(30,27,75,0.40) 0%, transparent 60%),
-    radial-gradient(ellipse 40% 35% at 45% 50%, rgba(109,40,217,0.12) 0%, transparent 55%);
+    radial-gradient(ellipse 72% 58% at 12% 22%, rgba(88,28,135,0.48) 0%, transparent 62%),
+    radial-gradient(ellipse 58% 48% at 88% 12%, rgba(49,46,129,0.40) 0%, transparent 58%),
+    radial-gradient(ellipse 55% 45% at 68% 88%, rgba(30,27,75,0.44) 0%, transparent 58%),
+    radial-gradient(ellipse 42% 38% at 42% 52%, rgba(109,40,217,0.16) 0%, transparent 55%),
+    radial-gradient(ellipse 32% 28% at 80% 58%, rgba(180,83,9,0.11) 0%, transparent 52%),
+    radial-gradient(ellipse 26% 20% at 20% 78%, rgba(99,102,241,0.13) 0%, transparent 50%);
   background-size: 200% 200%;
-  animation: meshDrift 22s ease-in-out infinite alternate;
+  animation: meshDrift 28s ease-in-out infinite alternate;
 }
 
 @keyframes meshDrift {
-  0%   { background-position: 0% 0%,   100% 0%,   0% 100%,  50% 50% }
-  33%  { background-position: 30% 60%,  70% 40%,   30% 70%,  20% 80% }
-  66%  { background-position: 70% 20%,  20% 70%,   80% 30%,  80% 20% }
-  100% { background-position: 100% 100%, 0% 100%, 100% 0%,   30% 70% }
+  0%   { background-position: 0% 0%,    100% 0%,    0% 100%,   50% 50%,   80% 20%,  20% 80% }
+  25%  { background-position: 20% 40%,   80% 30%,   25% 65%,   30% 70%,   60% 40%,  40% 60% }
+  50%  { background-position: 60% 20%,   30% 70%,   70% 30%,   70% 30%,   30% 70%,  70% 30% }
+  75%  { background-position: 40% 70%,   60% 10%,   50% 80%,   20% 50%,   90% 50%,  10% 40% }
+  100% { background-position: 100% 100%, 0% 100%,  100% 0%,   30% 70%,   10% 80%,  80% 10% }
 }
 
-#root { position: relative; z-index: 1; }
+#root {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-height: 100vh;
+}
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-#root {
-  width: 100%;
-  min-height: 100vh;
+/* ── Scrollbars ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(139,143,255,0.18); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(139,143,255,0.32); }
+.chat-messages::-webkit-scrollbar { width: 0; }
+
+/* ── Bento grid ── */
+.bento-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+@media (min-width: 768px) {
+  .bento-grid { grid-template-columns: repeat(4, 1fr); }
+  .mission-card { grid-column: span 2; grid-row: span 2; }
+  .skill-card   { grid-column: span 2; }
+  .lab-card     { grid-column: span 2; }
+}
+
+/* ── Debate HUD panel ── */
+.debate-feed-panel { display: none; }
+@media (min-width: 768px) { .debate-feed-panel { display: flex; } }
+
+/* ── Interrupt glitch ── */
+@keyframes interrupt-glitch {
+  0%   { transform: translateX(0);    filter: none; opacity: 1; }
+  10%  { transform: translateX(-4px); filter: hue-rotate(20deg) brightness(1.35) saturate(1.4); opacity: 0.85; }
+  22%  { transform: translateX(4px);  filter: hue-rotate(-15deg); opacity: 1; }
+  34%  { transform: translateX(-3px); filter: brightness(0.80); }
+  46%  { transform: translateX(3px);  filter: none; }
+  58%  { transform: translateX(-1px); }
+  72%  { transform: translateX(1px); }
+  100% { transform: translateX(0);    filter: none; opacity: 1; }
+}
+.interrupt-glitch { animation: interrupt-glitch 0.42s cubic-bezier(0.36,0.07,0.19,0.97) both; }
+
+/* ── Orb interrupt pulse ── */
+@keyframes orb-interrupt {
+  0%   { box-shadow: 0 0 0px rgba(239,68,68,0); }
+  30%  { box-shadow: 0 0 28px 8px rgba(239,68,68,0.70); }
+  60%  { box-shadow: 0 0 14px 4px rgba(239,68,68,0.35); }
+  100% { box-shadow: 0 0 0px rgba(239,68,68,0); }
+}
+.orb-interrupt { animation: orb-interrupt 1.2s ease-out forwards; }
+
+/* ── Profile share card (print) ── */
+@media print {
+  body > * { display: none !important; }
+  .share-card-print { display: flex !important; position: fixed; inset: 0; z-index: 99999; }
+}
+
+/* ── Glass card hover glow ── */
+.glass-card-glow:hover {
+  box-shadow: 0 8px 48px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.12), inset 0 1px 0 rgba(255,255,255,0.12) !important;
 }

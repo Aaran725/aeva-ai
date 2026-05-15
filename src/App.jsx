@@ -16,6 +16,8 @@ import AevaLens from './AevaLens'
 import DebateArena from './DebateArena'
 import AevaLibrary from './AevaLibrary'
 import CustomDrill from './CustomDrill'
+import FeynmanMode from './FeynmanMode'
+import UserProfile from './UserProfile'
 import { useLibraryStore } from './libraryStore'
 import './index.css'
 
@@ -256,55 +258,7 @@ async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}) {
   }
 }
 
-/* ─── Responsive grid CSS ─── */
-const gridCSS = `
-  .bento-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 18px;
-  }
-  @media (min-width: 768px) {
-    .bento-grid { grid-template-columns: repeat(4, 1fr); }
-    .mission-card { grid-column: span 2; grid-row: span 2; }
-    .skill-card   { grid-column: span 2; }
-    .lab-card     { grid-column: span 2; }
-  }
-  .chat-messages::-webkit-scrollbar { width: 0; }
-
-  /* Debate HUD panel — hidden on mobile, visible on desktop */
-  .debate-feed-panel { display: none; }
-  @media (min-width: 768px) { .debate-feed-panel { display: flex; } }
-
-  /* ── Interrupt glitch animation ── */
-  @keyframes interrupt-glitch {
-    0%   { transform: translateX(0);    filter: none; opacity: 1; }
-    10%  { transform: translateX(-4px); filter: hue-rotate(20deg) brightness(1.35) saturate(1.4); opacity: 0.85; }
-    22%  { transform: translateX(4px);  filter: hue-rotate(-15deg); opacity: 1; }
-    34%  { transform: translateX(-3px); filter: brightness(0.80); }
-    46%  { transform: translateX(3px);  filter: none; }
-    58%  { transform: translateX(-1px); }
-    72%  { transform: translateX(1px); }
-    100% { transform: translateX(0);    filter: none; opacity: 1; }
-  }
-  .interrupt-glitch {
-    animation: interrupt-glitch 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
-  }
-
-  /* ── Orb interrupt pulse ── */
-  @keyframes orb-interrupt {
-    0%   { box-shadow: 0 0 0px rgba(239,68,68,0); }
-    30%  { box-shadow: 0 0 28px 8px rgba(239,68,68,0.70); }
-    60%  { box-shadow: 0 0 14px 4px rgba(239,68,68,0.35); }
-    100% { box-shadow: 0 0 0px rgba(239,68,68,0); }
-  }
-  .orb-interrupt { animation: orb-interrupt 1.2s ease-out forwards; }
-
-  /* ── Profile share card (print / screenshot) ── */
-  @media print {
-    body > * { display: none !important; }
-    .share-card-print { display: flex !important; position: fixed; inset: 0; z-index: 99999; }
-  }
-`
+/* gridCSS moved to index.css */
 
 /* ═══ USER CONTEXT ═══════════════════════════════ */
 const UserContext = createContext({ name: 'Martin', mood: 'LOCKED IN' })
@@ -324,24 +278,43 @@ function NoiseOverlay() {
 
 /* ═══ GLASS CARD ══════════════════════════════════ */
 function GlassCard({ children, className = '', style = {}, onClick }) {
+  const [hovered, setHovered] = useState(false)
   return (
     <motion.div
       className={className}
       onClick={onClick}
-      whileHover={{ y: -8, scale: 1.015 }}
-      transition={{ type: 'spring', stiffness: 280, damping: 22 }}
+      onHoverStart={() => setHovered(true)}
+      onHoverEnd={() => setHovered(false)}
+      whileHover={{ y: -6, scale: 1.012 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 24 }}
       style={{
         position: 'relative',
-        background: 'rgba(255,255,255,0.08)',
-        backdropFilter: 'blur(32px)',
-        WebkitBackdropFilter: 'blur(32px)',
-        border: '1px solid rgba(255,255,255,0.16)',
-        borderRadius: 36, overflow: 'hidden',
+        background: 'linear-gradient(145deg, rgba(255,255,255,0.075) 0%, rgba(255,255,255,0.042) 100%)',
+        backdropFilter: 'blur(40px)',
+        WebkitBackdropFilter: 'blur(40px)',
+        border: '1px solid transparent',
+        backgroundClip: 'padding-box',
+        borderRadius: 32, overflow: 'hidden',
         cursor: onClick ? 'pointer' : 'default',
-        boxShadow: '0 4px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.10)',
+        boxShadow: hovered
+          ? '0 12px 56px rgba(0,0,0,0.50), 0 0 0 1px rgba(139,143,255,0.18), inset 0 1px 0 rgba(255,255,255,0.14)'
+          : '0 4px 32px rgba(0,0,0,0.38), 0 0 0 1px rgba(255,255,255,0.09), inset 0 1px 0 rgba(255,255,255,0.08)',
+        transition: 'box-shadow 0.3s ease',
         ...style,
       }}
     >
+      {/* Gradient border overlay */}
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: 32, pointerEvents: 'none', zIndex: 0,
+        background: hovered
+          ? 'linear-gradient(135deg, rgba(139,143,255,0.22) 0%, rgba(255,255,255,0.04) 40%, rgba(233,163,100,0.10) 100%)'
+          : 'linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.02) 50%, rgba(255,255,255,0.06) 100%)',
+        WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+        WebkitMaskComposite: 'xor',
+        maskComposite: 'exclude',
+        padding: '1px',
+        transition: 'background 0.3s ease',
+      }} />
       <NoiseOverlay />
       <div style={{ position: 'relative', zIndex: 2, height: '100%' }}>{children}</div>
     </motion.div>
@@ -492,10 +465,16 @@ function MissionCard({ onChatOpen }) {
         <AevaOrb size={96} personality={orbPersonality} />
       </div>
       <div style={{ marginTop: 8 }}>
-        <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 'clamp(20px, 3vw, 30px)', fontWeight: 400, color: 'rgba(255,255,255,0.92)', lineHeight: 1.22, marginBottom: 12 }}>
+        <h2 style={{
+          fontFamily: "'Playfair Display', Georgia, serif",
+          fontSize: 'clamp(22px, 3vw, 32px)', fontWeight: 400, lineHeight: 1.20, marginBottom: 12,
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(233,163,100,0.85) 100%)',
+          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+        }}>
           Ready to start<br />today's mission?
         </h2>
-        <p style={{ fontSize: 13.5, lineHeight: 1.6, maxWidth: '88%', color: 'rgba(255,255,255,0.48)', fontFamily: "'Inter', system-ui, sans-serif" }}>
+        <p style={{ fontSize: 13.5, lineHeight: 1.65, maxWidth: '88%', color: 'rgba(255,255,255,0.42)', fontFamily: "'Inter', system-ui, sans-serif" }}>
           Aeva: <em>"{name}'s Startup Empire is at a critical crossroads. Let's look at your margins."</em>
         </p>
       </div>
@@ -1115,10 +1094,12 @@ function DashboardView({ onChatOpen, onSignOut }) {
   const { openLab } = useLabStore()
   const { getDueCount } = useSRStore()
   const { sessions } = useLibraryStore()
+  const { name } = useUser()
   const srDueCount = getDueCount()
   const [fingerprintOpen, setFingerprintOpen] = useState(false)
   const [palaceOpen, setPalaceOpen] = useState(false)
   const [libraryOpen, setLibraryOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
 
   return (
     <motion.div
@@ -1140,12 +1121,19 @@ function DashboardView({ onChatOpen, onSignOut }) {
       <LabHub />
 
       <div style={{ position: 'relative' }}>
-        <header style={{ padding: '26px 28px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', maxWidth: 1280, margin: '0 auto' }}>
+        <header style={{
+          position: 'sticky', top: 0, zIndex: 50,
+          padding: '18px 28px 16px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          maxWidth: 1280, margin: '0 auto',
+          backdropFilter: 'blur(32px)',
+          WebkitBackdropFilter: 'blur(32px)',
+        }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 9, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 30, height: 30, borderRadius: 10, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 14px rgba(45,48,142,0.50)' }}>
               <Star size={13} color="white" fill="white" />
             </div>
-            <span style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.88)', letterSpacing: '-0.02em' }}>aeva</span>
+            <span style={{ fontSize: 17, fontWeight: 900, letterSpacing: '-0.04em', background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(233,163,100,0.80) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>aeva</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {/* Library button */}
@@ -1234,6 +1222,21 @@ function DashboardView({ onChatOpen, onSignOut }) {
               <MessageCircle size={13} />
               Chat
             </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+              onClick={() => setProfileOpen(true)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 7,
+                padding: '7px 16px', borderRadius: 99,
+                background: 'rgba(233,163,100,0.12)',
+                border: '1px solid rgba(233,163,100,0.30)',
+                color: 'rgba(233,163,100,0.88)',
+                fontFamily: "'Inter', system-ui, sans-serif",
+                fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              👤 My Profile
+            </motion.button>
             <UserAvatar onSignOut={onSignOut} />
           </div>
         </header>
@@ -1312,6 +1315,10 @@ function DashboardView({ onChatOpen, onSignOut }) {
             }}
           />
         )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {profileOpen && <UserProfile name={name} onClose={() => setProfileOpen(false)} />}
       </AnimatePresence>
     </motion.div>
   )
@@ -1843,13 +1850,13 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.26, ease: 'easeOut' }}
+      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
       style={{
         display: 'flex',
         justifyContent: isUser ? 'flex-end' : 'flex-start',
-        marginBottom: 12,
+        marginBottom: 14,
         gap: 12,
         alignItems: 'flex-start',
       }}
@@ -1857,23 +1864,33 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard }) {
       <div style={{
         maxWidth: 700,
         width: isUser ? 'auto' : '100%',
-        padding: isUser ? '10px 16px' : '16px 20px',
-        borderRadius: isUser ? '20px 20px 6px 20px' : '20px 20px 20px 6px',
-        background: isUser ? 'rgba(139,143,255,0.22)' : 'rgba(255,255,255,0.08)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        border: isUser ? '1px solid rgba(139,143,255,0.35)' : '1px solid rgba(255,255,255,0.12)',
-        color: isUser ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.85)',
+        padding: isUser ? '11px 18px' : '18px 22px',
+        borderRadius: isUser ? '22px 22px 6px 22px' : '6px 22px 22px 22px',
+        background: isUser
+          ? 'linear-gradient(135deg, rgba(139,143,255,0.28) 0%, rgba(109,113,225,0.20) 100%)'
+          : 'rgba(255,255,255,0.055)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        border: isUser
+          ? '1px solid rgba(139,143,255,0.40)'
+          : '1px solid rgba(255,255,255,0.09)',
+        boxShadow: isUser
+          ? '0 4px 20px rgba(139,143,255,0.15), inset 0 1px 0 rgba(255,255,255,0.12)'
+          : '0 2px 16px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.06)',
+        color: 'rgba(255,255,255,0.90)',
         fontFamily: "'Inter', system-ui, sans-serif",
       }}>
         {isUser ? (
-          <span style={{ fontSize: 14.5, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{msg.text}</span>
+          <span style={{ fontSize: 15, lineHeight: 1.65, whiteSpace: 'pre-wrap', fontWeight: 400 }}>{msg.text}</span>
         ) : (
           <>
             {msg.lockIn && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}>
-                <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#4ADE80', boxShadow: '0 0 6px #4ADE80' }} />
-                <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#4ADE80', opacity: 0.8 }}>Lock-In</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 10 }}>
+                <motion.div
+                  animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.6, repeat: Infinity }}
+                  style={{ width: 5, height: 5, borderRadius: '50%', background: '#4ADE80', boxShadow: '0 0 7px #4ADE80' }}
+                />
+                <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#4ADE80' }}>Lock-In</span>
               </div>
             )}
             <MarkdownRenderer text={msg.text} streaming={!!msg.streaming} cursorColor="rgba(139,143,255,0.9)" />
@@ -1881,11 +1898,11 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard }) {
         )}
       </div>
 
-      {/* Deep dive cards — appear beside the AI bubble */}
+      {/* Deep dive cards */}
       {!isUser && deepDiveCards && deepDiveCards.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4, flexShrink: 0 }}>
           <AnimatePresence>
-            {deepDiveCards.map((card, ci) => (
+            {deepDiveCards.map((card) => (
               <DeepDiveCard key={card.id} term={card.term} definition={card.definition} onClose={() => onDismissCard(card.id)} />
             ))}
           </AnimatePresence>
@@ -1979,6 +1996,7 @@ function ChatView({ onBack }) {
   const [lockInActive, setLockInActive] = useState(false)
   const [lockInSecondsLeft, setLockInSecondsLeft] = useState(25 * 60)
   const [lockInSummary, setLockInSummary] = useState(null)
+  const [feynmanOpen, setFeynmanOpen] = useState(false)
   const lockInStartExchangesRef = useRef(0)
   const lockInTimerRef = useRef(null)
   const [countdown, setCountdown] = useState(null)
@@ -2092,8 +2110,8 @@ function ChatView({ onBack }) {
 
   // Background theme for mission mode
   const missionBg = isMission
-    ? `linear-gradient(172deg, rgba(5,7,26,0.92) 0%, rgba(8,10,32,0.92) 40%, rgba(10,12,37,0.92) 100%)`
-    : 'linear-gradient(172deg, rgba(191,201,212,0.94) 0%, rgba(199,207,217,0.94) 22%, rgba(209,217,228,0.94) 48%, rgba(218,221,232,0.94) 72%, rgba(228,231,240,0.94) 100%)'
+    ? `linear-gradient(172deg, rgba(4,5,20,0.94) 0%, rgba(6,8,26,0.94) 40%, rgba(8,10,30,0.94) 100%)`
+    : `linear-gradient(172deg, rgba(4,5,18,0.82) 0%, rgba(5,6,22,0.78) 50%, rgba(4,5,18,0.82) 100%)`
 
   const missionGlow = isMission && activeMission
     ? { position: 'absolute', top: 0, left: 0, right: 0, height: 320, background: `radial-gradient(ellipse at 50% 0%, ${activeMission.glow} 0%, transparent 70%)`, pointerEvents: 'none' }
@@ -2337,37 +2355,39 @@ function ChatView({ onBack }) {
 
   const isEmpty = messages.length === 0
 
-  // Text colors adapt to mode
-  const backBtnStyle = isMission
-    ? { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', color: 'rgba(255,255,255,0.65)' }
-    : { background: 'rgba(255,255,255,0.28)', border: '1px solid rgba(255,255,255,0.45)', color: '#3a3550' }
+  // All modes are dark — mesh shows through
+  const backBtnStyle = {
+    background: 'rgba(255,255,255,0.07)',
+    border: '1px solid rgba(255,255,255,0.13)',
+    color: 'rgba(255,255,255,0.62)',
+  }
 
-  const logoColor = isMission ? 'rgba(255,255,255,0.85)' : '#3a3550'
-  const headingColor = isMission ? 'rgba(255,255,255,0.55)' : '#4a4560'
-  const titleColor = isMission ? 'rgba(255,255,255,0.92)' : '#1e1a2a'
+  const logoColor = 'rgba(255,255,255,0.88)'
+  const headingColor = 'rgba(255,255,255,0.50)'
+  const titleColor = 'rgba(255,255,255,0.94)'
 
   const inputBarStyle = isMission
     ? {
-        background: 'rgba(255,255,255,0.06)',
-        border: activeMission ? `1px solid ${activeMission.border}` : '1px solid rgba(255,255,255,0.14)',
+        background: 'rgba(255,255,255,0.05)',
+        border: activeMission ? `1px solid ${activeMission.border}` : '1px solid rgba(255,255,255,0.12)',
         boxShadow: activeMission ? `0 0 24px ${activeMission.glow}` : 'none',
       }
     : {
-        background: 'rgba(255,255,255,0.28)',
-        border: '1px solid rgba(255,255,255,0.45)',
-        boxShadow: '0 8px 32px rgba(30,36,100,0.07), inset 0 1px 0 rgba(255,255,255,0.90)',
+        background: 'rgba(255,255,255,0.06)',
+        border: '1px solid rgba(139,143,255,0.22)',
+        boxShadow: '0 0 0 1px rgba(139,143,255,0.08), 0 8px 32px rgba(0,0,0,0.40)',
       }
 
-  const inputTextColor = isMission ? 'rgba(255,255,255,0.88)' : '#1e1a2a'
+  const inputTextColor = 'rgba(255,255,255,0.88)'
   const placeholderNote = isMission
     ? `Respond to ${activeMission?.title || 'the mission'}…`
     : 'Ask Aeva anything…'
 
   const sendBtnStyle = isMission && activeMission
     ? { background: `linear-gradient(145deg, ${activeMission.color}80, ${activeMission.color}40)`, border: `1.5px solid ${activeMission.color}60`, boxShadow: `0 4px 14px ${activeMission.glow}` }
-    : { background: 'linear-gradient(145deg, #a090f0 0%, #c8bcfc 55%, #eeebff 100%)', border: '1.5px solid rgba(255,255,255,0.80)', boxShadow: '0 4px 14px rgba(95,85,200,0.34)' }
+    : { background: 'linear-gradient(145deg, rgba(139,143,255,0.90) 0%, rgba(167,139,250,0.70) 100%)', border: '1.5px solid rgba(167,139,250,0.55)', boxShadow: '0 4px 18px rgba(139,143,255,0.35)' }
 
-  const sendIconColor = isMission ? 'rgba(255,255,255,0.90)' : '#3a30a0'
+  const sendIconColor = 'rgba(255,255,255,0.95)'
 
   return (
     <motion.div
@@ -2525,12 +2545,28 @@ function ChatView({ onBack }) {
                 >
                   📋 Study Guide
                 </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                  onClick={() => setFeynmanOpen(true)}
+                  animate={{ opacity: lockInActive ? 0.3 : 1 }}
+                  style={{
+                    padding: '5px 12px', borderRadius: 99, cursor: 'pointer',
+                    background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.28)',
+                    color: 'rgba(245,158,11,0.85)', fontSize: 11, fontWeight: 700,
+                    fontFamily: "'Inter', system-ui, sans-serif",
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    pointerEvents: lockInActive ? 'none' : 'auto',
+                  }}
+                >
+                  🎓 Teach It
+                </motion.button>
               </>
             )}
-            <div style={{ width: 24, height: 24, borderRadius: 7, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 24, height: 24, borderRadius: 8, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(45,48,142,0.45)' }}>
               <Star size={11} color="white" fill="white" />
             </div>
-            <span style={{ fontSize: 14, fontWeight: 700, color: logoColor, letterSpacing: '-0.02em' }}>aeva</span>
+            <span style={{ fontSize: 14.5, fontWeight: 800, color: logoColor, letterSpacing: '-0.03em' }}>aeva</span>
           </div>
         </div>
 
@@ -2549,33 +2585,78 @@ function ChatView({ onBack }) {
                 <motion.div
                   initial={{ opacity: 1 }} exit={{ opacity: 0, y: -20 }}
                   transition={{ duration: 0.4 }}
-                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 16 }}
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 12 }}
                 >
-                  <AevaOrb size={218} active={isActive} scanMode={labOpen} />
-                  <div style={{ textAlign: 'center', padding: '0 28px', marginTop: 8 }}>
-                    <p style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 28, fontWeight: 400, color: headingColor, lineHeight: 1.3, letterSpacing: '0.01em', marginBottom: 2 }}>
+                  <AevaOrb size={218} active={isActive} scanMode={labOpen} personality={orbPersonality} />
+                  <div style={{ textAlign: 'center', padding: '0 28px', marginTop: 4 }}>
+                    <p style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 24, fontWeight: 400, color: 'rgba(255,255,255,0.45)', lineHeight: 1.3, letterSpacing: '0.01em', marginBottom: 4 }}>
                       Hey {name},
                     </p>
-                    <h1 style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif", fontSize: 'clamp(26px, 6vw, 42px)', fontWeight: 800, color: titleColor, lineHeight: 1.07, letterSpacing: '-0.05em', whiteSpace: 'nowrap', margin: 0 }}>
+                    <h1 style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif", fontSize: 'clamp(28px, 6vw, 44px)', fontWeight: 900, color: 'rgba(255,255,255,0.95)', lineHeight: 1.05, letterSpacing: '-0.05em', margin: '0 0 20px' }}>
                       What can I help with?
                     </h1>
                   </div>
+                  {/* Suggestion chips */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2, duration: 0.4 }}
+                    style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', padding: '0 24px', maxWidth: 560 }}
+                  >
+                    {[
+                      { label: 'Explain a concept', icon: '💡' },
+                      { label: 'Help me understand', icon: '🧠' },
+                      { label: 'Quiz me on a topic', icon: '🎯' },
+                      { label: 'Break this down', icon: '🔬' },
+                    ].map((s, i) => (
+                      <motion.button
+                        key={s.label}
+                        initial={{ opacity: 0, scale: 0.88 }} animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.25 + i * 0.06, type: 'spring', stiffness: 320 }}
+                        whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.96 }}
+                        onClick={() => { setInput(s.label); inputRef.current?.focus() }}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 7,
+                          padding: '9px 16px', borderRadius: 99,
+                          background: 'rgba(255,255,255,0.06)',
+                          border: '1px solid rgba(255,255,255,0.10)',
+                          color: 'rgba(255,255,255,0.60)',
+                          fontSize: 13, fontWeight: 500,
+                          fontFamily: "'Inter', system-ui, sans-serif",
+                          cursor: 'pointer',
+                          backdropFilter: 'blur(20px)',
+                          transition: 'border 0.2s, color 0.2s',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(139,143,255,0.35)'; e.currentTarget.style.color = 'rgba(255,255,255,0.85)' }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'; e.currentTarget.style.color = 'rgba(255,255,255,0.60)' }}
+                      >
+                        <span>{s.icon}</span> {s.label}
+                      </motion.button>
+                    ))}
+                  </motion.div>
                 </motion.div>
               )}
             </AnimatePresence>
 
             {/* Mini orb + mastery (tutor mode active) */}
             {!isEmpty && !isMission && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 4, flexShrink: 0, gap: 6 }}>
-                <AevaOrb size={72} active={isThinking} scanMode={labOpen} />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 4, flexShrink: 0, gap: 8 }}>
+                <AevaOrb size={72} active={isThinking} scanMode={labOpen} personality={orbPersonality} />
                 {Object.keys(masteryMap).length > 0 && (
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', padding: '0 20px' }}>
-                    {Object.entries(masteryMap).slice(0, 4).map(([topic, score]) => (
-                      <div key={topic} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 99, background: 'rgba(255,255,255,0.20)', border: '1px solid rgba(255,255,255,0.35)', fontSize: 11, color: '#3a3550', fontWeight: 500 }}>
-                        <div style={{ width: 5, height: 5, borderRadius: '50%', background: score >= 75 ? '#4ADE80' : score >= 40 ? '#E9A364' : '#FF8C6B' }} />
-                        {topic} {score}%
-                      </div>
-                    ))}
+                    {Object.entries(masteryMap).slice(0, 4).map(([topic, score]) => {
+                      const col = score >= 75 ? '#4ADE80' : score >= 40 ? '#FBBF24' : '#F87171'
+                      return (
+                        <div key={topic} style={{
+                          display: 'flex', alignItems: 'center', gap: 5,
+                          padding: '4px 11px', borderRadius: 99,
+                          background: `${col}12`, border: `1px solid ${col}30`,
+                          fontSize: 11, color: col, fontWeight: 600,
+                        }}>
+                          <div style={{ width: 4, height: 4, borderRadius: '50%', background: col }} />
+                          {topic} {score}%
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -2841,6 +2922,11 @@ function ChatView({ onBack }) {
       {/* Custom Drill Modal */}
       <AnimatePresence>
         {drillOpen && <CustomDrill onClose={() => setDrillOpen(false)} />}
+      </AnimatePresence>
+
+      {/* Feynman Mode */}
+      <AnimatePresence>
+        {feynmanOpen && <FeynmanMode onClose={() => setFeynmanOpen(false)} />}
       </AnimatePresence>
 
       {/* Library Modal */}
@@ -3156,7 +3242,6 @@ export default function App() {
 
   return (
     <UserContext.Provider value={userValue}>
-      <style>{gridCSS}</style>
       {/* Global chaos banner */}
       <ChaosEventBanner />
       <ProTipBanner />
