@@ -2023,8 +2023,26 @@ ${conversationText}${visualContext}`
 }
 
 /* ═══ CHAT BUBBLE ═════════════════════════════════ */
-function ChatBubble({ msg, deepDiveCards, onDismissCard }) {
+function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false }) {
   const isUser = msg.role === 'user'
+
+  const bubbleBg = isUser
+    ? isLight
+      ? 'linear-gradient(135deg, rgba(99,102,241,0.16) 0%, rgba(109,113,225,0.12) 100%)'
+      : 'linear-gradient(135deg, rgba(139,143,255,0.28) 0%, rgba(109,113,225,0.20) 100%)'
+    : isLight
+      ? 'rgba(0,0,0,0.04)'
+      : 'rgba(255,255,255,0.055)'
+
+  const bubbleBorder = isUser
+    ? isLight ? '1px solid rgba(99,102,241,0.28)' : '1px solid rgba(139,143,255,0.40)'
+    : isLight ? '1px solid rgba(0,0,0,0.07)' : '1px solid rgba(255,255,255,0.09)'
+
+  const bubbleShadow = isUser
+    ? isLight ? '0 2px 12px rgba(99,102,241,0.12)' : '0 4px 20px rgba(139,143,255,0.15), inset 0 1px 0 rgba(255,255,255,0.12)'
+    : isLight ? '0 1px 8px rgba(0,0,0,0.06)' : '0 2px 16px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.06)'
+
+  const textColor = isLight ? (isUser ? 'rgba(30,27,100,0.88)' : 'rgba(15,15,30,0.85)') : 'rgba(255,255,255,0.90)'
 
   return (
     <motion.div
@@ -2044,18 +2062,12 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard }) {
         width: isUser ? 'auto' : '100%',
         padding: isUser ? '11px 18px' : '18px 22px',
         borderRadius: isUser ? '22px 22px 6px 22px' : '6px 22px 22px 22px',
-        background: isUser
-          ? 'linear-gradient(135deg, rgba(139,143,255,0.28) 0%, rgba(109,113,225,0.20) 100%)'
-          : 'rgba(255,255,255,0.055)',
+        background: bubbleBg,
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
-        border: isUser
-          ? '1px solid rgba(139,143,255,0.40)'
-          : '1px solid rgba(255,255,255,0.09)',
-        boxShadow: isUser
-          ? '0 4px 20px rgba(139,143,255,0.15), inset 0 1px 0 rgba(255,255,255,0.12)'
-          : '0 2px 16px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.06)',
-        color: 'rgba(255,255,255,0.90)',
+        border: bubbleBorder,
+        boxShadow: bubbleShadow,
+        color: textColor,
         fontFamily: "'Inter', system-ui, sans-serif",
       }}>
         {isUser ? (
@@ -2539,17 +2551,15 @@ function ChatView({ onBack }) {
   const send = () => sendWithText()
 
   const isEmpty = messages.length === 0
+  const isLight = !isMission && (chatSettings.chatBg || 'default') === 'white'
 
-  // All modes are dark — mesh shows through
-  const backBtnStyle = {
-    background: 'rgba(255,255,255,0.07)',
-    border: '1px solid rgba(255,255,255,0.13)',
-    color: 'rgba(255,255,255,0.62)',
-  }
+  const backBtnStyle = isLight
+    ? { background: 'rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.12)', color: 'rgba(0,0,0,0.60)' }
+    : { background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.13)', color: 'rgba(255,255,255,0.62)' }
 
-  const logoColor = 'rgba(255,255,255,0.88)'
-  const headingColor = 'rgba(255,255,255,0.50)'
-  const titleColor = 'rgba(255,255,255,0.94)'
+  const logoColor = isLight ? 'rgba(15,15,30,0.85)' : 'rgba(255,255,255,0.88)'
+  const headingColor = isLight ? 'rgba(0,0,0,0.40)' : 'rgba(255,255,255,0.50)'
+  const titleColor = isLight ? 'rgba(0,0,0,0.88)' : 'rgba(255,255,255,0.94)'
 
   const inputBarStyle = isMission
     ? {
@@ -2557,20 +2567,26 @@ function ChatView({ onBack }) {
         border: activeMission ? `1px solid ${activeMission.border}` : '1px solid rgba(255,255,255,0.12)',
         boxShadow: activeMission ? `0 0 24px ${activeMission.glow}` : 'none',
       }
+    : isLight
+    ? {
+        background: 'rgba(255,255,255,0.90)',
+        border: '1px solid rgba(0,0,0,0.12)',
+        boxShadow: '0 2px 24px rgba(0,0,0,0.08)',
+      }
     : {
         background: 'rgba(255,255,255,0.06)',
         border: '1px solid rgba(139,143,255,0.22)',
         boxShadow: '0 0 0 1px rgba(139,143,255,0.08), 0 8px 32px rgba(0,0,0,0.40)',
       }
 
-  const inputTextColor = 'rgba(255,255,255,0.88)'
+  const inputTextColor = isLight ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.88)'
   const placeholderNote = isMission
     ? `Respond to ${activeMission?.title || 'the mission'}…`
     : 'Ask Aeva anything…'
 
   const sendBtnStyle = isMission && activeMission
     ? { background: `linear-gradient(145deg, ${activeMission.color}80, ${activeMission.color}40)`, border: `1.5px solid ${activeMission.color}60`, boxShadow: `0 4px 14px ${activeMission.glow}` }
-    : { background: 'linear-gradient(145deg, rgba(139,143,255,0.90) 0%, rgba(167,139,250,0.70) 100%)', border: '1.5px solid rgba(167,139,250,0.55)', boxShadow: '0 4px 18px rgba(139,143,255,0.35)' }
+    : { background: 'linear-gradient(145deg, rgba(99,102,241,0.90) 0%, rgba(139,92,246,0.80) 100%)', border: '1.5px solid rgba(99,102,241,0.55)', boxShadow: isLight ? '0 4px 14px rgba(99,102,241,0.25)' : '0 4px 18px rgba(139,143,255,0.35)' }
 
   const sendIconColor = 'rgba(255,255,255,0.95)'
 
@@ -2752,7 +2768,7 @@ function ChatView({ onBack }) {
             <motion.button
               whileHover={{ scale: 1.08, rotate: 45 }} whileTap={{ scale: 0.94 }}
               onClick={() => setChatAppSettingsOpen(true)}
-              style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.13)', color: 'rgba(255,255,255,0.45)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              style={{ width: 30, height: 30, borderRadius: '50%', background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.07)', border: isLight ? '1px solid rgba(0,0,0,0.12)' : '1px solid rgba(255,255,255,0.13)', color: isLight ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.45)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
               <Settings size={12} />
             </motion.button>
@@ -2782,10 +2798,10 @@ function ChatView({ onBack }) {
                 >
                   <AevaOrb size={218} active={isActive} scanMode={labOpen} personality={orbPersonality} />
                   <div style={{ textAlign: 'center', padding: '0 28px', marginTop: 4 }}>
-                    <p style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 24, fontWeight: 400, color: 'rgba(255,255,255,0.45)', lineHeight: 1.3, letterSpacing: '0.01em', marginBottom: 4 }}>
+                    <p style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 24, fontWeight: 400, color: isLight ? 'rgba(0,0,0,0.42)' : 'rgba(255,255,255,0.45)', lineHeight: 1.3, letterSpacing: '0.01em', marginBottom: 4 }}>
                       Hey {name},
                     </p>
-                    <h1 style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif", fontSize: 'clamp(28px, 6vw, 44px)', fontWeight: 900, color: 'rgba(255,255,255,0.95)', lineHeight: 1.05, letterSpacing: '-0.05em', margin: '0 0 20px' }}>
+                    <h1 style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif", fontSize: 'clamp(28px, 6vw, 44px)', fontWeight: 900, color: isLight ? 'rgba(0,0,0,0.88)' : 'rgba(255,255,255,0.95)', lineHeight: 1.05, letterSpacing: '-0.05em', margin: '0 0 20px' }}>
                       What can I help with?
                     </h1>
                   </div>
@@ -2852,17 +2868,17 @@ function ChatView({ onBack }) {
                             style={{
                               display: 'inline-flex', alignItems: 'center', gap: 7,
                               padding: '9px 16px', borderRadius: 99,
-                              background: 'rgba(255,255,255,0.06)',
-                              border: chipEditMode ? '1px solid rgba(239,68,68,0.22)' : '1px solid rgba(255,255,255,0.10)',
-                              color: 'rgba(255,255,255,0.60)',
+                              background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)',
+                              border: chipEditMode ? '1px solid rgba(239,68,68,0.22)' : isLight ? '1px solid rgba(0,0,0,0.10)' : '1px solid rgba(255,255,255,0.10)',
+                              color: isLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.60)',
                               fontSize: 13, fontWeight: 500,
                               fontFamily: "'Inter', system-ui, sans-serif",
                               cursor: chipEditMode ? 'default' : 'pointer',
                               backdropFilter: 'blur(20px)',
                               transition: 'border 0.2s, color 0.2s',
                             }}
-                            onMouseEnter={e => { if (!chipEditMode) { e.currentTarget.style.borderColor = 'rgba(139,143,255,0.35)'; e.currentTarget.style.color = 'rgba(255,255,255,0.85)' } }}
-                            onMouseLeave={e => { if (!chipEditMode) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'; e.currentTarget.style.color = 'rgba(255,255,255,0.60)' } }}
+                            onMouseEnter={e => { if (!chipEditMode) { e.currentTarget.style.borderColor = isLight ? 'rgba(99,102,241,0.40)' : 'rgba(139,143,255,0.35)'; e.currentTarget.style.color = isLight ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.85)' } }}
+                            onMouseLeave={e => { if (!chipEditMode) { e.currentTarget.style.borderColor = isLight ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.10)'; e.currentTarget.style.color = isLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.60)' } }}
                           >
                             <span>{s.icon}</span> {s.label}
                           </motion.button>
@@ -2948,9 +2964,9 @@ function ChatView({ onBack }) {
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 5,
                         padding: '5px 13px', borderRadius: 99,
-                        background: chipEditMode ? 'rgba(139,143,255,0.12)' : 'rgba(255,255,255,0.04)',
-                        border: chipEditMode ? '1px solid rgba(139,143,255,0.28)' : '1px solid rgba(255,255,255,0.07)',
-                        color: chipEditMode ? 'rgba(139,143,255,0.82)' : 'rgba(255,255,255,0.22)',
+                        background: chipEditMode ? 'rgba(99,102,241,0.12)' : isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)',
+                        border: chipEditMode ? '1px solid rgba(99,102,241,0.28)' : isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.07)',
+                        color: chipEditMode ? 'rgba(99,102,241,0.82)' : isLight ? 'rgba(0,0,0,0.32)' : 'rgba(255,255,255,0.22)',
                         fontSize: 11, fontWeight: 600,
                         fontFamily: "'Inter', system-ui, sans-serif",
                         cursor: 'pointer', transition: 'all 0.2s',
@@ -3004,7 +3020,7 @@ function ChatView({ onBack }) {
                 {messages.map((msg, i) =>
                   isMission
                     ? <ThemedChatBubble key={i} msg={msg} mission={activeMission} />
-                    : <ChatBubble key={i} msg={msg} deepDiveCards={deepDiveMap[i] || []} onDismissCard={(cardId) => setDeepDiveMap(prev => ({ ...prev, [i]: (prev[i] || []).filter(c => c.id !== cardId) }))} />
+                    : <ChatBubble key={i} msg={msg} deepDiveCards={deepDiveMap[i] || []} onDismissCard={(cardId) => setDeepDiveMap(prev => ({ ...prev, [i]: (prev[i] || []).filter(c => c.id !== cardId) }))} isLight={isLight} />
                 )}
                 <div ref={bottomRef} />
               </div>
