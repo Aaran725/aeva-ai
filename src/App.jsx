@@ -2678,7 +2678,7 @@ function ChatView({ onBack }) {
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 5,
                   padding: '4px 10px', borderRadius: 99,
-                  background: `${col}12`, border: `1px solid ${col}30`,
+                  background: isLight ? `${col}18` : `${col}12`, border: `1px solid ${isLight ? col + '50' : col + '30'}`,
                   fontSize: 10.5, fontWeight: 700, color: col,
                   letterSpacing: '0.04em',
                 }}>
@@ -2706,9 +2706,9 @@ function ChatView({ onBack }) {
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 6,
                     padding: lockInActive ? '6px 14px' : '5px 11px', borderRadius: 99, cursor: 'pointer',
-                    background: lockInActive ? (lockInUrgent ? 'rgba(239,68,68,0.18)' : 'rgba(74,222,128,0.14)') : 'rgba(255,255,255,0.07)',
-                    border: `1.5px solid ${lockInActive ? (lockInUrgent ? 'rgba(239,68,68,0.55)' : 'rgba(74,222,128,0.45)') : 'rgba(255,255,255,0.14)'}`,
-                    color: lockInActive ? (lockInUrgent ? '#F87171' : '#4ADE80') : 'rgba(255,255,255,0.50)',
+                    background: lockInActive ? (lockInUrgent ? 'rgba(239,68,68,0.18)' : 'rgba(74,222,128,0.14)') : isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.07)',
+                    border: `1.5px solid ${lockInActive ? (lockInUrgent ? 'rgba(239,68,68,0.55)' : 'rgba(74,222,128,0.45)') : isLight ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.14)'}`,
+                    color: lockInActive ? (lockInUrgent ? '#F87171' : '#4ADE80') : isLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.50)',
                     fontSize: lockInActive ? 12 : 11, fontWeight: 700, fontFamily: "'Inter', system-ui, sans-serif",
                     transition: 'padding 0.2s, font-size 0.2s, background 0.2s',
                   }}
@@ -2724,8 +2724,8 @@ function ChatView({ onBack }) {
                   animate={{ opacity: lockInActive ? 0.3 : 1 }}
                   style={{
                     padding: '5px 11px', borderRadius: 99, cursor: 'pointer',
-                    background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.24)',
-                    color: 'rgba(167,139,250,0.80)', fontSize: 11, fontWeight: 600,
+                    background: isLight ? 'rgba(139,92,246,0.08)' : 'rgba(167,139,250,0.10)', border: isLight ? '1px solid rgba(139,92,246,0.22)' : '1px solid rgba(167,139,250,0.24)',
+                    color: isLight ? 'rgba(109,40,217,0.80)' : 'rgba(167,139,250,0.80)', fontSize: 11, fontWeight: 600,
                     fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', alignItems: 'center', gap: 5,
                     pointerEvents: lockInActive ? 'none' : 'auto',
                   }}
@@ -2738,8 +2738,8 @@ function ChatView({ onBack }) {
                   animate={{ opacity: lockInActive ? 0.3 : 1 }}
                   style={{
                     padding: '5px 12px', borderRadius: 99, cursor: 'pointer',
-                    background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',
-                    color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: 600,
+                    background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.08)', border: isLight ? '1px solid rgba(0,0,0,0.12)' : '1px solid rgba(255,255,255,0.15)',
+                    color: isLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: 600,
                     fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: '0.04em',
                     pointerEvents: lockInActive ? 'none' : 'auto',
                   }}
