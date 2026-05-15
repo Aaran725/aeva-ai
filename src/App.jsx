@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, createContext, useContext } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowUp, Zap, TrendingDown, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer } from 'lucide-react'
+import { ArrowUp, Zap, TrendingDown, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus } from 'lucide-react'
 import { supabase } from './supabase'
 import { useArcadeStore } from './arcadeStore'
 import { useLabStore } from './labStore'
@@ -24,6 +24,42 @@ import './index.css'
 /* ─── Groq API ─── */
 const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
+
+/* ─── Chat customisation ─── */
+const CHIP_DEFAULTS = [
+  { id: '1', label: 'Explain a concept', icon: '💡' },
+  { id: '2', label: 'Help me understand', icon: '🧠' },
+  { id: '3', label: 'Quiz me on a topic', icon: '🎯' },
+  { id: '4', label: 'Break this down', icon: '🔬' },
+]
+
+const CHAT_BG_PRESETS = [
+  { id: 'none',    label: 'Clear',   color: null,         gradient: 'transparent' },
+  { id: 'default', label: 'Default', color: '#05061a',    gradient: `linear-gradient(172deg, rgba(4,5,18,0.82) 0%, rgba(5,6,22,0.78) 50%, rgba(4,5,18,0.82) 100%)` },
+  { id: 'abyss',   label: 'Abyss',   color: '#010106',    gradient: `linear-gradient(180deg, rgba(0,0,0,0.94) 0%, rgba(2,2,8,0.92) 100%)` },
+  { id: 'cosmic',  label: 'Cosmic',  color: '#1c063a',    gradient: `linear-gradient(172deg, rgba(30,8,62,0.92) 0%, rgba(16,5,42,0.90) 50%, rgba(8,3,26,0.92) 100%)` },
+  { id: 'ember',   label: 'Ember',   color: '#240a04',    gradient: `linear-gradient(172deg, rgba(38,10,4,0.92) 0%, rgba(24,7,3,0.90) 50%, rgba(14,4,2,0.92) 100%)` },
+  { id: 'ocean',   label: 'Ocean',   color: '#020c1c',    gradient: `linear-gradient(172deg, rgba(2,14,32,0.92) 0%, rgba(3,12,28,0.90) 50%, rgba(2,10,24,0.92) 100%)` },
+  { id: 'forest',  label: 'Forest',  color: '#031007',    gradient: `linear-gradient(172deg, rgba(3,18,8,0.92) 0%, rgba(2,14,6,0.90) 50%, rgba(2,10,5,0.92) 100%)` },
+]
+
+function useChatSettings() {
+  const [settings, _setSettings] = useState(() => {
+    try {
+      const s = localStorage.getItem('aeva_chat_settings')
+      if (s) return JSON.parse(s)
+    } catch {}
+    return { chatBg: 'default', chips: CHIP_DEFAULTS }
+  })
+  const save = (patch) => {
+    _setSettings(prev => {
+      const next = { ...prev, ...patch }
+      try { localStorage.setItem('aeva_chat_settings', JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
+  return [settings, save]
+}
 
 /* ─── Session state machine ─── */
 export const SESSION_STATES = ['DIAGNOSTIC', 'SCAFFOLDING', 'STRESS_TEST', 'CONSOLIDATION']
@@ -1997,6 +2033,11 @@ function ChatView({ onBack }) {
   const [lockInSecondsLeft, setLockInSecondsLeft] = useState(25 * 60)
   const [lockInSummary, setLockInSummary] = useState(null)
   const [feynmanOpen, setFeynmanOpen] = useState(false)
+  const [chatSettings, saveChatSettings] = useChatSettings()
+  const [chipEditMode, setChipEditMode] = useState(false)
+  const [addingChip, setAddingChip] = useState(false)
+  const [newChipLabel, setNewChipLabel] = useState('')
+  const newChipInputRef = useRef(null)
   const lockInStartExchangesRef = useRef(0)
   const lockInTimerRef = useRef(null)
   const [countdown, setCountdown] = useState(null)
@@ -2109,9 +2150,10 @@ function ChatView({ onBack }) {
   }
 
   // Background theme for mission mode
+  const bgPreset = CHAT_BG_PRESETS.find(p => p.id === (chatSettings.chatBg || 'default')) || CHAT_BG_PRESETS[1]
   const missionBg = isMission
     ? `linear-gradient(172deg, rgba(4,5,20,0.94) 0%, rgba(6,8,26,0.94) 40%, rgba(8,10,30,0.94) 100%)`
-    : `linear-gradient(172deg, rgba(4,5,18,0.82) 0%, rgba(5,6,22,0.78) 50%, rgba(4,5,18,0.82) 100%)`
+    : bgPreset.gradient
 
   const missionGlow = isMission && activeMission
     ? { position: 'absolute', top: 0, left: 0, right: 0, height: 320, background: `radial-gradient(ellipse at 50% 0%, ${activeMission.glow} 0%, transparent 70%)`, pointerEvents: 'none' }
@@ -2596,42 +2638,175 @@ function ChatView({ onBack }) {
                       What can I help with?
                     </h1>
                   </div>
-                  {/* Suggestion chips */}
+                  {/* Suggestion chips — customisable */}
                   <motion.div
                     initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2, duration: 0.4 }}
-                    style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', padding: '0 24px', maxWidth: 560 }}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '0 24px', maxWidth: 600, width: '100%' }}
                   >
-                    {[
-                      { label: 'Explain a concept', icon: '💡' },
-                      { label: 'Help me understand', icon: '🧠' },
-                      { label: 'Quiz me on a topic', icon: '🎯' },
-                      { label: 'Break this down', icon: '🔬' },
-                    ].map((s, i) => (
-                      <motion.button
-                        key={s.label}
-                        initial={{ opacity: 0, scale: 0.88 }} animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.25 + i * 0.06, type: 'spring', stiffness: 320 }}
-                        whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.96 }}
-                        onClick={() => { setInput(s.label); inputRef.current?.focus() }}
-                        style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 7,
-                          padding: '9px 16px', borderRadius: 99,
-                          background: 'rgba(255,255,255,0.06)',
-                          border: '1px solid rgba(255,255,255,0.10)',
-                          color: 'rgba(255,255,255,0.60)',
-                          fontSize: 13, fontWeight: 500,
-                          fontFamily: "'Inter', system-ui, sans-serif",
-                          cursor: 'pointer',
-                          backdropFilter: 'blur(20px)',
-                          transition: 'border 0.2s, color 0.2s',
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(139,143,255,0.35)'; e.currentTarget.style.color = 'rgba(255,255,255,0.85)' }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'; e.currentTarget.style.color = 'rgba(255,255,255,0.60)' }}
-                      >
-                        <span>{s.icon}</span> {s.label}
-                      </motion.button>
-                    ))}
+                    {/* Background picker — visible in edit mode */}
+                    <AnimatePresence>
+                      {chipEditMode && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.25 }}
+                          style={{ overflow: 'hidden', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}
+                        >
+                          <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.30)', letterSpacing: '0.10em', textTransform: 'uppercase' }}>Chat Background</p>
+                          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                            {CHAT_BG_PRESETS.map(preset => {
+                              const isSel = (chatSettings.chatBg || 'default') === preset.id
+                              return (
+                                <motion.button key={preset.id} whileHover={{ scale: 1.10 }} whileTap={{ scale: 0.93 }}
+                                  onClick={() => saveChatSettings({ chatBg: preset.id })}
+                                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                                >
+                                  <div style={{
+                                    width: 40, height: 40, borderRadius: 12,
+                                    background: preset.color || 'transparent',
+                                    border: isSel ? '2px solid rgba(139,143,255,0.85)' : '2px solid rgba(255,255,255,0.10)',
+                                    boxShadow: isSel ? '0 0 14px rgba(139,143,255,0.40)' : 'none',
+                                    position: 'relative', overflow: 'hidden',
+                                    transition: 'border 0.18s, box-shadow 0.18s',
+                                    ...(preset.id === 'none' ? {
+                                      backgroundImage: 'linear-gradient(45deg, rgba(255,255,255,0.07) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.07) 75%), linear-gradient(45deg, rgba(255,255,255,0.07) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.07) 75%)',
+                                      backgroundSize: '8px 8px', backgroundPosition: '0 0, 4px 4px',
+                                    } : {}),
+                                  }}>
+                                    {isSel && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ width: 9, height: 9, borderRadius: '50%', background: 'rgba(139,143,255,0.95)' }} /></div>}
+                                  </div>
+                                  <span style={{ fontSize: 10, fontWeight: 500, color: isSel ? 'rgba(139,143,255,0.88)' : 'rgba(255,255,255,0.32)', transition: 'color 0.18s' }}>{preset.label}</span>
+                                </motion.button>
+                              )
+                            })}
+                          </div>
+                          <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.06)', margin: '2px 0 0' }} />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {chipEditMode && (
+                      <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.30)', letterSpacing: '0.10em', textTransform: 'uppercase' }}>Suggestions</p>
+                    )}
+
+                    {/* Chips row */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+                      {(chatSettings.chips || CHIP_DEFAULTS).map((s, i) => (
+                        <div key={s.id} className={chipEditMode ? 'chip-wiggle' : ''} style={{ '--wiggle-delay': `${i * 0.06}s`, position: 'relative' }}>
+                          <motion.button
+                            initial={{ opacity: 0, scale: 0.88 }} animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: 0.25 + i * 0.06, type: 'spring', stiffness: 320 }}
+                            whileHover={!chipEditMode ? { scale: 1.05, y: -2 } : {}} whileTap={{ scale: 0.96 }}
+                            onClick={() => { if (!chipEditMode) { setInput(s.label); inputRef.current?.focus() } }}
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 7,
+                              padding: '9px 16px', borderRadius: 99,
+                              background: 'rgba(255,255,255,0.06)',
+                              border: chipEditMode ? '1px solid rgba(239,68,68,0.22)' : '1px solid rgba(255,255,255,0.10)',
+                              color: 'rgba(255,255,255,0.60)',
+                              fontSize: 13, fontWeight: 500,
+                              fontFamily: "'Inter', system-ui, sans-serif",
+                              cursor: chipEditMode ? 'default' : 'pointer',
+                              backdropFilter: 'blur(20px)',
+                              transition: 'border 0.2s, color 0.2s',
+                            }}
+                            onMouseEnter={e => { if (!chipEditMode) { e.currentTarget.style.borderColor = 'rgba(139,143,255,0.35)'; e.currentTarget.style.color = 'rgba(255,255,255,0.85)' } }}
+                            onMouseLeave={e => { if (!chipEditMode) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'; e.currentTarget.style.color = 'rgba(255,255,255,0.60)' } }}
+                          >
+                            <span>{s.icon}</span> {s.label}
+                          </motion.button>
+                          <AnimatePresence>
+                            {chipEditMode && (
+                              <motion.button
+                                initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
+                                whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.88 }}
+                                onClick={() => saveChatSettings({ chips: (chatSettings.chips || CHIP_DEFAULTS).filter(c => c.id !== s.id) })}
+                                style={{
+                                  position: 'absolute', top: -7, right: -7,
+                                  width: 20, height: 20, borderRadius: '50%',
+                                  background: '#EF4444', border: '2px solid rgba(5,6,20,0.80)',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  cursor: 'pointer', padding: 0,
+                                }}
+                              >
+                                <X size={10} color="white" strokeWidth={3} />
+                              </motion.button>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      ))}
+
+                      {/* Add chip (edit mode) */}
+                      <AnimatePresence>
+                        {chipEditMode && !addingChip && (
+                          <motion.button
+                            key="add-btn"
+                            initial={{ opacity: 0, scale: 0.88 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.88 }}
+                            whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }}
+                            onClick={() => { setAddingChip(true); setTimeout(() => newChipInputRef.current?.focus(), 50) }}
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 6,
+                              padding: '9px 14px', borderRadius: 99,
+                              background: 'rgba(139,143,255,0.08)',
+                              border: '1.5px dashed rgba(139,143,255,0.30)',
+                              color: 'rgba(139,143,255,0.65)',
+                              fontSize: 13, fontWeight: 500,
+                              fontFamily: "'Inter', system-ui, sans-serif",
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <Plus size={13} /> Add
+                          </motion.button>
+                        )}
+                        {chipEditMode && addingChip && (
+                          <motion.form
+                            key="add-form"
+                            initial={{ opacity: 0, scale: 0.88 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.88 }}
+                            onSubmit={e => {
+                              e.preventDefault()
+                              const label = newChipLabel.trim()
+                              if (label) saveChatSettings({ chips: [...(chatSettings.chips || CHIP_DEFAULTS), { id: Date.now().toString(), label, icon: '✨' }] })
+                              setNewChipLabel(''); setAddingChip(false)
+                            }}
+                          >
+                            <input
+                              ref={newChipInputRef}
+                              value={newChipLabel}
+                              onChange={e => setNewChipLabel(e.target.value)}
+                              onBlur={() => { setAddingChip(false); setNewChipLabel('') }}
+                              placeholder="New suggestion…"
+                              style={{
+                                padding: '9px 14px', borderRadius: 99,
+                                background: 'rgba(255,255,255,0.08)',
+                                border: '1px solid rgba(139,143,255,0.40)',
+                                color: 'rgba(255,255,255,0.88)',
+                                fontSize: 13, fontWeight: 500,
+                                fontFamily: "'Inter', system-ui, sans-serif",
+                                outline: 'none', width: 180,
+                              }}
+                            />
+                          </motion.form>
+                        )}
+                      </AnimatePresence>
+                    </div>
+
+                    {/* Customise / Done toggle */}
+                    <motion.button
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
+                      onClick={() => { setChipEditMode(m => !m); setAddingChip(false); setNewChipLabel('') }}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                        padding: '5px 13px', borderRadius: 99,
+                        background: chipEditMode ? 'rgba(139,143,255,0.12)' : 'rgba(255,255,255,0.04)',
+                        border: chipEditMode ? '1px solid rgba(139,143,255,0.28)' : '1px solid rgba(255,255,255,0.07)',
+                        color: chipEditMode ? 'rgba(139,143,255,0.82)' : 'rgba(255,255,255,0.22)',
+                        fontSize: 11, fontWeight: 600,
+                        fontFamily: "'Inter', system-ui, sans-serif",
+                        cursor: 'pointer', transition: 'all 0.2s',
+                      }}
+                    >
+                      {chipEditMode ? '✓ Done' : <><PenLine size={10} style={{ marginRight: 1 }} /> Customise</>}
+                    </motion.button>
                   </motion.div>
                 </motion.div>
               )}
