@@ -42,6 +42,7 @@ const CHAT_BG_PRESETS = [
   { id: 'ember',   label: 'Ember',   color: '#240a04',    gradient: `linear-gradient(172deg, rgba(38,10,4,0.92) 0%, rgba(24,7,3,0.90) 50%, rgba(14,4,2,0.92) 100%)` },
   { id: 'ocean',   label: 'Ocean',   color: '#020c1c',    gradient: `linear-gradient(172deg, rgba(2,14,32,0.92) 0%, rgba(3,12,28,0.90) 50%, rgba(2,10,24,0.92) 100%)` },
   { id: 'forest',  label: 'Forest',  color: '#031007',    gradient: `linear-gradient(172deg, rgba(3,18,8,0.92) 0%, rgba(2,14,6,0.90) 50%, rgba(2,10,5,0.92) 100%)` },
+  { id: 'white',   label: 'White',   color: '#f5f5f7',    gradient: `linear-gradient(172deg, rgba(245,245,247,0.97) 0%, rgba(255,255,255,0.96) 50%, rgba(245,245,247,0.97) 100%)` },
 ]
 
 function useChatSettings() {
