@@ -39,6 +39,18 @@ export const DRILLS = {
     duration: '3 min', color: '#EC4899',
     colorDim: 'rgba(236,72,153,0.14)', border: 'rgba(236,72,153,0.32)', glow: 'rgba(236,72,153,0.22)',
   },
+  cloze: {
+    id: 'cloze', emoji: '✍️', title: 'Fill the Gaps',
+    tagline: 'Complete the passage from memory.',
+    duration: '5 min', color: '#10B981',
+    colorDim: 'rgba(16,185,129,0.14)', border: 'rgba(16,185,129,0.32)', glow: 'rgba(16,185,129,0.22)',
+  },
+  shortanswer: {
+    id: 'shortanswer', emoji: '🧩', title: 'Short Answer',
+    tagline: 'Type it out. AI grades your depth.',
+    duration: '8 min', color: '#F59E0B',
+    colorDim: 'rgba(245,158,11,0.14)', border: 'rgba(245,158,11,0.32)', glow: 'rgba(245,158,11,0.22)',
+  },
 }
 
 export const DIFFICULTIES = {

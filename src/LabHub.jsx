@@ -47,6 +47,18 @@ keyPoints: the 5 things a good explanation MUST cover. commonMistakes: things pe
 Difficulty: ${diffInstr}
 Return ONLY valid JSON: {"pairs":[{"term":"short term","definition":"clear 1-sentence definition"}]}
 Terms must be distinct. Definitions must not contain the term.`,
+
+    cloze: `Generate a fill-in-the-blank passage about "${topic}" for a student.
+Difficulty: ${diffInstr}
+Rules: Write a coherent 5-8 sentence educational paragraph. Replace ${Math.min(count, 8)} key terms or concepts with the token BLANK. Each blank should test a meaningful concept, not just filler words.
+Return ONLY valid JSON: {"passage":"sentence with BLANK tokens","blanks":["answer1","answer2"],"hints":["brief hint for blank 1","brief hint for blank 2"]}
+blanks array must match the number of BLANK tokens in passage, in order. hints: one short phrase per blank.`,
+
+    shortanswer: `Generate ${Math.min(count, 6)} short-answer questions about "${topic}".
+Difficulty: ${diffInstr}
+Focus: ${focusInstr}
+Each question should require 2-4 sentences to answer properly. Include a model answer and the 3 key points a good answer must cover.
+Return ONLY valid JSON: {"questions":[{"q":"question text","modelAnswer":"ideal 3-4 sentence answer","keyPoints":["point 1","point 2","point 3"]}]}`,
   }
 
   const res = await fetch(GROQ_URL, {
@@ -878,6 +890,202 @@ function FeynmanDrill({ data, topic, onExit }) {
   )
 }
 
+/* ═══ CLOZE (FILL THE GAPS) ══════════════════════════ */
+function ClozeDrill({ data, topic, onExit }) {
+  const { setDrillScore, recordDrillResult, currentTopic } = useLabStore()
+  const passage = data.passage || ''
+  const answers = data.blanks || []
+  const hints = data.hints || []
+  const parts = passage.split('BLANK')
+  const [inputs, setInputs] = useState(Array(answers.length).fill(''))
+  const [submitted, setSubmitted] = useState(false)
+  const [results, setResults] = useState([])
+
+  const handleSubmit = () => {
+    const res = answers.map((ans, i) => ({
+      correct: inputs[i].trim().toLowerCase() === ans.toLowerCase(),
+      userAnswer: inputs[i].trim(),
+      correctAnswer: ans,
+    }))
+    setResults(res)
+    setSubmitted(true)
+    const correct = res.filter(r => r.correct).length
+    setDrillScore({ correct, total: answers.length })
+    recordDrillResult({ topic: currentTopic, drillType: 'cloze', correct, total: answers.length })
+  }
+
+  if (submitted) {
+    const correct = results.filter(r => r.correct).length
+    return (
+      <DrillComplete
+        score={{ correct, total: answers.length }}
+        wrongItems={results.filter(r => !r.correct).map(r => ({ q: `You wrote: "${r.userAnswer}"`, correct: r.correctAnswer }))}
+        topic={topic} drillType="cloze"
+        onExit={onExit}
+        onRetry={() => { setInputs(Array(answers.length).fill('')); setSubmitted(false); setResults([]) }}
+        onGoHarder={onExit}
+      />
+    )
+  }
+
+  let blankIdx = 0
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(16,185,129,0.70)', letterSpacing: '0.10em', textTransform: 'uppercase' }}>Fill the Gaps — {topic}</div>
+      <div style={{ padding: '18px 20px', borderRadius: 16, background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.20)', lineHeight: 2.0, fontSize: 14.5, color: 'rgba(255,255,255,0.82)' }}>
+        {parts.map((part, pi) => {
+          const idx = blankIdx
+          if (pi < parts.length - 1) blankIdx++
+          return (
+            <span key={pi}>
+              {part}
+              {pi < parts.length - 1 && (
+                <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', margin: '0 3px', verticalAlign: 'middle' }}>
+                  <input
+                    value={inputs[idx] || ''}
+                    onChange={e => setInputs(prev => { const n = [...prev]; n[idx] = e.target.value; return n })}
+                    placeholder={hints[idx] ? `(${hints[idx]})` : '…'}
+                    style={{
+                      width: Math.max(90, (answers[idx]?.length || 8) * 9),
+                      padding: '3px 8px', borderRadius: 6,
+                      background: 'rgba(16,185,129,0.12)', border: '1.5px solid rgba(16,185,129,0.35)',
+                      color: 'rgba(255,255,255,0.90)', fontSize: 13.5, fontFamily: 'monospace',
+                      outline: 'none', textAlign: 'center',
+                    }}
+                  />
+                </span>
+              )}
+            </span>
+          )
+        })}
+      </div>
+      <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.28)', textAlign: 'center' }}>
+        {inputs.filter(v => v.trim()).length} / {answers.length} filled
+      </div>
+      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+        onClick={handleSubmit}
+        disabled={inputs.some(v => !v.trim())}
+        style={{ padding: '13px', borderRadius: 14, background: inputs.every(v => v.trim()) ? 'rgba(16,185,129,0.20)' : 'rgba(255,255,255,0.05)', border: `1px solid ${inputs.every(v => v.trim()) ? 'rgba(16,185,129,0.40)' : 'rgba(255,255,255,0.09)'}`, color: inputs.every(v => v.trim()) ? '#6EE7B7' : 'rgba(255,255,255,0.25)', fontSize: 14, fontWeight: 700, cursor: inputs.every(v => v.trim()) ? 'pointer' : 'not-allowed', fontFamily: "'Inter', system-ui, sans-serif" }}>
+        Check My Answers
+      </motion.button>
+    </div>
+  )
+}
+
+/* ═══ SHORT ANSWER ════════════════════════════════════ */
+async function gradeShortAnswer(topic, question, modelAnswer, keyPoints, userAnswer) {
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
+    body: JSON.stringify({
+      model: 'llama-3.1-8b-instant',
+      messages: [
+        { role: 'system', content: 'Grade a student short-answer response. Return ONLY JSON.' },
+        { role: 'user', content: `Topic: "${topic}"\nQuestion: "${question}"\nModel Answer: "${modelAnswer}"\nKey Points Required: ${JSON.stringify(keyPoints)}\n\nStudent's Answer: "${userAnswer}"\n\nReturn ONLY: {"score":0-100,"covered":["points covered"],"missing":["points missed"],"feedback":"1 sentence: what was good and what to improve","grade":"Excellent"|"Good"|"Partial"|"Weak"}` },
+      ],
+      temperature: 0.2, max_tokens: 300, response_format: { type: 'json_object' },
+    }),
+  })
+  const json = await res.json()
+  return JSON.parse(json.choices[0].message.content)
+}
+
+function ShortAnswerDrill({ data, topic, onExit }) {
+  const { setDrillScore, recordDrillResult, currentTopic } = useLabStore()
+  const questions = data.questions || []
+  const [idx, setIdx] = useState(0)
+  const [answers, setAnswers] = useState(Array(questions.length).fill(''))
+  const [grades, setGrades] = useState([])
+  const [grading, setGrading] = useState(false)
+  const [done, setDone] = useState(false)
+
+  const handleGrade = async () => {
+    const q = questions[idx]
+    setGrading(true)
+    try {
+      const result = await gradeShortAnswer(currentTopic, q.q, q.modelAnswer, q.keyPoints, answers[idx])
+      const newGrades = [...grades, result]
+      setGrades(newGrades)
+      if (idx + 1 >= questions.length) {
+        const avg = Math.round(newGrades.reduce((s, g) => s + g.score, 0) / newGrades.length)
+        const correct = newGrades.filter(g => g.score >= 70).length
+        setDrillScore({ correct, total: questions.length })
+        recordDrillResult({ topic: currentTopic, drillType: 'shortanswer', correct, total: questions.length })
+        setDone(true)
+      } else {
+        setIdx(i => i + 1)
+      }
+    } catch { setGrades(g => [...g, { score: 0, covered: [], missing: q.keyPoints, feedback: 'Could not grade.', grade: 'Weak' }]) }
+    setGrading(false)
+  }
+
+  if (done) {
+    const correct = grades.filter(g => g.score >= 70).length
+    return (
+      <DrillComplete
+        score={{ correct, total: questions.length }}
+        wrongItems={grades.filter(g => g.score < 70).map((g, i) => ({ q: questions[i]?.q || '', correct: g.feedback }))}
+        topic={topic} drillType="shortanswer"
+        onExit={onExit}
+        onRetry={() => { setIdx(0); setAnswers(Array(questions.length).fill('')); setGrades([]); setDone(false) }}
+        onGoHarder={onExit}
+      />
+    )
+  }
+
+  const q = questions[idx]
+  const lastGrade = grades[idx - 1]
+  const GRADE_COL = { Excellent: '#4ADE80', Good: '#60A5FA', Partial: '#FBBF24', Weak: '#F87171' }
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(245,158,11,0.70)', letterSpacing: '0.10em', textTransform: 'uppercase' }}>Short Answer — {idx + 1}/{questions.length}</span>
+        {grades.length > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: '#60A5FA' }}>Avg: {Math.round(grades.reduce((s, g) => s + g.score, 0) / grades.length)}%</span>}
+      </div>
+
+      {/* Previous grade feedback */}
+      <AnimatePresence>
+        {lastGrade && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: `1px solid ${GRADE_COL[lastGrade.grade] || '#60A5FA'}33` }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: GRADE_COL[lastGrade.grade] || '#60A5FA' }}>{lastGrade.grade} ({lastGrade.score}%) — </span>
+            <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.55)' }}>{lastGrade.feedback}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(245,158,11,0.60)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Question</div>
+        <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.88)', lineHeight: 1.6, fontWeight: 500 }}>{q?.q}</div>
+      </div>
+
+      <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.28)' }}>Key points to cover: {q?.keyPoints?.join(' · ')}</div>
+
+      <textarea
+        value={answers[idx] || ''}
+        onChange={e => setAnswers(prev => { const n = [...prev]; n[idx] = e.target.value; return n })}
+        placeholder="Write your answer here — aim for 2-4 clear sentences…"
+        rows={5}
+        style={{ resize: 'vertical', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1.5px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.85)', fontSize: 13.5, fontFamily: "'Inter', system-ui, sans-serif", lineHeight: 1.6, outline: 'none' }}
+        onFocus={e => e.target.style.borderColor = 'rgba(245,158,11,0.40)'}
+        onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.10)'}
+      />
+
+      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+        onClick={handleGrade}
+        disabled={!answers[idx]?.trim() || grading}
+        style={{ padding: '13px', borderRadius: 14, background: answers[idx]?.trim() ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.05)', border: `1px solid ${answers[idx]?.trim() ? 'rgba(245,158,11,0.38)' : 'rgba(255,255,255,0.09)'}`, color: answers[idx]?.trim() ? '#FCD34D' : 'rgba(255,255,255,0.25)', fontSize: 14, fontWeight: 700, cursor: answers[idx]?.trim() && !grading ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: "'Inter', system-ui, sans-serif" }}>
+        {grading ? (
+          <><motion.div animate={{ rotate: 360 }} transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }} style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(252,211,77,0.2)', borderTopColor: '#FCD34D' }} /> Grading…</>
+        ) : (
+          idx + 1 < questions.length ? 'Submit & Next →' : 'Submit & See Results'
+        )}
+      </motion.button>
+    </div>
+  )
+}
+
 /* ═══ MATCH GRID ═════════════════════════════════════ */
 function MatchGridDrill({ data, topic, onExit }) {
   const { setDrillScore, recordDrillResult, currentTopic } = useLabStore()
@@ -1379,11 +1587,13 @@ export default function LabHub() {
                     : drillLoading
                       ? <LabLoading topic={currentTopic} />
                       : drillData
-                        ? activeDrill === 'flashcard'  ? <FlashcardDrill  data={drillData} topic={currentTopic} onExit={exitDrill} />
-                          : activeDrill === 'speedround' ? <SpeedRoundDrill data={drillData} topic={currentTopic} onExit={exitDrill} />
-                            : activeDrill === 'mocktest'  ? <MockTestDrill   data={drillData} topic={currentTopic} onExit={exitDrill} />
-                              : activeDrill === 'feynman'  ? <FeynmanDrill    data={drillData} topic={currentTopic} onExit={exitDrill} />
-                                : <MatchGridDrill data={drillData} topic={currentTopic} onExit={exitDrill} />
+                        ? activeDrill === 'flashcard'    ? <FlashcardDrill    data={drillData} topic={currentTopic} onExit={exitDrill} />
+                          : activeDrill === 'speedround'  ? <SpeedRoundDrill   data={drillData} topic={currentTopic} onExit={exitDrill} />
+                          : activeDrill === 'mocktest'    ? <MockTestDrill     data={drillData} topic={currentTopic} onExit={exitDrill} />
+                          : activeDrill === 'feynman'     ? <FeynmanDrill      data={drillData} topic={currentTopic} onExit={exitDrill} />
+                          : activeDrill === 'cloze'       ? <ClozeDrill        data={drillData} topic={currentTopic} onExit={exitDrill} />
+                          : activeDrill === 'shortanswer' ? <ShortAnswerDrill  data={drillData} topic={currentTopic} onExit={exitDrill} />
+                                                         : <MatchGridDrill     data={drillData} topic={currentTopic} onExit={exitDrill} />
                         : <LabLoading topic={currentTopic} />
                   }
                 </>

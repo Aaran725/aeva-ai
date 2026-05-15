@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, createContext, useContext } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowUp, Zap, TrendingDown, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus } from 'lucide-react'
+import { ArrowUp, Zap, TrendingDown, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings } from 'lucide-react'
+import { useAppSettings, SECTION_BG_PRESETS, CARD_STYLES, FONT_STYLES } from './appSettings'
 import { supabase } from './supabase'
 import { useArcadeStore } from './arcadeStore'
 import { useLabStore } from './labStore'
@@ -312,9 +313,133 @@ function NoiseOverlay() {
   )
 }
 
+/* ═══ APP SETTINGS PANEL ══════════════════════════ */
+function BgSwatchRow({ presets, selected, onChange }) {
+  return (
+    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+      {presets.map(preset => {
+        const isSel = (selected || 'default') === preset.id
+        return (
+          <motion.button key={preset.id} whileHover={{ scale: 1.10 }} whileTap={{ scale: 0.93 }}
+            onClick={() => onChange(preset.id)}
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 12,
+              background: preset.color || 'transparent',
+              border: isSel ? '2px solid rgba(139,143,255,0.85)' : '2px solid rgba(255,255,255,0.10)',
+              boxShadow: isSel ? '0 0 14px rgba(139,143,255,0.40)' : 'none',
+              position: 'relative', overflow: 'hidden',
+              transition: 'border 0.18s, box-shadow 0.18s',
+              ...(preset.id === 'none' ? {
+                backgroundImage: 'linear-gradient(45deg, rgba(255,255,255,0.07) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.07) 75%), linear-gradient(45deg, rgba(255,255,255,0.07) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.07) 75%)',
+                backgroundSize: '8px 8px', backgroundPosition: '0 0, 4px 4px',
+              } : {}),
+            }}>
+              {isSel && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ width: 9, height: 9, borderRadius: '50%', background: 'rgba(139,143,255,0.95)' }} /></div>}
+            </div>
+            <span style={{ fontSize: 10, fontWeight: 500, color: isSel ? 'rgba(139,143,255,0.88)' : 'rgba(255,255,255,0.32)', transition: 'color 0.18s' }}>{preset.label}</span>
+          </motion.button>
+        )
+      })}
+    </div>
+  )
+}
+
+function SettingsSection({ label, children }) {
+  return (
+    <div>
+      <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 12 }}>{label}</p>
+      {children}
+    </div>
+  )
+}
+
+function AppSettingsPanel({ onClose }) {
+  const { dashboardBg, cardStyle, fontStyle, update } = useAppSettings()
+  const [chatSettings, saveChatSettings] = useChatSettings()
+
+  return (
+    <motion.div
+      key="app-settings"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: "'Inter', system-ui, sans-serif" }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <motion.div
+        initial={{ scale: 0.92, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.92, y: 20 }}
+        transition={{ type: 'spring', stiffness: 340, damping: 28 }}
+        style={{ width: '100%', maxWidth: 540, borderRadius: 28, background: 'rgba(8,10,26,0.99)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 40px 120px rgba(0,0,0,0.80)', overflow: 'hidden', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+      >
+        {/* Header */}
+        <div style={{ flexShrink: 0, padding: '18px 22px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Settings size={14} color="rgba(139,143,255,0.80)" />
+            <span style={{ fontSize: 14, fontWeight: 800, color: 'rgba(255,255,255,0.90)', letterSpacing: '-0.02em' }}>Appearance</span>
+          </div>
+          <motion.button whileHover={{ scale: 1.08, rotate: 90 }} whileTap={{ scale: 0.94 }} onClick={onClose}
+            style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.50)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <X size={12} />
+          </motion.button>
+        </div>
+
+        {/* Scrollable content */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '22px', display: 'flex', flexDirection: 'column', gap: 26 }}>
+
+          <SettingsSection label="Dashboard Background">
+            <BgSwatchRow presets={SECTION_BG_PRESETS} selected={dashboardBg} onChange={v => update({ dashboardBg: v })} />
+          </SettingsSection>
+
+          <SettingsSection label="Chat Background">
+            <BgSwatchRow presets={CHAT_BG_PRESETS} selected={chatSettings.chatBg || 'default'} onChange={v => saveChatSettings({ chatBg: v })} />
+          </SettingsSection>
+
+          <SettingsSection label="Card Style">
+            <div style={{ display: 'flex', gap: 8 }}>
+              {Object.entries(CARD_STYLES).map(([id, cs]) => {
+                const isSel = (cardStyle || 'normal') === id
+                return (
+                  <motion.button key={id} whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                    onClick={() => update({ cardStyle: id })}
+                    style={{ flex: 1, padding: '12px 10px', borderRadius: 14, background: isSel ? 'rgba(139,143,255,0.12)' : 'rgba(255,255,255,0.04)', border: isSel ? '1.5px solid rgba(139,143,255,0.40)' : '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', textAlign: 'center', transition: 'all 0.18s' }}>
+                    <div style={{ width: '100%', height: 26, borderRadius: 8, marginBottom: 8, background: cs.bg, backdropFilter: cs.blur, WebkitBackdropFilter: cs.blur, border: '1px solid rgba(255,255,255,0.12)' }} />
+                    <div style={{ fontSize: 12, fontWeight: 700, color: isSel ? 'rgba(139,143,255,0.90)' : 'rgba(255,255,255,0.55)' }}>{cs.label}</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', marginTop: 2 }}>{cs.description}</div>
+                  </motion.button>
+                )
+              })}
+            </div>
+          </SettingsSection>
+
+          <SettingsSection label="Font Style">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {Object.entries(FONT_STYLES).map(([id, font]) => {
+                const isSel = (fontStyle || 'inter') === id
+                return (
+                  <motion.button key={id} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
+                    onClick={() => update({ fontStyle: id })}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 14px', borderRadius: 12, background: isSel ? 'rgba(139,143,255,0.10)' : 'rgba(255,255,255,0.03)', border: isSel ? '1.5px solid rgba(139,143,255,0.35)' : '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', transition: 'all 0.18s' }}>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: isSel ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.60)', fontFamily: font.family }}>{font.label}</div>
+                      <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.28)', marginTop: 2 }}>{font.description}</div>
+                    </div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: isSel ? 'rgba(139,143,255,0.80)' : 'rgba(255,255,255,0.18)', fontFamily: font.family }}>Aa</div>
+                  </motion.button>
+                )
+              })}
+            </div>
+          </SettingsSection>
+
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 /* ═══ GLASS CARD ══════════════════════════════════ */
 function GlassCard({ children, className = '', style = {}, onClick }) {
   const [hovered, setHovered] = useState(false)
+  const { cardStyle } = useAppSettings()
+  const cs = CARD_STYLES[cardStyle || 'normal']
   return (
     <motion.div
       className={className}
@@ -325,9 +450,9 @@ function GlassCard({ children, className = '', style = {}, onClick }) {
       transition={{ type: 'spring', stiffness: 300, damping: 24 }}
       style={{
         position: 'relative',
-        background: 'linear-gradient(145deg, rgba(255,255,255,0.075) 0%, rgba(255,255,255,0.042) 100%)',
-        backdropFilter: 'blur(40px)',
-        WebkitBackdropFilter: 'blur(40px)',
+        background: cs.bg,
+        backdropFilter: cs.blur,
+        WebkitBackdropFilter: cs.blur,
         border: '1px solid transparent',
         backgroundClip: 'padding-box',
         borderRadius: 32, overflow: 'hidden',
@@ -1136,6 +1261,10 @@ function DashboardView({ onChatOpen, onSignOut }) {
   const [palaceOpen, setPalaceOpen] = useState(false)
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [appSettingsOpen, setAppSettingsOpen] = useState(false)
+  const { dashboardBg, fontStyle } = useAppSettings()
+  const dashBgPreset = SECTION_BG_PRESETS.find(p => p.id === (dashboardBg || 'default')) || SECTION_BG_PRESETS[1]
+  const fontFamily = FONT_STYLES[fontStyle || 'inter']?.family || "'Inter', system-ui, sans-serif"
 
   return (
     <motion.div
@@ -1145,8 +1274,8 @@ function DashboardView({ onChatOpen, onSignOut }) {
       style={{
         position: 'relative', minHeight: '100vh', width: '100%',
         overflowX: 'hidden', overflowY: 'auto',
-        background: 'transparent',
-        fontFamily: "'Inter', system-ui, sans-serif",
+        background: dashBgPreset.gradient,
+        fontFamily,
       }}
     >
       <div aria-hidden style={{ position: 'absolute', top: '-5%', left: '15%', width: 700, height: 700, borderRadius: '50%', background: 'radial-gradient(circle, rgba(45,48,142,0.22) 0%, transparent 70%)', filter: 'blur(60px)', pointerEvents: 'none' }} />
@@ -1273,6 +1402,14 @@ function DashboardView({ onChatOpen, onSignOut }) {
             >
               👤 My Profile
             </motion.button>
+            {/* Settings gear */}
+            <motion.button
+              whileHover={{ scale: 1.08, rotate: 45 }} whileTap={{ scale: 0.94 }}
+              onClick={() => setAppSettingsOpen(true)}
+              style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.13)', color: 'rgba(255,255,255,0.50)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Settings size={14} />
+            </motion.button>
             <UserAvatar onSignOut={onSignOut} />
           </div>
         </header>
@@ -1355,6 +1492,10 @@ function DashboardView({ onChatOpen, onSignOut }) {
 
       <AnimatePresence>
         {profileOpen && <UserProfile name={name} onClose={() => setProfileOpen(false)} />}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {appSettingsOpen && <AppSettingsPanel onClose={() => setAppSettingsOpen(false)} />}
       </AnimatePresence>
     </motion.div>
   )
@@ -2033,6 +2174,7 @@ function ChatView({ onBack }) {
   const [lockInSecondsLeft, setLockInSecondsLeft] = useState(25 * 60)
   const [lockInSummary, setLockInSummary] = useState(null)
   const [feynmanOpen, setFeynmanOpen] = useState(false)
+  const [chatAppSettingsOpen, setChatAppSettingsOpen] = useState(false)
   const [chatSettings, saveChatSettings] = useChatSettings()
   const [chipEditMode, setChipEditMode] = useState(false)
   const [addingChip, setAddingChip] = useState(false)
@@ -2605,6 +2747,14 @@ function ChatView({ onBack }) {
                 </motion.button>
               </>
             )}
+            {/* Appearance gear */}
+            <motion.button
+              whileHover={{ scale: 1.08, rotate: 45 }} whileTap={{ scale: 0.94 }}
+              onClick={() => setChatAppSettingsOpen(true)}
+              style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.13)', color: 'rgba(255,255,255,0.45)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Settings size={12} />
+            </motion.button>
             <div style={{ width: 24, height: 24, borderRadius: 8, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(45,48,142,0.45)' }}>
               <Star size={11} color="white" fill="white" />
             </div>
@@ -3102,6 +3252,11 @@ function ChatView({ onBack }) {
       {/* Feynman Mode */}
       <AnimatePresence>
         {feynmanOpen && <FeynmanMode onClose={() => setFeynmanOpen(false)} />}
+      </AnimatePresence>
+
+      {/* Appearance settings */}
+      <AnimatePresence>
+        {chatAppSettingsOpen && <AppSettingsPanel onClose={() => setChatAppSettingsOpen(false)} />}
       </AnimatePresence>
 
       {/* Library Modal */}

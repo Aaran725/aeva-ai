@@ -13,49 +13,55 @@ const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
 
-const ANALYSIS_PROMPT = `You are an expert math tutor analyzing an image of a student's work. Be thorough and genuinely helpful.
+const ANALYSIS_PROMPT = `You are an expert tutor analyzing a student's work image. Be thorough and genuinely helpful across any subject — math, science, economics, history, language, code, diagrams.
 
-Do NOT just solve it — teach the method so the student can do it themselves next time.
+Do NOT just solve it — teach the method so the student can reproduce it.
 
-STRICT JSON RULES (violation causes crash):
+STRICT JSON RULES:
 - Output ONLY a raw JSON object. No markdown, no fences, no text outside braces.
 - NO backslashes anywhere. Write sqrt(x), x^2, a/b — never LaTeX.
-- All strings must be ONE LINE. ASCII only. No newlines inside strings.
+- All strings ONE LINE. ASCII only. No newlines inside strings.
 
-HOTSPOT ANCHORING: x and y are percentage coordinates from the top-left of the image.
-Visually locate each key term and anchor the hotspot directly on it. Do NOT guess.
+HOTSPOT ANCHORING: x and y are percentage coordinates from the top-left of the image. Pin to actual visible elements.
 
 Output EXACTLY this structure:
 {
   "topic": "2-4 word topic name",
-  "coreInsight": "One sentence capturing the key mathematical idea — the WHY, not just what to do.",
+  "subjectTags": ["subject area", "subtopic", "technique name"],
+  "confidence": 85,
+  "coreInsight": "One sentence capturing the key idea — the WHY, not just what to do.",
   "expertTip": "Goal: [specific actionable instruction for this exact problem]. Name the technique and why it works here.",
+  "alternativeApproach": "One sentence describing a completely different valid method to solve or analyse this. Name the technique.",
   "syntaxCard": {
-    "pattern": "the general algebraic pattern, e.g. sqrt(a + b - 2*sqrt(a*b)) = sqrt(a) - sqrt(b)",
-    "conditions": ["condition 1 the pattern requires", "condition 2"]
+    "pattern": "the general pattern or rule in plain notation — no backslashes",
+    "conditions": ["condition 1", "condition 2"]
   },
   "variables": [
-    { "symbol": "a", "value": "7", "meaning": "what this variable represents in context" }
+    { "symbol": "a", "value": "7", "meaning": "what this symbol represents in context" }
   ],
   "steps": [
     {
       "verb": "IDENTIFY",
       "title": "Identify the Structure",
-      "body": "2-3 sentences. Explain clearly what the student needs to recognise here and why. Connect to the general pattern.",
-      "formula": "the key formula or expression for this step",
-      "worked": "the actual calculation using the values from this image, e.g. a + b = 7 + 3 = 10",
-      "proTip": "Name the single most common mistake students make at this step and how to avoid it."
+      "body": "2-3 sentences. Explain what the student needs to recognise and why. Connect to the general pattern.",
+      "formula": "key formula or expression for this step, plain notation",
+      "worked": "the actual calculation using values from this image",
+      "proTip": "The single most common mistake at this step and how to avoid it."
     }
   ],
+  "followUp": ["Try: [first practice problem closely related to this one]", "Challenge: [harder variant that extends the same skill]"],
   "hotspots": [
-    { "id": "h1", "x": 55, "y": 35, "label": "Short label", "detail": "2-3 sentences explaining what this term is, what role it plays, and what the student should do with it.", "linkedVar": "a" }
+    { "id": "h1", "x": 55, "y": 35, "label": "Short label", "detail": "2-3 sentences: what this term is, its role, what the student should do with it.", "linkedVar": "a" }
   ]
 }
 
-Steps: give 4-5 steps. Each step body must be 2-3 sentences — genuinely explain the reasoning.
-The worked field must show the actual numbers from the image, not variables.
-variables.value: use the ACTUAL number visible in the image.
-hotspots: 2-3, pinned to specific visible symbols or numbers.`
+Rules:
+- steps: 4-5 steps, each body 2-3 sentences with real reasoning.
+- worked: use the actual numbers/values visible in the image, not abstract variables.
+- confidence: 0-100. How certain you are this analysis is correct given image clarity and your subject coverage.
+- subjectTags: 2-4 tags from broad to specific, e.g. ["Mathematics", "Algebra", "Radical Simplification"].
+- followUp: exactly 2 items — one practice, one challenge. Make them specific and solvable.
+- hotspots: 2-3, pinned to specific visible elements.`
 
 /* ─── Unicode math prettifier ─── */
 function mathify(text) {
@@ -348,11 +354,31 @@ export default function AevaLens({ file, onClose, onInsightReady, preloadedSessi
                 WebkitBackdropFilter: 'blur(20px)',
               }}
             >
-              {/* Topic badge */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {/* Topic badge + subject tags */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
                 <div style={{ padding: '3px 10px', borderRadius: 99, background: 'rgba(0,200,255,0.10)', border: '1px solid rgba(0,200,255,0.25)', fontSize: 11, fontWeight: 700, color: '#67E8F9', letterSpacing: '0.05em' }}>{analysis.topic}</div>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Aeva Lens</span>
+                {analysis.subjectTags?.slice(1).map((tag, i) => (
+                  <div key={i} style={{ padding: '2px 8px', borderRadius: 99, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.38)' }}>{tag}</div>
+                ))}
               </div>
+
+              {/* Confidence bar */}
+              {analysis.confidence != null && (() => {
+                const c = analysis.confidence
+                const col = c >= 80 ? '#4ADE80' : c >= 60 ? '#FBBF24' : '#F87171'
+                return (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                      <span style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Analysis Confidence</span>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: col }}>{c}%</span>
+                    </div>
+                    <div style={{ height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.07)' }}>
+                      <motion.div initial={{ width: 0 }} animate={{ width: `${c}%` }} transition={{ duration: 0.8, ease: 'easeOut' }}
+                        style={{ height: '100%', borderRadius: 99, background: `linear-gradient(90deg, ${col}88, ${col})` }} />
+                    </div>
+                  </div>
+                )
+              })()}
 
               {/* Core insight */}
               <InfoCard color="rgba(99,102,241,0.22)" border="rgba(99,102,241,0.28)" label="Core Insight" labelColor="rgba(165,180,252,0.65)">
@@ -363,6 +389,13 @@ export default function AevaLens({ file, onClose, onInsightReady, preloadedSessi
               <InfoCard color="rgba(239,68,68,0.08)" border="rgba(239,68,68,0.22)" label="Expert Tip" labelColor="rgba(252,165,165,0.65)">
                 <span style={{ fontSize: 13, color: 'rgba(255,200,200,0.90)', lineHeight: 1.55 }}>{mathify(analysis.expertTip || analysis.strugglePoint)}</span>
               </InfoCard>
+
+              {/* Alternative approach */}
+              {analysis.alternativeApproach && (
+                <InfoCard color="rgba(245,158,11,0.07)" border="rgba(245,158,11,0.20)" label="Alternative Approach" labelColor="rgba(253,230,138,0.60)">
+                  <span style={{ fontSize: 12.5, color: 'rgba(254,243,199,0.82)', lineHeight: 1.60 }}>{mathify(analysis.alternativeApproach)}</span>
+                </InfoCard>
+              )}
 
               {/* Syntax pattern card */}
               {analysis.syntaxCard && <SyntaxCard card={analysis.syntaxCard} />}
@@ -413,6 +446,23 @@ export default function AevaLens({ file, onClose, onInsightReady, preloadedSessi
                         revealed={revealedSteps.has(i)}
                         onReveal={() => setRevealedSteps(prev => new Set([...prev, i]))}
                       />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Follow-up practice */}
+              {analysis.followUp?.length > 0 && (
+                <div>
+                  <SectionLabel>Practice Next</SectionLabel>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {analysis.followUp.map((item, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: '9px 12px', borderRadius: 10, background: i === 0 ? 'rgba(74,222,128,0.06)' : 'rgba(99,102,241,0.08)', border: `1px solid ${i === 0 ? 'rgba(74,222,128,0.18)' : 'rgba(99,102,241,0.20)'}` }}>
+                        <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>{i === 0 ? '📝' : '🔥'}</span>
+                        <span style={{ fontSize: 12.5, color: i === 0 ? 'rgba(187,247,208,0.85)' : 'rgba(196,181,253,0.85)', lineHeight: 1.55, fontFamily: 'monospace' }}>
+                          {mathify(item)}
+                        </span>
+                      </div>
                     ))}
                   </div>
                 </div>

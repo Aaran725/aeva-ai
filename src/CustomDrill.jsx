@@ -23,21 +23,31 @@ STRICT JSON RULES:
 Output EXACTLY this structure:
 {
   "topic": "subject name e.g. Algebra, Physics, Economics, Chemistry",
-  "coreInsight": "the single most important thing to understand — one crisp sentence",
-  "expertTip": "Goal: [direct imperative instruction for what to do with this material]",
+  "subjectTags": ["broad subject", "specific subtopic"],
+  "coreInsight": "the single most important thing to understand — one crisp sentence capturing the WHY",
+  "expertTip": "Goal: [direct imperative instruction]. Name the technique and exactly why it applies here.",
   "syntaxCard": {
     "pattern": "key formula or rule in plain notation — no backslashes",
-    "conditions": ["condition or constraint 1", "condition 2"]
+    "conditions": ["condition 1", "condition 2"]
   },
   "variables": [
-    { "symbol": "x", "value": "extracted value or null", "meaning": "what this symbol represents" }
+    { "symbol": "x", "value": "extracted value or null", "meaning": "what this symbol represents in context" }
   ],
   "steps": [
-    { "verb": "IDENTIFY", "title": "step title", "body": "one short sentence explanation", "formula": "formula in plain notation or empty string", "proTip": "10 words max on WHY this step matters" }
+    {
+      "verb": "IDENTIFY",
+      "title": "step title",
+      "body": "2-3 sentences. Explain what to do AND why this step matters. Connect to the core concept.",
+      "formula": "formula or rule for this step in plain notation, or empty string",
+      "worked": "concrete example using actual values from the text, showing the calculation",
+      "proTip": "the single most common mistake at this step and how to avoid it"
+    }
   ]
 }
 
-steps: 3-5 max. variables: extract all symbols/values from the text. syntaxCard.pattern: the single master formula or rule.`
+steps: 4-5 steps. Each body must be 2-3 sentences — real explanation, not just labels.
+worked: use actual numbers or examples from the text — not abstract variables.
+variables: extract every symbol/value that appears. syntaxCard.pattern: the master rule.`
 }
 
 /* ── Math prettifier (same as AevaLens) ─────────────── */
