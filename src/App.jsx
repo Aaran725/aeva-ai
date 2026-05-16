@@ -1503,7 +1503,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
 }
 
 /* ═══ MARKDOWN RENDERER ═══════════════════════════ */
-function parseInline(text) {
+function parseInline(text, isLight = false) {
   // Returns array of React elements for inline markdown
   const parts = []
   let remaining = text
@@ -1534,11 +1534,11 @@ function parseInline(text) {
         <code key={key++} style={{
           fontFamily: '"JetBrains Mono", "Fira Code", monospace',
           fontSize: '0.88em',
-          background: 'rgba(255,255,255,0.10)',
-          border: '1px solid rgba(255,255,255,0.14)',
+          background: isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.10)',
+          border: isLight ? '1px solid rgba(0,0,0,0.12)' : '1px solid rgba(255,255,255,0.14)',
           borderRadius: 5,
           padding: '1px 6px',
-          color: '#7DD3FC',
+          color: isLight ? '#2563EB' : '#7DD3FC',
         }}>{codeMatch[2]}</code>
       )
       remaining = remaining.slice(codeMatch[0].length)
@@ -1551,36 +1551,35 @@ function parseInline(text) {
   return parts
 }
 
-function MarkdownTable({ lines }) {
-  // lines[0] = header row, lines[1] = separator, lines[2+] = data rows
+function MarkdownTable({ lines, isLight = false }) {
   const parseRow = (line) => line.split('|').map(c => c.trim()).filter((c, i, arr) => i > 0 && i < arr.length - 1)
   const headers = parseRow(lines[0])
   const rows = lines.slice(2).map(parseRow)
 
   return (
-    <div style={{ overflowX: 'auto', margin: '10px 0', borderRadius: 10, border: '1px solid rgba(255,255,255,0.10)' }}>
+    <div style={{ overflowX: 'auto', margin: '10px 0', borderRadius: 10, border: isLight ? '1px solid rgba(0,0,0,0.10)' : '1px solid rgba(255,255,255,0.10)' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5, fontFamily: "'Inter', system-ui, sans-serif" }}>
         <thead>
-          <tr style={{ background: 'rgba(255,255,255,0.07)' }}>
+          <tr style={{ background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.07)' }}>
             {headers.map((h, i) => (
               <th key={i} style={{
                 padding: '9px 14px', textAlign: 'left',
-                color: 'rgba(255,255,255,0.85)', fontWeight: 700, fontSize: 12,
+                color: isLight ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.85)', fontWeight: 700, fontSize: 12,
                 letterSpacing: '0.04em', textTransform: 'uppercase',
-                borderBottom: '1px solid rgba(255,255,255,0.10)',
-              }}>{parseInline(h)}</th>
+                borderBottom: isLight ? '1px solid rgba(0,0,0,0.10)' : '1px solid rgba(255,255,255,0.10)',
+              }}>{parseInline(h, isLight)}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {rows.map((row, ri) => (
-            <tr key={ri} style={{ background: ri % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.03)' }}>
+            <tr key={ri} style={{ background: ri % 2 === 0 ? 'transparent' : isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)' }}>
               {row.map((cell, ci) => (
                 <td key={ci} style={{
-                  padding: '8px 14px', color: 'rgba(255,255,255,0.75)', fontSize: 13.5,
-                  borderBottom: ri < rows.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                  padding: '8px 14px', color: isLight ? 'rgba(0,0,0,0.68)' : 'rgba(255,255,255,0.75)', fontSize: 13.5,
+                  borderBottom: ri < rows.length - 1 ? isLight ? '1px solid rgba(0,0,0,0.06)' : '1px solid rgba(255,255,255,0.06)' : 'none',
                   lineHeight: 1.55,
-                }}>{parseInline(cell)}</td>
+                }}>{parseInline(cell, isLight)}</td>
               ))}
             </tr>
           ))}
@@ -1590,8 +1589,13 @@ function MarkdownTable({ lines }) {
   )
 }
 
-function MarkdownRenderer({ text, streaming, cursorColor }) {
-  // Strip smart tags silently
+function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
+  const txt    = isLight ? 'rgba(0,0,0,0.82)'  : 'rgba(255,255,255,0.82)'
+  const txtH1  = isLight ? 'rgba(0,0,0,0.90)'  : 'rgba(255,255,255,0.95)'
+  const txtH2  = isLight ? 'rgba(0,0,0,0.80)'  : 'rgba(255,255,255,0.90)'
+  const txtP   = isLight ? 'rgba(0,0,0,0.78)'  : 'rgba(255,255,255,0.85)'
+  const bullet = isLight ? 'rgba(99,102,241,0.75)' : 'rgba(139,143,255,0.8)'
+
   const clean = text
     .replace(/\[TERM:[^\]]*\]/g, '')
     .replace(/\[SUMMARY:[^\]]*\]/g, '')
@@ -1600,7 +1604,7 @@ function MarkdownRenderer({ text, streaming, cursorColor }) {
   const elements = []
   let i = 0
   let listItems = []
-  let listType = null // 'ul' | 'ol'
+  let listType = null
 
   const flushList = () => {
     if (listItems.length === 0) return
@@ -1608,7 +1612,7 @@ function MarkdownRenderer({ text, streaming, cursorColor }) {
       elements.push(
         <ol key={`list-${elements.length}`} style={{ margin: '8px 0 8px 4px', paddingLeft: 22, display: 'flex', flexDirection: 'column', gap: 5 }}>
           {listItems.map((item, idx) => (
-            <li key={idx} style={{ color: 'rgba(255,255,255,0.82)', fontSize: 14.5, lineHeight: 1.6 }}>{parseInline(item)}</li>
+            <li key={idx} style={{ color: txt, fontSize: 14.5, lineHeight: 1.6 }}>{parseInline(item, isLight)}</li>
           ))}
         </ol>
       )
@@ -1616,9 +1620,9 @@ function MarkdownRenderer({ text, streaming, cursorColor }) {
       elements.push(
         <ul key={`list-${elements.length}`} style={{ margin: '8px 0 8px 4px', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4, listStyle: 'none' }}>
           {listItems.map((item, idx) => (
-            <li key={idx} style={{ color: 'rgba(255,255,255,0.82)', fontSize: 14.5, lineHeight: 1.6, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-              <span style={{ color: 'rgba(139,143,255,0.8)', marginTop: 2, flexShrink: 0, fontSize: 11 }}>◆</span>
-              <span>{parseInline(item)}</span>
+            <li key={idx} style={{ color: txt, fontSize: 14.5, lineHeight: 1.6, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <span style={{ color: bullet, marginTop: 2, flexShrink: 0, fontSize: 11 }}>◆</span>
+              <span>{parseInline(item, isLight)}</span>
             </li>
           ))}
         </ul>
@@ -1632,14 +1636,12 @@ function MarkdownRenderer({ text, streaming, cursorColor }) {
     const line = lines[i]
     const trimmed = line.trim()
 
-    // Empty line
     if (trimmed === '') {
       flushList()
       elements.push(<div key={`gap-${i}`} style={{ height: 6 }} />)
       i++; continue
     }
 
-    // Table detection: current line is a table row AND next line is separator
     if (/^\|/.test(trimmed) && i + 1 < lines.length && /^\|[\s\-:|]+\|/.test(lines[i + 1])) {
       flushList()
       const tableLines = []
@@ -1648,36 +1650,33 @@ function MarkdownRenderer({ text, streaming, cursorColor }) {
         i++
       }
       if (tableLines.length >= 2) {
-        elements.push(<MarkdownTable key={`table-${elements.length}`} lines={tableLines} />)
+        elements.push(<MarkdownTable key={`table-${elements.length}`} lines={tableLines} isLight={isLight} />)
       }
       continue
     }
 
-    // H1
     if (/^#\s/.test(trimmed)) {
       flushList()
       const content = trimmed.replace(/^#+\s/, '')
       elements.push(
-        <div key={`h1-${i}`} style={{ fontSize: 16, fontWeight: 800, color: 'rgba(255,255,255,0.95)', margin: '12px 0 6px', letterSpacing: '-0.02em', lineHeight: 1.3 }}>
-          {parseInline(content)}
+        <div key={`h1-${i}`} style={{ fontSize: 16, fontWeight: 800, color: txtH1, margin: '12px 0 6px', letterSpacing: '-0.02em', lineHeight: 1.3 }}>
+          {parseInline(content, isLight)}
         </div>
       )
       i++; continue
     }
 
-    // H2/H3
     if (/^##/.test(trimmed)) {
       flushList()
       const content = trimmed.replace(/^#+\s/, '')
       elements.push(
-        <div key={`h2-${i}`} style={{ fontSize: 14.5, fontWeight: 700, color: 'rgba(255,255,255,0.90)', margin: '10px 0 4px', letterSpacing: '-0.01em' }}>
-          {parseInline(content)}
+        <div key={`h2-${i}`} style={{ fontSize: 14.5, fontWeight: 700, color: txtH2, margin: '10px 0 4px', letterSpacing: '-0.01em' }}>
+          {parseInline(content, isLight)}
         </div>
       )
       i++; continue
     }
 
-    // Blockquote
     if (/^>/.test(trimmed)) {
       flushList()
       const content = trimmed.replace(/^>\s*/, '')
@@ -1685,18 +1684,17 @@ function MarkdownRenderer({ text, streaming, cursorColor }) {
         <div key={`bq-${i}`} style={{
           margin: '10px 0', padding: '12px 16px',
           borderLeft: '3px solid #6366F1',
-          background: 'rgba(99,102,241,0.13)',
+          background: isLight ? 'rgba(99,102,241,0.08)' : 'rgba(99,102,241,0.13)',
           borderRadius: '0 10px 10px 0',
-          fontSize: 14.5, color: '#1e1852',
+          fontSize: 14.5, color: 'rgba(220,220,255,0.90)',
           fontStyle: 'italic', fontWeight: 500, lineHeight: 1.70,
         }}>
-          {parseInline(content)}
+          {parseInline(content, isLight)}
         </div>
       )
       i++; continue
     }
 
-    // Code block
     if (/^```/.test(trimmed)) {
       flushList()
       const lang = trimmed.replace(/^```/, '').trim()
@@ -1706,18 +1704,18 @@ function MarkdownRenderer({ text, streaming, cursorColor }) {
         codeLines.push(lines[i])
         i++
       }
-      i++ // skip closing ```
+      i++
       elements.push(
         <div key={`code-${elements.length}`} style={{
           margin: '10px 0', borderRadius: 10,
-          background: 'rgba(0,0,0,0.35)',
-          border: '1px solid rgba(255,255,255,0.10)',
+          background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(0,0,0,0.35)',
+          border: isLight ? '1px solid rgba(0,0,0,0.10)' : '1px solid rgba(255,255,255,0.10)',
           overflow: 'hidden',
         }}>
           {lang && (
-            <div style={{ padding: '5px 12px', background: 'rgba(255,255,255,0.05)', fontSize: 10.5, color: 'rgba(255,255,255,0.35)', fontFamily: 'monospace', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{lang}</div>
+            <div style={{ padding: '5px 12px', background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)', fontSize: 10.5, color: isLight ? 'rgba(0,0,0,0.38)' : 'rgba(255,255,255,0.35)', fontFamily: 'monospace', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{lang}</div>
           )}
-          <pre style={{ margin: 0, padding: '12px 14px', fontFamily: '"JetBrains Mono", "Fira Code", monospace', fontSize: 13, color: '#93C5FD', lineHeight: 1.65, overflowX: 'auto', whiteSpace: 'pre' }}>
+          <pre style={{ margin: 0, padding: '12px 14px', fontFamily: '"JetBrains Mono", "Fira Code", monospace', fontSize: 13, color: isLight ? '#1D4ED8' : '#93C5FD', lineHeight: 1.65, overflowX: 'auto', whiteSpace: 'pre' }}>
             {codeLines.join('\n')}
           </pre>
         </div>
@@ -1725,7 +1723,6 @@ function MarkdownRenderer({ text, streaming, cursorColor }) {
       continue
     }
 
-    // Ordered list
     const olMatch = trimmed.match(/^(\d+)[.)]\s+(.*)/)
     if (olMatch) {
       if (listType !== 'ol') { flushList(); listType = 'ol' }
@@ -1733,7 +1730,6 @@ function MarkdownRenderer({ text, streaming, cursorColor }) {
       i++; continue
     }
 
-    // Unordered list
     const ulMatch = trimmed.match(/^[-*•]\s+(.*)/)
     if (ulMatch) {
       if (listType !== 'ul') { flushList(); listType = 'ul' }
@@ -1741,11 +1737,10 @@ function MarkdownRenderer({ text, streaming, cursorColor }) {
       i++; continue
     }
 
-    // Normal paragraph
     flushList()
     elements.push(
-      <p key={`p-${i}`} style={{ margin: '4px 0', fontSize: 14.5, color: 'rgba(255,255,255,0.85)', lineHeight: 1.68 }}>
-        {parseInline(trimmed)}
+      <p key={`p-${i}`} style={{ margin: '4px 0', fontSize: 14.5, color: txtP, lineHeight: 1.68 }}>
+        {parseInline(trimmed, isLight)}
       </p>
     )
     i++
@@ -1760,7 +1755,7 @@ function MarkdownRenderer({ text, streaming, cursorColor }) {
         <motion.span
           animate={{ opacity: [1, 0, 1] }}
           transition={{ duration: 0.75, repeat: Infinity }}
-          style={{ display: 'inline-block', width: 2, height: 14, background: cursorColor || 'rgba(255,255,255,0.6)', borderRadius: 1, marginLeft: 3, verticalAlign: 'middle' }}
+          style={{ display: 'inline-block', width: 2, height: 14, background: cursorColor || (isLight ? 'rgba(99,102,241,0.7)' : 'rgba(255,255,255,0.6)'), borderRadius: 1, marginLeft: 3, verticalAlign: 'middle' }}
         />
       )}
     </div>
@@ -1894,7 +1889,7 @@ ${conversationText}${visualContext}`
   h2 { font-size: 16px; font-weight: 700; color: #3730a3; margin: 28px 0 10px; text-transform: uppercase; letter-spacing: 0.06em; }
   h3 { font-size: 14px; font-weight: 600; color: #4338ca; margin: 18px 0 8px; }
   p { margin: 8px 0; font-size: 14px; }
-  blockquote { border-left: 3px solid #6366F1; padding: 10px 16px; background: #eef0ff; border-radius: 0 8px 8px 0; font-style: italic; color: #312e81; margin: 12px 0; font-size: 14px; }
+  blockquote { border-left: 3px solid #6366F1; padding: 10px 16px; background: rgba(99,102,241,0.13); border-radius: 0 8px 8px 0; font-style: italic; color: rgba(220,220,255,0.90); margin: 12px 0; font-size: 14px; }
   ul, ol { padding-left: 20px; margin: 8px 0; }
   li { font-size: 14px; margin: 5px 0; }
   strong { color: #1e1a3a; }
@@ -2083,7 +2078,7 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false }) {
                 <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#4ADE80' }}>Lock-In</span>
               </div>
             )}
-            <MarkdownRenderer text={msg.text} streaming={!!msg.streaming} cursorColor="rgba(139,143,255,0.9)" />
+            <MarkdownRenderer text={msg.text} streaming={!!msg.streaming} cursorColor={isLight ? 'rgba(99,102,241,0.8)' : 'rgba(139,143,255,0.9)'} isLight={isLight} />
           </>
         )}
       </div>
