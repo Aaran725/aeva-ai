@@ -22,6 +22,7 @@ import UserProfile from './UserProfile'
 import { useLibraryStore } from './libraryStore'
 import LandingPage from './LandingPage'
 import Onboarding from './Onboarding'
+import AevaOrbComponent from './AevaOrb'
 import './index.css'
 
 /* ─── Groq API ─── */

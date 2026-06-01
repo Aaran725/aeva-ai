@@ -1,35 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Brain, FlaskConical, Camera, BookOpen, Trophy, Zap, ArrowRight, Star, Check } from 'lucide-react'
+import AevaOrb from './AevaOrb'
 
-/* ── Hero Logo ────────────────────────────────────── */
-function HeroLogo() {
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.88 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.6, delay: 0.15 }}
-      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, flexShrink: 0 }}
-    >
-      {/* Glow */}
-      <div aria-hidden style={{ position: 'absolute', width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.22) 0%, transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
-
-      {/* Logo mark */}
-      <motion.div
-        animate={{ boxShadow: ['0 8px 40px rgba(45,48,142,0.50)', '0 12px 55px rgba(99,102,241,0.55)', '0 8px 40px rgba(45,48,142,0.50)'] }}
-        transition={{ duration: 3, repeat: Infinity }}
-        style={{ width: 96, height: 96, borderRadius: 28, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', zIndex: 1 }}
-      >
-        <Star size={42} color="white" fill="white" />
-      </motion.div>
-
-      {/* Wordmark */}
-      <span style={{ fontSize: 52, fontWeight: 800, color: 'rgba(255,255,255,0.94)', letterSpacing: '-0.05em', position: 'relative', zIndex: 1 }}>
-        aeva
-      </span>
-    </motion.div>
-  )
-}
 
 /* ── Animated chat demo ───────────────────────────── */
 const DEMO_USER = 'Explain quadratic equations'
@@ -295,10 +268,11 @@ export default function LandingPage({ onGetStarted }) {
             </motion.div>
           </div>
 
-          {/* Right — logo */}
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, margin: '0 auto' }}>
-            <HeroLogo />
-          </div>
+          {/* Right — Aeva character */}
+          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.65, delay: 0.15 }}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, margin: '0 auto' }}>
+            <AevaOrb size={280} />
+          </motion.div>
         </section>
 
         {/* ── Demo / Mockup ── */}
