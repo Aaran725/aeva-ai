@@ -185,7 +185,7 @@ const FEATURES = [
   { icon: FlaskConical, title: 'Practice Labs', desc: '7 drill modes — flashcards, speed rounds, mock tests, Feynman, fill the gaps, short answer, and match grid.', color: '#10B981', bg: 'rgba(16,185,129,0.10)' },
   { icon: Camera,     title: 'Aeva Lens',       desc: 'Point your camera at any problem. Aeva analyses it, identifies the topic, and gives you a full breakdown.', color: '#F97316', bg: 'rgba(249,115,22,0.10)' },
   { icon: BookOpen,   title: 'Study Guide',     desc: 'Every tutoring session auto-generates a clean, structured study guide you can review anytime.', color: '#06B6D4', bg: 'rgba(6,182,212,0.10)' },
-  { icon: Zap,        title: 'Memory Palace',   desc: 'Spaced repetition built in. Aeva tracks what you know, what you're shaky on, and reviews it at the right time.', color: '#EC4899', bg: 'rgba(236,72,153,0.10)' },
+  { icon: Zap,        title: 'Memory Palace',   desc: "Spaced repetition built in. Aeva tracks what you know, what you're shaky on, and reviews it at the right time.", color: '#EC4899', bg: 'rgba(236,72,153,0.10)' },
   { icon: Trophy,     title: 'Mission Mode',    desc: 'Gamified learning challenges with chaos events, debate arenas, and timed missions that make studying addictive.', color: '#F59E0B', bg: 'rgba(245,158,11,0.10)' },
 ]
 
