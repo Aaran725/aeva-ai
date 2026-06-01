@@ -25,6 +25,8 @@ import Onboarding from './Onboarding'
 import AevaOrbComponent from './AevaOrb'
 import SecondBrain from './SecondBrain'
 import { useBrainStore } from './brainStore'
+import OrbSelector from './OrbSelector'
+import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
 import './index.css'
 
 /* ─── Groq API ─── */
@@ -497,11 +499,14 @@ const ORB_PULSES = {
   balanced:   { scale: [1, 1.05, 1],              dur: 4.5  },
 }
 
-function AevaOrb({ size = 218, active = false, scanMode = false, personality = 'balanced' }) {
+const DEFAULT_ORB_GRADIENT = 'linear-gradient(122deg,#040622 0%,#090b38 7%,#141870 16%,#2D308E 27%,#4545aa 38%,#6a6ac0 48%,#9898d2 56%,#c0c6e8 63%,#dde2f6 68%,#eeeaf4 72%,#f4ede0 76%,#f0d4a0 80%,#E9A364 84%,#d08038 88%,#964e20 93%,#501808 97%,#1a0806 100%)'
+
+function AevaOrb({ size = 218, active = false, scanMode = false, personality = 'balanced', orbGradient }) {
   const s = size / 218
   const shellW = Math.round(218 * s * 0.88)
   const shellH = Math.round(205 * s * 0.88)
   const pulse = ORB_PULSES[personality] || ORB_PULSES.balanced
+  const gradient = orbGradient || DEFAULT_ORB_GRADIENT
 
   return (
     <div style={{
@@ -542,7 +547,7 @@ function AevaOrb({ size = 218, active = false, scanMode = false, personality = '
       >
         <div style={{ position: 'absolute', inset: 0, background: scanMode
           ? 'linear-gradient(122deg,#020a1a 0%,#051430 8%,#0a2456 16%,#1240a0 26%,#1D4ED8 36%,#2563EB 46%,#3B82F6 54%,#60A5FA 62%,#93C5FD 68%,#BAE6FD 72%,#E0F2FE 76%,#BAE6FD 80%,#60A5FA 84%,#2563EB 88%,#1a3a8a 93%,#0d1f50 97%,#020a1a 100%)'
-          : 'linear-gradient(122deg,#040622 0%,#090b38 7%,#141870 16%,#2D308E 27%,#4545aa 38%,#6a6ac0 48%,#9898d2 56%,#c0c6e8 63%,#dde2f6 68%,#eeeaf4 72%,#f4ede0 76%,#f0d4a0 80%,#E9A364 84%,#d08038 88%,#964e20 93%,#501808 97%,#1a0806 100%)'
+          : gradient
         }} />
         <div style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', background: 'radial-gradient(ellipse at 50% 50%, transparent 46%, rgba(8,10,48,0.38) 62%, rgba(4,6,28,0.65) 76%, rgba(2,3,18,0.86) 90%, rgba(1,2,12,0.94) 100%)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', background: 'radial-gradient(ellipse at 72% 28%, rgba(4,5,30,0.72) 0%, rgba(8,10,50,0.50) 30%, transparent 62%)', pointerEvents: 'none' }} />
@@ -622,14 +627,46 @@ const NODES = [
 const EDGES = [[0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [1, 6], [2, 7], [3, 4], [5, 4], [6, 7]]
 // SKILLS is now derived from real conceptMap data — see SkillDecayCard
 
-function MissionCard({ onChatOpen }) {
+function MissionCard({ onChatOpen, onOrbClick }) {
   const { name } = useUser()
   const { orbPersonality } = useNeuralStore()
+  const { activeOrb: activeOrbId, streak, xp } = useXPStore()
+  const activeOrbDef = ORBS.find(o => o.id === activeOrbId) || ORBS[0]
+  const currentLevel = levelFromXP(xp)
+  const xpProgress = xpIntoLevel(xp)
+
   return (
     <GlassCard className="mission-card" style={{ padding: 32, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 300 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase' }}>Mission Briefing</span>
-        <AevaOrb size={96} personality={orbPersonality} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase' }}>Mission Briefing</span>
+          {/* Streak + Level */}
+          <div style={{ display: 'flex', gap: 8 }}>
+            {streak > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(245,158,11,0.14)', border: '1px solid rgba(245,158,11,0.30)', borderRadius: 10, padding: '4px 9px' }}>
+                <span style={{ fontSize: 12 }}>🔥</span>
+                <span style={{ fontSize: 11.5, fontWeight: 700, color: '#FCD34D' }}>{streak}</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(139,143,255,0.12)', border: '1px solid rgba(139,143,255,0.25)', borderRadius: 10, padding: '4px 9px' }}>
+              <Zap size={10} color="#8B8FFF" fill="#8B8FFF" />
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: '#A5B4FC' }}>Lv {currentLevel}</span>
+            </div>
+          </div>
+          {/* XP bar */}
+          <div style={{ width: 80, height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{ width: `${xpProgress}%`, height: '100%', background: 'linear-gradient(90deg, #6366F1, #8B8FFF)', borderRadius: 2, transition: 'width 0.5s ease' }} />
+          </div>
+        </div>
+        {/* Clickable orb */}
+        <motion.button onClick={onOrbClick} whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.95 }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, position: 'relative' }}
+          title="Change Aeva's orb">
+          <AevaOrb size={96} personality={orbPersonality} orbGradient={activeOrbDef.gradient} />
+          <div style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 6, padding: '2px 5px', fontSize: 9, color: 'rgba(255,255,255,0.70)', fontWeight: 600, backdropFilter: 'blur(4px)' }}>
+            {activeOrbDef.name}
+          </div>
+        </motion.button>
       </div>
       <div style={{ marginTop: 8 }}>
         <h2 style={{
@@ -1269,8 +1306,13 @@ function DashboardView({ onChatOpen, onSignOut }) {
   const [profileOpen, setProfileOpen] = useState(false)
   const [appSettingsOpen, setAppSettingsOpen] = useState(false)
   const [brainOpen, setBrainOpen] = useState(false)
+  const [orbSelectorOpen, setOrbSelectorOpen] = useState(false)
   const { getStats } = useBrainStore()
   const brainStats = getStats()
+  const { xp, streak, activeOrb: activeOrbId, unlockedOrbs } = useXPStore()
+  const currentLevel = levelFromXP(xp)
+  const xpProgress = xpIntoLevel(xp)
+  const activeOrbDef = ORBS.find(o => o.id === activeOrbId) || ORBS[0]
   const { dashboardBg, fontStyle } = useAppSettings()
   const dashBgPreset = SECTION_BG_PRESETS.find(p => p.id === (dashboardBg || 'default')) || SECTION_BG_PRESETS[1]
   const fontFamily = FONT_STYLES[fontStyle || 'inter']?.family || "'Inter', system-ui, sans-serif"
@@ -1447,7 +1489,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
         </header>
 
         <div className="bento-grid" style={{ padding: '0 24px', maxWidth: 1280, margin: '0 auto' }}>
-          <MissionCard onChatOpen={onChatOpen} />
+          <MissionCard onChatOpen={onChatOpen} onOrbClick={() => setOrbSelectorOpen(true)} />
           <ConstellationCard />
           <MoodCard />
           <SkillDecayCard />
@@ -1532,6 +1574,10 @@ function DashboardView({ onChatOpen, onSignOut }) {
 
       <AnimatePresence>
         {brainOpen && <SecondBrain onClose={() => setBrainOpen(false)} />}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {orbSelectorOpen && <OrbSelector onClose={() => setOrbSelectorOpen(false)} />}
       </AnimatePresence>
     </motion.div>
   )
@@ -2440,9 +2486,18 @@ function ChatView({ onBack }) {
         updateMastery(criticResult)
         exchangeCountRef.current += 1
         advanceSessionState(exchangeCountRef.current, criticResult)
+        // XP for Socratic sessions at 5-exchange milestone
+        if (socraticActive && exchangeCountRef.current === 5) {
+          useXPStore.getState().addXP('SOCRATIC_5')
+        }
         systemPrompt = buildAevaPrompt(sessionState, criticResult, name, null, buildMemoryBlock(name))
         if (socraticActive) {
           systemPrompt += '\n\nSOCRATIC MODE: You must NEVER state facts, answers, or explanations directly. Respond ONLY with 1-3 targeted questions that guide the student to discover the answer themselves. If they arrive at the correct answer, confirm warmly and deepen with another question. If wrong, ask a question that exposes the specific gap without revealing the answer. Never say "the answer is", never explain anything outright. Make them think every time.'
+        }
+        // Active orb personality modifier
+        const activeOrbDef = ORBS.find(o => o.id === useXPStore.getState().activeOrb)
+        if (activeOrbDef?.personality) {
+          systemPrompt += `\n\n${activeOrbDef.personality}`
         }
       }
 
@@ -2500,6 +2555,7 @@ function ChatView({ onBack }) {
         if (understanding === 'mastery' || understanding === 'solid') {
           addMastered(criticResult.topic)
           touchConceptNode(criticResult.topic, 90)
+          useXPStore.getState().addXP('TOPIC_MASTERED')
           computePredictions()
         } else if (understanding === 'none') {
           addStruggle(criticResult.topic)
@@ -2803,7 +2859,7 @@ function ChatView({ onBack }) {
                   transition={{ duration: 0.4 }}
                   style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 12 }}
                 >
-                  <AevaOrb size={218} active={isActive} scanMode={labOpen} personality={orbPersonality} />
+                  <AevaOrb size={218} active={isActive} scanMode={labOpen} personality={orbPersonality} orbGradient={ORBS.find(o => o.id === useXPStore.getState().activeOrb)?.gradient} />
                   <div style={{ textAlign: 'center', padding: '0 28px', marginTop: 4 }}>
                     <p style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 24, fontWeight: 400, color: isLight ? 'rgba(0,0,0,0.42)' : 'rgba(255,255,255,0.45)', lineHeight: 1.3, letterSpacing: '0.01em', marginBottom: 4 }}>
                       Hey {name},
@@ -3468,22 +3524,72 @@ function LoginScreen({ onBack }) {
 }
 
 /* ═══ APP ROOT ════════════════════════════════════ */
+/* ── XP Toast ─────────────────────────────────────── */
+function XPToast() {
+  const { pendingToast, clearToast } = useXPStore()
+  useEffect(() => {
+    if (!pendingToast) return
+    const t = setTimeout(clearToast, 3200)
+    return () => clearTimeout(t)
+  }, [pendingToast])
+
+  return (
+    <AnimatePresence>
+      {pendingToast && (
+        <motion.div
+          key={pendingToast.label + pendingToast.amount}
+          initial={{ opacity: 0, y: 24, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -12, scale: 0.9 }}
+          transition={{ type: 'spring', stiffness: 380, damping: 26 }}
+          style={{
+            position: 'fixed', bottom: 28, right: 24, zIndex: 999,
+            display: 'flex', flexDirection: 'column', gap: 4,
+            background: 'rgba(8,9,26,0.96)', border: '1px solid rgba(139,143,255,0.30)',
+            borderRadius: 16, padding: '12px 18px',
+            backdropFilter: 'blur(16px)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.50)',
+            fontFamily: "'Inter', system-ui, sans-serif",
+            pointerEvents: 'none',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Zap size={13} color="#8B8FFF" fill="#8B8FFF" />
+            <span style={{ fontSize: 14, fontWeight: 800, color: '#8B8FFF' }}>+{pendingToast.amount} XP</span>
+            <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.55)' }}>{pendingToast.label}</span>
+          </div>
+          {pendingToast.newOrb && (
+            <div style={{ fontSize: 12, color: '#F59E0B', fontWeight: 700 }}>
+              🔓 New orb unlocked: {pendingToast.newOrb.name}!
+            </div>
+          )}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
 export default function App() {
   const [view, setView] = useState('dashboard')
   const [authUser, setAuthUser] = useState(undefined)
   const [showLogin, setShowLogin] = useState(false)
   const [onboarded, setOnboarded] = useState(() => !!localStorage.getItem('aeva_onboarded'))
   const { activeMode, exitMission } = useArcadeStore()
+  const { checkStreak } = useXPStore()
 
   useEffect(() => {
     if (activeMode) setView('chat')
   }, [activeMode])
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setAuthUser(data.session?.user ?? null))
+    supabase.auth.getSession().then(({ data }) => {
+      setAuthUser(data.session?.user ?? null)
+      if (data.session?.user) checkStreak()
+    })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       setAuthUser(session?.user ?? null)
       if (!session) { setView('dashboard'); setShowLogin(false) }
+      if (session?.user) checkStreak()
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -3535,6 +3641,7 @@ export default function App() {
 
   return (
     <UserContext.Provider value={userValue}>
+      <XPToast />
       {/* Global chaos banner */}
       <ChaosEventBanner />
       <ProTipBanner />

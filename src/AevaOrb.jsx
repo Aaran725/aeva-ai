@@ -7,7 +7,10 @@ const ORB_PULSES = {
   balanced:   { scale: [1, 1.05, 1],              dur: 4.5  },
 }
 
-export default function AevaOrb({ size = 218, active = false, scanMode = false, personality = 'balanced' }) {
+const DEFAULT_GRADIENT = 'linear-gradient(122deg,#040622 0%,#090b38 7%,#141870 16%,#2D308E 27%,#4545aa 38%,#6a6ac0 48%,#9898d2 56%,#c0c6e8 63%,#dde2f6 68%,#eeeaf4 72%,#f4ede0 76%,#f0d4a0 80%,#E9A364 84%,#d08038 88%,#964e20 93%,#501808 97%,#1a0806 100%)'
+
+export default function AevaOrb({ size = 218, active = false, scanMode = false, personality = 'balanced', orbGradient }) {
+  const gradient = orbGradient || DEFAULT_GRADIENT
   const s = size / 218
   const shellW = Math.round(218 * s * 0.88)
   const shellH = Math.round(205 * s * 0.88)
@@ -52,7 +55,7 @@ export default function AevaOrb({ size = 218, active = false, scanMode = false, 
       >
         <div style={{ position: 'absolute', inset: 0, background: scanMode
           ? 'linear-gradient(122deg,#020a1a 0%,#051430 8%,#0a2456 16%,#1240a0 26%,#1D4ED8 36%,#2563EB 46%,#3B82F6 54%,#60A5FA 62%,#93C5FD 68%,#BAE6FD 72%,#E0F2FE 76%,#BAE6FD 80%,#60A5FA 84%,#2563EB 88%,#1a3a8a 93%,#0d1f50 97%,#020a1a 100%)'
-          : 'linear-gradient(122deg,#040622 0%,#090b38 7%,#141870 16%,#2D308E 27%,#4545aa 38%,#6a6ac0 48%,#9898d2 56%,#c0c6e8 63%,#dde2f6 68%,#eeeaf4 72%,#f4ede0 76%,#f0d4a0 80%,#E9A364 84%,#d08038 88%,#964e20 93%,#501808 97%,#1a0806 100%)'
+          : gradient
         }} />
         <div style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', background: 'radial-gradient(ellipse at 50% 50%, transparent 46%, rgba(8,10,48,0.38) 62%, rgba(4,6,28,0.65) 76%, rgba(2,3,18,0.86) 90%, rgba(1,2,12,0.94) 100%)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', background: 'radial-gradient(ellipse at 72% 28%, rgba(4,5,30,0.72) 0%, rgba(8,10,50,0.50) 30%, transparent 62%)', pointerEvents: 'none' }} />

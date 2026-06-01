@@ -101,6 +101,8 @@ export const useLabStore = create((set, get) => ({
     const updated = [...get().drillHistory, entry]
     saveHistory(updated)
     set({ drillHistory: updated })
+    // Award XP for completing a drill
+    try { useXPStore.getState().addXP('DRILL_COMPLETE') } catch {}
   },
 
   setLabSuggestion: (s) => set({ labSuggestion: s }),
