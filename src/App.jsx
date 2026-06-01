@@ -23,6 +23,8 @@ import { useLibraryStore } from './libraryStore'
 import LandingPage from './LandingPage'
 import Onboarding from './Onboarding'
 import AevaOrbComponent from './AevaOrb'
+import SecondBrain from './SecondBrain'
+import { useBrainStore } from './brainStore'
 import './index.css'
 
 /* ─── Groq API ─── */
@@ -1266,6 +1268,9 @@ function DashboardView({ onChatOpen, onSignOut }) {
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [appSettingsOpen, setAppSettingsOpen] = useState(false)
+  const [brainOpen, setBrainOpen] = useState(false)
+  const { getStats } = useBrainStore()
+  const brainStats = getStats()
   const { dashboardBg, fontStyle } = useAppSettings()
   const dashBgPreset = SECTION_BG_PRESETS.find(p => p.id === (dashboardBg || 'default')) || SECTION_BG_PRESETS[1]
   const fontFamily = FONT_STYLES[fontStyle || 'inter']?.family || "'Inter', system-ui, sans-serif"
@@ -1325,6 +1330,29 @@ function DashboardView({ onChatOpen, onSignOut }) {
               {sessions.length > 0 && (
                 <span style={{ padding: '1px 6px', borderRadius: 99, background: 'rgba(167,139,250,0.25)', fontSize: 9.5, fontWeight: 800, color: '#A78BFA' }}>
                   {sessions.length}
+                </span>
+              )}
+            </motion.button>
+
+            {/* Second Brain button */}
+            <motion.button
+              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+              onClick={() => setBrainOpen(true)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 7,
+                padding: '7px 16px', borderRadius: 99,
+                background: 'rgba(139,143,255,0.13)',
+                border: '1px solid rgba(139,143,255,0.32)',
+                color: 'rgba(200,200,255,0.85)',
+                fontFamily: "'Inter', system-ui, sans-serif",
+                fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              <Brain size={13} />
+              Second Brain
+              {brainStats.total > 0 && (
+                <span style={{ padding: '1px 6px', borderRadius: 99, background: 'rgba(139,143,255,0.22)', fontSize: 9.5, fontWeight: 800, color: '#8B8FFF' }}>
+                  {brainStats.total}
                 </span>
               )}
             </motion.button>
@@ -1500,6 +1528,10 @@ function DashboardView({ onChatOpen, onSignOut }) {
 
       <AnimatePresence>
         {appSettingsOpen && <AppSettingsPanel onClose={() => setAppSettingsOpen(false)} />}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {brainOpen && <SecondBrain onClose={() => setBrainOpen(false)} />}
       </AnimatePresence>
     </motion.div>
   )
@@ -2181,9 +2213,7 @@ function ChatView({ onBack }) {
   const lensInputRef = useRef(null)
   const [drillOpen, setDrillOpen] = useState(false)
   const [libraryOpen, setLibraryOpen] = useState(false)
-  const [lockInActive, setLockInActive] = useState(false)
-  const [lockInSecondsLeft, setLockInSecondsLeft] = useState(25 * 60)
-  const [lockInSummary, setLockInSummary] = useState(null)
+  const [socraticActive, setSocraticActive] = useState(false)
   const [feynmanOpen, setFeynmanOpen] = useState(false)
   const [chatAppSettingsOpen, setChatAppSettingsOpen] = useState(false)
   const [chatSettings, saveChatSettings] = useChatSettings()
@@ -2191,8 +2221,6 @@ function ChatView({ onBack }) {
   const [addingChip, setAddingChip] = useState(false)
   const [newChipLabel, setNewChipLabel] = useState('')
   const newChipInputRef = useRef(null)
-  const lockInStartExchangesRef = useRef(0)
-  const lockInTimerRef = useRef(null)
   const [countdown, setCountdown] = useState(null)
   const countdownRef = useRef(null)
   const abortRef = useRef(null)
@@ -2248,51 +2276,19 @@ function ChatView({ onBack }) {
     }
   }, [input])
 
-  // Lock-In timer
-  useEffect(() => {
-    if (!lockInActive) return
-    lockInTimerRef.current = setInterval(() => {
-      setLockInSecondsLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(lockInTimerRef.current)
-          const exchanges = exchangeCountRef.current - lockInStartExchangesRef.current
-          const focusScore = Math.min(100, Math.round((exchanges / 10) * 100))
-          setLockInSummary({ focusScore, exchanges, duration: 25 * 60 })
-          setLockInActive(false)
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-    return () => clearInterval(lockInTimerRef.current)
-  }, [lockInActive])
-
-  const startLockIn = () => {
-    lockInStartExchangesRef.current = exchangeCountRef.current
-    setLockInSecondsLeft(25 * 60)
-    setLockInSummary(null)
-    setLockInActive(true)
-    setMessages(prev => [...prev, {
-      role: 'model',
-      text: `Locked in. 25 minutes. I'll keep every answer to 2 sentences — no tangents, no fluff. What are we working on?`,
-      streaming: false,
-      lockIn: true,
-    }])
+  const toggleSocratic = () => {
+    setSocraticActive(prev => {
+      const next = !prev
+      setMessages(m => [...m, {
+        role: 'model',
+        text: next
+          ? `Socratic mode on. I won't give you answers directly — I'll ask questions until you find them yourself. This is harder, but it's how real understanding forms. What are we working on?`
+          : `Back to normal mode. I'll explain things directly again.`,
+        streaming: false,
+      }])
+      return next
+    })
   }
-
-  const exitLockIn = () => {
-    clearInterval(lockInTimerRef.current)
-    const exchanges = exchangeCountRef.current - lockInStartExchangesRef.current
-    const elapsed = 25 * 60 - lockInSecondsLeft
-    const focusScore = Math.min(100, Math.round((exchanges / Math.max(1, elapsed / 150)) * 100))
-    setLockInSummary({ focusScore, exchanges, duration: elapsed })
-    setLockInActive(false)
-  }
-
-  const lockInMinutes = Math.floor(lockInSecondsLeft / 60)
-  const lockInSecs = lockInSecondsLeft % 60
-  const lockInDisplay = `${String(lockInMinutes).padStart(2,'0')}:${String(lockInSecs).padStart(2,'0')}`
-  const lockInUrgent = lockInActive && lockInSecondsLeft <= 60
 
   // Per-mission opening opts (same shape as MISSION_OPTS in send())
   const MISSION_OPEN_OPTS = {
@@ -2411,7 +2407,7 @@ function ChatView({ onBack }) {
 
     const userMsg = { role: 'user', text: userText }
     const history = [...messages, userMsg]
-    setMessages([...history, { role: 'model', text: '', streaming: true, lockIn: !!lockInActive }])
+    setMessages([...history, { role: 'model', text: '', streaming: true, lockIn: false }])
     setIsThinking(true)
 
     const controller = new AbortController()
@@ -2445,12 +2441,12 @@ function ChatView({ onBack }) {
         exchangeCountRef.current += 1
         advanceSessionState(exchangeCountRef.current, criticResult)
         systemPrompt = buildAevaPrompt(sessionState, criticResult, name, null, buildMemoryBlock(name))
-        if (lockInActive) {
-          systemPrompt += '\n\nLOCK-IN MODE: The student is in a deep-work Pomodoro session. Keep every response to 2 sentences maximum — surgical, no elaboration. Move them forward, not sideways.'
+        if (socraticActive) {
+          systemPrompt += '\n\nSOCRATIC MODE: You must NEVER state facts, answers, or explanations directly. Respond ONLY with 1-3 targeted questions that guide the student to discover the answer themselves. If they arrive at the correct answer, confirm warmly and deepen with another question. If wrong, ask a question that exposes the specific gap without revealing the answer. Never say "the answer is", never explain anything outright. Make them think every time.'
         }
       }
 
-      const streamOpts = isMission ? (MISSION_OPTS[activeMode] || {}) : lockInActive ? { maxTokens: 80 } : {}
+      const streamOpts = isMission ? (MISSION_OPTS[activeMode] || {}) : {}
 
       await streamGroq(
         history,
@@ -2541,6 +2537,23 @@ function ChatView({ onBack }) {
         if (termMatches.length > 0) {
           const cards = termMatches.map(m => ({ id: `${Date.now()}-${m[1].trim()}`, term: m[1].trim(), definition: m[2].trim() }))
           setDeepDiveMap(prev => ({ ...prev, [history.length]: cards }))
+          // Pipe TERM concepts into Second Brain
+          cards.forEach(c => {
+            useBrainStore.getState().addConcept({ concept: c.term, definition: c.definition, mastery: 20, source: 'term' })
+          })
+          // Link concepts that appeared in the same response
+          if (cards.length >= 2) {
+            for (let i = 0; i < cards.length - 1; i++) {
+              useBrainStore.getState().linkConcepts(cards[i].term, cards[i + 1].term)
+            }
+          }
+        }
+
+        // Pipe topic from critic into Second Brain
+        if (criticResult?.topic) {
+          const masteryScore = { none: 10, partial: 35, solid: 70, mastery: 90 }[criticResult.understanding] ?? 35
+          useBrainStore.getState().addConcept({ concept: criticResult.topic, mastery: masteryScore, source: 'topic' })
+          useBrainStore.getState().updateMastery(criticResult.topic, masteryScore)
         }
 
         // Detect study guide request
@@ -2696,41 +2709,34 @@ function ChatView({ onBack }) {
 
             {!isMission && (
               <>
-                {/* Lock-In toggle */}
+                {/* Socratic mode toggle */}
                 <motion.button
                   whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-                  onClick={lockInActive ? exitLockIn : startLockIn}
-                  animate={lockInActive
-                    ? lockInUrgent
-                      ? { boxShadow: ['0 0 0px rgba(239,68,68,0)', '0 0 16px rgba(239,68,68,0.80)', '0 0 0px rgba(239,68,68,0)'] }
-                      : { boxShadow: ['0 0 0px rgba(74,222,128,0)', '0 0 10px rgba(74,222,128,0.45)', '0 0 0px rgba(74,222,128,0)'] }
-                    : {}}
-                  transition={{ boxShadow: { duration: lockInUrgent ? 0.7 : 2, repeat: Infinity } }}
+                  onClick={toggleSocratic}
+                  animate={socraticActive ? { boxShadow: ['0 0 0px rgba(167,139,250,0)', '0 0 12px rgba(167,139,250,0.55)', '0 0 0px rgba(167,139,250,0)'] } : {}}
+                  transition={{ boxShadow: { duration: 2.2, repeat: Infinity } }}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 6,
-                    padding: lockInActive ? '6px 14px' : '5px 11px', borderRadius: 99, cursor: 'pointer',
-                    background: lockInActive ? (lockInUrgent ? 'rgba(239,68,68,0.18)' : 'rgba(74,222,128,0.14)') : isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.07)',
-                    border: `1.5px solid ${lockInActive ? (lockInUrgent ? 'rgba(239,68,68,0.55)' : 'rgba(74,222,128,0.45)') : isLight ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.14)'}`,
-                    color: lockInActive ? (lockInUrgent ? '#F87171' : '#4ADE80') : isLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.50)',
-                    fontSize: lockInActive ? 12 : 11, fontWeight: 700, fontFamily: "'Inter', system-ui, sans-serif",
-                    transition: 'padding 0.2s, font-size 0.2s, background 0.2s',
+                    padding: '5px 11px', borderRadius: 99, cursor: 'pointer',
+                    background: socraticActive ? 'rgba(167,139,250,0.18)' : isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.07)',
+                    border: `1.5px solid ${socraticActive ? 'rgba(167,139,250,0.50)' : isLight ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.14)'}`,
+                    color: socraticActive ? '#C4B5FD' : isLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.50)',
+                    fontSize: 11, fontWeight: 700, fontFamily: "'Inter', system-ui, sans-serif",
                   }}
                 >
-                  <Timer size={lockInActive ? 13 : 11} />
-                  {lockInActive ? lockInDisplay : 'Lock-In'}
+                  <Brain size={11} />
+                  Socratic
                 </motion.button>
 
-                {/* Library — dimmed during Lock-In */}
+                {/* Library */}
                 <motion.button
                   whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
                   onClick={() => setLibraryOpen(true)}
-                  animate={{ opacity: lockInActive ? 0.3 : 1 }}
                   style={{
                     padding: '5px 11px', borderRadius: 99, cursor: 'pointer',
                     background: isLight ? 'rgba(139,92,246,0.08)' : 'rgba(167,139,250,0.10)', border: isLight ? '1px solid rgba(139,92,246,0.22)' : '1px solid rgba(167,139,250,0.24)',
                     color: isLight ? 'rgba(109,40,217,0.80)' : 'rgba(167,139,250,0.80)', fontSize: 11, fontWeight: 600,
                     fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', alignItems: 'center', gap: 5,
-                    pointerEvents: lockInActive ? 'none' : 'auto',
                   }}
                 >
                   <BookOpen size={11} /> Library
@@ -2738,13 +2744,11 @@ function ChatView({ onBack }) {
 
                 <motion.button
                   onClick={() => setStudyGuideOpen(true)}
-                  animate={{ opacity: lockInActive ? 0.3 : 1 }}
                   style={{
                     padding: '5px 12px', borderRadius: 99, cursor: 'pointer',
                     background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.08)', border: isLight ? '1px solid rgba(0,0,0,0.12)' : '1px solid rgba(255,255,255,0.15)',
                     color: isLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: 600,
                     fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: '0.04em',
-                    pointerEvents: lockInActive ? 'none' : 'auto',
                   }}
                 >
                   📋 Study Guide
@@ -2753,14 +2757,14 @@ function ChatView({ onBack }) {
                 <motion.button
                   whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
                   onClick={() => setFeynmanOpen(true)}
-                  animate={{ opacity: lockInActive ? 0.3 : 1 }}
+                  
                   style={{
                     padding: '5px 12px', borderRadius: 99, cursor: 'pointer',
                     background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.28)',
                     color: 'rgba(245,158,11,0.85)', fontSize: 11, fontWeight: 700,
                     fontFamily: "'Inter', system-ui, sans-serif",
                     display: 'flex', alignItems: 'center', gap: 5,
-                    pointerEvents: lockInActive ? 'none' : 'auto',
+                    
                   }}
                 >
                   🎓 Teach It
@@ -3290,101 +3294,13 @@ function ChatView({ onBack }) {
         )}
       </AnimatePresence>
 
-      {/* Lock-In ambient overlay */}
-      <AnimatePresence>
-        {lockInActive && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 5 }}
-          >
-            {/* Screen tint */}
-            <div style={{
-              position: 'absolute', inset: 0,
-              background: lockInUrgent
-                ? 'radial-gradient(ellipse at 50% 100%, rgba(239,68,68,0.08) 0%, transparent 65%)'
-                : 'radial-gradient(ellipse at 50% 100%, rgba(74,222,128,0.07) 0%, transparent 65%)',
-            }} />
-            {/* Border frame */}
-            <div style={{
-              position: 'absolute', inset: 0,
-              border: lockInUrgent ? '2px solid rgba(239,68,68,0.45)' : '2px solid rgba(74,222,128,0.30)',
-              borderRadius: 0,
-              pointerEvents: 'none',
-            }} />
-          </motion.div>
-        )}
-      </AnimatePresence>
 
-      {/* Lock-In floating timer bar (above input) */}
+      {/* Socratic ambient overlay */}
       <AnimatePresence>
-        {lockInActive && (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }}
-            style={{
-              position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)',
-              zIndex: 20, pointerEvents: 'none',
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '8px 18px', borderRadius: 99,
-              background: lockInUrgent ? 'rgba(239,68,68,0.14)' : 'rgba(74,222,128,0.10)',
-              border: `1px solid ${lockInUrgent ? 'rgba(239,68,68,0.40)' : 'rgba(74,222,128,0.30)'}`,
-              backdropFilter: 'blur(16px)',
-              WebkitBackdropFilter: 'blur(16px)',
-              boxShadow: lockInUrgent ? '0 4px 24px rgba(239,68,68,0.20)' : '0 4px 24px rgba(74,222,128,0.12)',
-              fontFamily: "'Inter', system-ui, sans-serif",
-            }}
-          >
-            {/* Progress bar */}
-            <div style={{ width: 80, height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
-              <motion.div
-                style={{
-                  height: '100%', borderRadius: 99,
-                  background: lockInUrgent ? '#F87171' : '#4ADE80',
-                  width: `${(lockInSecondsLeft / (25 * 60)) * 100}%`,
-                  transition: 'width 1s linear, background 0.3s',
-                }}
-              />
-            </div>
-            <span style={{ fontSize: 13, fontWeight: 800, color: lockInUrgent ? '#F87171' : '#4ADE80', letterSpacing: '0.02em', fontVariantNumeric: 'tabular-nums' }}>
-              {lockInDisplay}
-            </span>
-            <span style={{ fontSize: 10, fontWeight: 600, color: lockInUrgent ? 'rgba(248,113,113,0.70)' : 'rgba(74,222,128,0.60)', letterSpacing: '0.10em', textTransform: 'uppercase' }}>
-              {lockInUrgent ? 'Almost done' : 'Focus'}
-            </span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Lock-In Focus Summary */}
-      <AnimatePresence>
-        {lockInSummary && (
+        {socraticActive && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            style={{ position: 'fixed', inset: 0, zIndex: 800, background: 'rgba(4,6,20,0.90)', backdropFilter: 'blur(20px)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Inter', system-ui, sans-serif" }}
-            onClick={() => setLockInSummary(null)}>
-            <motion.div initial={{ scale: 0.88, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.88, y: 20 }}
-              transition={{ type: 'spring', stiffness: 320, damping: 26 }}
-              onClick={e => e.stopPropagation()}
-              style={{ width: '100%', maxWidth: 380, borderRadius: 28, padding: '32px 28px', background: 'rgba(12,14,32,0.98)', border: '1px solid rgba(74,222,128,0.28)', boxShadow: '0 32px 80px rgba(0,0,0,0.70)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
-              <div style={{ fontSize: 36 }}>🎯</div>
-              <div style={{ fontSize: 20, fontWeight: 900, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.02em' }}>Focus Session Complete</div>
-              <div style={{ display: 'flex', gap: 12, width: '100%' }}>
-                {[
-                  { label: 'Focus Efficiency', value: `${lockInSummary.focusScore}%`, color: '#4ADE80' },
-                  { label: 'Exchanges', value: lockInSummary.exchanges, color: '#60A5FA' },
-                  { label: 'Duration', value: `${Math.round(lockInSummary.duration / 60)}m`, color: '#A78BFA' },
-                ].map(s => (
-                  <div key={s.label} style={{ flex: 1, padding: '14px 10px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', textAlign: 'center' }}>
-                    <div style={{ fontSize: 26, fontWeight: 900, color: s.color, letterSpacing: '-0.03em' }}>{s.value}</div>
-                    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.30)', marginTop: 4 }}>{s.label}</div>
-                  </div>
-                ))}
-              </div>
-              <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                onClick={() => setLockInSummary(null)}
-                style={{ width: '100%', padding: '13px', borderRadius: 14, background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.28)', color: '#4ADE80', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif" }}>
-                Back to Learning
-              </motion.button>
-            </motion.div>
-          </motion.div>
+            style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 5, border: '2px solid rgba(167,139,250,0.22)', borderRadius: 0 }}
+          />
         )}
       </AnimatePresence>
     </motion.div>
