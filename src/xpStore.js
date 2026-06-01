@@ -147,6 +147,7 @@ export const useXPStore = create((set, get) => {
             amount: event.amount,
             label: event.label,
             newOrb: newUnlocks[0] || null,
+            id: Date.now(),
           },
         }
         save(updated)

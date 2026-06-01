@@ -2260,6 +2260,7 @@ function ChatView({ onBack }) {
   const [drillOpen, setDrillOpen] = useState(false)
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [socraticActive, setSocraticActive] = useState(false)
+  const socraticExchangeRef = useRef(0)
   const [feynmanOpen, setFeynmanOpen] = useState(false)
   const [chatAppSettingsOpen, setChatAppSettingsOpen] = useState(false)
   const [chatSettings, saveChatSettings] = useChatSettings()
@@ -2325,6 +2326,7 @@ function ChatView({ onBack }) {
   const toggleSocratic = () => {
     setSocraticActive(prev => {
       const next = !prev
+      if (!next) socraticExchangeRef.current = 0
       setMessages(m => [...m, {
         role: 'model',
         text: next
@@ -2486,9 +2488,12 @@ function ChatView({ onBack }) {
         updateMastery(criticResult)
         exchangeCountRef.current += 1
         advanceSessionState(exchangeCountRef.current, criticResult)
-        // XP for Socratic sessions at 5-exchange milestone
-        if (socraticActive && exchangeCountRef.current === 5) {
-          useXPStore.getState().addXP('SOCRATIC_5')
+        // XP every 5 Socratic exchanges (resets when mode is toggled)
+        if (socraticActive) {
+          socraticExchangeRef.current += 1
+          if (socraticExchangeRef.current % 5 === 0) {
+            useXPStore.getState().addXP('SOCRATIC_5')
+          }
         }
         systemPrompt = buildAevaPrompt(sessionState, criticResult, name, null, buildMemoryBlock(name))
         if (socraticActive) {
@@ -3537,7 +3542,7 @@ function XPToast() {
     <AnimatePresence>
       {pendingToast && (
         <motion.div
-          key={pendingToast.label + pendingToast.amount}
+          key={pendingToast.id}
           initial={{ opacity: 0, y: 24, scale: 0.9 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -12, scale: 0.9 }}
