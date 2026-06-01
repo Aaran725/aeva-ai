@@ -2324,9 +2324,14 @@ function ChatView({ onBack }) {
     if (states[nextIdx] !== sessionState) setSessionState(states[nextIdx])
   }
 
+  const GREETING_WORDS = new Set(['hello','hi','hey','hiya','sup','yo','greetings','howdy','thanks','thank','bye','goodbye','ok','okay','sure','yes','no','yep','nope','lol','haha','cool','nice','great','awesome','wow'])
+
   const updateMastery = (criticResult) => {
     if (!criticResult?.topic) return
     const topic = criticResult.topic.toLowerCase().trim()
+    // Skip trivial/greeting words — not real study topics
+    if (topic.split(' ').every(w => GREETING_WORDS.has(w))) return
+    if (topic.length < 3) return
     const score = { none: 10, partial: 40, solid: 75, mastery: 95 }[criticResult.understanding] ?? 40
     setMasteryMap(prev => ({ ...prev, [topic]: Math.round((prev[topic] ?? score) * 0.6 + score * 0.4) }))
   }
