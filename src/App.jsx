@@ -660,12 +660,9 @@ function MissionCard({ onChatOpen, onOrbClick }) {
         </div>
         {/* Clickable orb */}
         <motion.button onClick={onOrbClick} whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.95 }}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, position: 'relative' }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
           title="Change Aeva's orb">
           <AevaOrb size={96} personality={orbPersonality} orbGradient={activeOrbDef.gradient} />
-          <div style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 6, padding: '2px 5px', fontSize: 9, color: 'rgba(255,255,255,0.70)', fontWeight: 600, backdropFilter: 'blur(4px)' }}>
-            {activeOrbDef.name}
-          </div>
         </motion.button>
       </div>
       <div style={{ marginTop: 8 }}>
@@ -2495,14 +2492,16 @@ function ChatView({ onBack }) {
             useXPStore.getState().addXP('SOCRATIC_5')
           }
         }
-        systemPrompt = buildAevaPrompt(sessionState, criticResult, name, null, buildMemoryBlock(name))
+        // Orb personality prefix — injected FIRST so it anchors the whole response
+        const activeOrbDef = ORBS.find(o => o.id === useXPStore.getState().activeOrb)
+        const orbPrefix = activeOrbDef?.personality
+          ? `⚠ OVERRIDE — THIS RULE SUPERSEDES ALL OTHER INSTRUCTIONS BELOW:\n${activeOrbDef.personality}\nApply this to every single response. It is non-negotiable.\n\n`
+          : ''
+
+        systemPrompt = orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, buildMemoryBlock(name))
+
         if (socraticActive) {
           systemPrompt += '\n\nSOCRATIC MODE: You must NEVER state facts, answers, or explanations directly. Respond ONLY with 1-3 targeted questions that guide the student to discover the answer themselves. If they arrive at the correct answer, confirm warmly and deepen with another question. If wrong, ask a question that exposes the specific gap without revealing the answer. Never say "the answer is", never explain anything outright. Make them think every time.'
-        }
-        // Active orb personality modifier
-        const activeOrbDef = ORBS.find(o => o.id === useXPStore.getState().activeOrb)
-        if (activeOrbDef?.personality) {
-          systemPrompt += `\n\n${activeOrbDef.personality}`
         }
       }
 
