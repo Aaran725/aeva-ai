@@ -20,6 +20,8 @@ import CustomDrill from './CustomDrill'
 import FeynmanMode from './FeynmanMode'
 import UserProfile from './UserProfile'
 import { useLibraryStore } from './libraryStore'
+import LandingPage from './LandingPage'
+import Onboarding from './Onboarding'
 import './index.css'
 
 /* ─── Groq API ─── */
@@ -3399,7 +3401,7 @@ function AuthField({ label, type, value, onChange, placeholder }) {
 }
 
 /* ═══ LOGIN SCREEN ════════════════════════════════ */
-function LoginScreen() {
+function LoginScreen({ onBack }) {
   const [tab, setTab] = useState('signin') // 'signin' | 'signup'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -3459,6 +3461,12 @@ function LoginScreen() {
         transition={{ duration: 0.55, ease: 'easeOut' }}
         style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 28, zIndex: 1, padding: '0 24px', maxWidth: 420, width: '100%' }}
       >
+        {/* Back to landing */}
+        {onBack && (
+          <button onClick={onBack} style={{ alignSelf: 'flex-start', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '7px 13px', color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
+            ← Back
+          </button>
+        )}
         {/* Logo */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
           <AevaOrb size={100} />
@@ -3541,9 +3549,10 @@ function LoginScreen() {
 export default function App() {
   const [view, setView] = useState('dashboard')
   const [authUser, setAuthUser] = useState(undefined)
+  const [showLogin, setShowLogin] = useState(false)
+  const [onboarded, setOnboarded] = useState(() => !!localStorage.getItem('aeva_onboarded'))
   const { activeMode, exitMission } = useArcadeStore()
 
-  // When a mission is selected from Arcade Hub, auto-open chat
   useEffect(() => {
     if (activeMode) setView('chat')
   }, [activeMode])
@@ -3552,11 +3561,12 @@ export default function App() {
     supabase.auth.getSession().then(({ data }) => setAuthUser(data.session?.user ?? null))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       setAuthUser(session?.user ?? null)
-      if (!session) setView('dashboard')
+      if (!session) { setView('dashboard'); setShowLogin(false) }
     })
     return () => subscription.unsubscribe()
   }, [])
 
+  // Loading spinner
   if (authUser === undefined) {
     return (
       <div style={{ width: '100%', height: '100vh', background: '#08091a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -3567,9 +3577,28 @@ export default function App() {
     )
   }
 
-  if (!authUser) return <LoginScreen />
+  // Not logged in — landing page or login screen
+  if (!authUser) {
+    return showLogin
+      ? <LoginScreen onBack={() => setShowLogin(false)} />
+      : <LandingPage onGetStarted={() => setShowLogin(true)} />
+  }
 
   const firstName = (authUser.user_metadata?.full_name || authUser.email)?.split(' ')[0] || 'there'
+
+  // First-time onboarding
+  if (!onboarded) {
+    return (
+      <Onboarding
+        name={authUser.user_metadata?.full_name || firstName}
+        onComplete={() => {
+          localStorage.setItem('aeva_onboarded', '1')
+          setOnboarded(true)
+        }}
+      />
+    )
+  }
+
   const userValue = {
     name: firstName,
     mood: 'LOCKED IN',
