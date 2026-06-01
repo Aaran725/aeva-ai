@@ -2,52 +2,31 @@ import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Brain, FlaskConical, Camera, BookOpen, Trophy, Zap, ArrowRight, Star, Check } from 'lucide-react'
 
-/* ── Hero Orb ─────────────────────────────────────── */
-function HeroOrb() {
-  return (
-    <div style={{ position: 'relative', width: 220, height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      {[220, 260, 300].map((s, i) => (
-        <motion.div key={s}
-          animate={{ scale: [1, 1.08, 1], opacity: [0.18, 0.30, 0.18] }}
-          transition={{ duration: 3.5 + i * 0.6, repeat: Infinity, delay: i * 0.4 }}
-          style={{ position: 'absolute', width: s, height: s, borderRadius: '50%', border: '1px solid rgba(139,143,255,0.25)', pointerEvents: 'none' }}
-        />
-      ))}
-      <motion.div
-        animate={{ boxShadow: ['0 0 50px rgba(99,102,241,0.45)', '0 0 80px rgba(99,102,241,0.65)', '0 0 50px rgba(99,102,241,0.45)'] }}
-        transition={{ duration: 3, repeat: Infinity }}
-        style={{ width: 130, height: 130, borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%, rgba(190,180,255,0.95) 0%, rgba(99,102,241,0.85) 40%, rgba(45,48,142,0.92) 70%, rgba(18,18,52,0.97) 100%)', position: 'relative', zIndex: 1 }}
-      />
-    </div>
-  )
-}
-
-/* ── Floating feature tags around orb ─────────────── */
-const FLOAT_TAGS = [
-  { label: '⚡ AI Tutor',       x: -150, y: -55,  delay: 0 },
-  { label: '🧪 Labs & Drills',  x:  130, y: -40,  delay: 0.3 },
-  { label: '🔬 Aeva Lens',      x: -140, y:  65,  delay: 0.6 },
-  { label: '📚 Study Guide',    x:  120, y:  70,  delay: 0.9 },
-]
-
-function FloatTag({ label, x, y, delay }) {
+/* ── Hero Logo ────────────────────────────────────── */
+function HeroLogo() {
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1, y: [0, -5, 0] }}
-      transition={{ opacity: { delay, duration: 0.5 }, scale: { delay, duration: 0.5 }, y: { duration: 3.5 + delay, repeat: Infinity, ease: 'easeInOut', delay: delay * 0.5 } }}
-      style={{
-        position: 'absolute', left: '50%', top: '50%',
-        transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
-        background: 'rgba(255,255,255,0.07)',
-        border: '1px solid rgba(255,255,255,0.13)',
-        backdropFilter: 'blur(12px)',
-        borderRadius: 20, padding: '6px 12px',
-        fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.80)',
-        whiteSpace: 'nowrap', pointerEvents: 'none',
-      }}
+      initial={{ opacity: 0, scale: 0.88 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.6, delay: 0.15 }}
+      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, flexShrink: 0 }}
     >
-      {label}
+      {/* Glow */}
+      <div aria-hidden style={{ position: 'absolute', width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.22) 0%, transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
+
+      {/* Logo mark */}
+      <motion.div
+        animate={{ boxShadow: ['0 8px 40px rgba(45,48,142,0.50)', '0 12px 55px rgba(99,102,241,0.55)', '0 8px 40px rgba(45,48,142,0.50)'] }}
+        transition={{ duration: 3, repeat: Infinity }}
+        style={{ width: 96, height: 96, borderRadius: 28, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', zIndex: 1 }}
+      >
+        <Star size={42} color="white" fill="white" />
+      </motion.div>
+
+      {/* Wordmark */}
+      <span style={{ fontSize: 52, fontWeight: 800, color: 'rgba(255,255,255,0.94)', letterSpacing: '-0.05em', position: 'relative', zIndex: 1 }}>
+        aeva
+      </span>
     </motion.div>
   )
 }
@@ -316,12 +295,10 @@ export default function LandingPage({ onGetStarted }) {
             </motion.div>
           </div>
 
-          {/* Right — orb + tags */}
-          <motion.div initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.65, delay: 0.15 }}
-            style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 340, height: 340, flexShrink: 0, margin: '0 auto' }}>
-            <HeroOrb />
-            {FLOAT_TAGS.map(t => <FloatTag key={t.label} {...t} />)}
-          </motion.div>
+          {/* Right — logo */}
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, margin: '0 auto' }}>
+            <HeroLogo />
+          </div>
         </section>
 
         {/* ── Demo / Mockup ── */}
