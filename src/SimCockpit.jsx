@@ -237,7 +237,7 @@ export function DebateLogicFeed() {
         <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.10em', color: 'rgba(255,255,255,0.22)', textTransform: 'uppercase' }}>Fallacies Caught</div>
         <AnimatePresence>
           {debateState.fallacyAlerts.length === 0 && (
-            <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.18)', fontStyle: 'italic' }}>None yet</div>
+            <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.38)', fontStyle: 'italic' }}>None yet</div>
           )}
           {debateState.fallacyAlerts.map((alert, i) => (
             <motion.div key={`${alert}-${i}`}

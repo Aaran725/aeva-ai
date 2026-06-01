@@ -720,7 +720,7 @@ export default function UserProfile({ name, onClose }) {
         {/* ── Footer ── */}
         <motion.div
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.55 }}
-          style={{ textAlign: 'center', marginTop: 40, fontSize: 11.5, color: 'rgba(255,255,255,0.16)' }}
+          style={{ textAlign: 'center', marginTop: 40, fontSize: 11.5, color: 'rgba(255,255,255,0.35)' }}
         >
           This profile is built entirely from your behaviour across {totalExchanges} session{totalExchanges !== 1 ? 's' : ''}.<br />
           Aeva never shares or stores your data externally.

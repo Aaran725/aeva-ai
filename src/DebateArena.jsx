@@ -1150,7 +1150,7 @@ export default function DebateArena({ onBack }) {
               <motion.div animate={{ width: `${arenaState.logicStrength}%` }} transition={{ duration: 0.7, ease: 'easeOut' }}
                 style={{ height: '100%', borderRadius: 99, background: logicColor(arenaState.logicStrength) }} />
             </div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.20)', marginTop: 5 }}>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.38)', marginTop: 5 }}>
               {arenaState.logicStrength >= 75 ? 'Strong argument' : arenaState.logicStrength >= 50 ? 'Needs more evidence' : 'Logical gaps detected'}
             </div>
           </div>
@@ -1204,7 +1204,7 @@ export default function DebateArena({ onBack }) {
 
           {/* Positions card */}
           <div style={{ padding: '11px 13px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', marginTop: 'auto' }}>
-            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.20)', marginBottom: 7 }}>Positions</div>
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.38)', marginBottom: 7 }}>Positions</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div style={{ width: 5, height: 5, borderRadius: '50%', background: COLOR, flexShrink: 0 }} />

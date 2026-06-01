@@ -426,7 +426,7 @@ function AppSettingsPanel({ onClose }) {
                       <div style={{ fontSize: 14, fontWeight: 600, color: isSel ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.60)', fontFamily: font.family }}>{font.label}</div>
                       <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.28)', marginTop: 2 }}>{font.description}</div>
                     </div>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: isSel ? 'rgba(139,143,255,0.80)' : 'rgba(255,255,255,0.18)', fontFamily: font.family }}>Aa</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: isSel ? 'rgba(139,143,255,0.80)' : 'rgba(255,255,255,0.38)', fontFamily: font.family }}>Aa</div>
                   </motion.button>
                 )
               })}
@@ -556,7 +556,7 @@ function AevaOrb({ size = 218, active = false, scanMode = false, personality = '
           style={{ position: 'absolute', width: '36%', height: '34%', top: '30%', left: '8%', borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(255,252,220,1) 0%, rgba(255,218,120,0.88) 32%, rgba(235,158,50,0.42) 66%, transparent 100%)', filter: `blur(${Math.round(7 * s)}px)`, mixBlendMode: 'screen' }}
         />
         <motion.div animate={{ rotate: [0, 360] }} transition={{ duration: 24, repeat: Infinity, ease: 'linear' }}
-          style={{ position: 'absolute', width: '200%', height: '200%', top: '-50%', left: '-50%', background: 'repeating-conic-gradient(from 0deg at 55% 55%, rgba(255,255,255,0.20) 0deg, rgba(255,255,255,0.20) 1deg, transparent 1deg, transparent 5deg)', mixBlendMode: 'overlay' }} />
+          style={{ position: 'absolute', width: '200%', height: '200%', top: '-50%', left: '-50%', background: 'repeating-conic-gradient(from 0deg at 55% 55%, rgba(255,255,255,0.38) 0deg, rgba(255,255,255,0.38) 1deg, transparent 1deg, transparent 5deg)', mixBlendMode: 'overlay' }} />
         <motion.div animate={{ rotate: [0, -360] }} transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
           style={{ position: 'absolute', width: '200%', height: '200%', top: '-50%', left: '-50%', background: 'repeating-conic-gradient(from 30deg at 48% 48%, rgba(255,255,255,0.07) 0deg, rgba(255,255,255,0.07) 0.6deg, transparent 0.6deg, transparent 4deg)', mixBlendMode: 'overlay', opacity: 0.7 }} />
         <div style={{ position: 'absolute', width: '38%', height: '28%', top: '4%', right: '2%', borderRadius: '50%', background: 'radial-gradient(ellipse at 44% 34%, rgba(255,255,255,0.56) 0%, rgba(218,226,255,0.22) 48%, transparent 76%)', filter: `blur(${Math.round(10 * s)}px)` }} />
@@ -650,7 +650,7 @@ function MissionCard({ onChatOpen }) {
           Start Mission
         </motion.button>
         <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={onChatOpen}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 22px', borderRadius: 99, background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.18)', color: 'rgba(255,255,255,0.65)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 13.5, fontWeight: 500, cursor: 'pointer' }}>
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 22px', borderRadius: 99, background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.38)', color: 'rgba(255,255,255,0.65)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 13.5, fontWeight: 500, cursor: 'pointer' }}>
           <MessageCircle size={13} />
           Chat with Aeva
         </motion.button>
@@ -666,7 +666,7 @@ function ConstellationCard() {
       <svg viewBox="0 0 100 100" style={{ width: '100%', marginTop: 12 }}>
         {EDGES.map(([a, b], i) => (
           <motion.line key={i} x1={NODES[a].x} y1={NODES[a].y} x2={NODES[b].x} y2={NODES[b].y}
-            stroke="rgba(255,255,255,0.18)" strokeWidth={0.6}
+            stroke="rgba(255,255,255,0.38)" strokeWidth={0.6}
             animate={{ opacity: [0.18, 0.45, 0.18] }}
             transition={{ duration: 3 + i * 0.35, repeat: Infinity, ease: 'easeInOut', delay: i * 0.25 }}
           />
@@ -853,7 +853,7 @@ function ShareProfileModal({ onClose }) {
           )}
 
           {/* Footer */}
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.18)', position: 'relative', zIndex: 1 }}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', position: 'relative', zIndex: 1 }}>
             aeva-ai.vercel.app — Your AI learns you.
           </div>
         </div>
@@ -1035,7 +1035,7 @@ function SkillDecayCard() {
               </div>
             </div>
           ))}
-          <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.20)', marginTop: 4 }}>
+          <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.38)', marginTop: 4 }}>
             Drill in The Lab to stop decay →
           </div>
         </div>
@@ -1892,7 +1892,7 @@ ${conversationText}${visualContext}`
   h2 { font-size: 16px; font-weight: 700; color: #3730a3; margin: 28px 0 10px; text-transform: uppercase; letter-spacing: 0.06em; }
   h3 { font-size: 14px; font-weight: 600; color: #4338ca; margin: 18px 0 8px; }
   p { margin: 8px 0; font-size: 14px; }
-  blockquote { border-left: 3px solid #6366F1; padding: 10px 16px; background: rgba(99,102,241,0.13); border-radius: 0 8px 8px 0; font-style: italic; color: rgba(220,220,255,0.90); margin: 12px 0; font-size: 14px; }
+  blockquote { border-left: 3px solid #6366F1; padding: 10px 16px; background: rgba(99,102,241,0.08); border-radius: 0 8px 8px 0; font-style: italic; color: #4338ca; margin: 12px 0; font-size: 14px; }
   ul, ol { padding-left: 20px; margin: 8px 0; }
   li { font-size: 14px; margin: 5px 0; }
   strong { color: #1e1a3a; }

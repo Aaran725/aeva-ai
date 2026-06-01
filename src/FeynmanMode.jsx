@@ -245,7 +245,7 @@ function SetupScreen({ onStart }) {
               ? 'linear-gradient(135deg, rgba(245,158,11,0.28), rgba(251,191,36,0.18))'
               : 'rgba(255,255,255,0.05)',
             border: `1.5px solid ${canStart ? 'rgba(245,158,11,0.50)' : 'rgba(255,255,255,0.10)'}`,
-            color: canStart ? '#FDE68A' : 'rgba(255,255,255,0.20)',
+            color: canStart ? '#FDE68A' : 'rgba(255,255,255,0.38)',
             fontSize: 15, fontWeight: 800,
             fontFamily: "'Inter', system-ui, sans-serif",
             letterSpacing: '0.01em', transition: 'all 0.2s',

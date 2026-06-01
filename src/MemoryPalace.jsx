@@ -26,7 +26,7 @@ const LEGEND = [
   { color: '#10B981', label: 'Mastered' },
   { color: '#F59E0B', label: 'Learning' },
   { color: '#EF4444', label: 'Struggling' },
-  { color: 'rgba(255,255,255,0.14)', label: 'Unexplored' },
+  { color: 'rgba(255,255,255,0.35)', label: 'Unexplored' },
 ]
 
 function HexCell({ concept, index, onHover, isHovered }) {

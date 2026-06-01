@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowRight, Brain, FlaskConical, Camera, BookOpen, Check } from 'lucide-react'
+import AevaOrb from './AevaOrb'
 
 const SUBJECTS = ['Mathematics', 'Sciences', 'History', 'Languages', 'Computer Science', 'Business', 'Law', 'Other']
 
@@ -55,11 +56,7 @@ function StepWelcome({ name, displayName, setDisplayName, subject, setSubject, o
       style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
       {/* Orb */}
       <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <motion.div
-          animate={{ boxShadow: ['0 0 40px rgba(99,102,241,0.35)', '0 0 65px rgba(99,102,241,0.55)', '0 0 40px rgba(99,102,241,0.35)'] }}
-          transition={{ duration: 2.8, repeat: Infinity }}
-          style={{ width: 80, height: 80, borderRadius: '50%', background: 'radial-gradient(circle at 35% 35%, rgba(190,180,255,0.95) 0%, rgba(99,102,241,0.85) 45%, rgba(45,48,142,0.92) 75%, rgba(18,18,52,0.97) 100%)' }}
-        />
+        <AevaOrb size={110} />
       </div>
 
       <div style={{ textAlign: 'center' }}>

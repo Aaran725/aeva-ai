@@ -110,7 +110,7 @@ export default function PersonalProgress() {
                   )
                 })}
               </div>
-              <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.20)', marginTop: 5 }}>
+              <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.38)', marginTop: 5 }}>
                 Aeva uses these as example domains
               </div>
             </div>
