@@ -175,19 +175,27 @@ async function runCritic(history, userMessage) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: 'llama-3.3-70b-versatile',
         messages: [
           {
             role: 'system',
-            content: `Pedagogical critic. Return ONLY JSON:
-{"understanding":"none"|"partial"|"solid"|"mastery","lazy_thinking":true|false,"mode":"hype"|"coach"|"challenge"|"redirect","topic":"<1-3 words>","confidence":"confused"|"uncertain"|"confident"|"overconfident","note":"<one specific sentence about the gap or strength to target>"}
-hype=solid/mastery with genuine reasoning. challenge=vague/shallow/no reasoning. redirect=confused or off-topic. coach=everything else.`,
+            content: `You are a strict pedagogical critic. Analyse the student's last message and return ONLY valid JSON — no markdown, no explanation.
+
+Required format:
+{"understanding":"none"|"partial"|"solid"|"mastery","lazy_thinking":true|false,"mode":"hype"|"coach"|"challenge"|"redirect","topic":"<1-3 word academic noun>","confidence":"confused"|"uncertain"|"confident"|"overconfident","note":"<one precise sentence: what exactly is right or wrong, and what to target next>"}
+
+Rules:
+- "topic" must be a real academic concept (e.g. "photosynthesis", "quadratic equations", "supply and demand"). NEVER use social words like "greeting", "thanks", "yes", "ok".
+- "understanding": none=wrong/no attempt, partial=right idea but gaps, solid=correct with reasoning, mastery=correct+can extend/apply
+- "lazy_thinking": true if the answer is a guess, vague, or copied without reasoning
+- "mode": hype=solid or mastery WITH genuine reasoning shown. challenge=vague/lazy/no reasoning. redirect=confused or completely off-topic. coach=everything else.
+- "note": be surgical — name the exact gap or strength, not a generic comment`,
           },
           ...context,
           { role: 'user', content: userMessage },
         ],
         temperature: 0.1,
-        max_tokens: 150,
+        max_tokens: 220,
         response_format: { type: 'json_object' },
       }),
     })
@@ -282,9 +290,12 @@ CONTRADICTION WATCH: Scan the full conversation history above. If ${userName}'s 
 
 SESSION PHASE: ${sessionState} — ${state.instruction}
 
-READING ON ${userName.toUpperCase()}'S LAST MESSAGE:
-- Understanding: ${criticism?.understanding || 'unknown'} | Topic: ${criticism?.topic || 'general'}
-- Mode: ${(criticism?.mode || 'coach').toUpperCase()} — ${mode.instruction}`
+━━━ CRITIC SIGNAL — ACT ON THIS NOW ━━━
+Understanding: ${criticism?.understanding || 'unknown'} | Topic: ${criticism?.topic || 'general'} | Confidence: ${criticism?.confidence || 'uncertain'}
+Mode: ${(criticism?.mode || 'coach').toUpperCase()} — ${mode.instruction}
+Note: ${criticism?.note || ''}
+
+YOUR RESPONSE MUST REFLECT THIS SIGNAL. Do not ignore it. If mode is REDIRECT, use an analogy. If CHALLENGE, surface the gap. If HYPE, raise the bar immediately. If COACH, ask one precise Socratic question.`
 }
 
 /* ─── Trend / scaffold / difficulty helpers ─── */
@@ -336,7 +347,7 @@ async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}) {
     messages,
     stream: true,
     temperature:       opts.temperature       ?? 0.75,
-    max_tokens:        opts.maxTokens         ?? 200,
+    max_tokens:        opts.maxTokens         ?? 450,
     frequency_penalty: opts.frequencyPenalty  ?? 0,
     presence_penalty:  opts.presencePenalty   ?? 0,
   }
@@ -2443,6 +2454,7 @@ function ChatView({ onBack }) {
   const sessionConceptsRef = useRef({})    // concept → understanding map this session
   const masteryMapRef = useRef({})         // kept in sync for session-end save
   const lastTopicRef = useRef(null)        // previous critic topic for change detection
+  const phaseStreakRef = useRef(0)         // consecutive solid/mastery answers in current phase
 
   const hasInput = input.trim().length > 0
   const isActive = isThinking || hasInput
@@ -2583,26 +2595,58 @@ Write a direct, specific opener under 35 words. Reference something concrete. En
     ? { position: 'absolute', top: 0, left: 0, right: 0, height: 320, background: `radial-gradient(ellipse at 50% 0%, ${activeMission.glow} 0%, transparent 70%)`, pointerEvents: 'none' }
     : null
 
-  /* Advance session state every 4 exchanges */
+  /* Advance session state based on demonstrated mastery, not message count */
   const advanceSessionState = (count, criticResult) => {
-    const thresholds = [4, 8, 12]
     const states = SESSION_STATES
-    let nextIdx = states.indexOf(sessionState)
-    if (count >= thresholds[2] && nextIdx < 3) nextIdx = 3
-    else if (count >= thresholds[1] && nextIdx < 2) nextIdx = 2
-    else if (count >= thresholds[0] && nextIdx < 1) nextIdx = 1
-    if (criticResult?.understanding === 'mastery' && nextIdx < 2) nextIdx = 2
-    if (states[nextIdx] !== sessionState) setSessionState(states[nextIdx])
+    const currentIdx = states.indexOf(sessionState)
+    const understanding = criticResult?.understanding
+
+    // Update phase streak
+    const isStrong = understanding === 'solid' || understanding === 'mastery'
+    const isWeak   = understanding === 'none'  || understanding === 'partial'
+    if (isStrong) phaseStreakRef.current += 1
+    if (isWeak)   phaseStreakRef.current = 0
+
+    let nextIdx = currentIdx
+
+    if (currentIdx === 0) {
+      // DIAGNOSTIC → SCAFFOLDING: after 2 exchanges (we've seen enough to start building)
+      if (count >= 2) nextIdx = 1
+    } else if (currentIdx === 1) {
+      // SCAFFOLDING → STRESS_TEST: 2 consecutive solid/mastery answers, min 4 exchanges
+      if (phaseStreakRef.current >= 2 && count >= 4) nextIdx = 2
+      // Hard cap: advance after 10 exchanges regardless
+      else if (count >= 10) nextIdx = 2
+    } else if (currentIdx === 2) {
+      // STRESS_TEST → CONSOLIDATION: 2 consecutive solid/mastery at stress level, min 7 exchanges
+      if (phaseStreakRef.current >= 2 && count >= 7) nextIdx = 3
+      else if (count >= 14) nextIdx = 3
+    }
+    // CONSOLIDATION: stay here — no further advance
+
+    if (nextIdx !== currentIdx) {
+      phaseStreakRef.current = 0  // reset streak on phase change
+      setSessionState(states[nextIdx])
+    }
   }
 
   const GREETING_WORDS = new Set(['hello','hi','hey','hiya','sup','yo','greetings','howdy','thanks','thank','bye','goodbye','ok','okay','sure','yes','no','yep','nope','lol','haha','cool','nice','great','awesome','wow'])
 
+  const JUNK_TOPICS = new Set([
+    'general','greeting','response','answer','question','message','topic','concept',
+    'explanation','example','understanding','learning','studying','help','information',
+    'yes','no','ok','okay','sure','thanks','hello','hi','hey','good','great','nice',
+  ])
+
   const updateMastery = (criticResult) => {
     if (!criticResult?.topic) return
     const topic = criticResult.topic.toLowerCase().trim()
-    // Skip trivial/greeting words — not real study topics
-    if (topic.split(' ').every(w => GREETING_WORDS.has(w))) return
-    if (topic.length < 3) return
+    if (topic.length < 4) return
+    if (topic.split(' ').every(w => GREETING_WORDS.has(w) || JUNK_TOPICS.has(w))) return
+    if (JUNK_TOPICS.has(topic)) return
+    // Must contain at least one non-stopword of length > 3
+    const hasRealWord = topic.split(' ').some(w => w.length > 3 && !JUNK_TOPICS.has(w) && !GREETING_WORDS.has(w))
+    if (!hasRealWord) return
     const score = { none: 10, partial: 40, solid: 75, mastery: 95 }[criticResult.understanding] ?? 40
     setMasteryMap(prev => ({ ...prev, [topic]: Math.round((prev[topic] ?? score) * 0.6 + score * 0.4) }))
   }
