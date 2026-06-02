@@ -245,15 +245,14 @@ MARKDOWN RULES (non-negotiable):
 - Numbered lists for steps/sequences. Bullet lists for comparisons/features.
 - Inline code (\`backticks\`) for code, variables, formulas.
 
-MATH NOTATION — non-negotiable:
-- ALL mathematical expressions MUST use LaTeX wrapped in dollar signs
-- Inline math: $x^2 + 2x + 1$ — use for variables, expressions within sentences
-- Display math (own line): $$\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$ — use for full equations
-- NEVER write fractions as a/b — ALWAYS \\frac{a}{b}
-- NEVER write powers as x^2 in plain text — ALWAYS $x^2$
-- NEVER write sqrt(x) — ALWAYS $\\sqrt{x}$
-- Greek letters: $\\alpha$, $\\beta$, $\\theta$, $\\pi$ etc.
-- Common symbols: $\\pm$, $\\times$, $\\leq$, $\\geq$, $\\neq$, $\\infty$, $\\int$, $\\sum$
+MATH NOTATION:
+- Use LaTeX ONLY for real mathematical expressions — not for single plain letters in prose
+- Inline math $...$: for expressions with operators, powers, roots, subscripts, fractions (e.g. $x^2 + 2x$, $\\sqrt{b^2-4ac}$)
+- Display math $$...$$: for standalone full equations (e.g. $$x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$)
+- DO NOT wrap bare single letters in LaTeX just because they're variables — write "let x be..." not "let $x$ be..."
+- DO use LaTeX when the expression has actual notation: $x^2$, $\\frac{a}{b}$, $\\sqrt{x}$, $\\theta$, $\\pm$
+- NEVER write fractions as a/b in math — use $\\frac{a}{b}$
+- Greek letters in equations: $\\alpha$, $\\beta$, $\\theta$, $\\pi$
 
 FEEDBACK TAGS — use these when ${userName} attempts an answer or exercise:
 - If correct: start your response with \`[CORRECT: one sentence confirming what they got right]\`
