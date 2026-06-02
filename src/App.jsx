@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, createContext, useContext } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import { ArrowUp, Zap, TrendingDown, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Volume2, VolumeX } from 'lucide-react'
+import { ArrowUp, Zap, TrendingDown, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Volume2, VolumeX, Mic } from 'lucide-react'
 import { useAppSettings, SECTION_BG_PRESETS, CARD_STYLES, FONT_STYLES } from './appSettings'
 import { useLanguageStore } from './languageStore'
 import { useT } from './translations'
@@ -33,6 +33,7 @@ import SecondBrain from './SecondBrain'
 import { useBrainStore } from './brainStore'
 import Mirror from './Mirror'
 import OrbSelector from './OrbSelector'
+import VoiceMode from './VoiceMode'
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
 import { useVoiceStore, ORB_VOICES } from './voiceStore'
 import './index.css'
@@ -2776,6 +2777,7 @@ function ChatView({ onBack }) {
   const [newChipLabel, setNewChipLabel] = useState('')
   const newChipInputRef = useRef(null)
   const [countdown, setCountdown] = useState(null)
+  const [voiceModeOpen, setVoiceModeOpen] = useState(false)
   const { voiceEnabled, isSpeaking, toggleVoice, stopSpeaking } = useVoiceStore()
   const countdownRef = useRef(null)
   const abortRef = useRef(null)
@@ -3929,6 +3931,23 @@ function ChatView({ onBack }) {
                     >
                       <PenLine size={14} strokeWidth={2} />
                     </motion.button>
+
+                    {/* Voice mode trigger */}
+                    <motion.button
+                      whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.90 }}
+                      onClick={() => setVoiceModeOpen(true)}
+                      title="Voice mode — speak to Aeva"
+                      style={{
+                        flexShrink: 0, width: 32, height: 32, borderRadius: '50%',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: isLight ? 'rgba(99,102,241,0.08)' : 'rgba(139,143,255,0.10)',
+                        border: isLight ? '1.5px solid rgba(99,102,241,0.28)' : '1.5px solid rgba(139,143,255,0.28)',
+                        cursor: 'pointer',
+                        color: isLight ? 'rgba(99,102,241,0.80)' : 'rgba(139,143,255,0.80)',
+                      }}
+                    >
+                      <Mic size={14} strokeWidth={2} />
+                    </motion.button>
                   </>
                 )}
                 <input
@@ -3997,6 +4016,18 @@ function ChatView({ onBack }) {
       {/* Feynman Mode */}
       <AnimatePresence>
         {feynmanOpen && <FeynmanMode onClose={() => setFeynmanOpen(false)} />}
+      </AnimatePresence>
+
+      {/* Voice Mode */}
+      <AnimatePresence>
+        {voiceModeOpen && (
+          <VoiceMode
+            onClose={() => setVoiceModeOpen(false)}
+            onSend={(text) => { sendWithText(text) }}
+            isThinking={isThinking}
+            name={name}
+          />
+        )}
       </AnimatePresence>
 
       {/* Appearance settings */}
