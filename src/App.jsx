@@ -2750,7 +2750,23 @@ Write a direct, specific opener under 35 words. Reference something concrete. En
           ? `⚠ OVERRIDE — THIS RULE SUPERSEDES ALL OTHER INSTRUCTIONS BELOW:\n${activeOrbDef.personality}\nApply this to every single response. It is non-negotiable.\n\n`
           : ''
 
-        systemPrompt = orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, buildMemoryBlock(name), extras)
+        // Feedback tag injection — detect if user answered a question and force the correct tag
+        const lastModelMsg = [...messages].reverse().find(m => m.role === 'model')
+        const userAnsweredQuestion = lastModelMsg && /\?/.test(lastModelMsg.text)
+        let feedbackPrefix = ''
+        if (userAnsweredQuestion && criticResult && !socraticActive) {
+          const understanding = criticResult.understanding
+          const tagMap = {
+            mastery: `[CORRECT: {one specific sentence praising exactly what ${name} got right}]`,
+            solid:   `[CORRECT: {one specific sentence praising exactly what ${name} got right}]`,
+            partial: `[PARTIAL: {one sentence — what was right, then what was missing or wrong}]`,
+            none:    `[INCORRECT: {one sentence — the specific misconception or gap, not just "that's wrong"}]`,
+          }
+          const tag = tagMap[understanding] || tagMap.partial
+          feedbackPrefix = `🚨 FEEDBACK REQUIRED: ${name} just answered your question. The critic assessment is: ${understanding.toUpperCase()}.\nYou MUST begin your response with exactly this tag (fill in the curly braces): ${tag}\nDo NOT skip this. Do NOT start with anything else. The tag renders as a visual banner — it is the most important part of your response.\n\n`
+        }
+
+        systemPrompt = feedbackPrefix + orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, buildMemoryBlock(name), extras)
 
         if (socraticActive) {
           systemPrompt += '\n\nSOCRATIC MODE: You must NEVER state facts, answers, or explanations directly. Respond ONLY with 1-3 targeted questions that guide the student to discover the answer themselves. If they arrive at the correct answer, confirm warmly and deepen with another question. If wrong, ask a question that exposes the specific gap without revealing the answer. Never say "the answer is", never explain anything outright. Make them think every time.'
