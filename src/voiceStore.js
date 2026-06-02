@@ -6,17 +6,20 @@ export const useVoiceStore = create((set, get) => ({
   voiceEnabled: (() => { try { return localStorage.getItem(KEY) === 'true' } catch { return false } })(),
   isSpeaking: false,
   currentAudio: null,
+  // Set to true while VoiceMode overlay is open — bypasses voiceEnabled check
+  voiceModeActive: false,
 
   toggleVoice: () => set(s => {
     const next = !s.voiceEnabled
     try { localStorage.setItem(KEY, String(next)) } catch {}
-    // Stop audio when disabling voice
     if (!next && s.currentAudio) {
       s.currentAudio.pause()
       try { URL.revokeObjectURL(s.currentAudio.src) } catch {}
     }
     return { voiceEnabled: next, ...(!next && { isSpeaking: false, currentAudio: null }) }
   }),
+
+  setVoiceModeActive: (v) => set({ voiceModeActive: v }),
 
   setIsSpeaking: (v) => set({ isSpeaking: v }),
 

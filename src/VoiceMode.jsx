@@ -80,9 +80,25 @@ export default function VoiceMode({ onClose, onSend, isThinking, name = 'there' 
   useEffect(() => {
     if (isThinking && !prevIsThinkingRef.current) {
       setStatus('thinking')
+    } else if (!isThinking && prevIsThinkingRef.current) {
+      // Aeva just finished thinking
+      // Give TTS a moment to start; if isSpeaking never fires within 1.5s, restart anyway
+      if (!isSpeaking) {
+        const fallback = setTimeout(() => {
+          // If still not speaking after 1.5s, TTS either failed or wasn't triggered
+          if (!useVoiceStore.getState().isSpeaking) {
+            if (autoRestartRef.current) {
+              startListening()
+            } else {
+              setStatus('idle')
+            }
+          }
+        }, 1500)
+        return () => clearTimeout(fallback)
+      }
     }
     prevIsThinkingRef.current = isThinking
-  }, [isThinking])
+  }, [isThinking, isSpeaking, startListening])
 
   useEffect(() => {
     if (isSpeaking && !prevIsSpeakingRef.current) {

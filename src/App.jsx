@@ -61,8 +61,9 @@ function stripForTTS(text) {
 }
 
 async function triggerAevaVoice(rawText, orbId) {
-  const { voiceEnabled, stopSpeaking, setIsSpeaking, setCurrentAudio } = useVoiceStore.getState()
-  if (!voiceEnabled || !rawText) return
+  const { voiceEnabled, voiceModeActive, stopSpeaking, setIsSpeaking, setCurrentAudio } = useVoiceStore.getState()
+  if (!voiceEnabled && !voiceModeActive) return
+  if (!rawText) return
 
   stopSpeaking()
 
@@ -2779,6 +2780,12 @@ function ChatView({ onBack }) {
   const [countdown, setCountdown] = useState(null)
   const [voiceModeOpen, setVoiceModeOpen] = useState(false)
   const { voiceEnabled, isSpeaking, toggleVoice, stopSpeaking } = useVoiceStore()
+
+  // Keep voiceStore in sync so triggerAevaVoice knows to speak even if toggle is off
+  useEffect(() => {
+    useVoiceStore.getState().setVoiceModeActive(voiceModeOpen)
+    return () => { if (voiceModeOpen) useVoiceStore.getState().setVoiceModeActive(false) }
+  }, [voiceModeOpen])
   const countdownRef = useRef(null)
   const abortRef = useRef(null)
   const bottomRef = useRef(null)
