@@ -92,7 +92,10 @@ async function triggerAevaVoice(rawText, orbId) {
         response_format: 'mp3',
       }),
     })
-    if (!res.ok) return
+    if (!res.ok) {
+      console.error('[Aeva TTS] API error:', res.status, await res.text().catch(() => ''))
+      return
+    }
 
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)

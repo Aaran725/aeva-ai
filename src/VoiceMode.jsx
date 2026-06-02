@@ -76,42 +76,58 @@ export default function VoiceMode({ onClose, onSend, isThinking, name = 'there' 
     try { rec.start() } catch {}
   }, [language, onSend])
 
-  // ─── Watch thinking/speaking to auto-restart after Aeva responds ──────────
-  useEffect(() => {
-    if (isThinking && !prevIsThinkingRef.current) {
-      setStatus('thinking')
-    } else if (!isThinking && prevIsThinkingRef.current) {
-      // Aeva just finished thinking
-      // Give TTS a moment to start; if isSpeaking never fires within 1.5s, restart anyway
-      if (!isSpeaking) {
-        const fallback = setTimeout(() => {
-          // If still not speaking after 1.5s, TTS either failed or wasn't triggered
-          if (!useVoiceStore.getState().isSpeaking) {
-            if (autoRestartRef.current) {
-              startListening()
-            } else {
-              setStatus('idle')
-            }
-          }
-        }, 1500)
-        return () => clearTimeout(fallback)
-      }
-    }
-    prevIsThinkingRef.current = isThinking
-  }, [isThinking, isSpeaking, startListening])
+  // ─── Timers managed via refs so they survive re-renders ──────────────────
+  const fallbackTimerRef = useRef(null)
 
+  // ─── Watch isThinking ─────────────────────────────────────────────────────
   useEffect(() => {
-    if (isSpeaking && !prevIsSpeakingRef.current) {
+    // Always snapshot the transition BEFORE doing anything
+    const wasThinking = prevIsThinkingRef.current
+    prevIsThinkingRef.current = isThinking
+
+    if (isThinking && !wasThinking) {
+      // Aeva just started responding
+      setStatus('thinking')
+      // Clear any stale fallback from a previous response
+      if (fallbackTimerRef.current) { clearTimeout(fallbackTimerRef.current); fallbackTimerRef.current = null }
+      return
+    }
+
+    if (!isThinking && wasThinking) {
+      // Aeva just finished responding — give TTS up to 1s to start playing
+      // If it doesn't, restart listening anyway (handles TTS failure / being disabled)
+      fallbackTimerRef.current = setTimeout(() => {
+        fallbackTimerRef.current = null
+        if (useVoiceStore.getState().isSpeaking) return // TTS started, let it finish
+        if (autoRestartRef.current) {
+          startListening()
+        } else {
+          setStatus('idle')
+        }
+      }, 1000)
+    }
+  }, [isThinking, startListening])   // ← isSpeaking intentionally NOT here
+
+  // ─── Watch isSpeaking ─────────────────────────────────────────────────────
+  useEffect(() => {
+    const wasSpeaking = prevIsSpeakingRef.current
+    prevIsSpeakingRef.current = isSpeaking
+
+    if (isSpeaking && !wasSpeaking) {
+      // TTS started — cancel the fallback timer, we're in good shape
       setStatus('speaking')
-    } else if (!isSpeaking && prevIsSpeakingRef.current && !isThinking) {
-      // Aeva just finished speaking — auto restart if in voice session
+      if (fallbackTimerRef.current) { clearTimeout(fallbackTimerRef.current); fallbackTimerRef.current = null }
+      return
+    }
+
+    if (!isSpeaking && wasSpeaking && !isThinking) {
+      // TTS finished — restart listening
       if (autoRestartRef.current) {
         setTimeout(() => startListening(), 700)
       } else {
         setStatus('idle')
       }
     }
-    prevIsSpeakingRef.current = isSpeaking
   }, [isSpeaking, isThinking, startListening])
 
   // ─── Cleanup on unmount ────────────────────────────────────────────────────
