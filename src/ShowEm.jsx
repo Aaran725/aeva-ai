@@ -173,46 +173,103 @@ export default function ShowEm({ onClose, name = 'Your student' }) {
           boxShadow: '0 32px 80px rgba(0,0,0,0.35)',
         }}>
 
-          {/* Header gradient band */}
+          {/* Header — full redesign */}
           <div style={{
-            background: 'linear-gradient(135deg, #2D308E 0%, #5B5FC7 50%, #8B8FFF 100%)',
-            padding: '32px 32px 28px',
+            background: 'linear-gradient(160deg, #1e2070 0%, #2D308E 40%, #4a4ec7 75%, #7c7fff 100%)',
+            padding: '48px 40px 40px',
             position: 'relative', overflow: 'hidden',
           }}>
-            <div aria-hidden style={{ position: 'absolute', top: -40, right: -40, width: 220, height: 220, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', pointerEvents: 'none' }} />
-            <div aria-hidden style={{ position: 'absolute', bottom: -30, left: 120, width: 150, height: 150, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none' }} />
+            {/* Decorative orbs */}
+            <div aria-hidden style={{ position: 'absolute', top: -60, right: -60, width: 280, height: 280, borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,143,255,0.18) 0%, transparent 70%)', pointerEvents: 'none' }} />
+            <div aria-hidden style={{ position: 'absolute', bottom: -40, left: -20, width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle, rgba(233,163,100,0.10) 0%, transparent 70%)', pointerEvents: 'none' }} />
+            <div aria-hidden style={{ position: 'absolute', top: '40%', right: '20%', width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
 
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.60)', marginBottom: 6 }}>
-                  Learning Report
+            {/* Top label row */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+              <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)' }}>
+                Aeva Learning Report
+              </span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.04em' }}>
+                {today}
+              </span>
+            </div>
+
+            {/* Name — large */}
+            <h1 style={{
+              fontSize: 'clamp(32px, 6vw, 52px)',
+              fontWeight: 900,
+              color: '#fff',
+              letterSpacing: '-0.04em',
+              lineHeight: 1.0,
+              margin: '0 0 10px',
+            }}>
+              {name}
+            </h1>
+
+            {/* Profile title */}
+            <p style={{
+              fontSize: 16,
+              fontWeight: 500,
+              color: 'rgba(255,255,255,0.60)',
+              margin: '0 0 28px',
+              letterSpacing: '-0.01em',
+            }}>
+              {profileTitle}
+            </p>
+
+            {/* Key numbers strip */}
+            <div style={{
+              display: 'flex', flexWrap: 'wrap', gap: 0,
+              background: 'rgba(0,0,0,0.20)',
+              borderRadius: 16,
+              overflow: 'hidden',
+              border: '1px solid rgba(255,255,255,0.10)',
+              marginBottom: 24,
+            }}>
+              {[
+                { val: `Level ${level}`, sub: `${xpPct}% to next` },
+                { val: `${streak}`,       sub: 'day streak'        },
+                { val: `${xp}`,           sub: 'total XP'          },
+                { val: `${masteredTopics.length}`, sub: 'topics mastered' },
+              ].map((item, i, arr) => (
+                <div key={i} style={{
+                  flex: 1, minWidth: 80,
+                  padding: '14px 18px',
+                  borderRight: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.08)' : 'none',
+                  textAlign: 'center',
+                }}>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1 }}>
+                    {item.val}
+                  </div>
+                  <div style={{ fontSize: 10.5, fontWeight: 600, color: 'rgba(255,255,255,0.42)', marginTop: 3, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                    {item.sub}
+                  </div>
                 </div>
-                <h1 style={{ fontSize: 30, fontWeight: 900, color: '#fff', letterSpacing: '-0.04em', margin: '0 0 4px', lineHeight: 1.1 }}>
-                  {name}'s Progress
-                </h1>
-                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', margin: 0 }}>
-                  Generated {today} · Powered by Aeva AI
-                </p>
+              ))}
+            </div>
+
+            {/* XP progress bar */}
+            <div style={{ marginBottom: 22 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ fontSize: 10.5, fontWeight: 700, color: 'rgba(255,255,255,0.40)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Level {level}</span>
+                <span style={{ fontSize: 10.5, fontWeight: 700, color: 'rgba(255,255,255,0.40)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Level {level + 1}</span>
               </div>
-
-              {/* Level badge */}
-              <div style={{ background: 'rgba(255,255,255,0.15)', border: '1.5px solid rgba(255,255,255,0.30)', borderRadius: 16, padding: '12px 20px', textAlign: 'center', backdropFilter: 'blur(12px)' }}>
-                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)', marginBottom: 2 }}>Current Level</div>
-                <div style={{ fontSize: 32, fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.03em' }}>{level}</div>
-                <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>{xpPct}% to Level {level + 1}</div>
-                <div style={{ marginTop: 6, height: 4, background: 'rgba(255,255,255,0.20)', borderRadius: 2, overflow: 'hidden', width: 80 }}>
-                  <div style={{ height: '100%', width: `${xpPct}%`, background: '#fff', borderRadius: 2 }} />
-                </div>
+              <div style={{ height: 6, background: 'rgba(255,255,255,0.12)', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${xpPct}%`, background: 'linear-gradient(90deg, rgba(255,255,255,0.70), rgba(255,255,255,0.95))', borderRadius: 3 }} />
               </div>
             </div>
 
-            {/* Profile title & vibe */}
-            <div style={{ marginTop: 18, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.90)', background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 99, padding: '4px 12px' }}>
-                {profileTitle}
-              </span>
-              {traits.slice(0, 3).map((t, i) => (
-                <span key={i} style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.75)', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.16)', borderRadius: 99, padding: '4px 12px' }}>
+            {/* Trait badges */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {traits.slice(0, 4).map((t, i) => (
+                <span key={i} style={{
+                  fontSize: 12, fontWeight: 600,
+                  color: 'rgba(255,255,255,0.80)',
+                  background: 'rgba(255,255,255,0.10)',
+                  border: '1px solid rgba(255,255,255,0.16)',
+                  borderRadius: 99, padding: '5px 13px',
+                  display: 'flex', alignItems: 'center', gap: 5,
+                }}>
                   {t.icon} {t.label}
                 </span>
               ))}
@@ -222,38 +279,13 @@ export default function ShowEm({ onClose, name = 'Your student' }) {
           {/* Body */}
           <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: 32 }}>
 
-            {/* ── Stat row ────────────────────────────────────────── */}
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <StatCard
-                icon={<MessageSquare size={18} color="#6366F1" />}
-                value={totalExchanges}
-                label="Exchanges"
-                accent="#6366F1"
-              />
-              <StatCard
-                icon={<Award size={18} color="#10B981" />}
-                value={masteredTopics.length}
-                label="Topics Mastered"
-                accent="#10B981"
-              />
-              <StatCard
-                icon={<Flame size={18} color="#F59E0B" />}
-                value={streak}
-                label="Day Streak"
-                accent="#F59E0B"
-              />
-              <StatCard
-                icon={<Layers size={18} color="#8B5CF6" />}
-                value={brainStats.total}
-                label="Concepts Built"
-                accent="#8B5CF6"
-              />
-              <StatCard
-                icon={<Zap size={18} color="#EC4899" />}
-                value={xp}
-                label="Total XP"
-                accent="#EC4899"
-              />
+            {/* ── Stat grid ───────────────────────────────────────── */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12 }}>
+              <StatCard icon={<MessageSquare size={18} color="#6366F1" />} value={totalExchanges}        label="Exchanges"      accent="#6366F1" />
+              <StatCard icon={<Award         size={18} color="#10B981" />} value={masteredTopics.length} label="Topics Mastered" accent="#10B981" />
+              <StatCard icon={<Flame         size={18} color="#F59E0B" />} value={streak}                label="Day Streak"     accent="#F59E0B" />
+              <StatCard icon={<Layers        size={18} color="#8B5CF6" />} value={brainStats.total}      label="Concepts Built" accent="#8B5CF6" />
+              <StatCard icon={<Zap           size={18} color="#EC4899" />} value={xp}                   label="Total XP"       accent="#EC4899" />
             </div>
 
             {/* ── What they're mastering ───────────────────────────── */}
