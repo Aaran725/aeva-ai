@@ -26,9 +26,10 @@ export const useVoiceStore = create((set, get) => ({
   stopSpeaking: () => {
     const { currentAudio } = get()
     if (currentAudio) {
-      currentAudio.pause()
+      try { currentAudio.pause() } catch {}
       try { URL.revokeObjectURL(currentAudio.src) } catch {}
     }
+    try { window.speechSynthesis?.cancel() } catch {}
     set({ isSpeaking: false, currentAudio: null })
   },
 

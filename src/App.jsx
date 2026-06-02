@@ -35,7 +35,7 @@ import Mirror from './Mirror'
 import OrbSelector from './OrbSelector'
 import VoiceMode from './VoiceMode'
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
-import { useVoiceStore, ORB_VOICES } from './voiceStore'
+import { useVoiceStore } from './voiceStore'
 import './index.css'
 
 /* ─── Groq API ─── */
@@ -60,12 +60,27 @@ function stripForTTS(text) {
     .trim()
 }
 
-async function triggerAevaVoice(rawText, orbId) {
-  const { voiceEnabled, voiceModeActive, stopSpeaking, setIsSpeaking, setCurrentAudio } = useVoiceStore.getState()
-  if (!voiceEnabled && !voiceModeActive) return
-  if (!rawText) return
+// Voice characteristics per orb — rate/pitch/gender shape the personality
+const ORB_VOICE_PROPS = {
+  balanced:   { rate: 1.00, pitch: 1.05, female: true  },
+  challenger: { rate: 1.15, pitch: 0.88, female: false },
+  scholar:    { rate: 0.92, pitch: 0.98, female: false },
+  mystic:     { rate: 0.82, pitch: 1.12, female: true  },
+  void:       { rate: 0.88, pitch: 0.80, female: false },
+  ember:      { rate: 1.22, pitch: 1.18, female: false },
+  aurora:     { rate: 1.05, pitch: 1.10, female: true  },
+  phantom:    { rate: 0.78, pitch: 0.92, female: false },
+}
 
-  stopSpeaking()
+function triggerAevaVoice(rawText, orbId) {
+  const { voiceEnabled, voiceModeActive, setIsSpeaking, setCurrentAudio } = useVoiceStore.getState()
+  if (!voiceEnabled && !voiceModeActive) return
+  if (!rawText || !window.speechSynthesis) return
+
+  // Cancel any currently playing speech
+  window.speechSynthesis.cancel()
+  setIsSpeaking(false)
+  setCurrentAudio(null)
 
   let text = stripForTTS(rawText)
   if (!text || text.length < 4) return
@@ -76,52 +91,51 @@ async function triggerAevaVoice(rawText, orbId) {
     text = text.slice(0, cutoff > 300 ? cutoff + 1 : 1200)
   }
 
-  const voice = ORB_VOICES[orbId] || 'Celeste-PlayAI'
+  const props = ORB_VOICE_PROPS[orbId] || ORB_VOICE_PROPS.balanced
+  const lang = useLanguageStore.getState().language
 
-  try {
-    const res = await fetch('https://api.groq.com/openai/v1/audio/speech', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'playai-tts',
-        input: text,
-        voice,
-        response_format: 'mp3',
-      }),
-    })
-    if (!res.ok) {
-      console.error('[Aeva TTS] API error:', res.status, await res.text().catch(() => ''))
-      return
+  const utter = new SpeechSynthesisUtterance(text)
+  utter.rate   = props.rate
+  utter.pitch  = props.pitch
+  utter.volume = 1.0
+  utter.lang   = lang === 'ja' ? 'ja-JP' : 'en-US'
+
+  // Pick the best available voice for this orb's gender
+  const allVoices = window.speechSynthesis.getVoices()
+  if (allVoices.length > 0) {
+    const targetLang = lang === 'ja' ? 'ja' : 'en'
+    const langPool = allVoices.filter(v => v.lang.startsWith(targetLang))
+    const local    = langPool.filter(v => v.localService)
+    const pool     = local.length > 0 ? local : langPool
+
+    if (pool.length > 0) {
+      if (props.female) {
+        const f = pool.find(v => /female|samantha|siri|victoria|karen|tessa|fiona|moira|zoe/i.test(v.name))
+        utter.voice = f || pool[0]
+      } else {
+        const m = pool.find(v => /male|alex|daniel|james|aaron|fred|rishi|bruce|lee/i.test(v.name))
+        utter.voice = m || pool[pool.length - 1]
+      }
     }
-
-    const blob = await res.blob()
-    const url = URL.createObjectURL(blob)
-    const audio = new Audio(url)
-
-    setIsSpeaking(true)
-    setCurrentAudio(audio)
-
-    audio.onended = () => {
-      try { URL.revokeObjectURL(url) } catch {}
-      setIsSpeaking(false)
-      setCurrentAudio(null)
-    }
-    audio.onerror = () => {
-      try { URL.revokeObjectURL(url) } catch {}
-      setIsSpeaking(false)
-      setCurrentAudio(null)
-    }
-
-    audio.play().catch(() => {
-      setIsSpeaking(false)
-      setCurrentAudio(null)
-    })
-  } catch {
-    setIsSpeaking(false)
   }
+
+  utter.onstart = () => {
+    setIsSpeaking(true)
+    // Wrap speechSynthesis cancel so stopSpeaking() works
+    setCurrentAudio({ pause: () => window.speechSynthesis.cancel(), src: '' })
+  }
+  utter.onend = () => {
+    setIsSpeaking(false)
+    setCurrentAudio(null)
+  }
+  utter.onerror = () => {
+    setIsSpeaking(false)
+    setCurrentAudio(null)
+  }
+
+  // Chrome bug: synthesis silently stops after ~15s unless kept alive
+  // Fix: cancel + re-queue if it stalls
+  window.speechSynthesis.speak(utter)
 }
 
 /* ─── Chat customisation ─── */
@@ -3043,10 +3057,10 @@ function ChatView({ onBack }) {
     abortRef.current = controller
 
     let rawResponse = ''
+    let criticResult = null   // declared outside try so finally can access it
 
     try {
       let systemPrompt
-      let criticResult = null
 
       // Per-mission API options: penalise repetition, cap length
       const MISSION_OPTS = {
