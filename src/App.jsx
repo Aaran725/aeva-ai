@@ -736,13 +736,43 @@ const NODES = [
 const EDGES = [[0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [1, 6], [2, 7], [3, 4], [5, 4], [6, 7]]
 // SKILLS is now derived from real conceptMap data — see SkillDecayCard
 
+function getMissionQuote(name, { dominantTopics, masteredTopics, currentVibe, profileTitle, totalExchanges, traits }) {
+  const topic = dominantTopics?.[0] || masteredTopics?.[0]
+
+  // New user — nothing learned yet
+  if (!totalExchanges || totalExchanges < 3) {
+    return `Tell me one thing you want to understand better. We'll build from there.`
+  }
+
+  const vibeLines = {
+    Proud:     topic ? `You're on a streak with ${topic}. Let's see how far that understanding actually goes.` : `Strong session yesterday. Let's push further today.`,
+    Skeptical: topic ? `You've been questioning ${topic} — that's the right instinct. Let's stress-test it properly.` : `Your critical mode is on. Let's find something worth questioning.`,
+    Concerned: topic ? `${topic} gave you trouble last time. Let's try a completely different angle on it.` : `Something didn't click last session. Let's reset and rebuild.`,
+    Impressed: topic ? `That ${topic} insight was real. Now let's apply it somewhere harder.` : `Good momentum last session. Time to raise the stakes.`,
+    Engaged:   topic ? `${topic} is your current frontier. What do you actually know vs what do you think you know?` : `You're in the zone. Let's make today count.`,
+    Focused:   topic ? `Back to ${topic}. What's still unclear?` : `Ready when you are. What are we tackling?`,
+  }
+
+  return vibeLines[currentVibe] || (topic
+    ? `${topic} is next. What do you already know about it?`
+    : `Your profile is calibrating. Let's find out how your mind works.`)
+}
+
+function getMissionHeading({ masteredTopics, totalExchanges }) {
+  if (!totalExchanges || totalExchanges < 3) return <>Your first<br />mission awaits.</>
+  if ((masteredTopics?.length || 0) >= 3) return <>Keep building<br />your mastery.</>
+  return <>Ready to start<br />today's mission?</>
+}
+
 function MissionCard({ onChatOpen, onOrbClick }) {
   const { name } = useUser()
-  const { orbPersonality } = useNeuralStore()
+  const { orbPersonality, dominantTopics, masteredTopics, currentVibe, profileTitle, totalExchanges, traits } = useNeuralStore()
   const { activeOrb: activeOrbId, streak, xp } = useXPStore()
   const activeOrbDef = ORBS.find(o => o.id === activeOrbId) || ORBS[0]
   const currentLevel = levelFromXP(xp)
   const xpProgress = xpIntoLevel(xp)
+  const missionQuote = getMissionQuote(name, { dominantTopics, masteredTopics, currentVibe, profileTitle, totalExchanges, traits })
+  const missionHeading = getMissionHeading({ masteredTopics, totalExchanges })
 
   return (
     <GlassCard className="mission-card" style={{ padding: 32, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 300 }}>
@@ -782,10 +812,10 @@ function MissionCard({ onChatOpen, onOrbClick }) {
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
           backgroundClip: 'text',
         }}>
-          Ready to start<br />today's mission?
+          {missionHeading}
         </h2>
         <p style={{ fontSize: 13.5, lineHeight: 1.65, maxWidth: '88%', color: 'rgba(255,255,255,0.42)', fontFamily: "'Inter', system-ui, sans-serif" }}>
-          Aeva: <em>"{name}'s Startup Empire is at a critical crossroads. Let's look at your margins."</em>
+          Aeva: <em>"{missionQuote}"</em>
         </p>
       </div>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 20 }}>
@@ -834,21 +864,40 @@ function ConstellationCard() {
   )
 }
 
+const VIBE_TO_MODE = {
+  Proud:     { label: 'IN THE ZONE',    color: '#4ADE80', sub: 'On a winning streak' },
+  Skeptical: { label: 'CRITICAL MODE',  color: '#F87171', sub: 'Questioning everything' },
+  Concerned: { label: 'FINDING FOCUS',  color: '#FBBF24', sub: 'Rebuilding from here' },
+  Impressed: { label: 'MOMENTUM',       color: '#60A5FA', sub: 'Building fast' },
+  Engaged:   { label: 'LOCKED IN',      color: '#4ADE80', sub: 'Full focus engaged' },
+  Focused:   { label: 'LOCKED IN',      color: '#4ADE80', sub: 'Full focus engaged' },
+}
+
 function MoodCard() {
-  const { mood } = useUser()
-  const isLocked = mood === 'LOCKED IN'
+  const { currentVibe, frustrationScore, totalExchanges } = useNeuralStore()
+
+  // Before any sessions, show calibrating state
+  const isNew = !totalExchanges || totalExchanges < 3
+  const modeConfig = isNew
+    ? { label: 'CALIBRATING', color: '#A78BFA', sub: 'Getting to know you…' }
+    : frustrationScore > 72
+      ? { label: 'FRUSTRATED', color: '#F97316', sub: 'Aeva is simplifying' }
+      : VIBE_TO_MODE[currentVibe] || VIBE_TO_MODE.Focused
+
+  const dotColor = modeConfig.color
+
   return (
     <GlassCard style={{ padding: 24, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 140 }}>
       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase' }}>Aeva Mode</span>
       <div>
         <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.7, 1, 0.7] }} transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-          style={{ width: 7, height: 7, borderRadius: '50%', marginBottom: 10, background: isLocked ? '#4ADE80' : '#FBBF24', boxShadow: `0 0 10px ${isLocked ? '#4ADE80' : '#FBBF24'}` }} />
+          style={{ width: 7, height: 7, borderRadius: '50%', marginBottom: 10, background: dotColor, boxShadow: `0 0 10px ${dotColor}` }} />
         <h2 style={{ fontFamily: "'Inter', system-ui, sans-serif", fontSize: 20, fontWeight: 800, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.03em', lineHeight: 1.1, margin: 0 }}>
-          {mood}
+          {modeConfig.label}
         </h2>
       </div>
       <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.30)', margin: 0 }}>
-        {isLocked ? 'Full focus engaged' : 'Recalibrating…'}
+        {modeConfig.sub}
       </p>
     </GlassCard>
   )
@@ -3434,7 +3483,7 @@ Write a direct, specific opener under 35 words. Reference something concrete. En
             {/* Mission thinking orb — red pulse on interrupt, blue in scan mode */}
             {isMission && isThinking && (
               <div className={interruptActive ? 'orb-interrupt' : ''} style={{ display: 'flex', justifyContent: 'center', paddingTop: 6, flexShrink: 0 }}>
-                <AevaOrb size={48} active={!labOpen} scanMode={labOpen} />
+                <AevaOrb size={48} active={!labOpen} scanMode={labOpen} orbGradient={ORBS.find(o => o.id === useXPStore.getState().activeOrb)?.gradient} orbAccent={ORBS.find(o => o.id === useXPStore.getState().activeOrb)?.accent} />
               </div>
             )}
 
