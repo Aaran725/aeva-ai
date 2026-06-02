@@ -4,6 +4,8 @@ import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import { ArrowUp, Zap, TrendingDown, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu } from 'lucide-react'
 import { useAppSettings, SECTION_BG_PRESETS, CARD_STYLES, FONT_STYLES } from './appSettings'
+import { useLanguageStore } from './languageStore'
+import { useT } from './translations'
 import { supabase } from './supabase'
 import { useArcadeStore } from './arcadeStore'
 import { useLabStore } from './labStore'
@@ -229,7 +231,7 @@ Rules:
 }
 
 /* ─── Step B: Build dynamic Aeva prompt ─── */
-function buildAevaPrompt(sessionState, criticism, userName, profile, memoryBlock = '', extras = {}) {
+function buildAevaPrompt(sessionState, criticism, userName, profile, memoryBlock = '', extras = {}, langDirective = '') {
   const state = STATE_CONFIG[sessionState] || STATE_CONFIG.DIAGNOSTIC
   const mode = MODE_CONFIG[criticism?.mode] || MODE_CONFIG.coach
   const { trend, conceptScaffold, difficultyDirective } = extras
@@ -306,7 +308,7 @@ Understanding: ${criticism?.understanding || 'unknown'} | Topic: ${criticism?.to
 Mode: ${(criticism?.mode || 'coach').toUpperCase()} — ${mode.instruction}
 Note: ${criticism?.note || ''}
 
-YOUR RESPONSE MUST REFLECT THIS SIGNAL. Do not ignore it. If mode is REDIRECT, use an analogy. If CHALLENGE, surface the gap. If HYPE, raise the bar immediately. If COACH, ask one precise Socratic question.`
+YOUR RESPONSE MUST REFLECT THIS SIGNAL. Do not ignore it. If mode is REDIRECT, use an analogy. If CHALLENGE, surface the gap. If HYPE, raise the bar immediately. If COACH, ask one precise Socratic question.${langDirective}`
 }
 
 /* ─── Trend / scaffold / difficulty helpers ─── */
@@ -455,6 +457,8 @@ function SettingsSection({ label, children }) {
 }
 
 function AppSettingsPanel({ onClose }) {
+  const T = useT()
+  const { language, setLanguage } = useLanguageStore()
   const { dashboardBg, cardStyle, fontStyle, update } = useAppSettings()
   const [chatSettings, saveChatSettings] = useChatSettings()
 
@@ -474,7 +478,7 @@ function AppSettingsPanel({ onClose }) {
         <div style={{ flexShrink: 0, padding: '18px 22px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Settings size={14} color="rgba(139,143,255,0.80)" />
-            <span style={{ fontSize: 14, fontWeight: 800, color: 'rgba(255,255,255,0.90)', letterSpacing: '-0.02em' }}>Appearance</span>
+            <span style={{ fontSize: 14, fontWeight: 800, color: 'rgba(255,255,255,0.90)', letterSpacing: '-0.02em' }}>{T.appearance}</span>
           </div>
           <motion.button whileHover={{ scale: 1.08, rotate: 90 }} whileTap={{ scale: 0.94 }} onClick={onClose}
             style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.50)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -485,15 +489,39 @@ function AppSettingsPanel({ onClose }) {
         {/* Scrollable content */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '22px', display: 'flex', flexDirection: 'column', gap: 26 }}>
 
-          <SettingsSection label="Dashboard Background">
+          {/* Language toggle */}
+          <SettingsSection label={T.language}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[{ code: 'en', label: '🇬🇧 English' }, { code: 'ja', label: '🇯🇵 日本語' }].map(({ code, label }) => {
+                const isSel = language === code
+                return (
+                  <motion.button key={code} whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                    onClick={() => setLanguage(code)}
+                    style={{
+                      flex: 1, padding: '11px 10px', borderRadius: 14,
+                      background: isSel ? 'rgba(139,143,255,0.16)' : 'rgba(255,255,255,0.04)',
+                      border: isSel ? '1.5px solid rgba(139,143,255,0.50)' : '1px solid rgba(255,255,255,0.10)',
+                      color: isSel ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.45)',
+                      fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                      fontFamily: "'Inter', system-ui, sans-serif",
+                      transition: 'all 0.18s',
+                    }}>
+                    {label}
+                  </motion.button>
+                )
+              })}
+            </div>
+          </SettingsSection>
+
+          <SettingsSection label={T.dashboardBackground}>
             <BgSwatchRow presets={SECTION_BG_PRESETS} selected={dashboardBg} onChange={v => update({ dashboardBg: v })} />
           </SettingsSection>
 
-          <SettingsSection label="Chat Background">
+          <SettingsSection label={T.chatBackground}>
             <BgSwatchRow presets={CHAT_BG_PRESETS} selected={chatSettings.chatBg || 'default'} onChange={v => saveChatSettings({ chatBg: v })} />
           </SettingsSection>
 
-          <SettingsSection label="Card Style">
+          <SettingsSection label={T.cardStyle}>
             <div style={{ display: 'flex', gap: 8 }}>
               {Object.entries(CARD_STYLES).map(([id, cs]) => {
                 const isSel = (cardStyle || 'normal') === id
@@ -510,7 +538,7 @@ function AppSettingsPanel({ onClose }) {
             </div>
           </SettingsSection>
 
-          <SettingsSection label="Font Style">
+          <SettingsSection label={T.fontStyle}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {Object.entries(FONT_STYLES).map(([id, font]) => {
                 const isSel = (fontStyle || 'inter') === id
@@ -696,6 +724,7 @@ function AevaOrb({ size = 218, active = false, scanMode = false, personality = '
 
 /* ═══ USER AVATAR ═════════════════════════════════ */
 function UserAvatar({ onSignOut }) {
+  const T = useT()
   const { name, photo } = useUser()
   const [open, setOpen] = useState(false)
   return (
@@ -724,7 +753,7 @@ function UserAvatar({ onSignOut }) {
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
               <LogOut size={13} />
-              Sign out
+              {T.signOut}
             </button>
           </motion.div>
         )}
@@ -747,49 +776,35 @@ const NODES = [
 const EDGES = [[0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [1, 6], [2, 7], [3, 4], [5, 4], [6, 7]]
 // SKILLS is now derived from real conceptMap data — see SkillDecayCard
 
-function getMissionQuote(name, { dominantTopics, masteredTopics, currentVibe, profileTitle, totalExchanges, traits }) {
+function getMissionQuote(T, { dominantTopics, masteredTopics, currentVibe, totalExchanges }) {
   const topic = dominantTopics?.[0] || masteredTopics?.[0]
-
-  // New user — nothing learned yet
-  if (!totalExchanges || totalExchanges < 3) {
-    return `Tell me one thing you want to understand better. We'll build from there.`
-  }
-
-  const vibeLines = {
-    Proud:     topic ? `You're on a streak with ${topic}. Let's see how far that understanding actually goes.` : `Strong session yesterday. Let's push further today.`,
-    Skeptical: topic ? `You've been questioning ${topic} — that's the right instinct. Let's stress-test it properly.` : `Your critical mode is on. Let's find something worth questioning.`,
-    Concerned: topic ? `${topic} gave you trouble last time. Let's try a completely different angle on it.` : `Something didn't click last session. Let's reset and rebuild.`,
-    Impressed: topic ? `That ${topic} insight was real. Now let's apply it somewhere harder.` : `Good momentum last session. Time to raise the stakes.`,
-    Engaged:   topic ? `${topic} is your current frontier. What do you actually know vs what do you think you know?` : `You're in the zone. Let's make today count.`,
-    Focused:   topic ? `Back to ${topic}. What's still unclear?` : `Ready when you are. What are we tackling?`,
-  }
-
-  return vibeLines[currentVibe] || (topic
-    ? `${topic} is next. What do you already know about it?`
-    : `Your profile is calibrating. Let's find out how your mind works.`)
+  if (!totalExchanges || totalExchanges < 3) return T.missionQuoteNew
+  return T.missionQuote(currentVibe, topic)
 }
 
-function getMissionHeading({ masteredTopics, totalExchanges }) {
-  if (!totalExchanges || totalExchanges < 3) return <>Your first<br />mission awaits.</>
-  if ((masteredTopics?.length || 0) >= 3) return <>Keep building<br />your mastery.</>
-  return <>Ready to start<br />today's mission?</>
+function getMissionHeading(T, { masteredTopics, totalExchanges }) {
+  const lines = (!totalExchanges || totalExchanges < 3) ? T.firstMissionAwaits
+    : (masteredTopics?.length || 0) >= 3 ? T.keepBuilding
+    : T.readyToStart
+  return <>{lines[0]}<br />{lines[1]}</>
 }
 
 function MissionCard({ onChatOpen, onOrbClick }) {
+  const T = useT()
   const { name } = useUser()
-  const { orbPersonality, dominantTopics, masteredTopics, currentVibe, profileTitle, totalExchanges, traits } = useNeuralStore()
+  const { orbPersonality, dominantTopics, masteredTopics, currentVibe, totalExchanges } = useNeuralStore()
   const { activeOrb: activeOrbId, streak, xp } = useXPStore()
   const activeOrbDef = ORBS.find(o => o.id === activeOrbId) || ORBS[0]
   const currentLevel = levelFromXP(xp)
   const xpProgress = xpIntoLevel(xp)
-  const missionQuote = getMissionQuote(name, { dominantTopics, masteredTopics, currentVibe, profileTitle, totalExchanges, traits })
-  const missionHeading = getMissionHeading({ masteredTopics, totalExchanges })
+  const missionQuote = getMissionQuote(T, { dominantTopics, masteredTopics, currentVibe, totalExchanges })
+  const missionHeading = getMissionHeading(T, { masteredTopics, totalExchanges })
 
   return (
     <GlassCard className="mission-card" style={{ padding: 32, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 300 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase' }}>Mission Briefing</span>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase' }}>{T.missionBriefing}</span>
           {/* Streak + Level */}
           <div style={{ display: 'flex', gap: 8 }}>
             {streak > 0 && (
@@ -833,12 +848,12 @@ function MissionCard({ onChatOpen, onOrbClick }) {
         <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={onChatOpen}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 22px', borderRadius: 99, background: 'rgba(139,143,255,0.20)', backdropFilter: 'blur(20px)', border: '1px solid rgba(139,143,255,0.35)', color: 'rgba(255,255,255,0.92)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 13.5, fontWeight: 600, letterSpacing: '0.02em', cursor: 'pointer' }}>
           <Zap size={13} />
-          Start Mission
+          {T.startMission}
         </motion.button>
         <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={onChatOpen}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 22px', borderRadius: 99, background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.38)', color: 'rgba(255,255,255,0.65)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 13.5, fontWeight: 500, cursor: 'pointer' }}>
           <MessageCircle size={13} />
-          Chat with Aeva
+          {T.chatWithAeva}
         </motion.button>
       </div>
     </GlassCard>
@@ -853,6 +868,7 @@ function conceptNodeColor(mastery) {
 }
 
 function ConstellationCard() {
+  const T = useT()
   const { conceptMap } = useNeuralStore()
 
   const concepts = [...conceptMap]
@@ -896,7 +912,7 @@ function ConstellationCard() {
   return (
     <GlassCard style={{ padding: '22px 20px', minHeight: 200 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase' }}>Knowledge Map</span>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase' }}>{T.knowledgeMap}</span>
         {hasData && (
           <span style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.22)' }}>
             {concepts.length} concept{concepts.length !== 1 ? 's' : ''}
@@ -940,38 +956,39 @@ function ConstellationCard() {
       </svg>
       {!hasData && (
         <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', textAlign: 'center', marginTop: -10, paddingBottom: 4, margin: 0 }}>
-          Chat to grow your map
+          {T.chatToGrowMap}
         </p>
       )}
     </GlassCard>
   )
 }
 
-const VIBE_TO_MODE = {
-  Proud:     { label: 'IN THE ZONE',    color: '#4ADE80', sub: 'On a winning streak' },
-  Skeptical: { label: 'CRITICAL MODE',  color: '#F87171', sub: 'Questioning everything' },
-  Concerned: { label: 'FINDING FOCUS',  color: '#FBBF24', sub: 'Rebuilding from here' },
-  Impressed: { label: 'MOMENTUM',       color: '#60A5FA', sub: 'Building fast' },
-  Engaged:   { label: 'LOCKED IN',      color: '#4ADE80', sub: 'Full focus engaged' },
-  Focused:   { label: 'LOCKED IN',      color: '#4ADE80', sub: 'Full focus engaged' },
-}
-
 function MoodCard() {
+  const T = useT()
   const { currentVibe, frustrationScore, totalExchanges } = useNeuralStore()
 
-  // Before any sessions, show calibrating state
+  const VIBE_TO_MODE_T = {
+    Proud:     { labelKey: 'inTheZone',    color: '#4ADE80', subKey: 'onAWinningStreak' },
+    Skeptical: { labelKey: 'criticalMode', color: '#F87171', subKey: 'questioningEverything' },
+    Concerned: { labelKey: 'findingFocus', color: '#FBBF24', subKey: 'rebuildingFromHere' },
+    Impressed: { labelKey: 'momentum',     color: '#60A5FA', subKey: 'buildingFast' },
+    Engaged:   { labelKey: 'lockedIn',     color: '#4ADE80', subKey: 'fullFocusEngaged' },
+    Focused:   { labelKey: 'lockedIn',     color: '#4ADE80', subKey: 'fullFocusEngaged' },
+  }
+
   const isNew = !totalExchanges || totalExchanges < 3
-  const modeConfig = isNew
-    ? { label: 'CALIBRATING', color: '#A78BFA', sub: 'Getting to know you…' }
+  const raw = isNew
+    ? { labelKey: 'calibrating', color: '#A78BFA', subKey: 'gettingToKnowYou' }
     : frustrationScore > 72
-      ? { label: 'FRUSTRATED', color: '#F97316', sub: 'Aeva is simplifying' }
-      : VIBE_TO_MODE[currentVibe] || VIBE_TO_MODE.Focused
+      ? { labelKey: 'frustrated', color: '#F97316', subKey: 'aevaIsSimplifying' }
+      : VIBE_TO_MODE_T[currentVibe] || VIBE_TO_MODE_T.Focused
+  const modeConfig = { label: T[raw.labelKey] || raw.labelKey, color: raw.color, sub: T[raw.subKey] || raw.subKey }
 
   const dotColor = modeConfig.color
 
   return (
     <GlassCard style={{ padding: 24, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 140 }}>
-      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase' }}>Aeva Mode</span>
+      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase' }}>{T.aevaMode}</span>
       <div>
         <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.7, 1, 0.7] }} transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
           style={{ width: 7, height: 7, borderRadius: '50%', marginBottom: 10, background: dotColor, boxShadow: `0 0 10px ${dotColor}` }} />
@@ -987,18 +1004,19 @@ function MoodCard() {
 }
 
 function TrainingLabCard() {
+  const T = useT()
   const { openLab } = useLabStore()
   const drills = [
-    { emoji: '⚡', label: 'Flashcard Sprint', color: '#3B82F6' },
-    { emoji: '🎯', label: 'Mock Test',        color: '#06B6D4' },
-    { emoji: '🔗', label: 'Match Grid',       color: '#8B5CF6' },
+    { emoji: '⚡', label: T.flashcardSprint, color: '#3B82F6' },
+    { emoji: '🎯', label: T.mockTest,        color: '#06B6D4' },
+    { emoji: '🔗', label: T.matchGrid,       color: '#8B5CF6' },
   ]
   return (
     <GlassCard className="lab-card" onClick={openLab} style={{ padding: '24px 26px', cursor: 'pointer', minHeight: 160 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <FlaskConical size={13} color="rgba(59,130,246,0.70)" />
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(59,130,246,0.70)', textTransform: 'uppercase' }}>Training Lab</span>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(59,130,246,0.70)', textTransform: 'uppercase' }}>{T.trainingLab}</span>
         </div>
         <motion.div
           animate={{ opacity: [0.4, 1, 0.4], scale: [1, 1.15, 1] }}
@@ -1007,10 +1025,10 @@ function TrainingLabCard() {
         />
       </div>
       <h3 style={{ fontFamily: "'Inter', system-ui, sans-serif", fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.90)', margin: '0 0 6px', letterSpacing: '-0.02em' }}>
-        Drill &amp; Mastery Hub
+        {T.drillMasteryHub}
       </h3>
       <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.38)', margin: '0 0 16px', lineHeight: 1.5 }}>
-        The Arcade creates the need. The Lab builds the skill.
+        {T.theArcadeCreates}
       </p>
       <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
         {drills.map(d => (
@@ -1154,6 +1172,7 @@ function ShareProfileModal({ onClose }) {
 
 /* ─── Aeva's Perception Card ─── */
 function PerceptionCard() {
+  const T = useT()
   const { traits, currentVibe, profileTitle, orbPersonality, learningStyle, learningStyleTotal, learningStyleLocked, dominantTopics } = useNeuralStore()
   const [showShare, setShowShare] = useState(false)
 
@@ -1172,7 +1191,7 @@ function PerceptionCard() {
     <>
       <GlassCard style={{ padding: '22px 22px', minHeight: 180 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase' }}>Aeva's Perception</span>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase' }}>{T.aevasPerception}</span>
           {/* Vibe indicator */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 99, background: `${vibeColor}15`, border: `1px solid ${vibeColor}35` }}>
             <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.6, repeat: Infinity }}
@@ -1220,7 +1239,7 @@ function PerceptionCard() {
             />
             <div>
               <div style={{ fontSize: 9, fontWeight: 700, color: STYLE_COLORS[dominant], letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 1 }}>
-                Adapting now
+                {T.adaptingNow}
               </div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', lineHeight: 1.3 }}>
                 {STYLE_TITLES[dominant]} approach {learningStyleLocked ? '(confirmed)' : `(${confidence}% confident)`}
@@ -1233,7 +1252,7 @@ function PerceptionCard() {
         {(dominantTopics || []).length > 0 && (
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 5 }}>
-              Core interests
+              {T.coreInterests}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {(dominantTopics || []).slice(0, 4).map(t => (
@@ -1249,7 +1268,7 @@ function PerceptionCard() {
         <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
           onClick={() => setShowShare(true)}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 13px', borderRadius: 99, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.14)', color: 'rgba(255,255,255,0.50)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-          <Share2 size={11} /> Share My Profile
+          <Share2 size={11} /> {T.shareMyProfile}
         </motion.button>
       </GlassCard>
 
@@ -1261,6 +1280,7 @@ function PerceptionCard() {
 }
 
 function SkillDecayCard() {
+  const T = useT()
   const { conceptMap } = useNeuralStore()
 
   // Build real skill list from concept map, sorted by mastery desc
@@ -1280,15 +1300,15 @@ function SkillDecayCard() {
     <GlassCard className="skill-card" style={{ padding: '24px 28px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
         <div>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase' }}>Skill Retention</span>
-          <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.22)', marginTop: 3 }}>Live decay from last practice</div>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase' }}>{T.skillRetention}</span>
+          <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.22)', marginTop: 3 }}>{T.liveDecay}</div>
         </div>
         <TrendingDown size={13} color="rgba(255,255,255,0.28)" />
       </div>
 
       {skills.length === 0 ? (
         <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.28)', lineHeight: 1.65, paddingTop: 6 }}>
-          Chat with Aeva — concepts you explore appear here with live retention tracking. Skills decay over time without practice.
+          {T.chatWithAeva} — concepts you explore appear here with live retention tracking. Skills decay over time without practice.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1313,7 +1333,7 @@ function SkillDecayCard() {
             </div>
           ))}
           <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.38)', marginTop: 4 }}>
-            Drill in The Lab to stop decay →
+            {T.drillToStopDecay}
           </div>
         </div>
       )}
@@ -1323,12 +1343,13 @@ function SkillDecayCard() {
 
 /* ═══ FINGERPRINT BENTO CARD ═══════════════════════ */
 function FingerprintCard({ onOpen }) {
+  const T = useT()
   const { learningStyle, learningStyleTotal, learningStyleLocked } = useNeuralStore()
 
   const DIMENSIONS = ['analogical', 'visual', 'structural', 'exampleFirst', 'conceptual']
   const STYLE_TITLES = {
-    analogical: 'Analogy Thinker', visual: 'Spatial Reasoner', structural: 'Systems Builder',
-    exampleFirst: 'Concrete Learner', conceptual: 'Principle Seeker',
+    analogical: T.analogyThinker, visual: T.spatialReasoner, structural: T.systemsBuilder,
+    exampleFirst: T.concreteLearner, conceptual: T.principleSeeker,
   }
   const STYLE_COLORS = { analogical: '#A78BFA', visual: '#60A5FA', structural: '#34D399', exampleFirst: '#FBBF24', conceptual: '#F87171' }
   const cx = 60, cy = 60, radius = 42
@@ -1365,11 +1386,11 @@ function FingerprintCard({ onOpen }) {
     <GlassCard style={{ padding: '20px 20px', minHeight: 180, cursor: 'pointer' }} onClick={onOpen}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(139,143,255,0.70)', textTransform: 'uppercase' }}>
-          Learning Fingerprint
+          {T.learningFingerprint}
         </span>
         {learningStyleLocked ? (
           <div style={{ fontSize: 9, fontWeight: 700, color: '#8B8FFF', letterSpacing: '0.08em', padding: '2px 7px', borderRadius: 99, background: 'rgba(139,143,255,0.12)', border: '1px solid rgba(139,143,255,0.25)' }}>
-            CALIBRATED
+            {T.calibrated}
           </div>
         ) : hasAnyData ? (
           <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.38)', letterSpacing: '0.06em' }}>
@@ -1421,7 +1442,7 @@ function FingerprintCard({ onOpen }) {
                 {STYLE_TITLES[dominant]}
               </div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', lineHeight: 1.45 }}>
-                {learningStyleLocked ? 'Confirmed style' : `${confidence}% calibrated`}
+                {learningStyleLocked ? T.confirmedStyle : T.calibratedPct(confidence)}
               </div>
               {/* Mini calibration bar */}
               {!learningStyleLocked && (
@@ -1438,15 +1459,15 @@ function FingerprintCard({ onOpen }) {
           ) : (
             <>
               <div style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.45)', marginBottom: 3 }}>
-                Reading your style…
+                {T.readingYourStyle}
               </div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', lineHeight: 1.45 }}>
-                Chat to calibrate
+                {T.chatToCalibrate}
               </div>
             </>
           )}
           <div style={{ marginTop: hasAnyData ? 9 : 8, fontSize: 10.5, color: 'rgba(139,143,255,0.60)', fontWeight: 600 }}>
-            Tap to explore →
+            {T.tapToExplore}
           </div>
         </div>
       </div>
@@ -1456,6 +1477,7 @@ function FingerprintCard({ onOpen }) {
 
 /* ═══ MEMORY PALACE BENTO CARD ══════════════════════ */
 function MemoryPalaceCard({ onOpen }) {
+  const T = useT()
   const { conceptMap } = useNeuralStore()
   const HEX_CLIP = 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)'
 
@@ -1472,14 +1494,14 @@ function MemoryPalaceCard({ onOpen }) {
     <GlassCard style={{ padding: '20px 20px', minHeight: 180, cursor: 'pointer' }} onClick={onOpen}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase' }}>
-          Memory Palace
+          {T.memoryPalace}
         </span>
         <Brain size={12} color="rgba(255,255,255,0.25)" />
       </div>
 
       {conceptMap.length === 0 ? (
         <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.30)', lineHeight: 1.6, marginTop: 8 }}>
-          Start chatting to build your concept map.
+          {T.startChattingPalace}
         </div>
       ) : (
         <>
@@ -1502,7 +1524,7 @@ function MemoryPalaceCard({ onOpen }) {
             ))}
           </div>
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.42)', marginBottom: 8 }}>
-            {conceptMap.length} concept{conceptMap.length !== 1 ? 's' : ''} mapped
+            {T.conceptsMapped(conceptMap.length)}
           </div>
         </>
       )}
@@ -1515,7 +1537,7 @@ function MemoryPalaceCard({ onOpen }) {
           background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
           color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: 600, cursor: 'pointer',
         }}>
-        <Layers size={10} /> Explore Palace
+        <Layers size={10} /> {T.explorePalace}
       </motion.button>
     </GlassCard>
   )
@@ -1533,12 +1555,13 @@ function PersonalProgressCard() {
 /* ═══ DASHBOARD VIEW ══════════════════════════════ */
 /* ═══ MOBILE DRAWER ══════════════════════════════ */
 function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings, onProfile, onSignOut }) {
+  const T = useT()
   const items = [
-    { label: 'Library',      icon: <BookOpen size={17} />,  color: '#A78BFA', bg: 'rgba(167,139,250,0.10)', border: 'rgba(167,139,250,0.22)', action: onLibrary },
-    { label: 'Second Brain', icon: <Brain size={17} />,     color: '#8B8FFF', bg: 'rgba(139,143,255,0.10)', border: 'rgba(139,143,255,0.22)', action: onBrain },
-    { label: 'Mirror',       icon: <span style={{ fontSize: 17 }}>🪞</span>, color: '#D8B4FE', bg: 'rgba(139,92,246,0.10)', border: 'rgba(139,92,246,0.22)', action: onMirror },
-    { label: 'My Profile',   icon: <Star size={17} />,      color: '#E9A364', bg: 'rgba(233,163,100,0.10)', border: 'rgba(233,163,100,0.22)', action: onProfile },
-    { label: 'Appearance',   icon: <Settings size={17} />,  color: 'rgba(255,255,255,0.55)', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.10)', action: onSettings },
+    { label: T.library,      icon: <BookOpen size={17} />,  color: '#A78BFA', bg: 'rgba(167,139,250,0.10)', border: 'rgba(167,139,250,0.22)', action: onLibrary },
+    { label: T.secondBrain,  icon: <Brain size={17} />,     color: '#8B8FFF', bg: 'rgba(139,143,255,0.10)', border: 'rgba(139,143,255,0.22)', action: onBrain },
+    { label: T.mirror,       icon: <span style={{ fontSize: 17 }}>🪞</span>, color: '#D8B4FE', bg: 'rgba(139,92,246,0.10)', border: 'rgba(139,92,246,0.22)', action: onMirror },
+    { label: T.myProfile,    icon: <Star size={17} />,      color: '#E9A364', bg: 'rgba(233,163,100,0.10)', border: 'rgba(233,163,100,0.22)', action: onProfile },
+    { label: T.appearance,   icon: <Settings size={17} />,  color: 'rgba(255,255,255,0.55)', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.10)', action: onSettings },
   ]
   return (
     <AnimatePresence>
@@ -1569,6 +1592,7 @@ function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings,
                   <Star size={10} color="white" fill="white" />
                 </div>
                 <span style={{ fontSize: 15, fontWeight: 800, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.02em' }}>aeva</span>
+
               </div>
               <motion.button whileHover={{ scale: 1.08, rotate: 90 }} whileTap={{ scale: 0.94 }} onClick={onClose}
                 style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.50)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1606,7 +1630,7 @@ function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings,
                   cursor: 'pointer', fontFamily: 'inherit',
                 }}>
                 <LogOut size={16} />
-                Sign Out
+                {T.signOut}
               </motion.button>
             </div>
           </motion.div>
@@ -1618,10 +1642,11 @@ function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings,
 
 /* ═══ MOBILE BOTTOM BAR ══════════════════════════ */
 function MobileBottomBar({ onChat, onLab, onArcade, onDrillCount }) {
+  const T = useT()
   const tabs = [
-    { label: 'Chat',   icon: <MessageCircle size={21} />, action: onChat,   color: '#8B8FFF' },
-    { label: 'Lab',    icon: <FlaskConical size={21} />,  action: onLab,    color: '#3B82F6', badge: onDrillCount > 0 ? onDrillCount : null },
-    { label: 'Arcade', icon: <Gamepad2 size={21} />,      action: onArcade, color: '#6366F1' },
+    { label: T.chat,   icon: <MessageCircle size={21} />, action: onChat,   color: '#8B8FFF' },
+    { label: T.lab,    icon: <FlaskConical size={21} />,  action: onLab,    color: '#3B82F6', badge: onDrillCount > 0 ? onDrillCount : null },
+    { label: T.arcade, icon: <Gamepad2 size={21} />,      action: onArcade, color: '#6366F1' },
   ]
   return (
     <div style={{
@@ -2559,8 +2584,24 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false }) {
 
 /* ═══ SESSION MODE BADGE ══════════════════════════ */
 function SessionBadge({ sessionState, criticism }) {
+  const T = useT()
   const state = STATE_CONFIG[sessionState] || STATE_CONFIG.DIAGNOSTIC
   const mode = criticism ? (MODE_CONFIG[criticism.mode] || null) : null
+
+  const stateLabel = {
+    DIAGNOSTIC:    T.diagnosing,
+    SCAFFOLDING:   T.building,
+    STRESS_TEST:   T.stressTesting,
+    CONSOLIDATION: T.consolidating,
+  }[sessionState] || state.label
+
+  const modeLabel = {
+    hype:      T.momentum || 'Momentum',
+    coach:     T.coachingMode,
+    challenge: T.challengeMode,
+    redirect:  T.redirectMode,
+  }[criticism?.mode] || mode?.label
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       <motion.div
@@ -2574,7 +2615,7 @@ function SessionBadge({ sessionState, criticism }) {
           color: state.color, textTransform: 'uppercase',
         }}
       >
-        {state.label}
+        {stateLabel}
       </motion.div>
       {mode && (
         <motion.div
@@ -2588,7 +2629,7 @@ function SessionBadge({ sessionState, criticism }) {
             color: mode.color, textTransform: 'uppercase',
           }}
         >
-          {mode.label}
+          {modeLabel}
         </motion.div>
       )}
     </div>
@@ -2597,6 +2638,7 @@ function SessionBadge({ sessionState, criticism }) {
 
 /* ═══ CHAT VIEW / COCKPIT ═════════════════════════ */
 function ChatView({ onBack }) {
+  const T = useT()
   const { name } = useUser()
   const {
     activeMode, activeMission, processAIResponse, rewardPlayer, worldMemory,
@@ -2986,7 +3028,7 @@ function ChatView({ onBack }) {
           feedbackPrefix = `🚨 FEEDBACK REQUIRED: ${name} just answered your question. The critic assessment is: ${understanding.toUpperCase()}.\nYou MUST begin your response with exactly this tag (fill in the curly braces): ${tag}\nDo NOT skip this. Do NOT start with anything else. The tag renders as a visual banner — it is the most important part of your response.\n\n`
         }
 
-        systemPrompt = feedbackPrefix + orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, buildMemoryBlock(name), extras)
+        systemPrompt = feedbackPrefix + orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, buildMemoryBlock(name), extras, T.aevaLanguageDirective)
 
         if (socraticActive) {
           systemPrompt += '\n\nSOCRATIC MODE: You must NEVER state facts, answers, or explanations directly. Respond ONLY with 1-3 targeted questions that guide the student to discover the answer themselves. If they arrive at the correct answer, confirm warmly and deepen with another question. If wrong, ask a question that exposes the specific gap without revealing the answer. Never say "the answer is", never explain anything outright. Make them think every time.'
@@ -3196,7 +3238,7 @@ function ChatView({ onBack }) {
           <motion.button className="chat-back-btn" whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={onBack}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 99, backdropFilter: 'blur(20px)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 13, fontWeight: 600, cursor: 'pointer', ...backBtnStyle }}>
             <ChevronLeft size={14} strokeWidth={2.5} />
-            {isMission ? 'Exit Mission' : 'Dashboard'}
+            {isMission ? T.exitMission : T.backToDashboard}
           </motion.button>
 
           {/* Center: mission badge or session badges */}
@@ -3306,7 +3348,7 @@ function ChatView({ onBack }) {
                     fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', alignItems: 'center', gap: 5,
                   }}
                 >
-                  <BookOpen size={11} /> Library
+                  <BookOpen size={11} /> {T.library}
                 </motion.button>
 
                 <motion.button className="chat-btn-studyguide"
@@ -3318,23 +3360,21 @@ function ChatView({ onBack }) {
                     fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: '0.04em',
                   }}
                 >
-                  📋 Study Guide
+                  {T.studyGuide}
                 </motion.button>
 
                 <motion.button
                   whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
                   onClick={() => setFeynmanOpen(true)}
-                  
                   style={{
                     padding: '5px 12px', borderRadius: 99, cursor: 'pointer',
                     background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.28)',
                     color: 'rgba(245,158,11,0.85)', fontSize: 11, fontWeight: 700,
                     fontFamily: "'Inter', system-ui, sans-serif",
                     display: 'flex', alignItems: 'center', gap: 5,
-                    
                   }}
                 >
-                  🎓 Teach It
+                  {T.feynmanMode}
                 </motion.button>
               </>
             )}
@@ -3376,7 +3416,7 @@ function ChatView({ onBack }) {
                       Hey {name},
                     </p>
                     <h1 style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif", fontSize: 'clamp(28px, 6vw, 44px)', fontWeight: 900, color: isLight ? 'rgba(0,0,0,0.88)' : 'rgba(255,255,255,0.95)', lineHeight: 1.05, letterSpacing: '-0.05em', margin: '0 0 20px' }}>
-                      What can I help with?
+                      {T.whatCanIHelpWith}
                     </h1>
                   </div>
                   {/* Suggestion chips — customisable */}
@@ -3546,7 +3586,7 @@ function ChatView({ onBack }) {
                         cursor: 'pointer', transition: 'all 0.2s',
                       }}
                     >
-                      {chipEditMode ? '✓ Done' : <><PenLine size={10} style={{ marginRight: 1 }} /> Customise</>}
+                      {chipEditMode ? T.done : <><PenLine size={10} style={{ marginRight: 1 }} /> {T.customise}</>}
                     </motion.button>
                   </motion.div>
                 </motion.div>
@@ -3639,7 +3679,7 @@ function ChatView({ onBack }) {
                     />
                     <span style={{ fontSize: 14, flexShrink: 0 }}>🔮</span>
                     <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.68)', lineHeight: 1.4, flex: 1 }}>
-                      <span style={{ color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>Heads up</span> — based on {strugglePredictions[0].reason},{' '}
+                      <span style={{ color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>{T.headsUp}</span> — based on {strugglePredictions[0].reason},{' '}
                       <span style={{ color: 'rgba(167,139,250,0.90)', fontWeight: 600 }}>{strugglePredictions[0].concept}</span> is coming.
                     </span>
                     <motion.button
@@ -3666,7 +3706,7 @@ function ChatView({ onBack }) {
                         fontFamily: "'Inter', system-ui, sans-serif",
                       }}
                     >
-                      Prep Now
+                      {T.prepNow}
                     </motion.button>
                     <motion.button
                       whileHover={{ scale: 1.08 }}

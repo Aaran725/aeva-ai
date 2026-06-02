@@ -3,8 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Lock, Zap, Check } from 'lucide-react'
 import { ORBS, useXPStore, levelFromXP, xpIntoLevel } from './xpStore'
 import AevaOrb from './AevaOrb'
+import { useT } from './translations'
 
 export default function OrbSelector({ onClose }) {
+  const T = useT()
   const { xp, unlockedOrbs, activeOrb, setActiveOrb } = useXPStore()
   const currentLevel = levelFromXP(xp)
   const [hovered, setHovered] = useState(activeOrb)
@@ -45,8 +47,8 @@ export default function OrbSelector({ onClose }) {
         {/* Header */}
         <div style={{ padding: '18px 22px 14px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div>
-            <div style={{ fontSize: 17, fontWeight: 800, color: 'rgba(255,255,255,0.94)', letterSpacing: '-0.02em' }}>Choose Your Aeva</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>Each orb changes how Aeva teaches and responds</div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: 'rgba(255,255,255,0.94)', letterSpacing: '-0.02em' }}>{T.chooseYourAeva}</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>{T.eachOrbChanges}</div>
           </div>
           <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.50)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <X size={15} />
@@ -92,10 +94,10 @@ export default function OrbSelector({ onClose }) {
                 <span style={{ fontSize: 22 }}>{previewOrb.emoji}</span>
                 <span style={{ fontSize: 20, fontWeight: 800, color: 'rgba(255,255,255,0.94)', letterSpacing: '-0.02em' }}>{previewOrb.name}</span>
                 {activeOrb === previewOrb.id && (
-                  <span style={{ fontSize: 10, fontWeight: 800, background: `rgba(${previewOrb.accent?.join(',') || '139,143,255'},0.20)`, border: `1px solid rgba(${previewOrb.accent?.join(',') || '139,143,255'},0.45)`, color: `rgb(${previewOrb.accent?.join(',') || '139,143,255'})`, borderRadius: 6, padding: '2px 7px', letterSpacing: '0.06em' }}>ACTIVE</span>
+                  <span style={{ fontSize: 10, fontWeight: 800, background: `rgba(${previewOrb.accent?.join(',') || '139,143,255'},0.20)`, border: `1px solid rgba(${previewOrb.accent?.join(',') || '139,143,255'},0.45)`, color: `rgb(${previewOrb.accent?.join(',') || '139,143,255'})`, borderRadius: 6, padding: '2px 7px', letterSpacing: '0.06em' }}>{T.activeLabel}</span>
                 )}
               </div>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', margin: '0 0 10px', lineHeight: 1.55 }}>{previewOrb.tagline}</p>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', margin: '0 0 10px', lineHeight: 1.55 }}>{T.orbTaglines?.[previewOrb.id] || previewOrb.tagline}</p>
               {previewOrb.personality && (
                 <p style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.32)', margin: 0, lineHeight: 1.55, fontStyle: 'italic', maxWidth: 320 }}>
                   "{previewOrb.personality.split('.')[0]}."
@@ -104,7 +106,7 @@ export default function OrbSelector({ onClose }) {
               {!unlockedOrbs.includes(previewOrb.id) && (
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, padding: '4px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
                   <Lock size={11} color="rgba(255,255,255,0.45)" />
-                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.40)' }}>Unlocks at Level {previewOrb.requiredLevel}</span>
+                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.40)' }}>{T.unlocksAtLevel(previewOrb.requiredLevel)}</span>
                 </div>
               )}
             </motion.div>
@@ -190,7 +192,7 @@ export default function OrbSelector({ onClose }) {
                     {orb.name}
                   </div>
                   <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', lineHeight: 1.4 }}>
-                    {unlocked ? orb.tagline : `Level ${orb.requiredLevel} · ${levelsAway} level${levelsAway !== 1 ? 's' : ''} away`}
+                    {unlocked ? (T.orbTaglines?.[orb.id] || orb.tagline) : T.levelsAwayLabel(orb.requiredLevel, levelsAway)}
                   </div>
                 </div>
               </motion.button>
