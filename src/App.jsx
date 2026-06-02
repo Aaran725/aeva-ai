@@ -205,12 +205,16 @@ hype=solid/mastery with genuine reasoning. challenge=vague/shallow/no reasoning.
 }
 
 /* ─── Step B: Build dynamic Aeva prompt ─── */
-function buildAevaPrompt(sessionState, criticism, userName, profile, memoryBlock = '') {
+function buildAevaPrompt(sessionState, criticism, userName, profile, memoryBlock = '', extras = {}) {
   const state = STATE_CONFIG[sessionState] || STATE_CONFIG.DIAGNOSTIC
   const mode = MODE_CONFIG[criticism?.mode] || MODE_CONFIG.coach
+  const { trend, conceptScaffold, difficultyDirective } = extras
 
-  // Memory block goes FIRST — gives it highest attention weight in the model
-  return `${memoryBlock}
+  const trendBlock = trend ? `\n\n${trend}` : ''
+  const scaffoldBlock = conceptScaffold ? `\n\n${conceptScaffold}` : ''
+  const diffBlock = difficultyDirective ? `\n\n${difficultyDirective}` : ''
+
+  return `${memoryBlock}${trendBlock}${scaffoldBlock}${diffBlock}
 
 You are Aeva — a world-class personal mentor for ${userName}. Think: the most precise professor you never had, minus the ego.
 
@@ -247,11 +251,50 @@ THE 80/20 RULE:
 - Never write a 500-word essay. Give a 30-word insight + one beautiful visual + one sharp question.
 - Simple question → simple answer. Depth only when warranted.
 
+CONTRADICTION WATCH: Scan the full conversation history above. If ${userName}'s current message contradicts something they said in an earlier message, call it out directly before answering — "Hold on — earlier you said [X], but now you're saying [Y]. Which is it?" Make them resolve the contradiction before you continue.
+
 SESSION PHASE: ${sessionState} — ${state.instruction}
 
 READING ON ${userName.toUpperCase()}'S LAST MESSAGE:
 - Understanding: ${criticism?.understanding || 'unknown'} | Topic: ${criticism?.topic || 'general'}
 - Mode: ${(criticism?.mode || 'coach').toUpperCase()} — ${mode.instruction}`
+}
+
+/* ─── Trend / scaffold / difficulty helpers ─── */
+function computeTrend(recentCritic) {
+  if (!recentCritic || recentCritic.length < 3) return null
+  const last3 = recentCritic.slice(-3).map(c => c.understanding)
+  if (last3.every(u => u === 'mastery' || u === 'solid'))
+    return '⚡ LIVE SIGNAL — MOMENTUM: Student has shown strong understanding 3 exchanges in a row. Increase difficulty NOW. Push to harder applications, edge cases, and deeper nuance. Do not stay at the current level — explicitly acknowledge their progress and raise the bar.'
+  if (last3.every(u => u === 'none' || u === 'partial'))
+    return '🔴 LIVE SIGNAL — STRUGGLING: Student has shown low understanding 3 exchanges in a row. STOP advancing. Drop back to absolute first principles. Use simpler language. Confirm understanding of each micro-step before moving on. Ask "does this make sense?" explicitly.'
+  return null
+}
+
+function buildConceptScaffold(sessionConcepts) {
+  const entries = Object.entries(sessionConcepts)
+  if (entries.length < 2) return null
+  const mastered = entries.filter(([,u]) => u === 'mastery' || u === 'solid').map(([c]) => c)
+  const partial  = entries.filter(([,u]) => u === 'partial').map(([c]) => c)
+  const none     = entries.filter(([,u]) => u === 'none').map(([c]) => c)
+  let s = 'SESSION SCAFFOLD — concepts built this session (connect new ideas to these explicitly):\n'
+  if (mastered.length) s += `✓ Understands: ${mastered.join(', ')}\n`
+  if (partial.length)  s += `⟳ In progress: ${partial.join(', ')}\n`
+  if (none.length)     s += `✗ Struggling: ${none.join(', ')}\n`
+  s += 'When introducing a new concept, explicitly connect it to what is already understood.'
+  return s
+}
+
+function buildDifficultyDirective(neural) {
+  if (!neural || neural.totalExchanges < 4) return null
+  const { frustrationScore, avgResponseLength, totalExchanges, depth } = neural
+  if (avgResponseLength < 22 && totalExchanges > 5)
+    return '📉 DIFFICULTY SIGNAL — OVERLOADED: Very short replies detected across multiple exchanges. The student is overwhelmed. Simplify immediately — one micro-concept at a time, shorter sentences, explicit check-ins before advancing.'
+  if (frustrationScore > 70)
+    return '⚠ DIFFICULTY SIGNAL — FRUSTRATED: High frustration detected. Be concise and direct. Give a quick win. No lengthy theory — go straight to an example that clicks.'
+  if (avgResponseLength > 120 && (depth || 50) > 65)
+    return '🚀 DIFFICULTY SIGNAL — DEEPLY ENGAGED: Long, thoughtful replies and high depth score. Skip the basics. Go deeper — add nuance, challenge their assumptions, discuss edge cases and implications.'
+  return null
 }
 
 /* ─── Stream Aeva response ─── */
@@ -2239,7 +2282,14 @@ function ChatView({ onBack }) {
     learningStyleTotal,
     learningStyleLocked,
     dominantTopics,
+    masteredTopics,
+    struggleZones,
+    frustrationScore,
+    avgResponseLength,
+    totalExchanges,
+    depth,
   } = useNeuralStore()
+  const { saveWorldMemory } = useArcadeStore()
   const isMission = !!activeMode
   const sendTimeRef = useRef(null)
 
@@ -2271,9 +2321,70 @@ function ChatView({ onBack }) {
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
   const exchangeCountRef = useRef(0)
+  const recentCriticRef = useRef([])       // last 3 critic results for trend detection
+  const sessionConceptsRef = useRef({})    // concept → understanding map this session
+  const masteryMapRef = useRef({})         // kept in sync for session-end save
 
   const hasInput = input.trim().length > 0
   const isActive = isThinking || hasInput
+
+  // Keep masteryMapRef in sync for session-end save
+  useEffect(() => { masteryMapRef.current = masteryMap }, [masteryMap])
+
+  // Save session summary when ChatView unmounts
+  useEffect(() => {
+    return () => {
+      if (exchangeCountRef.current < 2) return
+      const topics = Object.keys(masteryMapRef.current)
+      const primaryTopic = topics.sort((a, b) => (masteryMapRef.current[b] || 0) - (masteryMapRef.current[a] || 0))[0] || null
+      saveWorldMemory('lastTutorSession', {
+        date: Date.now(),
+        topics: topics.slice(0, 6),
+        primaryTopic,
+        exchanges: exchangeCountRef.current,
+        mastered: masteredTopics.slice(-4),
+        struggled: struggleZones.slice(-3),
+      })
+    }
+  }, [])
+
+  // Proactive opener for returning users
+  useEffect(() => {
+    if (isMission || messages.length > 0 || totalExchanges < 3) return
+    const lastSession = worldMemory?.lastTutorSession
+    const daysSince = lastSession ? Math.floor((Date.now() - lastSession.date) / 86400000) : 99
+    if (daysSince > 21) return // stale data
+
+    const ab = new AbortController()
+    abortRef.current = ab
+    setIsThinking(true)
+
+    const openerPrompt = `You are Aeva, ${name}'s personal AI tutor. Write a natural 1–2 sentence session opener.
+${lastSession?.primaryTopic ? `Last session they worked on: ${lastSession.primaryTopic}.` : ''}
+${lastSession?.mastered?.length ? `Recently mastered: ${lastSession.mastered.join(', ')}.` : ''}
+${lastSession?.struggled?.length ? `They struggled with: ${lastSession.struggled.join(', ')}.` : ''}
+${dominantTopics?.length ? `Main interests: ${dominantTopics.slice(0,3).join(', ')}.` : ''}
+${daysSince === 0 ? 'They are back in the same day.' : `It has been ${daysSince} day${daysSince !== 1 ? 's' : ''}.`}
+
+Write a direct, specific opener under 35 words. Reference something concrete. End with one open question. No "Hey!", "Welcome back!", or generic greetings. Be specific.`
+
+    let raw = ''
+    const openerMsg = { role: 'model', text: '', streaming: true }
+    setMessages([openerMsg]);
+
+    (async () => {
+      try {
+        await streamGroq([], openerPrompt, chunk => {
+          raw += chunk
+          setMessages([{ ...openerMsg, text: raw }])
+        }, ab.signal, { maxTokens: 80 })
+        setMessages([{ role: 'model', text: raw, streaming: false }])
+      } catch {}
+      setIsThinking(false)
+    })()
+
+    return () => ab.abort()
+  }, [])
 
   // Auto-send the mission opening when a mission starts
   useEffect(() => {
@@ -2492,13 +2603,24 @@ function ChatView({ onBack }) {
             useXPStore.getState().addXP('SOCRATIC_5')
           }
         }
+        // Update session tracking refs
+        recentCriticRef.current = [...recentCriticRef.current, criticResult].slice(-3)
+        if (criticResult?.topic) sessionConceptsRef.current[criticResult.topic] = criticResult.understanding
+
+        // Build live adaptation extras
+        const extras = {
+          trend: computeTrend(recentCriticRef.current),
+          conceptScaffold: buildConceptScaffold(sessionConceptsRef.current),
+          difficultyDirective: buildDifficultyDirective({ frustrationScore, avgResponseLength, totalExchanges, depth }),
+        }
+
         // Orb personality prefix — injected FIRST so it anchors the whole response
         const activeOrbDef = ORBS.find(o => o.id === useXPStore.getState().activeOrb)
         const orbPrefix = activeOrbDef?.personality
           ? `⚠ OVERRIDE — THIS RULE SUPERSEDES ALL OTHER INSTRUCTIONS BELOW:\n${activeOrbDef.personality}\nApply this to every single response. It is non-negotiable.\n\n`
           : ''
 
-        systemPrompt = orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, buildMemoryBlock(name))
+        systemPrompt = orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, buildMemoryBlock(name), extras)
 
         if (socraticActive) {
           systemPrompt += '\n\nSOCRATIC MODE: You must NEVER state facts, answers, or explanations directly. Respond ONLY with 1-3 targeted questions that guide the student to discover the answer themselves. If they arrive at the correct answer, confirm warmly and deepen with another question. If wrong, ask a question that exposes the specific gap without revealing the answer. Never say "the answer is", never explain anything outright. Make them think every time.'
