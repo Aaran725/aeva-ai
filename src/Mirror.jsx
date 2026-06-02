@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Send, Brain, Sparkles, ChevronRight, TrendingUp } from 'lucide-react'
-import { useBrainStore, masteryColor, masteryLabel, SUBJECT_COLORS } from './brainStore'
+import { useBrainStore, masteryColor, masteryLabel, SUBJECT_COLORS, categorize } from './brainStore'
 import { useNeuralStore } from './neuralStore'
 
 const GROQ_KEY  = import.meta.env.VITE_GROQ_API_KEY
@@ -167,31 +167,31 @@ function StatChip({ label, value, color }) {
 function buildMergedNodes(brainNodes, neural) {
   const all = [...brainNodes]
 
-  // neuralStore conceptMap → same format
+  // neuralStore conceptMap → proper subject categorization (not hardcoded 'general')
   ;(neural.conceptMap || []).forEach(cm => {
     if (!all.find(n => n.concept.toLowerCase() === cm.label.toLowerCase())) {
-      all.push({ id: `cm-${cm.id}`, concept: cm.label, definition: '', subject: cm.category || 'General', mastery: cm.mastery, connections: [], firstSeen: cm.firstSeen, lastSeen: cm.lastSeen, visits: cm.visits, source: 'neural' })
+      all.push({ id: `cm-${cm.id}`, concept: cm.label, definition: '', subject: categorize(cm.label), mastery: cm.mastery, connections: [], firstSeen: cm.firstSeen, lastSeen: cm.lastSeen, visits: cm.visits, source: 'neural' })
     }
   })
 
-  // masteredTopics → high-mastery nodes
+  // masteredTopics → high-mastery nodes with proper subject
   ;(neural.masteredTopics || []).forEach(t => {
     if (t && !all.find(n => n.concept.toLowerCase() === t.toLowerCase())) {
-      all.push({ id: `mt-${t}`, concept: t, definition: '', subject: 'General', mastery: 88, connections: [], firstSeen: Date.now(), lastSeen: Date.now(), visits: 3, source: 'mastered' })
+      all.push({ id: `mt-${t}`, concept: t, definition: '', subject: categorize(t), mastery: 88, connections: [], firstSeen: Date.now(), lastSeen: Date.now(), visits: 3, source: 'mastered' })
     }
   })
 
-  // struggleZones → low-mastery nodes
+  // struggleZones → low-mastery nodes with proper subject
   ;(neural.struggleZones || []).forEach(t => {
     if (t && !all.find(n => n.concept.toLowerCase() === t.toLowerCase())) {
-      all.push({ id: `sz-${t}`, concept: t, definition: '', subject: 'General', mastery: 18, connections: [], firstSeen: Date.now(), lastSeen: Date.now(), visits: 1, source: 'struggle' })
+      all.push({ id: `sz-${t}`, concept: t, definition: '', subject: categorize(t), mastery: 18, connections: [], firstSeen: Date.now(), lastSeen: Date.now(), visits: 1, source: 'struggle' })
     }
   })
 
-  // dominantTopics → medium-mastery nodes (things they explore often)
+  // dominantTopics → medium-mastery nodes with proper subject
   ;(neural.dominantTopics || []).forEach(t => {
     if (t && !all.find(n => n.concept.toLowerCase() === t.toLowerCase())) {
-      all.push({ id: `dt-${t}`, concept: t, definition: '', subject: 'General', mastery: 45, connections: [], firstSeen: Date.now(), lastSeen: Date.now(), visits: 4, source: 'interest' })
+      all.push({ id: `dt-${t}`, concept: t, definition: '', subject: categorize(t), mastery: 45, connections: [], firstSeen: Date.now(), lastSeen: Date.now(), visits: 4, source: 'interest' })
     }
   })
 

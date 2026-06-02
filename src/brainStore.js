@@ -19,15 +19,15 @@ export const SUBJECT_COLORS = {
 
 export function categorize(concept) {
   const c = concept.toLowerCase()
-  if (/calculus|integral|derivative|algebra|geometry|matrix|vector|equation|polynomial|trigonometry|theorem|proof|prime|fraction|quadratic|logarithm|sequence|series/.test(c)) return 'Mathematics'
-  if (/physics|force|energy|momentum|quantum|gravity|wave|particle|kinematics|thermodynamics|electromagnetism|optics|nuclear|velocity|acceleration/.test(c)) return 'Physics'
-  if (/chemistry|molecule|atom|reaction|element|compound|bond|acid|base|oxidation|periodic|enzyme|catalyst|electron/.test(c)) return 'Chemistry'
-  if (/biology|cell|gene|protein|evolution|dna|rna|organism|ecology|photosynthesis|mitosis|chromosome|species|ecosystem/.test(c)) return 'Biology'
-  if (/history|war|revolution|empire|civilization|century|treaty|dynasty|colony|independence|ancient|medieval|renaissance|industrial/.test(c)) return 'History'
-  if (/algorithm|function|class|variable|loop|array|programming|recursion|database|network|binary|sorting|complexity|javascript|python|react|api|server/.test(c)) return 'Computing'
-  if (/economics|market|supply|demand|inflation|gdp|trade|currency|monopoly|fiscal|monetary|microeconomics|macroeconomics/.test(c)) return 'Economics'
-  if (/philosophy|ethics|logic|consciousness|epistemology|metaphysics|existentialism|utilitarianism|dialectic|phenomenology/.test(c)) return 'Philosophy'
-  if (/grammar|syntax|semantics|literature|writing|poetry|narrative|rhetoric|linguistics|phonetics|morphology/.test(c)) return 'Languages'
+  if (/calculus|integral|derivative|algebra|geometry|matrix|vector|equation|polynomial|trigonometry|theorem|proof|prime|fraction|quadratic|logarithm|sequence|series|math|maths|arithmetic|statistics|probability|number|parabola|function|graph|coordinate|gradient|intercept|factori|simultaneous|linear|cubic|exponential|binomial|permutation|combination/.test(c)) return 'Mathematics'
+  if (/physics|force|energy|momentum|quantum|gravity|wave|particle|kinematics|thermodynamics|electromagnetism|optics|nuclear|velocity|acceleration|motion|newton|electric|magnetic|circuit|current|voltage|resistance|pressure|density|friction|torque|pendulum|oscillation/.test(c)) return 'Physics'
+  if (/chemistry|molecule|atom|reaction|element|compound|bond|acid|base|oxidation|periodic|enzyme|catalyst|electron|orbital|valence|ionic|covalent|mole|titration|concentration|equilibrium|enthalpy|entropy|polymer|hydrocarbon|organic|inorganic/.test(c)) return 'Chemistry'
+  if (/biology|cell|gene|protein|evolution|dna|rna|organism|ecology|photosynthesis|mitosis|chromosome|species|ecosystem|membrane|respiration|metabolism|hormone|nervous|immune|muscle|skeleton|digestion|reproduction|natural selection|mutation|taxonomy/.test(c)) return 'Biology'
+  if (/history|war|revolution|empire|civilization|century|treaty|dynasty|colony|independence|ancient|medieval|renaissance|industrial|world war|cold war|civil war|colonial|political|government|constitution|democracy|monarchy|parliament|election|president|prime minister|fascism|communism|capitalism|imperialism/.test(c)) return 'History'
+  if (/algorithm|function|class|variable|loop|array|programming|recursion|database|network|binary|sorting|complexity|javascript|python|react|api|server|code|software|hardware|computer|internet|data structure|object|inheritance|polymorphism|compiler|operating system|machine learning|artificial intelligence|neural network/.test(c)) return 'Computing'
+  if (/economics|market|supply|demand|inflation|gdp|trade|currency|monopoly|fiscal|monetary|microeconomics|macroeconomics|budget|deficit|surplus|investment|interest rate|exchange rate|unemployment|growth|recession|tax|subsidy/.test(c)) return 'Economics'
+  if (/philosophy|ethics|logic|consciousness|epistemology|metaphysics|existentialism|utilitarianism|dialectic|phenomenology|moral|virtue|justice|freedom|knowledge|reality|mind|belief|argument|fallacy/.test(c)) return 'Philosophy'
+  if (/grammar|syntax|semantics|literature|writing|poetry|narrative|rhetoric|linguistics|phonetics|morphology|language|spanish|french|japanese|mandarin|german|arabic|verb|noun|tense|conjugation|vocabulary|essay|novel|prose/.test(c)) return 'Languages'
   return 'General'
 }
 
