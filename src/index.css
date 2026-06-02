@@ -135,22 +135,14 @@ body {
   /* ── Global ── */
   * { -webkit-tap-highlight-color: transparent; }
 
-  /* ── Dashboard ── */
-  .dash-header {
-    padding: 14px 16px !important;
-    flex-wrap: wrap;
-    gap: 10px !important;
+  /* ── Dashboard bento: single column, bottom padding for tab bar ── */
+  .bento-grid {
+    grid-template-columns: 1fr !important;
   }
-  .dash-header-actions {
-    gap: 6px !important;
-    flex-wrap: wrap;
+  .mission-card, .skill-card, .lab-card {
+    grid-column: span 1 !important;
+    grid-row: span 1 !important;
   }
-  .dash-header-actions button {
-    font-size: 11px !important;
-    padding: 5px 10px !important;
-  }
-  /* Hide secondary dashboard buttons on mobile */
-  .dash-hide-mobile { display: none !important; }
 
   /* ── Chat header ── */
   .chat-header {

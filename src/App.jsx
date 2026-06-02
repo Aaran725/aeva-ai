@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, createContext, useContext } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import { ArrowUp, Zap, TrendingDown, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings } from 'lucide-react'
+import { ArrowUp, Zap, TrendingDown, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu } from 'lucide-react'
 import { useAppSettings, SECTION_BG_PRESETS, CARD_STYLES, FONT_STYLES } from './appSettings'
 import { supabase } from './supabase'
 import { useArcadeStore } from './arcadeStore'
@@ -73,6 +73,17 @@ function useChatSettings() {
     })
   }
   return [settings, save]
+}
+
+/* ─── Mobile detection hook ─── */
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+  return isMobile
 }
 
 /* ─── Session state machine ─── */
@@ -834,32 +845,104 @@ function MissionCard({ onChatOpen, onOrbClick }) {
   )
 }
 
+function conceptNodeColor(mastery) {
+  if (mastery >= 75) return '#4ADE80'
+  if (mastery >= 45) return '#FBBF24'
+  if (mastery >= 20) return '#F97316'
+  return '#F87171'
+}
+
 function ConstellationCard() {
+  const { conceptMap } = useNeuralStore()
+
+  const concepts = [...conceptMap]
+    .filter(c => c.mastery > 0)
+    .sort((a, b) => b.mastery - a.mastery)
+    .slice(0, 8)
+
+  const hasData = concepts.length > 0
+  const cx = 50, cy = 50
+
+  // Build real nodes + edges from concept data
+  let nodes = []
+  let edges = []
+  if (hasData) {
+    // Center = highest mastery concept
+    nodes.push({ x: cx, y: cy, r: 4.5, color: conceptNodeColor(concepts[0].mastery), label: concepts[0].label })
+    if (concepts.length > 1) {
+      const ring = concepts.slice(1)
+      const ringR = 30
+      ring.forEach((c, i) => {
+        const angle = -Math.PI / 2 + (2 * Math.PI * i / ring.length)
+        nodes.push({
+          x: cx + ringR * Math.cos(angle),
+          y: cy + ringR * Math.sin(angle),
+          r: 2 + (c.mastery / 100) * 2.5,
+          color: conceptNodeColor(c.mastery),
+          label: c.label,
+        })
+        edges.push([0, i + 1])
+      })
+      // Connect adjacent ring nodes
+      for (let i = 1; i < nodes.length - 1; i++) edges.push([i, i + 1])
+      if (nodes.length > 2) edges.push([nodes.length - 1, 1])
+    }
+  } else {
+    // Decorative fallback
+    nodes = NODES.map(n => ({ ...n, label: null }))
+    edges = EDGES.map(e => [...e])
+  }
+
   return (
     <GlassCard style={{ padding: '22px 20px', minHeight: 200 }}>
-      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase' }}>Knowledge Map</span>
-      <svg viewBox="0 0 100 100" style={{ width: '100%', marginTop: 12 }}>
-        {EDGES.map(([a, b], i) => (
-          <motion.line key={i} x1={NODES[a].x} y1={NODES[a].y} x2={NODES[b].x} y2={NODES[b].y}
-            stroke="rgba(255,255,255,0.38)" strokeWidth={0.6}
-            animate={{ opacity: [0.18, 0.45, 0.18] }}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase' }}>Knowledge Map</span>
+        {hasData && (
+          <span style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.22)' }}>
+            {concepts.length} concept{concepts.length !== 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
+      <svg viewBox="0 0 100 100" style={{ width: '100%', marginTop: hasData ? 4 : 12 }}>
+        {edges.map(([a, b], i) => (
+          <motion.line key={i}
+            x1={nodes[a]?.x} y1={nodes[a]?.y} x2={nodes[b]?.x} y2={nodes[b]?.y}
+            stroke={hasData ? 'rgba(255,255,255,0.20)' : 'rgba(255,255,255,0.38)'} strokeWidth={0.6}
+            animate={{ opacity: [0.15, 0.40, 0.15] }}
             transition={{ duration: 3 + i * 0.35, repeat: Infinity, ease: 'easeInOut', delay: i * 0.25 }}
           />
         ))}
-        {NODES.map((n, i) => (
+        {nodes.map((n, i) => (
           <g key={i}>
             <motion.circle cx={n.x} cy={n.y} r={n.r + 3} fill={n.color} opacity={0}
-              animate={{ r: [n.r + 3, n.r + 7, n.r + 3], opacity: [0.12, 0.25, 0.12] }}
+              animate={{ r: [n.r + 3, n.r + 6, n.r + 3], opacity: [0.10, 0.24, 0.10] }}
               transition={{ duration: 2.5 + i * 0.3, repeat: Infinity, ease: 'easeInOut', delay: i * 0.18 }}
             />
             <motion.circle cx={n.x} cy={n.y} r={n.r} fill={n.color}
-              animate={{ scale: [1, 1.2, 1] }}
+              animate={{ scale: [1, 1.18, 1] }}
               style={{ transformOrigin: `${n.x}px ${n.y}px` }}
               transition={{ duration: 2.5 + i * 0.3, repeat: Infinity, ease: 'easeInOut', delay: i * 0.18 }}
             />
+            {hasData && n.label && (
+              <text
+                x={n.x} y={n.y + n.r + 5}
+                textAnchor="middle"
+                fill="rgba(255,255,255,0.40)"
+                fontSize="4"
+                fontFamily="Inter, system-ui, sans-serif"
+                style={{ pointerEvents: 'none' }}
+              >
+                {n.label.length > 11 ? n.label.slice(0, 10) + '…' : n.label}
+              </text>
+            )}
           </g>
         ))}
       </svg>
+      {!hasData && (
+        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', textAlign: 'center', marginTop: -10, paddingBottom: 4, margin: 0 }}>
+          Chat to grow your map
+        </p>
+      )}
     </GlassCard>
   )
 }
@@ -1448,6 +1531,138 @@ function PersonalProgressCard() {
 }
 
 /* ═══ DASHBOARD VIEW ══════════════════════════════ */
+/* ═══ MOBILE DRAWER ══════════════════════════════ */
+function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings, onProfile, onSignOut }) {
+  const items = [
+    { label: 'Library',      icon: <BookOpen size={17} />,  color: '#A78BFA', bg: 'rgba(167,139,250,0.10)', border: 'rgba(167,139,250,0.22)', action: onLibrary },
+    { label: 'Second Brain', icon: <Brain size={17} />,     color: '#8B8FFF', bg: 'rgba(139,143,255,0.10)', border: 'rgba(139,143,255,0.22)', action: onBrain },
+    { label: 'Mirror',       icon: <span style={{ fontSize: 17 }}>🪞</span>, color: '#D8B4FE', bg: 'rgba(139,92,246,0.10)', border: 'rgba(139,92,246,0.22)', action: onMirror },
+    { label: 'My Profile',   icon: <Star size={17} />,      color: '#E9A364', bg: 'rgba(233,163,100,0.10)', border: 'rgba(233,163,100,0.22)', action: onProfile },
+    { label: 'Appearance',   icon: <Settings size={17} />,  color: 'rgba(255,255,255,0.55)', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.10)', action: onSettings },
+  ]
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            key="drawer-backdrop"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={onClose}
+            style={{ position: 'fixed', inset: 0, zIndex: 298, background: 'rgba(0,0,0,0.70)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
+          />
+          <motion.div
+            key="drawer-panel"
+            initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+            transition={{ type: 'spring', stiffness: 340, damping: 32 }}
+            style={{
+              position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 299,
+              width: 270, background: 'rgba(6,7,22,0.99)',
+              borderLeft: '1px solid rgba(255,255,255,0.10)',
+              display: 'flex', flexDirection: 'column',
+              fontFamily: "'Inter', system-ui, sans-serif",
+            }}
+          >
+            {/* Drawer header */}
+            <div style={{ padding: '20px 18px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 24, height: 24, borderRadius: 7, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Star size={10} color="white" fill="white" />
+                </div>
+                <span style={{ fontSize: 15, fontWeight: 800, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.02em' }}>aeva</span>
+              </div>
+              <motion.button whileHover={{ scale: 1.08, rotate: 90 }} whileTap={{ scale: 0.94 }} onClick={onClose}
+                style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.50)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={13} />
+              </motion.button>
+            </div>
+
+            {/* Nav items */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {items.map(item => (
+                <motion.button key={item.label} whileTap={{ scale: 0.97 }}
+                  onClick={() => { item.action?.(); onClose() }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 13,
+                    padding: '13px 16px', borderRadius: 14,
+                    background: item.bg, border: `1px solid ${item.border}`,
+                    color: item.color, fontSize: 14, fontWeight: 600,
+                    cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', width: '100%',
+                  }}>
+                  {item.icon}
+                  {item.label}
+                </motion.button>
+              ))}
+            </div>
+
+            {/* Sign out */}
+            <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,0.07)', flexShrink: 0, paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+              <motion.button whileTap={{ scale: 0.97 }}
+                onClick={() => { onSignOut?.(); onClose() }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '12px 16px', borderRadius: 14, width: '100%',
+                  background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.20)',
+                  color: 'rgba(248,113,113,0.80)', fontSize: 14, fontWeight: 600,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}>
+                <LogOut size={16} />
+                Sign Out
+              </motion.button>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  )
+}
+
+/* ═══ MOBILE BOTTOM BAR ══════════════════════════ */
+function MobileBottomBar({ onChat, onLab, onArcade, onDrillCount }) {
+  const tabs = [
+    { label: 'Chat',   icon: <MessageCircle size={21} />, action: onChat,   color: '#8B8FFF' },
+    { label: 'Lab',    icon: <FlaskConical size={21} />,  action: onLab,    color: '#3B82F6', badge: onDrillCount > 0 ? onDrillCount : null },
+    { label: 'Arcade', icon: <Gamepad2 size={21} />,      action: onArcade, color: '#6366F1' },
+  ]
+  return (
+    <div style={{
+      position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 90,
+      background: 'rgba(5,6,18,0.97)', backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
+      borderTop: '1px solid rgba(255,255,255,0.08)',
+      display: 'flex', alignItems: 'stretch',
+      fontFamily: "'Inter', system-ui, sans-serif",
+      height: 'calc(60px + env(safe-area-inset-bottom))',
+      paddingBottom: 'env(safe-area-inset-bottom)',
+    }}>
+      {tabs.map(tab => (
+        <motion.button key={tab.label} whileTap={{ scale: 0.92 }}
+          onClick={tab.action}
+          style={{
+            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+            justifyContent: 'center', gap: 4, background: 'none', border: 'none',
+            cursor: 'pointer', color: 'rgba(255,255,255,0.40)',
+            fontFamily: 'inherit', position: 'relative',
+          }}>
+          <div style={{ color: 'rgba(255,255,255,0.42)', position: 'relative' }}>
+            {tab.icon}
+            {tab.badge && (
+              <div style={{
+                position: 'absolute', top: -5, right: -7,
+                minWidth: 16, height: 16, borderRadius: 99,
+                background: '#4ADE80', color: '#0a160a',
+                fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center',
+                justifyContent: 'center', padding: '0 3px',
+                boxShadow: '0 0 8px rgba(74,222,128,0.60)',
+              }}>{tab.badge}</div>
+            )}
+          </div>
+          <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.38)' }}>{tab.label}</span>
+        </motion.button>
+      ))}
+    </div>
+  )
+}
+
+/* ═══ DASHBOARD VIEW ══════════════════════════════ */
 function DashboardView({ onChatOpen, onSignOut }) {
   const { openArcade } = useArcadeStore()
   const { openLab } = useLabStore()
@@ -1463,6 +1678,8 @@ function DashboardView({ onChatOpen, onSignOut }) {
   const [brainOpen, setBrainOpen] = useState(false)
   const [mirrorOpen, setMirrorOpen] = useState(false)
   const [orbSelectorOpen, setOrbSelectorOpen] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const isMobile = useIsMobile()
   const { getStats } = useBrainStore()
   const brainStats = getStats()
   const { xp, streak, activeOrb: activeOrbId, unlockedOrbs } = useXPStore()
@@ -1493,177 +1710,69 @@ function DashboardView({ onChatOpen, onSignOut }) {
       <LabHub />
 
       <div style={{ position: 'relative' }}>
-        <header className="dash-header" style={{
-          position: 'sticky', top: 0, zIndex: 50,
-          padding: '18px 28px 16px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          maxWidth: 1280, margin: '0 auto',
-          backdropFilter: 'blur(32px)',
-          WebkitBackdropFilter: 'blur(32px)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 10, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 14px rgba(45,48,142,0.50)' }}>
-              <Star size={13} color="white" fill="white" />
+        {/* ── Desktop header (hidden on mobile) ── */}
+        {!isMobile && (
+          <header className="dash-header" style={{
+            position: 'sticky', top: 0, zIndex: 50,
+            padding: '18px 28px 16px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            maxWidth: 1280, margin: '0 auto',
+            backdropFilter: 'blur(32px)',
+            WebkitBackdropFilter: 'blur(32px)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+              <div style={{ width: 30, height: 30, borderRadius: 10, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 14px rgba(45,48,142,0.50)' }}>
+                <Star size={13} color="white" fill="white" />
+              </div>
+              <span style={{ fontSize: 17, fontWeight: 900, letterSpacing: '-0.04em', background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(233,163,100,0.80) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>aeva</span>
             </div>
-            <span style={{ fontSize: 17, fontWeight: 900, letterSpacing: '-0.04em', background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(233,163,100,0.80) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>aeva</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {/* Library button */}
-            <motion.button
-              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-              onClick={() => setLibraryOpen(true)}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 7,
-                padding: '7px 16px', borderRadius: 99,
-                background: 'rgba(167,139,250,0.12)',
-                border: '1px solid rgba(167,139,250,0.30)',
-                color: 'rgba(255,255,255,0.75)',
-                fontFamily: "'Inter', system-ui, sans-serif",
-                fontSize: 12.5, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.01em',
-                position: 'relative',
-              }}
-            >
-              <BookOpen size={13} />
-              Library
-              {sessions.length > 0 && (
-                <span style={{ padding: '1px 6px', borderRadius: 99, background: 'rgba(167,139,250,0.25)', fontSize: 9.5, fontWeight: 800, color: '#A78BFA' }}>
-                  {sessions.length}
-                </span>
-              )}
-            </motion.button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setLibraryOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 99, background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.30)', color: 'rgba(255,255,255,0.75)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12.5, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.01em', position: 'relative' }}>
+                <BookOpen size={13} />Library
+                {sessions.length > 0 && <span style={{ padding: '1px 6px', borderRadius: 99, background: 'rgba(167,139,250,0.25)', fontSize: 9.5, fontWeight: 800, color: '#A78BFA' }}>{sessions.length}</span>}
+              </motion.button>
+              <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setBrainOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 99, background: 'rgba(139,143,255,0.13)', border: '1px solid rgba(139,143,255,0.32)', color: 'rgba(200,200,255,0.85)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+                <Brain size={13} />Second Brain
+                {brainStats.total > 0 && <span style={{ padding: '1px 6px', borderRadius: 99, background: 'rgba(139,143,255,0.22)', fontSize: 9.5, fontWeight: 800, color: '#8B8FFF' }}>{brainStats.total}</span>}
+              </motion.button>
+              <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setMirrorOpen(true)} animate={{ boxShadow: ['0 0 0px rgba(139,92,246,0)', '0 0 12px rgba(139,92,246,0.35)', '0 0 0px rgba(139,92,246,0)'] }} transition={{ boxShadow: { duration: 3, repeat: Infinity } }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 99, background: 'linear-gradient(135deg, rgba(109,40,217,0.20), rgba(139,92,246,0.12))', border: '1px solid rgba(139,92,246,0.38)', color: 'rgba(216,180,254,0.90)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>🪞 Mirror</motion.button>
+              <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={openLab} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 99, background: 'rgba(59,130,246,0.14)', border: '1px solid rgba(59,130,246,0.35)', color: 'rgba(255,255,255,0.80)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12.5, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.01em', position: 'relative' }}>
+                <FlaskConical size={13} />The Lab
+                {srDueCount > 0 && <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400 }} style={{ position: 'absolute', top: -5, right: -5, minWidth: 17, height: 17, borderRadius: 99, background: '#4ADE80', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9.5, fontWeight: 800, color: '#0a160a', padding: '0 4px', boxShadow: '0 0 8px rgba(74,222,128,0.60)' }}>{srDueCount}</motion.div>}
+              </motion.button>
+              <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={openArcade} animate={{ boxShadow: ['0 0 0px rgba(99,102,241,0)', '0 0 18px rgba(99,102,241,0.55)', '0 0 0px rgba(99,102,241,0)'] }} transition={{ boxShadow: { duration: 2.5, repeat: Infinity, ease: 'easeInOut' } }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 99, background: 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(233,163,100,0.15))', border: '1px solid rgba(99,102,241,0.45)', color: 'rgba(255,255,255,0.92)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12.5, fontWeight: 700, cursor: 'pointer', letterSpacing: '0.04em', textTransform: 'uppercase' }}><Gamepad2 size={13} />Unleash Arcade</motion.button>
+              <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={onChatOpen} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 99, background: 'rgba(139,143,255,0.15)', border: '1px solid rgba(139,143,255,0.30)', color: 'rgba(255,255,255,0.80)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12.5, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.01em' }}><MessageCircle size={13} />Chat</motion.button>
+              <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={() => setProfileOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 99, background: 'rgba(233,163,100,0.12)', border: '1px solid rgba(233,163,100,0.30)', color: 'rgba(233,163,100,0.88)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>👤 My Profile</motion.button>
+              <motion.button whileHover={{ scale: 1.08, rotate: 45 }} whileTap={{ scale: 0.94 }} onClick={() => setAppSettingsOpen(true)} style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.13)', color: 'rgba(255,255,255,0.50)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Settings size={14} /></motion.button>
+              <UserAvatar onSignOut={onSignOut} />
+            </div>
+          </header>
+        )}
 
-            {/* Second Brain button */}
-            <motion.button
-              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-              onClick={() => setBrainOpen(true)}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 7,
-                padding: '7px 16px', borderRadius: 99,
-                background: 'rgba(139,143,255,0.13)',
-                border: '1px solid rgba(139,143,255,0.32)',
-                color: 'rgba(200,200,255,0.85)',
-                fontFamily: "'Inter', system-ui, sans-serif",
-                fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
-              }}
-            >
-              <Brain size={13} />
-              Second Brain
-              {brainStats.total > 0 && (
-                <span style={{ padding: '1px 6px', borderRadius: 99, background: 'rgba(139,143,255,0.22)', fontSize: 9.5, fontWeight: 800, color: '#8B8FFF' }}>
-                  {brainStats.total}
-                </span>
-              )}
+        {/* ── Mobile header (logo + hamburger only) ── */}
+        {isMobile && (
+          <header style={{
+            position: 'sticky', top: 0, zIndex: 50,
+            padding: '14px 18px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 9, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(45,48,142,0.50)' }}>
+                <Star size={11} color="white" fill="white" />
+              </div>
+              <span style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.04em', background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(233,163,100,0.80) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>aeva</span>
+            </div>
+            <motion.button whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.92 }}
+              onClick={() => setDrawerOpen(true)}
+              style={{ width: 38, height: 38, borderRadius: 12, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.70)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Menu size={18} />
             </motion.button>
+          </header>
+        )}
 
-            {/* Mirror button */}
-            <motion.button
-              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-              onClick={() => setMirrorOpen(true)}
-              animate={{ boxShadow: ['0 0 0px rgba(139,92,246,0)', '0 0 12px rgba(139,92,246,0.35)', '0 0 0px rgba(139,92,246,0)'] }}
-              transition={{ boxShadow: { duration: 3, repeat: Infinity } }}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 7,
-                padding: '7px 16px', borderRadius: 99,
-                background: 'linear-gradient(135deg, rgba(109,40,217,0.20), rgba(139,92,246,0.12))',
-                border: '1px solid rgba(139,92,246,0.38)',
-                color: 'rgba(216,180,254,0.90)',
-                fontFamily: "'Inter', system-ui, sans-serif",
-                fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
-              }}
-            >
-              🪞 Mirror
-            </motion.button>
-
-            {/* Training Lab button */}
-            <motion.button
-              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-              onClick={openLab}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 7,
-                padding: '7px 16px', borderRadius: 99,
-                background: 'rgba(59,130,246,0.14)',
-                border: '1px solid rgba(59,130,246,0.35)',
-                color: 'rgba(255,255,255,0.80)',
-                fontFamily: "'Inter', system-ui, sans-serif",
-                fontSize: 12.5, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.01em',
-                position: 'relative',
-              }}
-            >
-              <FlaskConical size={13} />
-              The Lab
-              {srDueCount > 0 && (
-                <motion.div
-                  initial={{ scale: 0 }} animate={{ scale: 1 }}
-                  transition={{ type: 'spring', stiffness: 400 }}
-                  style={{
-                    position: 'absolute', top: -5, right: -5,
-                    minWidth: 17, height: 17, borderRadius: 99,
-                    background: '#4ADE80',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 9.5, fontWeight: 800, color: '#0a160a',
-                    padding: '0 4px',
-                    boxShadow: '0 0 8px rgba(74,222,128,0.60)',
-                  }}
-                >
-                  {srDueCount}
-                </motion.div>
-              )}
-            </motion.button>
-
-            {/* UNLEASH ARCADE button */}
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={openArcade}
-              animate={{ boxShadow: ['0 0 0px rgba(99,102,241,0)', '0 0 18px rgba(99,102,241,0.55)', '0 0 0px rgba(99,102,241,0)'] }}
-              transition={{ boxShadow: { duration: 2.5, repeat: Infinity, ease: 'easeInOut' } }}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 7,
-                padding: '7px 16px', borderRadius: 99,
-                background: 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(233,163,100,0.15))',
-                border: '1px solid rgba(99,102,241,0.45)',
-                color: 'rgba(255,255,255,0.92)',
-                fontFamily: "'Inter', system-ui, sans-serif",
-                fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
-                letterSpacing: '0.04em', textTransform: 'uppercase',
-              }}
-            >
-              <Gamepad2 size={13} />
-              Unleash Arcade
-            </motion.button>
-            <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={onChatOpen}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 99, background: 'rgba(139,143,255,0.15)', border: '1px solid rgba(139,143,255,0.30)', color: 'rgba(255,255,255,0.80)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12.5, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.01em' }}>
-              <MessageCircle size={13} />
-              Chat
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-              onClick={() => setProfileOpen(true)}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 7,
-                padding: '7px 16px', borderRadius: 99,
-                background: 'rgba(233,163,100,0.12)',
-                border: '1px solid rgba(233,163,100,0.30)',
-                color: 'rgba(233,163,100,0.88)',
-                fontFamily: "'Inter', system-ui, sans-serif",
-                fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
-              }}
-            >
-              👤 My Profile
-            </motion.button>
-            {/* Settings gear */}
-            <motion.button
-              whileHover={{ scale: 1.08, rotate: 45 }} whileTap={{ scale: 0.94 }}
-              onClick={() => setAppSettingsOpen(true)}
-              style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.13)', color: 'rgba(255,255,255,0.50)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-              <Settings size={14} />
-            </motion.button>
-            <UserAvatar onSignOut={onSignOut} />
-          </div>
-        </header>
-
-        <div className="bento-grid" style={{ padding: '0 24px', maxWidth: 1280, margin: '0 auto' }}>
+        <div className="bento-grid" style={{ padding: isMobile ? '16px 14px' : '0 24px', maxWidth: 1280, margin: '0 auto', paddingBottom: isMobile ? 'calc(80px + env(safe-area-inset-bottom))' : undefined }}>
           <MissionCard onChatOpen={onChatOpen} onOrbClick={() => setOrbSelectorOpen(true)} />
           <ConstellationCard />
           <MoodCard />
@@ -1675,8 +1784,32 @@ function DashboardView({ onChatOpen, onSignOut }) {
           <PersonalProgressCard />
         </div>
 
-        <div style={{ height: 48 }} />
+        <div style={{ height: isMobile ? 0 : 48 }} />
       </div>
+
+      {/* ── Mobile drawer ── */}
+      {isMobile && (
+        <MobileDrawer
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          onLibrary={() => setLibraryOpen(true)}
+          onBrain={() => setBrainOpen(true)}
+          onMirror={() => setMirrorOpen(true)}
+          onSettings={() => setAppSettingsOpen(true)}
+          onProfile={() => setProfileOpen(true)}
+          onSignOut={onSignOut}
+        />
+      )}
+
+      {/* ── Mobile bottom bar ── */}
+      {isMobile && (
+        <MobileBottomBar
+          onChat={onChatOpen}
+          onLab={openLab}
+          onArcade={openArcade}
+          onDrillCount={srDueCount}
+        />
+      )}
 
       {/* Modals */}
       <AnimatePresence>

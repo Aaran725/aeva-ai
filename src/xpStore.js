@@ -97,12 +97,12 @@ export const ORBS = [
 ]
 
 export const XP_EVENTS = {
-  DAILY_LOGIN:    { amount: 15,  label: 'Daily Login' },
-  DRILL_COMPLETE: { amount: 25,  label: 'Drill Complete' },
-  TOPIC_MASTERED: { amount: 50,  label: 'Topic Mastered' },
-  SOCRATIC_5:     { amount: 40,  label: 'Socratic Session' },
-  STREAK_7:       { amount: 75,  label: '7-Day Streak!' },
-  STREAK_30:      { amount: 200, label: '30-Day Streak!' },
+  DAILY_LOGIN:    { amount: 30,  label: 'Daily Login' },
+  DRILL_COMPLETE: { amount: 40,  label: 'Drill Complete' },
+  TOPIC_MASTERED: { amount: 75,  label: 'Topic Mastered' },
+  SOCRATIC_5:     { amount: 55,  label: 'Socratic Session' },
+  STREAK_7:       { amount: 120, label: '7-Day Streak!' },
+  STREAK_30:      { amount: 300, label: '30-Day Streak!' },
 }
 
 export function xpForLevel(level) {
