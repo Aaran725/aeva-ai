@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Shield, Eye, EyeOff, ArrowRight } from 'lucide-react'
 
-const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL
-const ADMIN_PASS  = import.meta.env.VITE_ADMIN_PASS
+const _a = atob('YWRtaW5AYWV2YS5kZXY=')       // admin@aeva.dev
+const _b = atob('QWV2YUFkbWluMjAyNiE=')       // AevaAdmin2026!
 
 export default function AdminLogin({ onSuccess, onCancel }) {
   const [email, setEmail]       = useState('')
@@ -16,7 +16,7 @@ export default function AdminLogin({ onSuccess, onCancel }) {
     setError('')
     setLoading(true)
     setTimeout(() => {
-      if (email.trim() === ADMIN_EMAIL && password === ADMIN_PASS) {
+      if (email.trim() === _a && password === _b) {
         sessionStorage.setItem('aeva_admin_session', '1')
         onSuccess()
       } else {
