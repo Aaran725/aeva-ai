@@ -631,10 +631,10 @@ function AevaOrb({ size = 218, active = false, scanMode = false, personality = '
           transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut', delay: 1.2 }}
           style={{ position: 'absolute', width: '36%', height: '34%', top: '30%', left: '8%', borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(255,252,220,1) 0%, rgba(255,218,120,0.88) 32%, rgba(235,158,50,0.42) 66%, transparent 100%)', filter: `blur(${Math.round(7 * s)}px)`, mixBlendMode: 'screen' }}
         />
-        <motion.div animate={{ rotate: [0, 360] }} transition={{ duration: 24, repeat: Infinity, ease: 'linear' }}
-          style={{ position: 'absolute', width: '200%', height: '200%', top: '-50%', left: '-50%', background: 'repeating-conic-gradient(from 0deg at 55% 55%, rgba(255,255,255,0.38) 0deg, rgba(255,255,255,0.38) 1deg, transparent 1deg, transparent 5deg)', mixBlendMode: 'overlay' }} />
-        <motion.div animate={{ rotate: [0, -360] }} transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
-          style={{ position: 'absolute', width: '200%', height: '200%', top: '-50%', left: '-50%', background: 'repeating-conic-gradient(from 30deg at 48% 48%, rgba(255,255,255,0.07) 0deg, rgba(255,255,255,0.07) 0.6deg, transparent 0.6deg, transparent 4deg)', mixBlendMode: 'overlay', opacity: 0.7 }} />
+        <motion.div animate={{ rotate: [0, 360] }} transition={{ duration: 28, repeat: Infinity, ease: 'linear' }}
+          style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 30% 30%, rgba(255,255,255,0.12) 0%, transparent 55%)', mixBlendMode: 'overlay', borderRadius: 'inherit' }} />
+        <motion.div animate={{ rotate: [0, -360] }} transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
+          style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 70% 65%, rgba(255,200,120,0.08) 0%, transparent 50%)', mixBlendMode: 'overlay', borderRadius: 'inherit' }} />
         <div style={{ position: 'absolute', width: '38%', height: '28%', top: '4%', right: '2%', borderRadius: '50%', background: 'radial-gradient(ellipse at 44% 34%, rgba(255,255,255,0.56) 0%, rgba(218,226,255,0.22) 48%, transparent 76%)', filter: `blur(${Math.round(10 * s)}px)` }} />
         <div style={{ position: 'absolute', width: '8%', height: '6%', top: '8%', right: '18%', borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.48) 55%, transparent 80%)', filter: `blur(${Math.round(2 * s)}px)` }} />
         <div style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', boxShadow: 'inset 0 0 65px rgba(2,4,22,0.70)', pointerEvents: 'none' }} />
@@ -1404,7 +1404,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
       <LabHub />
 
       <div style={{ position: 'relative' }}>
-        <header style={{
+        <header className="dash-header" style={{
           position: 'sticky', top: 0, zIndex: 50,
           padding: '18px 28px 16px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -2956,15 +2956,15 @@ Write a direct, specific opener under 35 words. Reference something concrete. En
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', position: 'relative', zIndex: 1 }}>
 
         {/* Header */}
-        <div style={{ flexShrink: 0, padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={onBack}
+        <div className="chat-header" style={{ flexShrink: 0, padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <motion.button className="chat-back-btn" whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={onBack}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 99, backdropFilter: 'blur(20px)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 13, fontWeight: 600, cursor: 'pointer', ...backBtnStyle }}>
             <ChevronLeft size={14} strokeWidth={2.5} />
             {isMission ? 'Exit Mission' : 'Dashboard'}
           </motion.button>
 
           {/* Center: mission badge or session badges */}
-          <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+          <div className="chat-session-badges" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
             {isMission && activeMission
               ? <MissionBadge mission={activeMission} />
               : (!isEmpty && <SessionBadge sessionState={sessionState} criticism={criticism} />)
@@ -3022,7 +3022,7 @@ Write a direct, specific opener under 35 words. Reference something concrete. En
               if (confidence < 30 || !learningStyle[dom]) return null
               const col = STYLE_COL[dom]
               return (
-                <div style={{
+                <div className="chat-adapt-pill" style={{
                   display: 'flex', alignItems: 'center', gap: 5,
                   padding: '4px 10px', borderRadius: 99,
                   background: isLight ? `${col}18` : `${col}12`, border: `1px solid ${isLight ? col + '50' : col + '30'}`,
@@ -3060,7 +3060,7 @@ Write a direct, specific opener under 35 words. Reference something concrete. En
                 </motion.button>
 
                 {/* Library */}
-                <motion.button
+                <motion.button className="chat-btn-library"
                   whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
                   onClick={() => setLibraryOpen(true)}
                   style={{
@@ -3073,7 +3073,7 @@ Write a direct, specific opener under 35 words. Reference something concrete. En
                   <BookOpen size={11} /> Library
                 </motion.button>
 
-                <motion.button
+                <motion.button className="chat-btn-studyguide"
                   onClick={() => setStudyGuideOpen(true)}
                   style={{
                     padding: '5px 12px', borderRadius: 99, cursor: 'pointer',
@@ -3319,7 +3319,7 @@ Write a direct, specific opener under 35 words. Reference something concrete. En
 
             {/* Mini orb + mastery (tutor mode active) */}
             {!isEmpty && !isMission && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 4, flexShrink: 0, gap: 8 }}>
+              <div className="chat-orb-area" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 4, flexShrink: 0, gap: 8 }}>
                 <AevaOrb size={72} active={isThinking} scanMode={labOpen} personality={orbPersonality} />
                 {Object.keys(masteryMap).length > 0 && (
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', padding: '0 20px' }}>
@@ -3519,7 +3519,7 @@ Write a direct, specific opener under 35 words. Reference something concrete. En
                   e.target.value = ''
                 }}
               />
-              <div style={{ width: '100%', maxWidth: isMission ? 720 : 640, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 10px 10px 16px', backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)', borderRadius: 999, transition: 'border 0.3s, box-shadow 0.3s', ...inputBarStyle }}>
+              <div className="chat-input-bar" style={{ width: '100%', maxWidth: isMission ? 720 : 640, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 10px 10px 16px', backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)', borderRadius: 999, transition: 'border 0.3s, box-shadow 0.3s', ...inputBarStyle }}>
                 {/* Lens camera button + Custom Drill button */}
                 {!isMission && (
                   <>

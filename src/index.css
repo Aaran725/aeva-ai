@@ -126,3 +126,99 @@ body {
 .glass-card-glow:hover {
   box-shadow: 0 8px 48px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.12), inset 0 1px 0 rgba(255,255,255,0.12) !important;
 }
+
+/* ════════════════════════════════════════════════
+   MOBILE — everything below 768px
+════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+
+  /* ── Global ── */
+  * { -webkit-tap-highlight-color: transparent; }
+
+  /* ── Dashboard ── */
+  .dash-header {
+    padding: 14px 16px !important;
+    flex-wrap: wrap;
+    gap: 10px !important;
+  }
+  .dash-header-actions {
+    gap: 6px !important;
+    flex-wrap: wrap;
+  }
+  .dash-header-actions button {
+    font-size: 11px !important;
+    padding: 5px 10px !important;
+  }
+  /* Hide secondary dashboard buttons on mobile */
+  .dash-hide-mobile { display: none !important; }
+
+  /* ── Chat header ── */
+  .chat-header {
+    padding: 10px 12px !important;
+    gap: 8px !important;
+  }
+  /* Hide Analogy/Coaching pills on mobile — too cluttered */
+  .chat-session-badges { display: none !important; }
+  /* Hide adaptation pill on mobile */
+  .chat-adapt-pill { display: none !important; }
+  /* Smaller back button */
+  .chat-back-btn { padding: 5px 10px !important; font-size: 12px !important; }
+  /* Hide Library and Study Guide on mobile, show only Socratic */
+  .chat-btn-library { display: none !important; }
+  .chat-btn-studyguide { display: none !important; }
+  .chat-btn-socratic { font-size: 11px !important; padding: 5px 10px !important; }
+
+  /* ── Chat messages ── */
+  .chat-messages { padding: 12px 12px !important; }
+
+  /* ── Chat input ── */
+  .chat-input-bar {
+    margin: 0 10px 12px !important;
+    padding: 10px 12px !important;
+  }
+
+  /* ── Chat orb area ── */
+  .chat-orb-area { padding: 16px 12px 8px !important; }
+
+  /* ── Modals full-screen on mobile ── */
+  .modal-panel {
+    max-width: 100% !important;
+    max-height: 100% !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* ── Second Brain / Mirror header stats ── */
+  .brain-stats { display: none !important; }
+  .mirror-stats { display: none !important; }
+
+  /* ── Landing page ── */
+  .landing-hero { flex-direction: column !important; text-align: center !important; }
+  .landing-hero-orb { display: none !important; }
+  .landing-features { grid-template-columns: 1fr !important; }
+  .landing-nav-actions .nav-get-started-text { display: none !important; }
+
+  /* ── Orb selector ── */
+  .orb-grid { grid-template-columns: 1fr !important; }
+
+  /* ── Chips on chat empty state ── */
+  .chat-chips { gap: 6px !important; }
+  .chat-chips button { font-size: 12px !important; padding: 7px 12px !important; }
+
+  /* ── KaTeX display math ── */
+  .katex-display { font-size: 1em !important; overflow-x: auto; }
+  .katex { font-size: 1em !important; }
+}
+
+/* ── Prevent horizontal scroll everywhere ── */
+html, body, #root {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* ── Safe area for notched phones ── */
+@supports (padding: max(0px)) {
+  .chat-input-bar {
+    padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+  }
+}

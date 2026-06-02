@@ -320,6 +320,7 @@ export default function SecondBrain({ onClose, onMirrorOpen }) {
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="modal-panel"
       style={{ position: 'fixed', inset: 0, zIndex: 120, background: '#05061a', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', system-ui, sans-serif" }}
     >
       {/* Background glows */}
@@ -383,7 +384,7 @@ export default function SecondBrain({ onClose, onMirrorOpen }) {
       </div>
 
       {/* Stats row */}
-      <div style={{ padding: '14px 24px', display: 'flex', gap: 10, flexShrink: 0, position: 'relative', zIndex: 2 }}>
+      <div className="brain-stats" style={{ padding: '14px 24px', display: 'flex', gap: 10, flexShrink: 0, position: 'relative', zIndex: 2 }}>
         <StatPill icon={Brain}       label="concepts"     value={stats.total}    color="#8B8FFF" />
         <StatPill icon={TrendingUp}  label="mastered"     value={stats.mastered} color="#4ADE80" />
         <StatPill icon={BookOpen}    label="subjects"     value={stats.subjects} color="#60A5FA" />
