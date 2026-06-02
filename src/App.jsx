@@ -33,6 +33,7 @@ import SecondBrain from './SecondBrain'
 import { useBrainStore } from './brainStore'
 import Mirror from './Mirror'
 import OrbSelector from './OrbSelector'
+import ShowEm from './ShowEm'
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
 import './index.css'
 
@@ -1554,12 +1555,13 @@ function PersonalProgressCard() {
 
 /* ═══ DASHBOARD VIEW ══════════════════════════════ */
 /* ═══ MOBILE DRAWER ══════════════════════════════ */
-function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings, onProfile, onSignOut }) {
+function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings, onProfile, onShowEm, onSignOut }) {
   const T = useT()
   const items = [
     { label: T.library,      icon: <BookOpen size={17} />,  color: '#A78BFA', bg: 'rgba(167,139,250,0.10)', border: 'rgba(167,139,250,0.22)', action: onLibrary },
     { label: T.secondBrain,  icon: <Brain size={17} />,     color: '#8B8FFF', bg: 'rgba(139,143,255,0.10)', border: 'rgba(139,143,255,0.22)', action: onBrain },
     { label: T.mirror,       icon: <span style={{ fontSize: 17 }}>🪞</span>, color: '#D8B4FE', bg: 'rgba(139,92,246,0.10)', border: 'rgba(139,92,246,0.22)', action: onMirror },
+    { label: '📊 Show Em',   icon: <span style={{ fontSize: 17 }}>📊</span>, color: '#34D399', bg: 'rgba(52,211,153,0.10)', border: 'rgba(52,211,153,0.22)', action: onShowEm },
     { label: T.myProfile,    icon: <Star size={17} />,      color: '#E9A364', bg: 'rgba(233,163,100,0.10)', border: 'rgba(233,163,100,0.22)', action: onProfile },
     { label: T.appearance,   icon: <Settings size={17} />,  color: 'rgba(255,255,255,0.55)', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.10)', action: onSettings },
   ]
@@ -1703,6 +1705,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
   const [brainOpen, setBrainOpen] = useState(false)
   const [mirrorOpen, setMirrorOpen] = useState(false)
   const [orbSelectorOpen, setOrbSelectorOpen] = useState(false)
+  const [showEmOpen, setShowEmOpen] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const isMobile = useIsMobile()
   const { getStats } = useBrainStore()
@@ -1767,6 +1770,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
               </motion.button>
               <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={openArcade} animate={{ boxShadow: ['0 0 0px rgba(99,102,241,0)', '0 0 18px rgba(99,102,241,0.55)', '0 0 0px rgba(99,102,241,0)'] }} transition={{ boxShadow: { duration: 2.5, repeat: Infinity, ease: 'easeInOut' } }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 99, background: 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(233,163,100,0.15))', border: '1px solid rgba(99,102,241,0.45)', color: 'rgba(255,255,255,0.92)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12.5, fontWeight: 700, cursor: 'pointer', letterSpacing: '0.04em', textTransform: 'uppercase' }}><Gamepad2 size={13} />Unleash Arcade</motion.button>
               <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={onChatOpen} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 99, background: 'rgba(139,143,255,0.15)', border: '1px solid rgba(139,143,255,0.30)', color: 'rgba(255,255,255,0.80)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12.5, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.01em' }}><MessageCircle size={13} />Chat</motion.button>
+              <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={() => setShowEmOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 99, background: 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(16,185,129,0.10))', border: '1px solid rgba(99,102,241,0.38)', color: 'rgba(255,255,255,0.88)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>📊 Show Em</motion.button>
               <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={() => setProfileOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 99, background: 'rgba(233,163,100,0.12)', border: '1px solid rgba(233,163,100,0.30)', color: 'rgba(233,163,100,0.88)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>👤 My Profile</motion.button>
               <motion.button whileHover={{ scale: 1.08, rotate: 45 }} whileTap={{ scale: 0.94 }} onClick={() => setAppSettingsOpen(true)} style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.13)', color: 'rgba(255,255,255,0.50)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Settings size={14} /></motion.button>
               <UserAvatar onSignOut={onSignOut} />
@@ -1822,6 +1826,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
           onMirror={() => setMirrorOpen(true)}
           onSettings={() => setAppSettingsOpen(true)}
           onProfile={() => setProfileOpen(true)}
+          onShowEm={() => { setDrawerOpen(false); setShowEmOpen(true) }}
           onSignOut={onSignOut}
         />
       )}
@@ -1911,6 +1916,10 @@ function DashboardView({ onChatOpen, onSignOut }) {
 
       <AnimatePresence>
         {mirrorOpen && <Mirror onClose={() => setMirrorOpen(false)} name={name} />}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showEmOpen && <ShowEm onClose={() => setShowEmOpen(false)} name={name} />}
       </AnimatePresence>
 
       <AnimatePresence>

@@ -1,0 +1,458 @@
+import { useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { X, Star, Zap, Flame, Brain, BookOpen, TrendingUp, Award, Printer, MessageSquare, Layers } from 'lucide-react'
+import { useNeuralStore } from './neuralStore'
+import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
+import { useBrainStore, masteryColor, masteryLabel, SUBJECT_COLORS } from './brainStore'
+import { useArcadeStore } from './arcadeStore'
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function cap(str) {
+  if (!str) return ''
+  return str.charAt(0).toUpperCase() + str.slice(1)
+}
+
+function formatDate(ts) {
+  if (!ts) return ''
+  return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+function StatCard({ icon, value, label, accent = '#8B8FFF' }) {
+  return (
+    <div style={{
+      background: '#fff',
+      border: '1.5px solid #EDEDF5',
+      borderRadius: 18,
+      padding: '20px 18px',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+      flex: 1, minWidth: 110,
+      boxShadow: '0 2px 16px rgba(99,102,241,0.06)',
+    }}>
+      <div style={{ width: 38, height: 38, borderRadius: 12, background: `${accent}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 2 }}>
+        {icon}
+      </div>
+      <span style={{ fontSize: 28, fontWeight: 900, color: '#1a1a2e', letterSpacing: '-0.04em', lineHeight: 1 }}>{value}</span>
+      <span style={{ fontSize: 11, fontWeight: 600, color: '#9CA3AF', letterSpacing: '0.06em', textTransform: 'uppercase', textAlign: 'center' }}>{label}</span>
+    </div>
+  )
+}
+
+function SectionLabel({ children }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+      <div style={{ height: 2, width: 24, background: 'linear-gradient(90deg, #6366F1, #8B8FFF)', borderRadius: 2 }} />
+      <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#6366F1' }}>{children}</span>
+    </div>
+  )
+}
+
+// ─── Main component ────────────────────────────────────────────────────────────
+
+export default function ShowEm({ onClose, name = 'Your student' }) {
+  const printRef = useRef(null)
+
+  // ─── Data ──────────────────────────────────────────────────────────────────
+  const {
+    masteredTopics, dominantTopics, struggleZones, totalExchanges,
+    learningStyle, learningStyleTotal, learningStyleLocked,
+    orbPersonality, traits, profileTitle, currentVibe,
+  } = useNeuralStore()
+
+  const { xp, streak, activeOrb, unlockedOrbs } = useXPStore()
+  const { nodes, getStats } = useBrainStore()
+  const { worldMemory } = useArcadeStore()
+
+  const level       = levelFromXP(xp)
+  const xpPct       = xpIntoLevel(xp)
+  const brainStats  = getStats()
+  const activeOrbDef = ORBS.find(o => o.id === activeOrb) || ORBS[0]
+
+  // Top concepts by mastery
+  const topConcepts = [...nodes]
+    .sort((a, b) => b.mastery - a.mastery)
+    .slice(0, 12)
+
+  // Subject breakdown
+  const subjectMap = {}
+  nodes.forEach(n => {
+    if (!subjectMap[n.subject]) subjectMap[n.subject] = []
+    subjectMap[n.subject].push(n)
+  })
+  const subjects = Object.entries(subjectMap)
+    .sort((a, b) => b[1].length - a[1].length)
+    .slice(0, 5)
+
+  // Learning style dominant
+  const DIMS = ['analogical', 'visual', 'structural', 'exampleFirst', 'conceptual']
+  const STYLE_NAMES = {
+    analogical:   'Analogy Thinker',
+    visual:       'Visual Learner',
+    structural:   'Systems Builder',
+    exampleFirst: 'Concrete Learner',
+    conceptual:   'Principle Seeker',
+  }
+  const STYLE_DESC = {
+    analogical:   'Understands new ideas by connecting them to things they already know. Strong intuitive grasp.',
+    visual:       'Builds mental pictures and diagrams. Excels with spatial and visual information.',
+    structural:   'Learns by understanding how systems fit together. Great at seeing the big picture.',
+    exampleFirst: 'Needs concrete examples before abstractions click. Strong practical understanding.',
+    conceptual:   'Goes straight for the underlying principle. Loves asking "but why?"',
+  }
+  const dominantStyle = DIMS.reduce((best, d) => ((learningStyle[d] || 0) > (learningStyle[best] || 0) ? d : best), DIMS[0])
+  const calibration   = Math.min(100, Math.round((learningStyleTotal / 15) * 100))
+
+  // Session history from world memory
+  const lastSession = worldMemory?.lastTutorSession
+
+  // Orb personality description
+  const ORB_PARENT_DESC = {
+    balanced:   'Warm and encouraging — Aeva meets them where they are.',
+    challenger: 'High-standards mode — Aeva pushes them to think harder.',
+    scholar:    'Deep-dive mode — precise, thorough, no shortcuts.',
+    mystic:     'Metaphor & analogy mode — makes abstract ideas tangible.',
+    void:       'Socratic mode — Aeva only asks questions, never gives answers.',
+    ember:      'High-energy mode — passionate, fast-paced learning.',
+    aurora:     'Creative connections — joins ideas across different subjects.',
+    phantom:    'Independent thinking mode — hints only, they figure it out.',
+  }
+
+  const handlePrint = () => window.print()
+
+  const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+
+  // ─── Render ──────────────────────────────────────────────────────────────
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 200,
+        background: 'rgba(15,15,35,0.72)',
+        backdropFilter: 'blur(16px)',
+        overflowY: 'auto',
+        fontFamily: "'Inter', system-ui, sans-serif",
+      }}
+    >
+      {/* Scrollable content wrapper */}
+      <div
+        ref={printRef}
+        style={{
+          maxWidth: 780,
+          margin: '0 auto',
+          padding: '32px 20px 60px',
+        }}
+      >
+
+        {/* ── Toolbar (hidden on print) ────────────────────────────── */}
+        <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 9, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Star size={12} color="white" fill="white" />
+            </div>
+            <span style={{ fontSize: 14, fontWeight: 800, color: 'rgba(255,255,255,0.90)', letterSpacing: '-0.03em' }}>aeva</span>
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={handlePrint}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 99, background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.18)', color: 'rgba(255,255,255,0.80)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+              <Printer size={13} /> Print / Save PDF
+            </motion.button>
+            <motion.button whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }} onClick={onClose}
+              style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', color: 'rgba(255,255,255,0.60)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <X size={15} />
+            </motion.button>
+          </div>
+        </div>
+
+        {/* ── Report card ──────────────────────────────────────────── */}
+        <div style={{
+          background: '#F8F7FF',
+          borderRadius: 24,
+          overflow: 'hidden',
+          boxShadow: '0 32px 80px rgba(0,0,0,0.35)',
+        }}>
+
+          {/* Header gradient band */}
+          <div style={{
+            background: 'linear-gradient(135deg, #2D308E 0%, #5B5FC7 50%, #8B8FFF 100%)',
+            padding: '32px 32px 28px',
+            position: 'relative', overflow: 'hidden',
+          }}>
+            <div aria-hidden style={{ position: 'absolute', top: -40, right: -40, width: 220, height: 220, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', pointerEvents: 'none' }} />
+            <div aria-hidden style={{ position: 'absolute', bottom: -30, left: 120, width: 150, height: 150, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none' }} />
+
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.60)', marginBottom: 6 }}>
+                  Learning Report
+                </div>
+                <h1 style={{ fontSize: 30, fontWeight: 900, color: '#fff', letterSpacing: '-0.04em', margin: '0 0 4px', lineHeight: 1.1 }}>
+                  {name}'s Progress
+                </h1>
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', margin: 0 }}>
+                  Generated {today} · Powered by Aeva AI
+                </p>
+              </div>
+
+              {/* Level badge */}
+              <div style={{ background: 'rgba(255,255,255,0.15)', border: '1.5px solid rgba(255,255,255,0.30)', borderRadius: 16, padding: '12px 20px', textAlign: 'center', backdropFilter: 'blur(12px)' }}>
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)', marginBottom: 2 }}>Current Level</div>
+                <div style={{ fontSize: 32, fontWeight: 900, color: '#fff', lineHeight: 1, letterSpacing: '-0.03em' }}>{level}</div>
+                <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>{xpPct}% to Level {level + 1}</div>
+                <div style={{ marginTop: 6, height: 4, background: 'rgba(255,255,255,0.20)', borderRadius: 2, overflow: 'hidden', width: 80 }}>
+                  <div style={{ height: '100%', width: `${xpPct}%`, background: '#fff', borderRadius: 2 }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Profile title & vibe */}
+            <div style={{ marginTop: 18, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.90)', background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 99, padding: '4px 12px' }}>
+                {profileTitle}
+              </span>
+              {traits.slice(0, 3).map((t, i) => (
+                <span key={i} style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.75)', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.16)', borderRadius: 99, padding: '4px 12px' }}>
+                  {t.icon} {t.label}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Body */}
+          <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: 32 }}>
+
+            {/* ── Stat row ────────────────────────────────────────── */}
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <StatCard
+                icon={<MessageSquare size={18} color="#6366F1" />}
+                value={totalExchanges}
+                label="Exchanges"
+                accent="#6366F1"
+              />
+              <StatCard
+                icon={<Award size={18} color="#10B981" />}
+                value={masteredTopics.length}
+                label="Topics Mastered"
+                accent="#10B981"
+              />
+              <StatCard
+                icon={<Flame size={18} color="#F59E0B" />}
+                value={streak}
+                label="Day Streak"
+                accent="#F59E0B"
+              />
+              <StatCard
+                icon={<Layers size={18} color="#8B5CF6" />}
+                value={brainStats.total}
+                label="Concepts Built"
+                accent="#8B5CF6"
+              />
+              <StatCard
+                icon={<Zap size={18} color="#EC4899" />}
+                value={xp}
+                label="Total XP"
+                accent="#EC4899"
+              />
+            </div>
+
+            {/* ── What they're mastering ───────────────────────────── */}
+            {topConcepts.length > 0 && (
+              <div>
+                <SectionLabel>What They're Mastering</SectionLabel>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {topConcepts.slice(0, 8).map((node, i) => {
+                    const col = masteryColor(node.mastery)
+                    return (
+                      <div key={node.id || i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#374151', minWidth: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {cap(node.concept)}
+                        </span>
+                        <div style={{ width: 120, height: 6, background: '#E5E7EB', borderRadius: 3, overflow: 'hidden', flexShrink: 0 }}>
+                          <div style={{ height: '100%', width: `${node.mastery}%`, background: col, borderRadius: 3, transition: 'width 0.6s ease' }} />
+                        </div>
+                        <span style={{ fontSize: 11.5, fontWeight: 700, color: col, minWidth: 52, textAlign: 'right', flexShrink: 0 }}>
+                          {masteryLabel(node.mastery)}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Subject chips */}
+                {subjects.length > 0 && (
+                  <div style={{ marginTop: 14, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {subjects.map(([subject, nodes]) => {
+                      const sc = SUBJECT_COLORS[subject] || SUBJECT_COLORS.General
+                      return (
+                        <span key={subject} style={{
+                          fontSize: 11.5, fontWeight: 700,
+                          background: sc.bg, border: `1px solid ${sc.border}`,
+                          color: sc.color, borderRadius: 99, padding: '3px 10px',
+                        }}>
+                          {subject} · {nodes.length}
+                        </span>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── How they learn best ──────────────────────────────── */}
+            <div>
+              <SectionLabel>How They Learn Best</SectionLabel>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+
+                {/* Fingerprint card */}
+                <div style={{ background: '#fff', border: '1.5px solid #EDEDF5', borderRadius: 16, padding: '18px 20px', boxShadow: '0 2px 12px rgba(99,102,241,0.05)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <Brain size={16} color="#6366F1" />
+                    <span style={{ fontSize: 13, fontWeight: 800, color: '#1a1a2e' }}>
+                      {learningStyleLocked ? STYLE_NAMES[dominantStyle] : 'Still Calibrating'}
+                    </span>
+                    {learningStyleLocked && (
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#10B981', background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 99, padding: '1px 7px' }}>
+                        Confirmed
+                      </span>
+                    )}
+                  </div>
+                  <p style={{ fontSize: 12.5, color: '#6B7280', lineHeight: 1.55, margin: 0 }}>
+                    {learningStyleLocked
+                      ? STYLE_DESC[dominantStyle]
+                      : `Aeva is still learning how ${name} thinks best. ${calibration}% calibrated so far — more sessions will sharpen this.`
+                    }
+                  </p>
+                  {calibration > 0 && !learningStyleLocked && (
+                    <div style={{ marginTop: 10, height: 4, background: '#E5E7EB', borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${calibration}%`, background: 'linear-gradient(90deg, #6366F1, #8B8FFF)', borderRadius: 2 }} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Orb/teaching style card */}
+                <div style={{ background: '#fff', border: '1.5px solid #EDEDF5', borderRadius: 16, padding: '18px 20px', boxShadow: '0 2px 12px rgba(99,102,241,0.05)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <div style={{ width: 18, height: 18, borderRadius: '50%', background: activeOrbDef.gradient, flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, fontWeight: 800, color: '#1a1a2e' }}>{activeOrbDef.name} Mode</span>
+                  </div>
+                  <p style={{ fontSize: 12.5, color: '#6B7280', lineHeight: 1.55, margin: 0 }}>
+                    {ORB_PARENT_DESC[activeOrb] || ORB_PARENT_DESC.balanced}
+                  </p>
+                  <div style={{ marginTop: 10, fontSize: 11.5, color: '#9CA3AF' }}>
+                    {unlockedOrbs.length} of 8 teaching styles unlocked
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Topics mastered list ─────────────────────────────── */}
+            {masteredTopics.length > 0 && (
+              <div>
+                <SectionLabel>Topics They've Mastered</SectionLabel>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {masteredTopics.map((t, i) => (
+                    <span key={i} style={{
+                      fontSize: 12.5, fontWeight: 600,
+                      background: 'rgba(16,185,129,0.08)', border: '1.5px solid rgba(16,185,129,0.25)',
+                      color: '#059669', borderRadius: 99, padding: '4px 12px',
+                      display: 'flex', alignItems: 'center', gap: 4,
+                    }}>
+                      ✓ {cap(t)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Last session summary ─────────────────────────────── */}
+            {lastSession && (
+              <div>
+                <SectionLabel>Last Session</SectionLabel>
+                <div style={{ background: '#fff', border: '1.5px solid #EDEDF5', borderRadius: 16, padding: '18px 20px', boxShadow: '0 2px 12px rgba(99,102,241,0.05)' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1, minWidth: 200 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>
+                        {formatDate(lastSession.date)}
+                      </div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e', marginBottom: 8 }}>
+                        {cap(lastSession.primaryTopic) || 'General Session'}
+                      </div>
+                      {lastSession.topics?.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {lastSession.topics.map((t, i) => (
+                            <span key={i} style={{ fontSize: 11.5, color: '#6366F1', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.20)', borderRadius: 99, padding: '2px 9px', fontWeight: 600 }}>
+                              {cap(t)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 16 }}>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: 22, fontWeight: 900, color: '#6366F1', letterSpacing: '-0.03em' }}>{lastSession.exchanges || 0}</div>
+                        <div style={{ fontSize: 10.5, color: '#9CA3AF', fontWeight: 600 }}>exchanges</div>
+                      </div>
+                      {lastSession.mastered?.length > 0 && (
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 22, fontWeight: 900, color: '#10B981', letterSpacing: '-0.03em' }}>{lastSession.mastered.length}</div>
+                          <div style={{ fontSize: 10.5, color: '#9CA3AF', fontWeight: 600 }}>mastered</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Struggle zones (only if exists, framed constructively) ── */}
+            {struggleZones.length > 0 && (
+              <div>
+                <SectionLabel>Areas To Focus On</SectionLabel>
+                <div style={{ background: '#FFFBEB', border: '1.5px solid #FDE68A', borderRadius: 16, padding: '16px 20px' }}>
+                  <p style={{ fontSize: 12.5, color: '#92400E', margin: '0 0 10px', lineHeight: 1.5 }}>
+                    Aeva has flagged these topics as needing more practice. This is completely normal — it means {name} is being challenged at the right level.
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {struggleZones.slice(0, 5).map((t, i) => (
+                      <span key={i} style={{ fontSize: 12, fontWeight: 600, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.30)', color: '#B45309', borderRadius: 99, padding: '3px 10px' }}>
+                        {cap(t)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Footer ──────────────────────────────────────────── */}
+            <div style={{
+              marginTop: 8,
+              paddingTop: 20,
+              borderTop: '1.5px solid #EDEDF5',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 22, height: 22, borderRadius: 7, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Star size={10} color="white" fill="white" />
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#9CA3AF', letterSpacing: '-0.02em' }}>
+                  Generated by <span style={{ color: '#6366F1' }}>Aeva AI</span>
+                </span>
+              </div>
+              <span style={{ fontSize: 11.5, color: '#D1D5DB' }}>{today}</span>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      {/* Print styles */}
+      <style>{`
+        @media print {
+          .no-print { display: none !important; }
+          body { background: white !important; }
+        }
+      `}</style>
+    </motion.div>
+  )
+}
