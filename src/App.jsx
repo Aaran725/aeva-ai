@@ -2689,43 +2689,8 @@ function ChatView({ onBack }) {
     }
   }, [])
 
-  // Proactive opener for returning users
-  useEffect(() => {
-    if (isMission || messages.length > 0 || totalExchanges < 3) return
-    const lastSession = worldMemory?.lastTutorSession
-    const daysSince = lastSession ? Math.floor((Date.now() - lastSession.date) / 86400000) : 99
-    if (daysSince > 21) return // stale data
-
-    const ab = new AbortController()
-    abortRef.current = ab
-    setIsThinking(true)
-
-    const openerPrompt = `You are Aeva, ${name}'s personal AI tutor. Write a natural 1–2 sentence session opener.
-${lastSession?.primaryTopic ? `Last session they worked on: ${lastSession.primaryTopic}.` : ''}
-${lastSession?.mastered?.length ? `Recently mastered: ${lastSession.mastered.join(', ')}.` : ''}
-${lastSession?.struggled?.length ? `They struggled with: ${lastSession.struggled.join(', ')}.` : ''}
-${dominantTopics?.length ? `Main interests: ${dominantTopics.slice(0,3).join(', ')}.` : ''}
-${daysSince === 0 ? 'They are back in the same day.' : `It has been ${daysSince} day${daysSince !== 1 ? 's' : ''}.`}
-
-Write a direct, specific opener under 35 words. Reference something concrete. End with one open question. No "Hey!", "Welcome back!", or generic greetings. Be specific.`
-
-    let raw = ''
-    const openerMsg = { role: 'model', text: '', streaming: true }
-    setMessages([openerMsg]);
-
-    (async () => {
-      try {
-        await streamGroq([], openerPrompt, chunk => {
-          raw += chunk
-          setMessages([{ ...openerMsg, text: raw }])
-        }, ab.signal, { maxTokens: 80 })
-        setMessages([{ role: 'model', text: raw, streaming: false }])
-      } catch {}
-      setIsThinking(false)
-    })()
-
-    return () => ab.abort()
-  }, [])
+  // Proactive opener removed — chat always starts with the empty state UI
+  // (big orb + chips) until the user sends their first message.
 
   // Auto-send the mission opening when a mission starts
   useEffect(() => {
