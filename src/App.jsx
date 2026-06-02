@@ -2845,27 +2845,46 @@ Write a direct, specific opener under 35 words. Reference something concrete. En
 
       // Parse TERM tags from completed response (tutor mode only)
       if (!isMission) {
+        const brain = useBrainStore.getState()
+        const masteryScore = criticResult
+          ? ({ none: 10, partial: 35, solid: 70, mastery: 90 }[criticResult.understanding] ?? 35)
+          : 20
+
+        // 1. TERM tags → richest nodes (have definitions)
         const termMatches = [...rawResponse.matchAll(/\[TERM:\s*([^|]+)\|\s*([^\]]+)\]/g)]
         if (termMatches.length > 0) {
           const cards = termMatches.map(m => ({ id: `${Date.now()}-${m[1].trim()}`, term: m[1].trim(), definition: m[2].trim() }))
           setDeepDiveMap(prev => ({ ...prev, [history.length]: cards }))
-          // Pipe TERM concepts into Second Brain
-          cards.forEach(c => {
-            useBrainStore.getState().addConcept({ concept: c.term, definition: c.definition, mastery: 20, source: 'term' })
-          })
-          // Link concepts that appeared in the same response
+          cards.forEach(c => brain.addConcept({ concept: c.term, definition: c.definition, mastery: masteryScore, source: 'term' }))
           if (cards.length >= 2) {
-            for (let i = 0; i < cards.length - 1; i++) {
-              useBrainStore.getState().linkConcepts(cards[i].term, cards[i + 1].term)
-            }
+            for (let j = 0; j < cards.length - 1; j++) brain.linkConcepts(cards[j].term, cards[j + 1].term)
           }
         }
 
-        // Pipe topic from critic into Second Brain
-        if (criticResult?.topic) {
-          const masteryScore = { none: 10, partial: 35, solid: 70, mastery: 90 }[criticResult.understanding] ?? 35
-          useBrainStore.getState().addConcept({ concept: criticResult.topic, mastery: masteryScore, source: 'topic' })
-          useBrainStore.getState().updateMastery(criticResult.topic, masteryScore)
+        // 2. Bold terms **term** from AI response → extract as concepts
+        const boldMatches = [...rawResponse.matchAll(/\*\*([^*]{3,40})\*\*/g)]
+        boldMatches.forEach(m => {
+          const term = m[1].trim()
+          if (term.split(' ').length <= 5) { // not a full sentence
+            brain.addConcept({ concept: term, mastery: masteryScore, source: 'bold' })
+          }
+        })
+
+        // 3. Headings from AI response → H1/H2 = concept clusters
+        const headingMatches = [...rawResponse.matchAll(/^#{1,2}\s+(.+)$/gm)]
+        headingMatches.forEach(m => {
+          const heading = m[1].replace(/\*\*/g, '').trim()
+          if (heading.length > 2 && heading.length < 60) {
+            brain.addConcept({ concept: heading, mastery: masteryScore, source: 'heading' })
+          }
+        })
+
+        // 4. Critic topic → always add (covers when no TERM/bold/heading found)
+        if (criticResult?.topic && criticResult.topic !== 'general') {
+          brain.addConcept({ concept: criticResult.topic, mastery: masteryScore, source: 'topic' })
+          brain.updateMastery(criticResult.topic, masteryScore)
+          // Link topic to any bold terms found
+          boldMatches.slice(0, 3).forEach(m => brain.linkConcepts(criticResult.topic, m[1].trim()))
         }
 
         // Detect study guide request
