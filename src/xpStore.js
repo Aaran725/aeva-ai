@@ -191,6 +191,16 @@ export const useXPStore = create((set, get) => {
       })
     },
 
+    // Unlock an orb directly (used during onboarding to honour the user's choice)
+    unlockOrb: (orbId) => {
+      set(state => {
+        if (state.unlockedOrbs.includes(orbId)) return state
+        const updated = { ...state, unlockedOrbs: [...state.unlockedOrbs, orbId], activeOrb: orbId }
+        save(updated)
+        return updated
+      })
+    },
+
     clearToast: () => set({ pendingToast: null }),
   }
 })
