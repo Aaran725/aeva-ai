@@ -25,6 +25,7 @@ import Onboarding from './Onboarding'
 import AevaOrbComponent from './AevaOrb'
 import SecondBrain from './SecondBrain'
 import { useBrainStore } from './brainStore'
+import Mirror from './Mirror'
 import OrbSelector from './OrbSelector'
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
 import './index.css'
@@ -1346,6 +1347,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
   const [profileOpen, setProfileOpen] = useState(false)
   const [appSettingsOpen, setAppSettingsOpen] = useState(false)
   const [brainOpen, setBrainOpen] = useState(false)
+  const [mirrorOpen, setMirrorOpen] = useState(false)
   const [orbSelectorOpen, setOrbSelectorOpen] = useState(false)
   const { getStats } = useBrainStore()
   const brainStats = getStats()
@@ -1437,6 +1439,25 @@ function DashboardView({ onChatOpen, onSignOut }) {
                   {brainStats.total}
                 </span>
               )}
+            </motion.button>
+
+            {/* Mirror button */}
+            <motion.button
+              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+              onClick={() => setMirrorOpen(true)}
+              animate={{ boxShadow: ['0 0 0px rgba(139,92,246,0)', '0 0 12px rgba(139,92,246,0.35)', '0 0 0px rgba(139,92,246,0)'] }}
+              transition={{ boxShadow: { duration: 3, repeat: Infinity } }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 7,
+                padding: '7px 16px', borderRadius: 99,
+                background: 'linear-gradient(135deg, rgba(109,40,217,0.20), rgba(139,92,246,0.12))',
+                border: '1px solid rgba(139,92,246,0.38)',
+                color: 'rgba(216,180,254,0.90)',
+                fontFamily: "'Inter', system-ui, sans-serif",
+                fontSize: 12.5, fontWeight: 700, cursor: 'pointer',
+              }}
+            >
+              🪞 Mirror
             </motion.button>
 
             {/* Training Lab button */}
@@ -1613,7 +1634,11 @@ function DashboardView({ onChatOpen, onSignOut }) {
       </AnimatePresence>
 
       <AnimatePresence>
-        {brainOpen && <SecondBrain onClose={() => setBrainOpen(false)} />}
+        {brainOpen && <SecondBrain onClose={() => setBrainOpen(false)} onMirrorOpen={() => { setBrainOpen(false); setMirrorOpen(true) }} />}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {mirrorOpen && <Mirror onClose={() => setMirrorOpen(false)} name={name} />}
       </AnimatePresence>
 
       <AnimatePresence>

@@ -287,7 +287,7 @@ function IndexView({ nodes, onSelect }) {
 }
 
 /* ── Main Second Brain ────────────────────────────── */
-export default function SecondBrain({ onClose }) {
+export default function SecondBrain({ onClose, onMirrorOpen }) {
   const { nodes, getStats } = useBrainStore()
   const [query, setQuery] = useState('')
   const [view, setView] = useState('constellation') // 'constellation' | 'index'
@@ -366,6 +366,14 @@ export default function SecondBrain({ onClose }) {
             <option value="mastery">Mastery</option>
             <option value="subject">Subject</option>
           </select>
+        )}
+
+        {onMirrorOpen && (
+          <motion.button onClick={onMirrorOpen}
+            whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 10, background: 'linear-gradient(135deg, rgba(109,40,217,0.22), rgba(139,92,246,0.14))', border: '1px solid rgba(139,92,246,0.35)', color: 'rgba(216,180,254,0.90)', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+            🪞 Talk to Mirror
+          </motion.button>
         )}
 
         <button onClick={onClose}
