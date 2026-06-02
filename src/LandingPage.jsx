@@ -4,6 +4,7 @@ import { Brain, FlaskConical, Camera, BookOpen, Trophy, Zap, ArrowRight, Star, C
 import AevaOrb from './AevaOrb'
 
 
+
 /* ── Animated chat demo ───────────────────────────── */
 const DEMO_USER = 'Explain quadratic equations'
 const DEMO_AI = [

@@ -25,6 +25,8 @@ import { useLibraryStore } from './libraryStore'
 import LandingPage from './LandingPage'
 import Onboarding from './Onboarding'
 import AevaOrbComponent from './AevaOrb'
+import AdminLogin from './AdminLogin'
+import AdminPanel from './AdminPanel'
 import SecondBrain from './SecondBrain'
 import { useBrainStore } from './brainStore'
 import Mirror from './Mirror'
@@ -3864,6 +3866,8 @@ export default function App() {
   const [authUser, setAuthUser] = useState(undefined)
   const [showLogin, setShowLogin] = useState(false)
   const [onboarded, setOnboarded] = useState(() => !!localStorage.getItem('aeva_onboarded'))
+  const [adminMode, setAdminMode] = useState(() => sessionStorage.getItem('aeva_admin_session') === '1')
+  const [showAdminLogin, setShowAdminLogin] = useState(() => new URLSearchParams(window.location.search).has('admin'))
   const { activeMode, exitMission } = useArcadeStore()
   const { checkStreak } = useXPStore()
 
@@ -3883,6 +3887,25 @@ export default function App() {
     })
     return () => subscription.unsubscribe()
   }, [])
+
+  // Admin panel — completely separate from user auth
+  if (adminMode) {
+    return (
+      <AdminPanel onLogout={() => {
+        sessionStorage.removeItem('aeva_admin_session')
+        setAdminMode(false)
+      }} />
+    )
+  }
+
+  if (showAdminLogin) {
+    return (
+      <AdminLogin
+        onSuccess={() => { setAdminMode(true); setShowAdminLogin(false) }}
+        onCancel={() => setShowAdminLogin(false)}
+      />
+    )
+  }
 
   // Loading spinner
   if (authUser === undefined) {
