@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, createContext, useContext } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import katex from 'katex'
+import 'katex/dist/katex.min.css'
 import { ArrowUp, Zap, TrendingDown, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings } from 'lucide-react'
 import { useAppSettings, SECTION_BG_PRESETS, CARD_STYLES, FONT_STYLES } from './appSettings'
 import { supabase } from './supabase'
@@ -242,6 +244,29 @@ MARKDOWN RULES (non-negotiable):
 - Bold (\`**term**\`) when introducing a technical term for the first time.
 - Numbered lists for steps/sequences. Bullet lists for comparisons/features.
 - Inline code (\`backticks\`) for code, variables, formulas.
+
+MATH NOTATION — non-negotiable:
+- ALL mathematical expressions MUST use LaTeX wrapped in dollar signs
+- Inline math: $x^2 + 2x + 1$ — use for variables, expressions within sentences
+- Display math (own line): $$\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$ — use for full equations
+- NEVER write fractions as a/b — ALWAYS \\frac{a}{b}
+- NEVER write powers as x^2 in plain text — ALWAYS $x^2$
+- NEVER write sqrt(x) — ALWAYS $\\sqrt{x}$
+- Greek letters: $\\alpha$, $\\beta$, $\\theta$, $\\pi$ etc.
+- Common symbols: $\\pm$, $\\times$, $\\leq$, $\\geq$, $\\neq$, $\\infty$, $\\int$, $\\sum$
+
+FEEDBACK TAGS — use these when ${userName} attempts an answer or exercise:
+- If correct: start your response with \`[CORRECT: one sentence confirming what they got right]\`
+- If partially correct: start with \`[PARTIAL: what was right and what was wrong]\`
+- If incorrect: start with \`[INCORRECT: what was wrong and the key misunderstanding]\`
+- Then continue with your explanation. These tags render as visual banners so the student immediately knows where they stand.
+- ALWAYS use a feedback tag when the student has attempted an answer. Never leave them guessing.
+
+DIFFICULTY ADAPTATION:
+- When ${userName} switches to a NEW topic, immediately recalibrate — start at a simpler level and build up. Do not assume they know anything about the new topic just because they mastered the previous one.
+- When they answer 3 questions correctly in a row, explicitly say "You've got this. Let me push you harder." and raise the difficulty immediately.
+- When they struggle 2+ times on the same concept, stop advancing and say "Let me explain this differently." Rebuild from scratch with a different analogy.
+- Match your complexity to their demonstrated understanding — not their assumed level.
 
 SMART TAGS — always include these inline (the UI parses them silently):
 - When introducing a new technical term: \`[TERM: word | one-sentence definition]\`
@@ -1672,6 +1697,19 @@ function parseInline(text, isLight = false) {
       remaining = remaining.slice(italicMatch[0].length)
       continue
     }
+    // Inline math $...$
+    const mathMatch = remaining.match(/^(.*?)\$([^$\n]+?)\$/)
+    if (mathMatch) {
+      if (mathMatch[1]) parts.push(<span key={key++}>{mathMatch[1]}</span>)
+      try {
+        const html = katex.renderToString(mathMatch[2], { throwOnError: false, displayMode: false })
+        parts.push(<span key={key++} dangerouslySetInnerHTML={{ __html: html }} style={{ verticalAlign: 'middle' }} />)
+      } catch {
+        parts.push(<span key={key++} style={{ fontFamily: 'monospace', fontSize: '0.9em' }}>{mathMatch[2]}</span>)
+      }
+      remaining = remaining.slice(mathMatch[0].length)
+      continue
+    }
     // Inline code `code`
     const codeMatch = remaining.match(/^(.*?)`([^`]+)`/)
     if (codeMatch) {
@@ -1745,6 +1783,7 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
   const clean = text
     .replace(/\[TERM:[^\]]*\]/g, '')
     .replace(/\[SUMMARY:[^\]]*\]/g, '')
+    .replace(/\[CORRECT\]/g, '[CORRECT:]')  // normalise bare tags
 
   const lines = clean.split('\n')
   const elements = []
@@ -1785,6 +1824,59 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
     if (trimmed === '') {
       flushList()
       elements.push(<div key={`gap-${i}`} style={{ height: 6 }} />)
+      i++; continue
+    }
+
+    // Display math $$...$$
+    if (/^\$\$/.test(trimmed)) {
+      flushList()
+      const mathLines = []
+      const startI = i
+      if (trimmed.replace(/^\$\$/, '').replace(/\$\$$/, '').trim()) {
+        // Single-line $$expr$$
+        mathLines.push(trimmed.replace(/^\$\$/, '').replace(/\$\$$/, ''))
+        i++
+      } else {
+        i++
+        while (i < lines.length && !/^\$\$/.test(lines[i].trim())) {
+          mathLines.push(lines[i])
+          i++
+        }
+        i++ // skip closing $$
+      }
+      const mathContent = mathLines.join('\n').trim()
+      try {
+        const html = katex.renderToString(mathContent, { throwOnError: false, displayMode: true })
+        elements.push(
+          <div key={`dmath-${startI}`} style={{ overflowX: 'auto', margin: '10px 0', padding: '10px 4px', textAlign: 'center' }}
+            dangerouslySetInnerHTML={{ __html: html }} />
+        )
+      } catch {
+        elements.push(<p key={`dmath-${startI}`} style={{ fontFamily: 'monospace', color: txt }}>{mathContent}</p>)
+      }
+      continue
+    }
+
+    // Feedback tags [CORRECT: ...], [PARTIAL: ...], [INCORRECT: ...]
+    const feedbackMatch = trimmed.match(/^\[(CORRECT|PARTIAL|INCORRECT)(?::\s*(.*))?\]/)
+    if (feedbackMatch) {
+      flushList()
+      const type = feedbackMatch[1]
+      const msg  = feedbackMatch[2] || ''
+      const cfg  = {
+        CORRECT:   { bg: 'rgba(74,222,128,0.12)', border: 'rgba(74,222,128,0.32)', color: '#4ADE80', icon: '✓', label: 'Correct' },
+        PARTIAL:   { bg: 'rgba(251,191,36,0.10)', border: 'rgba(251,191,36,0.28)', color: '#FCD34D', icon: '◑', label: 'Partially correct' },
+        INCORRECT: { bg: 'rgba(248,113,113,0.12)', border: 'rgba(248,113,113,0.28)', color: '#F87171', icon: '✗', label: 'Not quite' },
+      }[type]
+      elements.push(
+        <div key={`fb-${i}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '8px 0', padding: '10px 14px', background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 12 }}>
+          <span style={{ fontSize: 16, fontWeight: 800, color: cfg.color, flexShrink: 0, lineHeight: 1.4 }}>{cfg.icon}</span>
+          <div>
+            <span style={{ fontSize: 12, fontWeight: 800, color: cfg.color, letterSpacing: '0.04em', textTransform: 'uppercase' }}>{cfg.label}</span>
+            {msg && <p style={{ margin: '3px 0 0', fontSize: 14, color: isLight ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.82)', lineHeight: 1.6 }}>{parseInline(msg, isLight)}</p>}
+          </div>
+        </div>
+      )
       i++; continue
     }
 
@@ -2349,6 +2441,7 @@ function ChatView({ onBack }) {
   const recentCriticRef = useRef([])       // last 3 critic results for trend detection
   const sessionConceptsRef = useRef({})    // concept → understanding map this session
   const masteryMapRef = useRef({})         // kept in sync for session-end save
+  const lastTopicRef = useRef(null)        // previous critic topic for change detection
 
   const hasInput = input.trim().length > 0
   const isActive = isThinking || hasInput
@@ -2631,6 +2724,18 @@ Write a direct, specific opener under 35 words. Reference something concrete. En
         // Update session tracking refs
         recentCriticRef.current = [...recentCriticRef.current, criticResult].slice(-3)
         if (criticResult?.topic) sessionConceptsRef.current[criticResult.topic] = criticResult.understanding
+
+        // Topic-change recalibration — reset session state when topic shifts significantly
+        const newTopic = criticResult?.topic?.toLowerCase().trim()
+        const prevTopic = lastTopicRef.current
+        if (newTopic && prevTopic && newTopic !== prevTopic && !newTopic.includes(prevTopic) && !prevTopic.includes(newTopic)) {
+          // Topic changed — reset to SCAFFOLDING so Aeva rebuilds for the new subject
+          if (sessionState === 'STRESS_TEST' || sessionState === 'CONSOLIDATION') {
+            setSessionState('SCAFFOLDING')
+            recentCriticRef.current = [] // clear trend so difficulty resets
+          }
+        }
+        lastTopicRef.current = newTopic
 
         // Build live adaptation extras
         const extras = {
