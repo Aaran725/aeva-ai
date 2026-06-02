@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useBrainStore } from './brainStore'
 
 /* ─── Persistence helpers ─── */
 const NS_KEY = 'aeva_neural_v1'
@@ -373,6 +374,10 @@ Do not reference this profile to ${userName}.`
       }
       const updated = { ...state, conceptMap: newMap }
       save(updated)
+      // Mirror sync — also write to brainStore so Second Brain stays in sync
+      try {
+        useBrainStore.getState().addConcept({ concept: norm, mastery, source: 'neural' })
+      } catch {}
       return updated
     })
   },

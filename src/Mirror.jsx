@@ -163,6 +163,41 @@ function StatChip({ label, value, color }) {
   )
 }
 
+/* ── Merge brainStore + neuralStore into one node list ── */
+function buildMergedNodes(brainNodes, neural) {
+  const all = [...brainNodes]
+
+  // neuralStore conceptMap → same format
+  ;(neural.conceptMap || []).forEach(cm => {
+    if (!all.find(n => n.concept.toLowerCase() === cm.label.toLowerCase())) {
+      all.push({ id: `cm-${cm.id}`, concept: cm.label, definition: '', subject: cm.category || 'General', mastery: cm.mastery, connections: [], firstSeen: cm.firstSeen, lastSeen: cm.lastSeen, visits: cm.visits, source: 'neural' })
+    }
+  })
+
+  // masteredTopics → high-mastery nodes
+  ;(neural.masteredTopics || []).forEach(t => {
+    if (t && !all.find(n => n.concept.toLowerCase() === t.toLowerCase())) {
+      all.push({ id: `mt-${t}`, concept: t, definition: '', subject: 'General', mastery: 88, connections: [], firstSeen: Date.now(), lastSeen: Date.now(), visits: 3, source: 'mastered' })
+    }
+  })
+
+  // struggleZones → low-mastery nodes
+  ;(neural.struggleZones || []).forEach(t => {
+    if (t && !all.find(n => n.concept.toLowerCase() === t.toLowerCase())) {
+      all.push({ id: `sz-${t}`, concept: t, definition: '', subject: 'General', mastery: 18, connections: [], firstSeen: Date.now(), lastSeen: Date.now(), visits: 1, source: 'struggle' })
+    }
+  })
+
+  // dominantTopics → medium-mastery nodes (things they explore often)
+  ;(neural.dominantTopics || []).forEach(t => {
+    if (t && !all.find(n => n.concept.toLowerCase() === t.toLowerCase())) {
+      all.push({ id: `dt-${t}`, concept: t, definition: '', subject: 'General', mastery: 45, connections: [], firstSeen: Date.now(), lastSeen: Date.now(), visits: 4, source: 'interest' })
+    }
+  })
+
+  return all
+}
+
 /* ── Main Mirror component ────────────────────────── */
 export default function Mirror({ onClose, name }) {
   const { nodes } = useBrainStore()
@@ -175,38 +210,41 @@ export default function Mirror({ onClose, name }) {
   const bottomRef = useRef(null)
   const inputRef  = useRef(null)
 
-  const systemPrompt = useMemo(() => buildMirrorPrompt(name, nodes, neural), [name, nodes])
+  // Merge brainStore nodes with neuralStore data so Mirror always has something
+  const mergedNodes = useMemo(() => buildMergedNodes(nodes, neural), [nodes, neural.conceptMap, neural.masteredTopics, neural.struggleZones, neural.dominantTopics])
+
+  const hasData = mergedNodes.length > 0 || (neural.totalExchanges || 0) >= 3
+
+  const systemPrompt = useMemo(() => buildMirrorPrompt(name, mergedNodes, neural), [name, mergedNodes])
 
   const stats = useMemo(() => {
-    if (!nodes.length) return { total: 0, mastered: 0, avgMastery: 0 }
+    if (!mergedNodes.length) return { total: 0, mastered: 0, avgMastery: 0 }
     return {
-      total:     nodes.length,
-      mastered:  nodes.filter(n => n.mastery >= 75).length,
-      avgMastery: Math.round(nodes.reduce((s, n) => s + n.mastery, 0) / nodes.length),
+      total:      mergedNodes.length,
+      mastered:   mergedNodes.filter(n => n.mastery >= 75).length,
+      avgMastery: Math.round(mergedNodes.reduce((s, n) => s + n.mastery, 0) / mergedNodes.length),
     }
-  }, [nodes])
+  }, [mergedNodes])
 
-  // Opening message from the mirror
+  // Opening message
   useEffect(() => {
-    if (nodes.length === 0) {
-      setMessages([{
-        role: 'mirror',
-        text: `I don't have anything to work with yet. You haven't built up enough of a knowledge base for me to draw from.\n\nGo have a few sessions with Aeva, complete some drills, learn some things. Then come back. The more you've learned, the more I can show you about yourself.`,
-      }])
+    if (!hasData) {
+      setMessages([{ role: 'mirror', text: `You haven't had any sessions yet. Go talk to Aeva about a topic you're studying — even one conversation gives me enough to work with.` }])
       return
     }
 
-    const solidNodes   = nodes.filter(n => n.mastery >= 75).slice(0, 3).map(n => n.concept)
-    const learningNodes = nodes.filter(n => n.mastery >= 35 && n.mastery < 75).slice(0, 3).map(n => n.concept)
-    const gapNodes     = nodes.filter(n => n.mastery < 35).slice(0, 2).map(n => n.concept)
-    const subjects     = [...new Set(nodes.map(n => n.subject))].filter(s => s !== 'General').slice(0, 3)
+    const solid    = mergedNodes.filter(n => n.mastery >= 75).slice(0, 3).map(n => n.concept)
+    const learning = mergedNodes.filter(n => n.mastery >= 35 && n.mastery < 75).slice(0, 3).map(n => n.concept)
+    const gaps     = mergedNodes.filter(n => n.mastery < 35).slice(0, 2).map(n => n.concept)
 
     const parts = []
-    if (solidNodes.length) parts.push(`I've got solid ground on ${solidNodes.join(', ')}.`)
-    else if (learningNodes.length) parts.push(`I'm actively working through ${learningNodes.join(', ')}.`)
-    if (gapNodes.length) parts.push(`${gapNodes.join(' and ')} — shaky territory. I'll be honest about that.`)
-    if (subjects.length) parts.push(`Most of what I know sits in ${subjects.join(' and ')}.`)
-    parts.push(`Ask me what I know. Ask me where I'd fail. I won't sugarcoat it.`)
+    if (solid.length)    parts.push(`I've got solid ground on ${solid.join(', ')}.`)
+    else if (learning.length) parts.push(`I'm working through ${learning.join(', ')}.`)
+    if (gaps.length)     parts.push(`${gaps.join(' and ')} — shaky territory, I'll be straight about that.`)
+    if (!solid.length && !learning.length && neural.totalExchanges > 0) {
+      parts.push(`I've had ${neural.totalExchanges} sessions. Still building a clear picture of what I know.`)
+    }
+    parts.push(`Ask me what I know, where I'd fail, or how I think. I won't sugarcoat it.`)
 
     setMessages([{ role: 'mirror', text: parts.join(' ') }])
   }, [])
@@ -329,7 +367,7 @@ export default function Mirror({ onClose, name }) {
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14, position: 'relative', zIndex: 1 }}>
 
         {/* Identity card — first thing shown */}
-        {messages.length <= 1 && nodes.length > 0 && (
+        {messages.length <= 1 && mergedNodes.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
             style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.18)', borderRadius: 16, padding: '14px 18px', display: 'flex', gap: 16, alignItems: 'center', flexShrink: 0 }}>
             <div style={{ flex: 1 }}>
