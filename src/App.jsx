@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, createContext, useContext } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import { ArrowUp, Zap, TrendingDown, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu } from 'lucide-react'
+import { ArrowUp, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu } from 'lucide-react'
 import { useAppSettings, SECTION_BG_PRESETS, CARD_STYLES, FONT_STYLES } from './appSettings'
 import { useLanguageStore } from './languageStore'
 import { useT } from './translations'
@@ -1754,26 +1754,88 @@ function DashboardView({ onChatOpen, onSignOut }) {
               </div>
               <span style={{ fontSize: 17, fontWeight: 900, letterSpacing: '-0.04em', background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(233,163,100,0.80) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>aeva</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setLibraryOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 99, background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.30)', color: 'rgba(255,255,255,0.75)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12.5, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.01em', position: 'relative' }}>
-                <BookOpen size={13} />Library
-                {sessions.length > 0 && <span style={{ padding: '1px 6px', borderRadius: 99, background: 'rgba(167,139,250,0.25)', fontSize: 9.5, fontWeight: 800, color: '#A78BFA' }}>{sessions.length}</span>}
-              </motion.button>
-              <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setBrainOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 99, background: 'rgba(139,143,255,0.13)', border: '1px solid rgba(139,143,255,0.32)', color: 'rgba(200,200,255,0.85)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
-                <Brain size={13} />Second Brain
-                {brainStats.total > 0 && <span style={{ padding: '1px 6px', borderRadius: 99, background: 'rgba(139,143,255,0.22)', fontSize: 9.5, fontWeight: 800, color: '#8B8FFF' }}>{brainStats.total}</span>}
-              </motion.button>
-              <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => setMirrorOpen(true)} animate={{ boxShadow: ['0 0 0px rgba(139,92,246,0)', '0 0 12px rgba(139,92,246,0.35)', '0 0 0px rgba(139,92,246,0)'] }} transition={{ boxShadow: { duration: 3, repeat: Infinity } }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 99, background: 'linear-gradient(135deg, rgba(109,40,217,0.20), rgba(139,92,246,0.12))', border: '1px solid rgba(139,92,246,0.38)', color: 'rgba(216,180,254,0.90)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>🪞 Mirror</motion.button>
-              <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={openLab} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 99, background: 'rgba(59,130,246,0.14)', border: '1px solid rgba(59,130,246,0.35)', color: 'rgba(255,255,255,0.80)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12.5, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.01em', position: 'relative' }}>
-                <FlaskConical size={13} />The Lab
-                {srDueCount > 0 && <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400 }} style={{ position: 'absolute', top: -5, right: -5, minWidth: 17, height: 17, borderRadius: 99, background: '#4ADE80', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9.5, fontWeight: 800, color: '#0a160a', padding: '0 4px', boxShadow: '0 0 8px rgba(74,222,128,0.60)' }}>{srDueCount}</motion.div>}
-              </motion.button>
-              <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={openArcade} animate={{ boxShadow: ['0 0 0px rgba(99,102,241,0)', '0 0 18px rgba(99,102,241,0.55)', '0 0 0px rgba(99,102,241,0)'] }} transition={{ boxShadow: { duration: 2.5, repeat: Infinity, ease: 'easeInOut' } }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 99, background: 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(233,163,100,0.15))', border: '1px solid rgba(99,102,241,0.45)', color: 'rgba(255,255,255,0.92)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12.5, fontWeight: 700, cursor: 'pointer', letterSpacing: '0.04em', textTransform: 'uppercase' }}><Gamepad2 size={13} />Unleash Arcade</motion.button>
-              <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={onChatOpen} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 99, background: 'rgba(139,143,255,0.15)', border: '1px solid rgba(139,143,255,0.30)', color: 'rgba(255,255,255,0.80)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12.5, fontWeight: 600, cursor: 'pointer', letterSpacing: '0.01em' }}><MessageCircle size={13} />Chat</motion.button>
-              <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={() => setShowEmOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 99, background: 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(16,185,129,0.10))', border: '1px solid rgba(99,102,241,0.38)', color: 'rgba(255,255,255,0.88)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>📊 Show Em</motion.button>
-              <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={() => setProfileOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 99, background: 'rgba(233,163,100,0.12)', border: '1px solid rgba(233,163,100,0.30)', color: 'rgba(233,163,100,0.88)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>👤 My Profile</motion.button>
-              <motion.button whileHover={{ scale: 1.08, rotate: 45 }} whileTap={{ scale: 0.94 }} onClick={() => setAppSettingsOpen(true)} style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.13)', color: 'rgba(255,255,255,0.50)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Settings size={14} /></motion.button>
-              <UserAvatar onSignOut={onSignOut} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+
+              {/* ── Shared nav button style ── */}
+              {(() => {
+                const nb = {
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  height: 34, padding: '0 13px', borderRadius: 9,
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.09)',
+                  color: 'rgba(255,255,255,0.62)',
+                  fontFamily: "'Inter', system-ui, sans-serif",
+                  fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                  whiteSpace: 'nowrap', letterSpacing: '-0.01em',
+                }
+                const badge = {
+                  padding: '1px 5px', borderRadius: 99,
+                  background: 'rgba(255,255,255,0.12)',
+                  fontSize: 9.5, fontWeight: 800,
+                  color: 'rgba(255,255,255,0.55)',
+                }
+                return (
+                  <>
+                    <motion.button whileHover={{ scale: 1.03, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.97 }} onClick={() => setLibraryOpen(true)} style={nb}>
+                      <BookOpen size={13} />Library
+                      {sessions.length > 0 && <span style={badge}>{sessions.length}</span>}
+                    </motion.button>
+
+                    <motion.button whileHover={{ scale: 1.03, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.97 }} onClick={() => setBrainOpen(true)} style={nb}>
+                      <Brain size={13} />Brain
+                      {brainStats.total > 0 && <span style={badge}>{brainStats.total}</span>}
+                    </motion.button>
+
+                    <motion.button whileHover={{ scale: 1.03, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.97 }} onClick={() => setMirrorOpen(true)} style={nb}>
+                      <span style={{ fontSize: 12 }}>🪞</span>Mirror
+                    </motion.button>
+
+                    {/* Divider */}
+                    <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.10)', margin: '0 2px' }} />
+
+                    <motion.button whileHover={{ scale: 1.03, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.97 }} onClick={openLab} style={{ ...nb, position: 'relative' }}>
+                      <FlaskConical size={13} />Lab
+                      {srDueCount > 0 && (
+                        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400 }}
+                          style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 99, background: '#4ADE80', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: '#0a160a', padding: '0 3px' }}>
+                          {srDueCount}
+                        </motion.div>
+                      )}
+                    </motion.button>
+
+                    {/* Arcade — only one that stands out */}
+                    <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={openArcade}
+                      style={{ ...nb, background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.35)', color: 'rgba(255,255,255,0.88)', fontWeight: 600 }}>
+                      <Gamepad2 size={13} />Arcade
+                    </motion.button>
+
+                    {/* Divider */}
+                    <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.10)', margin: '0 2px' }} />
+
+                    <motion.button whileHover={{ scale: 1.03, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.97 }} onClick={onChatOpen} style={nb}>
+                      <MessageCircle size={13} />Chat
+                    </motion.button>
+
+                    <motion.button whileHover={{ scale: 1.03, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.97 }} onClick={() => setShowEmOpen(true)} style={nb}>
+                      <TrendingUp size={13} />Show Em
+                    </motion.button>
+
+                    {/* Divider */}
+                    <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.10)', margin: '0 2px' }} />
+
+                    <motion.button whileHover={{ scale: 1.03, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.97 }} onClick={() => setProfileOpen(true)} style={nb}>
+                      <Star size={13} />Profile
+                    </motion.button>
+
+                    <motion.button whileHover={{ scale: 1.05, rotate: 45 }} whileTap={{ scale: 0.94 }} onClick={() => setAppSettingsOpen(true)}
+                      style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.45)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Settings size={14} />
+                    </motion.button>
+
+                    <UserAvatar onSignOut={onSignOut} />
+                  </>
+                )
+              })()}
             </div>
           </header>
         )}
