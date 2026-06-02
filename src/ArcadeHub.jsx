@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Zap } from 'lucide-react'
 import { MISSIONS, useArcadeStore } from './arcadeStore'
+import BoardroomGame from './BoardroomGame'
 
 /* ─── Mission tile ─── */
 function MissionTile({ mission, onSelect, index }) {
@@ -74,8 +76,10 @@ function MissionTile({ mission, onSelect, index }) {
 /* ═══ ARCADE HUB ═══════════════════════════════════ */
 export default function ArcadeHub() {
   const { arcadeOpen, closeArcade, selectMission } = useArcadeStore()
+  const [boardroomOpen, setBoardroomOpen] = useState(false)
 
   return (
+    <>
     <AnimatePresence>
       {arcadeOpen && (
         <>
@@ -193,11 +197,46 @@ export default function ArcadeHub() {
               display: 'flex', flexDirection: 'column', gap: 12,
               position: 'relative', zIndex: 1,
             }}>
+
+              {/* ── The Boardroom — standalone game tile ── */}
+              <motion.button
+                initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.05, ease: 'easeOut', duration: 0.35 }}
+                whileHover={{ scale: 1.025, y: -3 }} whileTap={{ scale: 0.97 }}
+                onClick={() => { closeArcade(); setBoardroomOpen(true) }}
+                style={{
+                  width: '100%', padding: '20px 22px', borderRadius: 22,
+                  background: 'rgba(16,185,129,0.08)',
+                  border: '1px solid rgba(16,185,129,0.25)',
+                  cursor: 'pointer', textAlign: 'left', position: 'relative', overflow: 'hidden',
+                  backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+                  boxShadow: '0 4px 30px rgba(16,185,129,0.10), inset 0 1px 0 rgba(255,255,255,0.08)',
+                }}
+              >
+                <div aria-hidden style={{ position: 'absolute', top: -20, right: -20, width: 80, height: 80, borderRadius: '50%', background: 'radial-gradient(circle, rgba(16,185,129,0.25) 0%, transparent 70%)', filter: 'blur(15px)', pointerEvents: 'none' }} />
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, position: 'relative', zIndex: 1 }}>
+                  <div style={{ fontSize: 26, width: 46, height: 46, borderRadius: 14, background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(16,185,129,0.30)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    🏢
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.01em' }}>The Boardroom</span>
+                      <span style={{ fontSize: 9.5, fontWeight: 800, color: '#10B981', background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.30)', borderRadius: 99, padding: '2px 7px', letterSpacing: '0.06em' }}>GAME</span>
+                    </div>
+                    <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.50)', lineHeight: 1.45 }}>
+                      CEO sim. 4 live meters. 10 days. Every decision costs something.
+                    </div>
+                  </div>
+                  <Zap size={14} color="#10B981" style={{ flexShrink: 0, marginTop: 2 }} />
+                </div>
+                <div style={{ position: 'absolute', bottom: 0, left: 22, right: 22, height: 1, background: 'linear-gradient(90deg, transparent, rgba(16,185,129,0.50), transparent)' }} />
+              </motion.button>
+
               {Object.values(MISSIONS).map((mission, i) => (
                 <MissionTile
                   key={mission.id}
                   mission={mission}
-                  index={i}
+                  index={i + 1}
                   onSelect={(id) => { selectMission(id) }}
                 />
               ))}
@@ -218,5 +257,13 @@ export default function ArcadeHub() {
         </>
       )}
     </AnimatePresence>
+
+    {/* Boardroom game — full screen, outside arcade panel */}
+    <AnimatePresence>
+      {boardroomOpen && (
+        <BoardroomGame onClose={() => setBoardroomOpen(false)} />
+      )}
+    </AnimatePresence>
+    </>
   )
 }
