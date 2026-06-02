@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, createContext, useContext } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import { ArrowUp, Zap, TrendingDown, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Volume2, VolumeX, Mic } from 'lucide-react'
+import { ArrowUp, Zap, TrendingDown, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu } from 'lucide-react'
 import { useAppSettings, SECTION_BG_PRESETS, CARD_STYLES, FONT_STYLES } from './appSettings'
 import { useLanguageStore } from './languageStore'
 import { useT } from './translations'
@@ -33,110 +33,12 @@ import SecondBrain from './SecondBrain'
 import { useBrainStore } from './brainStore'
 import Mirror from './Mirror'
 import OrbSelector from './OrbSelector'
-import VoiceMode from './VoiceMode'
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
-import { useVoiceStore } from './voiceStore'
 import './index.css'
 
 /* ─── Groq API ─── */
 const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
-
-/* ─── Voice TTS helpers ─── */
-function stripForTTS(text) {
-  return text
-    .replace(/\[TERM:[^\]]+\]/g, '')
-    .replace(/\[CORRECT:[^\]]+\]/g, '')
-    .replace(/\[PARTIAL:[^\]]+\]/g, '')
-    .replace(/\[INCORRECT:[^\]]+\]/g, '')
-    .replace(/━+[-─━]*/g, '')
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/\*(.+?)\*/g, '$1')
-    .replace(/`{1,3}[^`\n]*`{1,3}/g, '')
-    .replace(/#{1,6}\s/g, '')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/^[-*]\s/gm, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-}
-
-// Voice characteristics per orb — rate/pitch/gender shape the personality
-const ORB_VOICE_PROPS = {
-  balanced:   { rate: 1.00, pitch: 1.05, female: true  },
-  challenger: { rate: 1.15, pitch: 0.88, female: false },
-  scholar:    { rate: 0.92, pitch: 0.98, female: false },
-  mystic:     { rate: 0.82, pitch: 1.12, female: true  },
-  void:       { rate: 0.88, pitch: 0.80, female: false },
-  ember:      { rate: 1.22, pitch: 1.18, female: false },
-  aurora:     { rate: 1.05, pitch: 1.10, female: true  },
-  phantom:    { rate: 0.78, pitch: 0.92, female: false },
-}
-
-function triggerAevaVoice(rawText, orbId) {
-  const { voiceEnabled, voiceModeActive, setIsSpeaking, setCurrentAudio } = useVoiceStore.getState()
-  if (!voiceEnabled && !voiceModeActive) return
-  if (!rawText || !window.speechSynthesis) return
-
-  // Cancel any currently playing speech
-  window.speechSynthesis.cancel()
-  setIsSpeaking(false)
-  setCurrentAudio(null)
-
-  let text = stripForTTS(rawText)
-  if (!text || text.length < 4) return
-
-  // Cap at a natural sentence boundary around 1200 chars
-  if (text.length > 1200) {
-    const cutoff = text.lastIndexOf('. ', 1200)
-    text = text.slice(0, cutoff > 300 ? cutoff + 1 : 1200)
-  }
-
-  const props = ORB_VOICE_PROPS[orbId] || ORB_VOICE_PROPS.balanced
-  const lang = useLanguageStore.getState().language
-
-  const utter = new SpeechSynthesisUtterance(text)
-  utter.rate   = props.rate
-  utter.pitch  = props.pitch
-  utter.volume = 1.0
-  utter.lang   = lang === 'ja' ? 'ja-JP' : 'en-US'
-
-  // Pick the best available voice for this orb's gender
-  const allVoices = window.speechSynthesis.getVoices()
-  if (allVoices.length > 0) {
-    const targetLang = lang === 'ja' ? 'ja' : 'en'
-    const langPool = allVoices.filter(v => v.lang.startsWith(targetLang))
-    const local    = langPool.filter(v => v.localService)
-    const pool     = local.length > 0 ? local : langPool
-
-    if (pool.length > 0) {
-      if (props.female) {
-        const f = pool.find(v => /female|samantha|siri|victoria|karen|tessa|fiona|moira|zoe/i.test(v.name))
-        utter.voice = f || pool[0]
-      } else {
-        const m = pool.find(v => /male|alex|daniel|james|aaron|fred|rishi|bruce|lee/i.test(v.name))
-        utter.voice = m || pool[pool.length - 1]
-      }
-    }
-  }
-
-  utter.onstart = () => {
-    setIsSpeaking(true)
-    // Wrap speechSynthesis cancel so stopSpeaking() works
-    setCurrentAudio({ pause: () => window.speechSynthesis.cancel(), src: '' })
-  }
-  utter.onend = () => {
-    setIsSpeaking(false)
-    setCurrentAudio(null)
-  }
-  utter.onerror = () => {
-    setIsSpeaking(false)
-    setCurrentAudio(null)
-  }
-
-  // Chrome bug: synthesis silently stops after ~15s unless kept alive
-  // Fix: cancel + re-queue if it stalls
-  window.speechSynthesis.speak(utter)
-}
 
 /* ─── Chat customisation ─── */
 const CHIP_DEFAULTS = [
@@ -2795,14 +2697,6 @@ function ChatView({ onBack }) {
   const [newChipLabel, setNewChipLabel] = useState('')
   const newChipInputRef = useRef(null)
   const [countdown, setCountdown] = useState(null)
-  const [voiceModeOpen, setVoiceModeOpen] = useState(false)
-  const { voiceEnabled, isSpeaking, toggleVoice, stopSpeaking } = useVoiceStore()
-
-  // Keep voiceStore in sync so triggerAevaVoice knows to speak even if toggle is off
-  useEffect(() => {
-    useVoiceStore.getState().setVoiceModeActive(voiceModeOpen)
-    return () => { if (voiceModeOpen) useVoiceStore.getState().setVoiceModeActive(false) }
-  }, [voiceModeOpen])
   const countdownRef = useRef(null)
   const abortRef = useRef(null)
   const bottomRef = useRef(null)
@@ -3018,7 +2912,6 @@ function ChatView({ onBack }) {
     finally {
       setIsThinking(false)
       setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, streaming: false } : m))
-      triggerAevaVoice(openRaw, useXPStore.getState().activeOrb)
     }
   }
 
@@ -3227,9 +3120,6 @@ function ChatView({ onBack }) {
       setIsThinking(false)
       setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, streaming: false } : m))
       inputRef.current?.focus()
-
-      // Speak Aeva's response if voice is enabled
-      triggerAevaVoice(rawResponse, useXPStore.getState().activeOrb)
 
       // Parse TERM tags from completed response (tutor mode only)
       if (!isMission) {
@@ -3488,36 +3378,6 @@ function ChatView({ onBack }) {
                 </motion.button>
               </>
             )}
-            {/* Voice toggle */}
-            <motion.button
-              whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }}
-              onClick={() => { toggleVoice(); if (isSpeaking) stopSpeaking() }}
-              title={voiceEnabled ? (isSpeaking ? 'Speaking… (click to stop)' : 'Voice on') : 'Voice off'}
-              style={{
-                width: 30, height: 30, borderRadius: '50%', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: voiceEnabled
-                  ? isLight ? 'rgba(99,102,241,0.12)' : 'rgba(139,143,255,0.18)'
-                  : isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.07)',
-                border: voiceEnabled
-                  ? isLight ? '1px solid rgba(99,102,241,0.35)' : '1px solid rgba(139,143,255,0.40)'
-                  : isLight ? '1px solid rgba(0,0,0,0.12)' : '1px solid rgba(255,255,255,0.13)',
-                color: voiceEnabled
-                  ? isLight ? 'rgba(99,102,241,0.90)' : 'rgba(139,143,255,0.95)'
-                  : isLight ? 'rgba(0,0,0,0.40)' : 'rgba(255,255,255,0.40)',
-                boxShadow: isSpeaking ? '0 0 12px rgba(139,143,255,0.45)' : 'none',
-                transition: 'all 0.2s ease',
-              }}
-            >
-              <motion.div
-                animate={isSpeaking ? { scale: [1, 1.15, 1] } : { scale: 1 }}
-                transition={{ duration: 0.7, repeat: isSpeaking ? Infinity : 0 }}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
-                {voiceEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />}
-              </motion.div>
-            </motion.button>
-
             {/* Appearance gear */}
             <motion.button
               whileHover={{ scale: 1.08, rotate: 45 }} whileTap={{ scale: 0.94 }}
@@ -3550,7 +3410,7 @@ function ChatView({ onBack }) {
                   transition={{ duration: 0.4 }}
                   style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 12 }}
                 >
-                  <AevaOrb size={218} active={isActive || isSpeaking} scanMode={labOpen} personality={orbPersonality} orbGradient={ORBS.find(o => o.id === useXPStore.getState().activeOrb)?.gradient} orbAccent={ORBS.find(o => o.id === useXPStore.getState().activeOrb)?.accent} />
+                  <AevaOrb size={218} active={isActive} scanMode={labOpen} personality={orbPersonality} orbGradient={ORBS.find(o => o.id === useXPStore.getState().activeOrb)?.gradient} orbAccent={ORBS.find(o => o.id === useXPStore.getState().activeOrb)?.accent} />
                   <div style={{ textAlign: 'center', padding: '0 28px', marginTop: 4 }}>
                     <p style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 24, fontWeight: 400, color: isLight ? 'rgba(0,0,0,0.42)' : 'rgba(255,255,255,0.45)', lineHeight: 1.3, letterSpacing: '0.01em', marginBottom: 4 }}>
                       Hey {name},
@@ -3736,7 +3596,7 @@ function ChatView({ onBack }) {
             {/* Mini orb + mastery (tutor mode active) */}
             {!isEmpty && !isMission && (
               <div className="chat-orb-area" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 4, flexShrink: 0, gap: 8 }}>
-                <AevaOrb size={72} active={isThinking || isSpeaking} scanMode={labOpen} personality={orbPersonality} orbGradient={ORBS.find(o => o.id === useXPStore.getState().activeOrb)?.gradient} orbAccent={ORBS.find(o => o.id === useXPStore.getState().activeOrb)?.accent} />
+                <AevaOrb size={72} active={isThinking} scanMode={labOpen} personality={orbPersonality} orbGradient={ORBS.find(o => o.id === useXPStore.getState().activeOrb)?.gradient} orbAccent={ORBS.find(o => o.id === useXPStore.getState().activeOrb)?.accent} />
                 {Object.keys(masteryMap).length > 0 && (
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', padding: '0 20px' }}>
                     {Object.entries(masteryMap).slice(0, 4).map(([topic, score]) => {
@@ -3956,22 +3816,6 @@ function ChatView({ onBack }) {
                       <PenLine size={14} strokeWidth={2} />
                     </motion.button>
 
-                    {/* Voice mode trigger */}
-                    <motion.button
-                      whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.90 }}
-                      onClick={() => setVoiceModeOpen(true)}
-                      title="Voice mode — speak to Aeva"
-                      style={{
-                        flexShrink: 0, width: 32, height: 32, borderRadius: '50%',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: isLight ? 'rgba(99,102,241,0.08)' : 'rgba(139,143,255,0.10)',
-                        border: isLight ? '1.5px solid rgba(99,102,241,0.28)' : '1.5px solid rgba(139,143,255,0.28)',
-                        cursor: 'pointer',
-                        color: isLight ? 'rgba(99,102,241,0.80)' : 'rgba(139,143,255,0.80)',
-                      }}
-                    >
-                      <Mic size={14} strokeWidth={2} />
-                    </motion.button>
                   </>
                 )}
                 <input
@@ -4040,18 +3884,6 @@ function ChatView({ onBack }) {
       {/* Feynman Mode */}
       <AnimatePresence>
         {feynmanOpen && <FeynmanMode onClose={() => setFeynmanOpen(false)} />}
-      </AnimatePresence>
-
-      {/* Voice Mode */}
-      <AnimatePresence>
-        {voiceModeOpen && (
-          <VoiceMode
-            onClose={() => setVoiceModeOpen(false)}
-            onSend={(text) => { sendWithText(text) }}
-            isThinking={isThinking}
-            name={name}
-          />
-        )}
       </AnimatePresence>
 
       {/* Appearance settings */}
