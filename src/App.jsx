@@ -582,12 +582,14 @@ const ORB_PULSES = {
 
 const DEFAULT_ORB_GRADIENT = 'linear-gradient(122deg,#040622 0%,#090b38 7%,#141870 16%,#2D308E 27%,#4545aa 38%,#6a6ac0 48%,#9898d2 56%,#c0c6e8 63%,#dde2f6 68%,#eeeaf4 72%,#f4ede0 76%,#f0d4a0 80%,#E9A364 84%,#d08038 88%,#964e20 93%,#501808 97%,#1a0806 100%)'
 
-function AevaOrb({ size = 218, active = false, scanMode = false, personality = 'balanced', orbGradient }) {
+function AevaOrb({ size = 218, active = false, scanMode = false, personality = 'balanced', orbGradient, orbAccent }) {
   const s = size / 218
   const shellW = Math.round(218 * s * 0.88)
   const shellH = Math.round(205 * s * 0.88)
   const pulse = ORB_PULSES[personality] || ORB_PULSES.balanced
   const gradient = orbGradient || DEFAULT_ORB_GRADIENT
+  // Use provided accent or fall back to warm gold for the default balanced orb
+  const [ar, ag, ab] = orbAccent || [233, 163, 100]
 
   return (
     <div style={{
@@ -596,13 +598,15 @@ function AevaOrb({ size = 218, active = false, scanMode = false, personality = '
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       filter: 'saturate(1.55) contrast(1.10)', flexShrink: 0,
     }}>
+      {/* Outer aura — now uses orb accent colour */}
       <motion.div
         animate={{ scale: scanMode ? [1, 1.03, 1] : active ? [1, 1.18, 1] : pulse.scale }}
         transition={{ duration: scanMode ? 3.5 : active ? 1.2 : pulse.dur, repeat: Infinity, ease: 'easeInOut' }}
         style={{
           position: 'absolute', inset: Math.round(-20 * s), borderRadius: '50%',
-          background: 'radial-gradient(ellipse at 44% 52%, rgba(45,48,142,0.28) 0%, rgba(233,163,100,0.14) 52%, transparent 76%)',
+          background: `radial-gradient(ellipse at 44% 52%, rgba(${ar},${ag},${ab},0.32) 0%, rgba(${ar},${ag},${ab},0.10) 52%, transparent 76%)`,
           filter: `blur(${Math.round(42 * s)}px)`,
+          transition: 'background 1.2s ease',
         }}
       />
       <motion.div
@@ -622,34 +626,58 @@ function AevaOrb({ size = 218, active = false, scanMode = false, personality = '
           overflow: 'hidden',
           boxShadow: scanMode
             ? 'inset 0 0 30px rgba(96,165,250,0.50), inset 0 2px 10px rgba(147,197,253,0.60), 0 0 24px rgba(59,130,246,0.35)'
-            : 'inset 0 0 30px rgba(255,255,255,0.40), inset 0 2px 10px rgba(255,255,255,0.55)',
+            : `inset 0 0 30px rgba(${ar},${ag},${ab},0.28), inset 0 2px 10px rgba(255,255,255,0.40), 0 0 ${Math.round(28*s)}px rgba(${ar},${ag},${ab},0.35)`,
           backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+          transition: 'box-shadow 1.2s ease',
         }}
       >
+        {/* Base gradient */}
         <div style={{ position: 'absolute', inset: 0, background: scanMode
           ? 'linear-gradient(122deg,#020a1a 0%,#051430 8%,#0a2456 16%,#1240a0 26%,#1D4ED8 36%,#2563EB 46%,#3B82F6 54%,#60A5FA 62%,#93C5FD 68%,#BAE6FD 72%,#E0F2FE 76%,#BAE6FD 80%,#60A5FA 84%,#2563EB 88%,#1a3a8a 93%,#0d1f50 97%,#020a1a 100%)'
-          : gradient
+          : gradient,
+          transition: 'background 1.4s ease',
         }} />
-        <div style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', background: 'radial-gradient(ellipse at 50% 50%, transparent 46%, rgba(8,10,48,0.38) 62%, rgba(4,6,28,0.65) 76%, rgba(2,3,18,0.86) 90%, rgba(1,2,12,0.94) 100%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', background: 'radial-gradient(ellipse at 72% 28%, rgba(4,5,30,0.72) 0%, rgba(8,10,50,0.50) 30%, transparent 62%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', background: 'radial-gradient(ellipse at 80% 80%, rgba(3,4,22,0.55) 0%, rgba(6,8,40,0.30) 35%, transparent 60%)', pointerEvents: 'none' }} />
+        {/* Depth vignettes */}
+        <div style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', background: 'radial-gradient(ellipse at 50% 50%, transparent 46%, rgba(0,0,0,0.30) 62%, rgba(0,0,0,0.58) 76%, rgba(0,0,0,0.80) 90%, rgba(0,0,0,0.92) 100%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', background: 'radial-gradient(ellipse at 72% 28%, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.30) 30%, transparent 62%)', pointerEvents: 'none' }} />
+        {/* Primary inner light — accent coloured */}
         <motion.div
           animate={{ x: [0, -15, 9, -5, 0], y: [0, 11, -14, 6, 0], scale: [1, 1.15, 0.92, 1.07, 1] }}
           transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
-          style={{ position: 'absolute', width: '75%', height: '70%', top: '16%', left: '-6%', borderRadius: '60% 40% 46% 54% / 58% 62% 38% 42%', background: 'radial-gradient(ellipse at 46% 52%, rgba(255,240,180,1) 0%, rgba(255,195,100,0.92) 20%, rgba(240,150,60,0.68) 44%, rgba(180,85,18,0.28) 70%, transparent 100%)', filter: `blur(${Math.round(14 * s)}px)`, mixBlendMode: 'screen' }}
+          style={{
+            position: 'absolute', width: '75%', height: '70%', top: '16%', left: '-6%',
+            borderRadius: '60% 40% 46% 54% / 58% 62% 38% 42%',
+            background: `radial-gradient(ellipse at 46% 52%, rgba(255,255,255,0.95) 0%, rgba(${ar},${ag},${ab},0.90) 20%, rgba(${ar},${ag},${ab},0.60) 44%, rgba(${ar},${ag},${ab},0.18) 70%, transparent 100%)`,
+            filter: `blur(${Math.round(14 * s)}px)`, mixBlendMode: 'screen',
+            transition: 'background 1.2s ease',
+          }}
         />
+        {/* Secondary inner light — brighter core */}
         <motion.div
           animate={{ x: [0, -8, 5, 0], y: [0, 8, -10, 0], opacity: [0.95, 1, 0.88, 0.95] }}
           transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut', delay: 1.2 }}
-          style={{ position: 'absolute', width: '36%', height: '34%', top: '30%', left: '8%', borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(255,252,220,1) 0%, rgba(255,218,120,0.88) 32%, rgba(235,158,50,0.42) 66%, transparent 100%)', filter: `blur(${Math.round(7 * s)}px)`, mixBlendMode: 'screen' }}
+          style={{
+            position: 'absolute', width: '36%', height: '34%', top: '30%', left: '8%',
+            borderRadius: '50%',
+            background: `radial-gradient(ellipse, rgba(255,255,255,1) 0%, rgba(${ar},${ag},${ab},0.88) 32%, rgba(${ar},${ag},${ab},0.40) 66%, transparent 100%)`,
+            filter: `blur(${Math.round(7 * s)}px)`, mixBlendMode: 'screen',
+            transition: 'background 1.2s ease',
+          }}
         />
+        {/* Rotating shimmer */}
         <motion.div animate={{ rotate: [0, 360] }} transition={{ duration: 28, repeat: Infinity, ease: 'linear' }}
-          style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 30% 30%, rgba(255,255,255,0.12) 0%, transparent 55%)', mixBlendMode: 'overlay', borderRadius: 'inherit' }} />
+          style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 30% 30%, rgba(255,255,255,0.14) 0%, transparent 55%)', mixBlendMode: 'overlay', borderRadius: 'inherit' }} />
         <motion.div animate={{ rotate: [0, -360] }} transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
-          style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 70% 65%, rgba(255,200,120,0.08) 0%, transparent 50%)', mixBlendMode: 'overlay', borderRadius: 'inherit' }} />
-        <div style={{ position: 'absolute', width: '38%', height: '28%', top: '4%', right: '2%', borderRadius: '50%', background: 'radial-gradient(ellipse at 44% 34%, rgba(255,255,255,0.56) 0%, rgba(218,226,255,0.22) 48%, transparent 76%)', filter: `blur(${Math.round(10 * s)}px)` }} />
-        <div style={{ position: 'absolute', width: '8%', height: '6%', top: '8%', right: '18%', borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.48) 55%, transparent 80%)', filter: `blur(${Math.round(2 * s)}px)` }} />
-        <div style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', boxShadow: 'inset 0 0 65px rgba(2,4,22,0.70)', pointerEvents: 'none' }} />
+          style={{
+            position: 'absolute', inset: 0,
+            background: `radial-gradient(ellipse at 70% 65%, rgba(${ar},${ag},${ab},0.10) 0%, transparent 50%)`,
+            mixBlendMode: 'overlay', borderRadius: 'inherit',
+            transition: 'background 1.2s ease',
+          }} />
+        {/* Specular highlight */}
+        <div style={{ position: 'absolute', width: '38%', height: '28%', top: '4%', right: '2%', borderRadius: '50%', background: 'radial-gradient(ellipse at 44% 34%, rgba(255,255,255,0.60) 0%, rgba(255,255,255,0.18) 48%, transparent 76%)', filter: `blur(${Math.round(10 * s)}px)` }} />
+        <div style={{ position: 'absolute', width: '8%', height: '6%', top: '8%', right: '18%', borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(255,255,255,1) 0%, rgba(255,255,255,0.50) 55%, transparent 80%)', filter: `blur(${Math.round(2 * s)}px)` }} />
+        <div style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', boxShadow: 'inset 0 0 65px rgba(0,0,0,0.65)', pointerEvents: 'none' }} />
       </motion.div>
     </div>
   )
@@ -743,7 +771,7 @@ function MissionCard({ onChatOpen, onOrbClick }) {
         <motion.button onClick={onOrbClick} whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.95 }}
           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
           title="Change Aeva's orb">
-          <AevaOrb size={96} personality={orbPersonality} orbGradient={activeOrbDef.gradient} />
+          <AevaOrb size={96} personality={orbPersonality} orbGradient={activeOrbDef.gradient} orbAccent={activeOrbDef.accent} />
         </motion.button>
       </div>
       <div style={{ marginTop: 8 }}>
@@ -3195,7 +3223,7 @@ Write a direct, specific opener under 35 words. Reference something concrete. En
                   transition={{ duration: 0.4 }}
                   style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 12 }}
                 >
-                  <AevaOrb size={218} active={isActive} scanMode={labOpen} personality={orbPersonality} orbGradient={ORBS.find(o => o.id === useXPStore.getState().activeOrb)?.gradient} />
+                  <AevaOrb size={218} active={isActive} scanMode={labOpen} personality={orbPersonality} orbGradient={ORBS.find(o => o.id === useXPStore.getState().activeOrb)?.gradient} orbAccent={ORBS.find(o => o.id === useXPStore.getState().activeOrb)?.accent} />
                   <div style={{ textAlign: 'center', padding: '0 28px', marginTop: 4 }}>
                     <p style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 24, fontWeight: 400, color: isLight ? 'rgba(0,0,0,0.42)' : 'rgba(255,255,255,0.45)', lineHeight: 1.3, letterSpacing: '0.01em', marginBottom: 4 }}>
                       Hey {name},
@@ -3381,7 +3409,7 @@ Write a direct, specific opener under 35 words. Reference something concrete. En
             {/* Mini orb + mastery (tutor mode active) */}
             {!isEmpty && !isMission && (
               <div className="chat-orb-area" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 4, flexShrink: 0, gap: 8 }}>
-                <AevaOrb size={72} active={isThinking} scanMode={labOpen} personality={orbPersonality} />
+                <AevaOrb size={72} active={isThinking} scanMode={labOpen} personality={orbPersonality} orbGradient={ORBS.find(o => o.id === useXPStore.getState().activeOrb)?.gradient} orbAccent={ORBS.find(o => o.id === useXPStore.getState().activeOrb)?.accent} />
                 {Object.keys(masteryMap).length > 0 && (
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', padding: '0 20px' }}>
                     {Object.entries(masteryMap).slice(0, 4).map(([topic, score]) => {
