@@ -24,16 +24,15 @@ function StatCard({ icon, value, label, accent = '#8B8FFF' }) {
       background: '#fff',
       border: '1.5px solid #EDEDF5',
       borderRadius: 18,
-      padding: '20px 18px',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-      flex: 1, minWidth: 110,
+      padding: '22px 16px',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
       boxShadow: '0 2px 16px rgba(99,102,241,0.06)',
     }}>
-      <div style={{ width: 38, height: 38, borderRadius: 12, background: `${accent}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 2 }}>
+      <div style={{ width: 40, height: 40, borderRadius: 12, background: `${accent}18`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {icon}
       </div>
-      <span style={{ fontSize: 28, fontWeight: 900, color: '#1a1a2e', letterSpacing: '-0.04em', lineHeight: 1 }}>{value}</span>
-      <span style={{ fontSize: 11, fontWeight: 600, color: '#9CA3AF', letterSpacing: '0.06em', textTransform: 'uppercase', textAlign: 'center' }}>{label}</span>
+      <span style={{ fontSize: 30, fontWeight: 900, color: '#1a1a2e', letterSpacing: '-0.04em', lineHeight: 1 }}>{value}</span>
+      <span style={{ fontSize: 10.5, fontWeight: 700, color: '#9CA3AF', letterSpacing: '0.07em', textTransform: 'uppercase', textAlign: 'center', lineHeight: 1.3 }}>{label}</span>
     </div>
   )
 }
@@ -217,31 +216,31 @@ export default function ShowEm({ onClose, name = 'Your student' }) {
               {profileTitle}
             </p>
 
-            {/* Key numbers strip */}
+            {/* Key numbers strip — CSS grid, always 4 equal columns */}
             <div style={{
-              display: 'flex', flexWrap: 'wrap', gap: 0,
-              background: 'rgba(0,0,0,0.20)',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              background: 'rgba(0,0,0,0.22)',
               borderRadius: 16,
               overflow: 'hidden',
               border: '1px solid rgba(255,255,255,0.10)',
               marginBottom: 24,
             }}>
               {[
-                { val: `Level ${level}`, sub: `${xpPct}% to next` },
-                { val: `${streak}`,       sub: 'day streak'        },
-                { val: `${xp}`,           sub: 'total XP'          },
-                { val: `${masteredTopics.length}`, sub: 'topics mastered' },
+                { val: `${level}`,                    sub: 'level'           },
+                { val: `${streak}`,                   sub: 'day streak'      },
+                { val: `${xp}`,                       sub: 'total XP'        },
+                { val: `${masteredTopics.length}`,    sub: 'mastered'        },
               ].map((item, i, arr) => (
                 <div key={i} style={{
-                  flex: 1, minWidth: 80,
-                  padding: '14px 18px',
+                  padding: '16px 12px',
                   borderRight: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.08)' : 'none',
                   textAlign: 'center',
                 }}>
-                  <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1 }}>
+                  <div style={{ fontSize: 26, fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1 }}>
                     {item.val}
                   </div>
-                  <div style={{ fontSize: 10.5, fontWeight: 600, color: 'rgba(255,255,255,0.42)', marginTop: 3, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.40)', marginTop: 4, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
                     {item.sub}
                   </div>
                 </div>
@@ -279,13 +278,12 @@ export default function ShowEm({ onClose, name = 'Your student' }) {
           {/* Body */}
           <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: 32 }}>
 
-            {/* ── Stat grid ───────────────────────────────────────── */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12 }}>
-              <StatCard icon={<MessageSquare size={18} color="#6366F1" />} value={totalExchanges}        label="Exchanges"      accent="#6366F1" />
-              <StatCard icon={<Award         size={18} color="#10B981" />} value={masteredTopics.length} label="Topics Mastered" accent="#10B981" />
-              <StatCard icon={<Flame         size={18} color="#F59E0B" />} value={streak}                label="Day Streak"     accent="#F59E0B" />
-              <StatCard icon={<Layers        size={18} color="#8B5CF6" />} value={brainStats.total}      label="Concepts Built" accent="#8B5CF6" />
-              <StatCard icon={<Zap           size={18} color="#EC4899" />} value={xp}                   label="Total XP"       accent="#EC4899" />
+            {/* ── Stat grid — exactly 4 equal columns, always balanced ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+              <StatCard icon={<MessageSquare size={18} color="#6366F1" />} value={totalExchanges}   label="Exchanges"    accent="#6366F1" />
+              <StatCard icon={<Layers        size={18} color="#8B5CF6" />} value={brainStats.total} label="Concepts"     accent="#8B5CF6" />
+              <StatCard icon={<Award         size={18} color="#10B981" />} value={brainStats.mastered} label="Mastered"  accent="#10B981" />
+              <StatCard icon={<TrendingUp    size={18} color="#F59E0B" />} value={brainStats.thisWeek} label="This Week" accent="#F59E0B" />
             </div>
 
             {/* ── What they're mastering ───────────────────────────── */}
