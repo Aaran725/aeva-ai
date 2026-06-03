@@ -1,7 +1,66 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ChevronLeft, Plus, Map } from 'lucide-react'
+import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText } from 'lucide-react'
 import { useRoadmapStore } from './roadmapStore'
+
+const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
+
+async function generateRoadmapNodes(title, examDate, assessmentInfo) {
+  const daysLeft = Math.max(1, Math.ceil((new Date(examDate) - Date.now()) / 86400000))
+  const prompt = `You are Aeva, an AI tutor. Generate a structured exam preparation roadmap.
+
+Exam: "${title}"
+Date: ${examDate} (${daysLeft} days away)${assessmentInfo ? `\n\nAssessment info:\n${assessmentInfo}` : ''}
+
+Return ONLY valid JSON:
+{
+  "overview": "2-sentence description of what this exam covers and what matters most",
+  "nodes": [
+    {
+      "id": "n1",
+      "topic": "Topic Name",
+      "type": "learn",
+      "difficulty": 2,
+      "estimatedMinutes": 20,
+      "xp": 50,
+      "description": "One sentence: what the student gains from this step"
+    }
+  ]
+}
+
+Rules:
+- 10-14 nodes total
+- Cover all major topics from the assessment info (or infer from title)
+- Each main topic: 1 learn node + 1 drill node minimum
+- type must be one of: learn, drill, check, mock
+- First node: type "learn", easiest foundational topic
+- Last node: type "mock"
+- difficulty 1-5
+- xp: learn=50, drill=30, check=40, mock=100
+- Topic names: 2-4 words max
+- Order by prerequisites (foundations first)`
+
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+      temperature: 0.4,
+      max_tokens: 1800,
+    }),
+  })
+  const data = await res.json()
+  const parsed = JSON.parse(data.choices[0].message.content)
+  const nodes = (parsed.nodes || []).map((n, i) => ({
+    ...n,
+    id: `n${i}_${Math.random().toString(36).slice(2,6)}`,
+    status: i === 0 ? 'available' : 'locked',
+  }))
+  return { overview: parsed.overview || '', nodes }
+}
 
 export default function RoadmapHub() {
   const { roadmapOpen, closeRoadmapHub, roadmaps, getActive } = useRoadmapStore()
@@ -68,7 +127,7 @@ export default function RoadmapHub() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         <AnimatePresence mode="wait">
           {view === 'home'       && <HomeView       key="home"       onCreate={() => setView('create')} onOpen={() => setView('path')} />}
-          {view === 'create'     && <CreateView     key="create"     onGenerate={() => setView('generating')} />}
+          {view === 'create'     && <CreateView     key="create"     onGenerate={() => setView('path')} />}
           {view === 'generating' && <GeneratingView key="generating" onDone={() => setView('path')} />}
           {view === 'path'       && <PathView       key="path" />}
         </AnimatePresence>
@@ -107,11 +166,128 @@ function HomeView({ onCreate, onOpen }) {
 }
 
 function CreateView({ onGenerate }) {
+  const { createRoadmap, updateRoadmap, getActive } = useRoadmapStore()
+  const [title, setTitle]           = useState('')
+  const [examDate, setExamDate]     = useState('')
+  const [info, setInfo]             = useState('')
+  const [dragOver, setDragOver]     = useState(false)
+  const [loading, setLoading]       = useState(false)
+  const [error, setError]           = useState('')
+  const fileRef                     = useRef(null)
+
+  const handleFile = (f) => {
+    if (!f) return
+    const reader = new FileReader()
+    reader.onload = e => setInfo(prev => prev ? prev + '\n\n' + e.target.result : e.target.result)
+    reader.readAsText(f)
+  }
+
+  const handleGenerate = async () => {
+    if (!title.trim() || !examDate) { setError('Add a title and exam date to continue.'); return }
+    setError('')
+    setLoading(true)
+    try {
+      const id = createRoadmap({ title: title.trim(), examDate, assessmentInfo: info })
+      const { overview, nodes } = await generateRoadmapNodes(title.trim(), examDate, info)
+      updateRoadmap(id, { overview, nodes })
+      onGenerate()
+    } catch (e) {
+      setError('Generation failed — check your connection and try again.')
+    }
+    setLoading(false)
+  }
+
+  const field = {
+    width: '100%', padding: '13px 16px', borderRadius: 12,
+    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)',
+    color: 'rgba(255,255,255,0.88)', fontSize: 14, fontFamily: "'Inter', system-ui, sans-serif",
+    outline: 'none', boxSizing: 'border-box',
+  }
+
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-      style={{ flex: 1, padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      <div style={{ width: '100%', maxWidth: 480, color: 'rgba(255,255,255,0.5)', fontSize: 14, textAlign: 'center', marginTop: 60 }}>
-        Create form coming next
+      style={{ flex: 1, padding: '28px 24px 40px', display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: 'auto' }}>
+      <div style={{ width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+        {/* Title */}
+        <div>
+          <label style={{ fontSize: 11.5, fontWeight: 700, color: 'rgba(255,255,255,0.40)', letterSpacing: '0.10em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
+            Test / Assignment Name
+          </label>
+          <input
+            value={title} onChange={e => setTitle(e.target.value)}
+            placeholder="e.g. Biology Unit 3 Exam"
+            style={field}
+          />
+        </div>
+
+        {/* Exam date */}
+        <div>
+          <label style={{ fontSize: 11.5, fontWeight: 700, color: 'rgba(255,255,255,0.40)', letterSpacing: '0.10em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
+            Exam Date
+          </label>
+          <div style={{ position: 'relative' }}>
+            <input
+              type="date" value={examDate} onChange={e => setExamDate(e.target.value)}
+              style={{ ...field, paddingLeft: 40, colorScheme: 'dark' }}
+            />
+            <Calendar size={15} color="rgba(255,255,255,0.35)" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+          </div>
+        </div>
+
+        {/* Assessment info */}
+        <div>
+          <label style={{ fontSize: 11.5, fontWeight: 700, color: 'rgba(255,255,255,0.40)', letterSpacing: '0.10em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
+            Assessment Info <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: 'rgba(255,255,255,0.25)' }}>— optional</span>
+          </label>
+          <textarea
+            value={info} onChange={e => setInfo(e.target.value)}
+            placeholder="Paste rubrics, learning outcomes, study guides, teacher instructions…"
+            rows={5}
+            style={{ ...field, resize: 'vertical', lineHeight: 1.6 }}
+          />
+        </div>
+
+        {/* File drop zone */}
+        <motion.div
+          onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={e => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files?.[0]) }}
+          onClick={() => fileRef.current?.click()}
+          animate={{ borderColor: dragOver ? 'rgba(99,102,241,0.70)' : 'rgba(255,255,255,0.10)', background: dragOver ? 'rgba(99,102,241,0.07)' : 'rgba(255,255,255,0.02)' }}
+          style={{ border: '2px dashed rgba(255,255,255,0.10)', borderRadius: 12, padding: '18px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, cursor: 'pointer', transition: 'all 0.2s' }}>
+          <input ref={fileRef} type="file" accept=".txt,.pdf,.md,.csv" style={{ display: 'none' }} onChange={e => handleFile(e.target.files?.[0])} />
+          <Upload size={18} color="rgba(255,255,255,0.30)" />
+          <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.35)', fontWeight: 500 }}>Drop a file or click to upload</span>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.20)' }}>TXT · PDF · MD</span>
+        </motion.div>
+
+        {info && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.20)' }}>
+            <FileText size={13} color="#818CF8" />
+            <span style={{ fontSize: 12, color: '#A5B4FC', fontWeight: 500 }}>{info.length} characters of context added</span>
+          </div>
+        )}
+
+        {error && <div style={{ fontSize: 13, color: '#F87171', fontWeight: 500 }}>{error}</div>}
+
+        {/* Generate */}
+        <motion.button
+          whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+          onClick={handleGenerate}
+          disabled={loading}
+          style={{
+            width: '100%', padding: '15px 0', borderRadius: 14, border: 'none',
+            background: loading ? 'rgba(99,102,241,0.30)' : 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)',
+            color: '#fff', fontSize: 15, fontWeight: 700, cursor: loading ? 'default' : 'pointer',
+            fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          }}>
+          {loading
+            ? <><motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /> Building roadmap…</>
+            : <><Sparkles size={15} /> Generate Roadmap</>
+          }
+        </motion.button>
+
       </div>
     </motion.div>
   )
