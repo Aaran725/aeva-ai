@@ -1,10 +1,13 @@
-import { useRef } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Star, Zap, Flame, Brain, BookOpen, TrendingUp, Award, Printer, MessageSquare, Layers } from 'lucide-react'
+import { X, Star, Zap, Flame, Brain, BookOpen, TrendingUp, Award, Printer, MessageSquare, Layers, Send, Loader } from 'lucide-react'
 import { useNeuralStore } from './neuralStore'
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
 import { useBrainStore, masteryColor, masteryLabel, SUBJECT_COLORS } from './brainStore'
 import { useArcadeStore } from './arcadeStore'
+
+const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -48,7 +51,177 @@ function SectionLabel({ children }) {
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
-export default function ShowEm({ onClose, name = 'Your student' }) {
+// ─── Parent Q&A Chat ──────────────────────────────────────────────────────────
+
+function buildParentSystemPrompt({ name, level, xp, streak, masteredTopics, struggleZones,
+  learningStyleLocked, dominantStyle, STYLE_NAMES, brainStats, totalExchanges, profileTitle }) {
+  return `You are Aeva, an AI tutor. A parent is asking about their child ${name}'s learning progress.
+You have the following data about ${name}:
+- Profile title: ${profileTitle}
+- Level ${level} | ${xp} total XP | ${streak}-day streak
+- ${totalExchanges} tutoring exchanges completed
+- ${brainStats.total} concepts explored, ${brainStats.mastered} mastered
+- Learning style: ${learningStyleLocked ? STYLE_NAMES[dominantStyle] : 'still calibrating'}
+- Mastered topics: ${masteredTopics.slice(0, 10).join(', ') || 'none yet'}
+- Areas needing work: ${struggleZones.slice(0, 5).join(', ') || 'none identified yet'}
+
+Answer the parent's question warmly and helpfully. Be honest, specific, and supportive. Keep answers to 2-4 sentences. Reference the actual data above when relevant. Use the child's first name (${name.split(' ')[0]}).`
+}
+
+async function callGroqParent(systemPrompt, history) {
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'system', content: systemPrompt }, ...history],
+      max_tokens: 220,
+      temperature: 0.65,
+    }),
+  })
+  const data = await res.json()
+  return data.choices?.[0]?.message?.content || "I don't have enough data to answer that yet."
+}
+
+const PARENT_CHIPS = [
+  "How is my child progressing overall?",
+  "What can I do at home to help?",
+  "What should we focus on next?",
+  "Why are they struggling with certain topics?",
+]
+
+function ParentQA({ name, systemPromptData }) {
+  const [history, setHistory] = useState([])
+  const [input, setInput] = useState('')
+  const [thinking, setThinking] = useState(false)
+  const [started, setStarted] = useState(false)
+  const bottomRef = useRef(null)
+  const inputRef = useRef(null)
+
+  useEffect(() => {
+    if (history.length > 0) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [history])
+
+  const send = async (msg) => {
+    const text = (msg || input).trim()
+    if (!text || thinking) return
+    setInput('')
+    setStarted(true)
+    const userMsg = { role: 'user', content: text }
+    const newHistory = [...history, userMsg]
+    setHistory(newHistory)
+    setThinking(true)
+    try {
+      const sysPrompt = buildParentSystemPrompt(systemPromptData)
+      const reply = await callGroqParent(sysPrompt, newHistory)
+      setHistory(prev => [...prev, { role: 'assistant', content: reply }])
+    } catch {
+      setHistory(prev => [...prev, { role: 'assistant', content: "Something went wrong. Please try again." }])
+    }
+    setThinking(false)
+    setTimeout(() => inputRef.current?.focus(), 100)
+  }
+
+  return (
+    <div style={{ background: '#fff', border: '1.5px solid #EDEDF5', borderRadius: 20, overflow: 'hidden', boxShadow: '0 2px 20px rgba(99,102,241,0.07)' }}>
+      {/* Header */}
+      <div style={{ padding: '16px 20px 14px', borderBottom: '1px solid #EDEDF5', background: 'linear-gradient(135deg, #F5F3FF 0%, #EEF2FF 100%)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 9, background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <MessageSquare size={13} color="white" />
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#1a1a2e', letterSpacing: '-0.02em' }}>Ask Aeva</div>
+            <div style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 500 }}>Questions about {name.split(' ')[0]}'s progress</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Suggestion chips */}
+      {!started && (
+        <div style={{ padding: '14px 16px 0', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {PARENT_CHIPS.map(chip => (
+            <motion.button
+              key={chip}
+              whileHover={{ scale: 1.02, background: 'rgba(99,102,241,0.12)' }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => send(chip)}
+              style={{
+                fontSize: 12, fontWeight: 600, color: '#6366F1',
+                background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.22)',
+                borderRadius: 99, padding: '6px 13px', cursor: 'pointer',
+                fontFamily: "'Inter', system-ui, sans-serif",
+              }}
+            >
+              {chip}
+            </motion.button>
+          ))}
+        </div>
+      )}
+
+      {/* Messages */}
+      {history.length > 0 && (
+        <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 280, overflowY: 'auto' }}>
+          {history.map((msg, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+              <div style={{
+                maxWidth: '85%', padding: '10px 14px', borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                background: msg.role === 'user' ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : '#F3F4F6',
+                color: msg.role === 'user' ? '#fff' : '#374151',
+                fontSize: 13, fontWeight: 500, lineHeight: 1.55,
+              }}>
+                {msg.content}
+              </div>
+            </div>
+          ))}
+          {thinking && (
+            <div style={{ display: 'flex', gap: 5, padding: '6px 14px', alignItems: 'center' }}>
+              {[0, 1, 2].map(i => (
+                <motion.div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: '#6366F1' }}
+                  animate={{ y: [0, -5, 0], opacity: [0.5, 1, 0.5] }}
+                  transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.18 }} />
+              ))}
+            </div>
+          )}
+          <div ref={bottomRef} />
+        </div>
+      )}
+
+      {/* Input */}
+      <div style={{ padding: '12px 16px 14px', borderTop: history.length > 0 ? '1px solid #F3F4F6' : 'none' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: '#F9FAFB', border: '1.5px solid #E5E7EB', borderRadius: 99, padding: '8px 8px 8px 14px' }}>
+          <input
+            ref={inputRef}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') send() }}
+            placeholder="Ask a question about your child's progress…"
+            disabled={thinking}
+            style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 13, fontWeight: 500, color: '#374151', fontFamily: "'Inter', system-ui, sans-serif" }}
+          />
+          <motion.button
+            whileHover={{ scale: 1.07 }} whileTap={{ scale: 0.93 }}
+            onClick={() => send()}
+            disabled={!input.trim() || thinking}
+            style={{
+              width: 32, height: 32, borderRadius: '50%', flexShrink: 0, cursor: input.trim() && !thinking ? 'pointer' : 'default',
+              background: input.trim() && !thinking ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : '#E5E7EB',
+              border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            {thinking ? <Loader size={13} color="#9CA3AF" /> : <Send size={13} color={input.trim() ? '#fff' : '#9CA3AF'} />}
+          </motion.button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main component ────────────────────────────────────────────────────────────
+
+export default function Parents({ onClose, name = 'Your student' }) {
   const printRef = useRef(null)
 
   // ─── Data ──────────────────────────────────────────────────────────────────
@@ -186,7 +359,7 @@ export default function ShowEm({ onClose, name = 'Your student' }) {
             {/* Top label row */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
               <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)' }}>
-                Aeva Learning Report
+                Aeva Parents Report
               </span>
               <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.04em' }}>
                 {today}
@@ -453,6 +626,19 @@ export default function ShowEm({ onClose, name = 'Your student' }) {
                 </div>
               </div>
             )}
+
+            {/* ── Parent Q&A ───────────────────────────────────────── */}
+            <div className="no-print">
+              <SectionLabel>Ask Aeva a Question</SectionLabel>
+              <ParentQA
+                name={name}
+                systemPromptData={{
+                  name, level, xp, streak, masteredTopics, struggleZones,
+                  learningStyleLocked, dominantStyle, STYLE_NAMES,
+                  brainStats, totalExchanges, profileTitle,
+                }}
+              />
+            </div>
 
             {/* ── Footer ──────────────────────────────────────────── */}
             <div style={{

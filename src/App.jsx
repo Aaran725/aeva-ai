@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, createContext, useContext } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import { ArrowUp, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu } from 'lucide-react'
+import { ArrowUp, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Users, FileText } from 'lucide-react'
 import { useAppSettings, SECTION_BG_PRESETS, CARD_STYLES, FONT_STYLES } from './appSettings'
 import { useLanguageStore } from './languageStore'
 import { useT } from './translations'
@@ -33,7 +33,8 @@ import SecondBrain from './SecondBrain'
 import { useBrainStore } from './brainStore'
 import Mirror from './Mirror'
 import OrbSelector from './OrbSelector'
-import ShowEm from './ShowEm'
+import Parents from './ShowEm'
+import AevaDoc from './AevaDoc'
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
 import { useMemoryStore } from './memoryStore'
 import './index.css'
@@ -1584,13 +1585,14 @@ function PersonalProgressCard() {
 
 /* ═══ DASHBOARD VIEW ══════════════════════════════ */
 /* ═══ MOBILE DRAWER ══════════════════════════════ */
-function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings, onProfile, onShowEm, onSignOut }) {
+function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings, onProfile, onShowEm, onDocs, onSignOut }) {
   const T = useT()
   const items = [
     { label: T.library,      icon: <BookOpen size={17} />,  color: '#A78BFA', bg: 'rgba(167,139,250,0.10)', border: 'rgba(167,139,250,0.22)', action: onLibrary },
     { label: T.secondBrain,  icon: <Brain size={17} />,     color: '#8B8FFF', bg: 'rgba(139,143,255,0.10)', border: 'rgba(139,143,255,0.22)', action: onBrain },
     { label: T.mirror,       icon: <span style={{ fontSize: 17 }}>🪞</span>, color: '#D8B4FE', bg: 'rgba(139,92,246,0.10)', border: 'rgba(139,92,246,0.22)', action: onMirror },
-    { label: '📊 Show Em',   icon: <span style={{ fontSize: 17 }}>📊</span>, color: '#34D399', bg: 'rgba(52,211,153,0.10)', border: 'rgba(52,211,153,0.22)', action: onShowEm },
+    { label: 'Parents',      icon: <Users size={17} />,                        color: '#34D399', bg: 'rgba(52,211,153,0.10)', border: 'rgba(52,211,153,0.22)', action: onShowEm },
+    { label: 'Docs',         icon: <FileText size={17} />,                     color: '#60A5FA', bg: 'rgba(96,165,250,0.10)', border: 'rgba(96,165,250,0.22)', action: onDocs },
     { label: T.myProfile,    icon: <Star size={17} />,      color: '#E9A364', bg: 'rgba(233,163,100,0.10)', border: 'rgba(233,163,100,0.22)', action: onProfile },
     { label: T.appearance,   icon: <Settings size={17} />,  color: 'rgba(255,255,255,0.55)', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.10)', action: onSettings },
   ]
@@ -1735,6 +1737,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
   const [mirrorOpen, setMirrorOpen] = useState(false)
   const [orbSelectorOpen, setOrbSelectorOpen] = useState(false)
   const [showEmOpen, setShowEmOpen] = useState(false)
+  const [docOpen, setDocOpen]       = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const isMobile = useIsMobile()
   const { getStats } = useBrainStore()
@@ -1845,8 +1848,12 @@ function DashboardView({ onChatOpen, onSignOut }) {
                       <MessageCircle size={13} />Chat
                     </motion.button>
 
+                    <motion.button whileHover={{ scale: 1.03, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.97 }} onClick={() => setDocOpen(true)} style={nb}>
+                      <FileText size={13} />Docs
+                    </motion.button>
+
                     <motion.button whileHover={{ scale: 1.03, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.97 }} onClick={() => setShowEmOpen(true)} style={nb}>
-                      <TrendingUp size={13} />Show Em
+                      <Users size={13} />Parents
                     </motion.button>
 
                     {/* Divider */}
@@ -1918,6 +1925,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
           onSettings={() => setAppSettingsOpen(true)}
           onProfile={() => setProfileOpen(true)}
           onShowEm={() => { setDrawerOpen(false); setShowEmOpen(true) }}
+          onDocs={() => { setDrawerOpen(false); setDocOpen(true) }}
           onSignOut={onSignOut}
         />
       )}
@@ -2010,7 +2018,11 @@ function DashboardView({ onChatOpen, onSignOut }) {
       </AnimatePresence>
 
       <AnimatePresence>
-        {showEmOpen && <ShowEm onClose={() => setShowEmOpen(false)} name={name} />}
+        {showEmOpen && <Parents onClose={() => setShowEmOpen(false)} name={name} />}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {docOpen && <AevaDoc onClose={() => setDocOpen(false)} name={name} />}
       </AnimatePresence>
 
       <AnimatePresence>
@@ -2785,6 +2797,7 @@ function ChatView({ onBack }) {
   const [studyGuideOpen, setStudyGuideOpen] = useState(false)
   const [lensFile, setLensFile] = useState(null)
   const [visualInsights, setVisualInsights] = useState([])
+  const [chatDocOpen, setChatDocOpen] = useState(false)
   const lensInputRef = useRef(null)
   const [drillOpen, setDrillOpen] = useState(false)
   const [libraryOpen, setLibraryOpen] = useState(false)
@@ -3935,6 +3948,14 @@ function ChatView({ onBack }) {
                     </motion.button>
                     <motion.button
                       whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.90 }}
+                      onClick={() => setChatDocOpen(true)}
+                      title="Aeva Docs — upload a document or homework"
+                      style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(96,165,250,0.10)', border: '1.5px solid rgba(96,165,250,0.28)', cursor: 'pointer', color: 'rgba(96,165,250,0.75)' }}
+                    >
+                      <FileText size={14} strokeWidth={2} />
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.90 }}
                       onClick={() => setDrillOpen(true)}
                       title="Custom Drill — paste notes to build a HUD"
                       style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(167,139,250,0.10)', border: '1.5px solid rgba(167,139,250,0.28)', cursor: 'pointer', color: 'rgba(167,139,250,0.75)' }}
@@ -3989,6 +4010,11 @@ function ChatView({ onBack }) {
             onInsightReady={insight => setVisualInsights(prev => [...prev, insight])}
           />
         )}
+      </AnimatePresence>
+
+      {/* Aeva Docs Modal */}
+      <AnimatePresence>
+        {chatDocOpen && <AevaDoc onClose={() => setChatDocOpen(false)} name={name} />}
       </AnimatePresence>
 
       {/* Study Guide Modal */}
