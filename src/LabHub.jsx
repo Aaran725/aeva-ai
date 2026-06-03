@@ -1394,6 +1394,7 @@ function DrillTab() {
   const {
     difficulty, setDifficulty, questionCount, setQuestionCount, focusMode, setFocusMode,
     labSuggestion, clearSuggestion, startDrill, exitDrill, setDrillData, getPersonalBest,
+    pendingAutoStart, clearPendingAutoStart,
   } = useLabStore()
   const { struggleZones, dominantTopics } = useNeuralStore()
   const { getDueCards, getDueCount, getUpcomingCount, getTotalCards } = useSRStore()
@@ -1410,10 +1411,11 @@ function DrillTab() {
     if (labSuggestion?.topic) setTopicInput(labSuggestion.topic)
   }, [labSuggestion])
 
-  const handleStart = async (drillId) => {
-    const topic = topicInput.trim()
+  const handleStart = async (drillId, topicOverride) => {
+    const topic = (topicOverride ?? topicInput).trim()
     if (!topic) { setError('Enter a topic first.'); inputRef.current?.focus(); return }
     setError('')
+    if (topicOverride) setTopicInput(topicOverride)
     startDrill(drillId, topic)
     try {
       const { difficulty: d, questionCount: qc, focusMode: fm } = useLabStore.getState()
@@ -1424,6 +1426,15 @@ function DrillTab() {
       exitDrill()
     }
   }
+
+  // Auto-start drill when triggered from roadmap node
+  useEffect(() => {
+    if (!pendingAutoStart?.topic) return
+    const { drillType, topic } = pendingAutoStart
+    clearPendingAutoStart()
+    handleStart(drillType, topic)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAutoStart])
 
   const handleReview = () => {
     const due = getDueCards()

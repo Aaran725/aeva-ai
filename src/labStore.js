@@ -93,6 +93,10 @@ export const useLabStore = create((set, get) => ({
   openLab:  () => set({ labOpen: true }),
   closeLab: () => set({ labOpen: false }),
 
+  pendingAutoStart: null, // { drillType, topic } — auto-fires a drill when Lab opens
+  setPendingAutoStart: (drillType, topic) => set({ pendingAutoStart: { drillType, topic } }),
+  clearPendingAutoStart: () => set({ pendingAutoStart: null }),
+
   startDrill: (drillId, topic) => set({ activeDrill: drillId, currentTopic: topic, drillData: null, drillScore: null, drillLoading: true }),
   exitDrill:  () => set({ activeDrill: null, drillData: null, drillScore: null, drillLoading: false, activeOrderId: null }),
 

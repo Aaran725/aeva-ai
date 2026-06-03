@@ -442,7 +442,7 @@ const TOP_PAD      = 32
 
 function PathView() {
   const { getActive, completeNode, closeRoadmapHub, startNodeSession, endNodeSession } = useRoadmapStore()
-  const { openLab, setLabSuggestion, addOrder, setLabTab } = useLabStore()
+  const { openLab, addOrder, setLabTab, setPendingAutoStart } = useLabStore()
   const { addXP } = useXPStore()
   const { setPendingChatPrompt, requestChatView } = useAevaControlStore()
   const roadmap = getActive()
@@ -494,11 +494,11 @@ function PathView() {
       )
       closeRoadmapHub()
     } else if (node.type === 'drill') {
-      setLabSuggestion({ topic: node.topic, drillType: 'flashcard', reason: `Roadmap drill: ${node.topic} — ${roadmap.title}` })
+      setPendingAutoStart('flashcard', node.topic)
       closeRoadmapHub()
       openLab()
     } else if (node.type === 'check') {
-      setLabSuggestion({ topic: node.topic, drillType: 'quiz', reason: `Knowledge check: ${node.topic} — ${roadmap.title}` })
+      setPendingAutoStart('shortanswer', node.topic)
       closeRoadmapHub()
       openLab()
     } else if (node.type === 'mock') {
@@ -585,9 +585,9 @@ function PathView() {
                         setPendingChatPrompt(`Teach me "${t.topic}" for my ${roadmap.title}. I have ${daysLeft} days until the exam.`)
                         closeRoadmapHub()
                       } else if (t.type === 'drill') {
-                        setLabSuggestion({ topic: t.topic, drillType: 'flashcard', reason: `Daily mission drill: ${t.topic}` }); closeRoadmapHub(); openLab()
+                        setPendingAutoStart('flashcard', t.topic); closeRoadmapHub(); openLab()
                       } else if (t.type === 'check') {
-                        setLabSuggestion({ topic: t.topic, drillType: 'quiz', reason: `Daily mission check: ${t.topic}` }); closeRoadmapHub(); openLab()
+                        setPendingAutoStart('shortanswer', t.topic); closeRoadmapHub(); openLab()
                       } else if (t.type === 'mock') {
                         addOrder({ title: `Mock Test — ${roadmap.title}`, description: `Full mock test on ${roadmap.title}.`, subject: roadmap.title }); closeRoadmapHub(); setLabTab('orders'); openLab()
                       }
