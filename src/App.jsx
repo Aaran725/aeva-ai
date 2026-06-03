@@ -2411,18 +2411,27 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
     if (listItems.length === 0) return
     if (listType === 'ol') {
       elements.push(
-        <ol key={`list-${elements.length}`} style={{ margin: '8px 0 8px 4px', paddingLeft: 22, display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <ol key={`list-${elements.length}`} style={{ margin: '8px 0 8px 4px', paddingLeft: 0, display: 'flex', flexDirection: 'column', gap: 5, listStyle: 'none', counterReset: 'aeva-ol' }}>
           {listItems.map((item, idx) => (
-            <li key={idx} style={{ color: txt, fontSize: 14.5, lineHeight: 1.6 }}>{parseInline(item, isLight)}</li>
+            <li key={idx} style={{ color: txt, fontSize: 14.5, lineHeight: 1.6, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <span style={{
+                flexShrink: 0, minWidth: 22, height: 22, borderRadius: 6,
+                background: isLight ? 'rgba(99,102,241,0.12)' : 'rgba(139,143,255,0.15)',
+                color: isLight ? 'rgba(99,102,241,0.85)' : 'rgba(165,170,255,0.90)',
+                fontSize: 11.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                marginTop: 1,
+              }}>{idx + 1}</span>
+              <span style={{ paddingTop: 2 }}>{parseInline(item, isLight)}</span>
+            </li>
           ))}
         </ol>
       )
     } else {
       elements.push(
-        <ul key={`list-${elements.length}`} style={{ margin: '8px 0 8px 4px', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4, listStyle: 'none' }}>
+        <ul key={`list-${elements.length}`} style={{ margin: '8px 0 8px 4px', paddingLeft: 2, display: 'flex', flexDirection: 'column', gap: 5, listStyle: 'none' }}>
           {listItems.map((item, idx) => (
-            <li key={idx} style={{ color: txt, fontSize: 14.5, lineHeight: 1.6, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-              <span style={{ color: bullet, marginTop: 2, flexShrink: 0, fontSize: 11 }}>◆</span>
+            <li key={idx} style={{ color: txt, fontSize: 14.5, lineHeight: 1.6, display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+              <span style={{ color: bullet, marginTop: 5, flexShrink: 0, width: 5, height: 5, borderRadius: '50%', background: bullet, display: 'inline-block' }} />
               <span>{parseInline(item, isLight)}</span>
             </li>
           ))}
@@ -2439,7 +2448,23 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
 
     if (trimmed === '') {
       flushList()
-      elements.push(<div key={`gap-${i}`} style={{ height: 6 }} />)
+      elements.push(<div key={`gap-${i}`} style={{ height: 8 }} />)
+      i++; continue
+    }
+
+    // Horizontal rule ---
+    if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
+      flushList()
+      elements.push(
+        <div key={`hr-${i}`} style={{
+          margin: '14px 0',
+          height: 1,
+          background: isLight
+            ? 'linear-gradient(90deg, transparent, rgba(0,0,0,0.12) 20%, rgba(0,0,0,0.12) 80%, transparent)'
+            : 'linear-gradient(90deg, transparent, rgba(255,255,255,0.10) 20%, rgba(255,255,255,0.10) 80%, transparent)',
+          borderRadius: 1,
+        }} />
+      )
       i++; continue
     }
 
@@ -2464,14 +2489,21 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
       try {
         const html = katex.renderToString(mathContent, { throwOnError: false, displayMode: true })
         elements.push(
-          <div key={`dmath-${startI}`}
-            style={{
-              overflowX: 'auto', margin: '12px 0', padding: '14px 16px',
-              textAlign: 'center', borderRadius: 10,
-              background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)',
-              border: isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.08)',
-            }}
-            dangerouslySetInnerHTML={{ __html: html }} />
+          <div key={`dmath-${startI}`} style={{
+            overflowX: 'auto', margin: '14px 0', padding: '18px 20px',
+            textAlign: 'center', borderRadius: 12, position: 'relative',
+            background: isLight ? 'rgba(99,102,241,0.06)' : 'rgba(99,102,241,0.09)',
+            border: isLight ? '1px solid rgba(99,102,241,0.22)' : '1px solid rgba(99,102,241,0.30)',
+            boxShadow: isLight ? 'none' : '0 0 24px rgba(99,102,241,0.08)',
+          }}>
+            <div style={{
+              position: 'absolute', top: 6, right: 10,
+              fontSize: 9, fontWeight: 800, letterSpacing: '0.08em',
+              color: isLight ? 'rgba(99,102,241,0.45)' : 'rgba(139,143,255,0.42)',
+              textTransform: 'uppercase',
+            }}>formula</div>
+            <div dangerouslySetInnerHTML={{ __html: html }} />
+          </div>
         )
       } catch {
         elements.push(<p key={`dmath-${startI}`} style={{ fontFamily: 'monospace', color: txt }}>{mathContent}</p>)
@@ -2519,8 +2551,17 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
       flushList()
       const content = trimmed.replace(/^#+\s/, '')
       elements.push(
-        <div key={`h1-${i}`} style={{ fontSize: 16, fontWeight: 800, color: txtH1, margin: '12px 0 6px', letterSpacing: '-0.02em', lineHeight: 1.3 }}>
-          {parseInline(content, isLight)}
+        <div key={`h1-${i}`} style={{
+          fontSize: 15.5, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.3,
+          margin: '16px 0 6px',
+          background: isLight
+            ? 'linear-gradient(90deg, rgba(79,70,229,0.92), rgba(99,102,241,0.78))'
+            : 'linear-gradient(90deg, rgba(165,170,255,1) 0%, rgba(196,181,253,0.88) 100%)',
+          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+          paddingBottom: 7,
+          borderBottom: isLight ? '1px solid rgba(99,102,241,0.18)' : '1px solid rgba(139,143,255,0.20)',
+        }}>
+          {content}
         </div>
       )
       i++; continue
@@ -2530,7 +2571,13 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
       flushList()
       const content = trimmed.replace(/^#+\s/, '')
       elements.push(
-        <div key={`h2-${i}`} style={{ fontSize: 14.5, fontWeight: 700, color: txtH2, margin: '10px 0 4px', letterSpacing: '-0.01em' }}>
+        <div key={`h2-${i}`} style={{
+          fontSize: 14, fontWeight: 700, letterSpacing: '-0.01em',
+          color: isLight ? 'rgba(99,102,241,0.88)' : 'rgba(165,170,255,0.90)',
+          margin: '12px 0 4px',
+          display: 'flex', alignItems: 'center', gap: 7,
+        }}>
+          <span style={{ width: 3, height: 14, borderRadius: 2, background: isLight ? 'rgba(99,102,241,0.55)' : 'rgba(139,143,255,0.55)', flexShrink: 0, display: 'inline-block' }} />
           {parseInline(content, isLight)}
         </div>
       )
@@ -2542,14 +2589,19 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
       const content = trimmed.replace(/^>\s*/, '')
       elements.push(
         <div key={`bq-${i}`} style={{
-          margin: '10px 0', padding: '12px 16px',
-          borderLeft: '3px solid #6366F1',
-          background: isLight ? 'rgba(99,102,241,0.08)' : 'rgba(99,102,241,0.13)',
-          borderRadius: '0 10px 10px 0',
-          fontSize: 14.5, color: 'rgba(220,220,255,0.90)',
-          fontStyle: 'italic', fontWeight: 500, lineHeight: 1.70,
+          margin: '10px 0', padding: '11px 16px 11px 14px',
+          borderLeft: '3px solid rgba(99,102,241,0.70)',
+          background: isLight ? 'rgba(99,102,241,0.07)' : 'rgba(99,102,241,0.12)',
+          borderRadius: '0 12px 12px 0',
+          display: 'flex', alignItems: 'flex-start', gap: 10,
         }}>
-          {parseInline(content, isLight)}
+          <span style={{ color: isLight ? 'rgba(99,102,241,0.65)' : 'rgba(139,143,255,0.70)', fontSize: 13, flexShrink: 0, marginTop: 1 }}>◈</span>
+          <div style={{
+            fontSize: 14.5, lineHeight: 1.70, fontStyle: 'italic', fontWeight: 500,
+            color: isLight ? 'rgba(0,0,0,0.82)' : 'rgba(220,220,255,0.92)',
+          }}>
+            {parseInline(content, isLight)}
+          </div>
         </div>
       )
       i++; continue
@@ -2594,6 +2646,49 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
     if (ulMatch) {
       if (listType !== 'ul') { flushList(); listType = 'ul' }
       listItems.push(ulMatch[1])
+      i++; continue
+    }
+
+    // Standalone bold line **Concept Name** → accent section heading
+    const standaloneBoldMatch = trimmed.match(/^\*\*([^*].+?)\*\*$/)
+    if (standaloneBoldMatch) {
+      flushList()
+      elements.push(
+        <div key={`sh-${i}`} style={{
+          fontSize: 15, fontWeight: 800, letterSpacing: '-0.015em', lineHeight: 1.3,
+          margin: '16px 0 6px',
+          background: isLight
+            ? 'linear-gradient(90deg, rgba(79,70,229,0.90), rgba(99,102,241,0.76))'
+            : 'linear-gradient(90deg, rgba(165,170,255,1) 0%, rgba(196,181,253,0.88) 100%)',
+          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+          paddingBottom: 6,
+          borderBottom: isLight ? '1px solid rgba(99,102,241,0.16)' : '1px solid rgba(139,143,255,0.18)',
+        }}>
+          {standaloneBoldMatch[1]}
+        </div>
+      )
+      i++; continue
+    }
+
+    // Standalone italic line *question or example* → golden question callout
+    const isStandaloneItalic = trimmed.startsWith('*') && trimmed.endsWith('*')
+      && !trimmed.startsWith('**') && !trimmed.endsWith('**') && trimmed.length > 2
+    if (isStandaloneItalic) {
+      flushList()
+      const content = trimmed.slice(1, -1)
+      elements.push(
+        <div key={`qi-${i}`} style={{
+          margin: '10px 0 4px', padding: '10px 14px',
+          borderRadius: 10,
+          background: isLight ? 'rgba(234,179,8,0.07)' : 'rgba(251,191,36,0.07)',
+          border: isLight ? '1px solid rgba(234,179,8,0.20)' : '1px solid rgba(251,191,36,0.17)',
+          borderLeft: isLight ? '3px solid rgba(234,179,8,0.50)' : '3px solid rgba(251,191,36,0.42)',
+          fontSize: 14, color: isLight ? 'rgba(0,0,0,0.72)' : 'rgba(255,255,255,0.76)',
+          fontStyle: 'italic', lineHeight: 1.65,
+        }}>
+          {parseInline(content, isLight)}
+        </div>
+      )
       i++; continue
     }
 
