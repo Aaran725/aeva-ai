@@ -8,6 +8,14 @@ function saveHistory(h) {
   try { localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(-50))) } catch {} // keep last 50
 }
 
+const ORDERS_KEY = 'aeva_lab_orders_v1'
+function loadOrders() {
+  try { return JSON.parse(localStorage.getItem(ORDERS_KEY) || '[]') } catch { return [] }
+}
+function saveOrders(orders) {
+  try { localStorage.setItem(ORDERS_KEY, JSON.stringify(orders.slice(0, 30))) } catch {}
+}
+
 export const DRILLS = {
   flashcard: {
     id: 'flashcard', emoji: '⚡', title: 'Flashcard Sprint',
@@ -62,12 +70,14 @@ export const DIFFICULTIES = {
 
 export const useLabStore = create((set, get) => ({
   labOpen: false,
+  labTab: 'drill',  // 'drill' | 'orders' | 'stats'
   activeDrill: null,
   currentTopic: '',
   drillData: null,
   drillLoading: false,
   drillScore: null,
   labSuggestion: null,
+  activeOrderId: null,   // set when a drill is launched from Aeva's Orders
 
   // Customization
   difficulty: 'intermediate',
@@ -77,11 +87,14 @@ export const useLabStore = create((set, get) => ({
   // History (persisted)
   drillHistory: loadHistory(),  // [{ topic, drillType, difficulty, pct, date, correct, total }]
 
+  // Aeva's Orders (persisted)
+  orders: loadOrders(),  // [{ id, topic, drillType, reason, urgency, assignedAt, completedAt, score }]
+
   openLab:  () => set({ labOpen: true }),
   closeLab: () => set({ labOpen: false }),
 
   startDrill: (drillId, topic) => set({ activeDrill: drillId, currentTopic: topic, drillData: null, drillScore: null, drillLoading: true }),
-  exitDrill:  () => set({ activeDrill: null, drillData: null, drillScore: null, drillLoading: false }),
+  exitDrill:  () => set({ activeDrill: null, drillData: null, drillScore: null, drillLoading: false, activeOrderId: null }),
 
   setDrillData:    (data)  => set({ drillData: data, drillLoading: false }),
   setDrillLoading: (v)     => set({ drillLoading: v }),
@@ -98,15 +111,77 @@ export const useLabStore = create((set, get) => ({
       difficulty: get().difficulty,
       date: Date.now(),
     }
-    const updated = [...get().drillHistory, entry]
-    saveHistory(updated)
-    set({ drillHistory: updated })
-    // Award XP for completing a drill
+    const updatedHistory = [...get().drillHistory, entry]
+    saveHistory(updatedHistory)
+    const stateUpdate = { drillHistory: updatedHistory }
+
+    // Mark the sourcing order as complete if this drill was launched from Aeva's Orders
+    const orderId = get().activeOrderId
+    if (orderId) {
+      const updatedOrders = get().orders.map(o =>
+        o.id === orderId ? { ...o, completedAt: Date.now(), score: pct } : o
+      )
+      saveOrders(updatedOrders)
+      stateUpdate.orders = updatedOrders
+      stateUpdate.activeOrderId = null
+    }
+
+    set(stateUpdate)
     try { useXPStore.getState().addXP('DRILL_COMPLETE') } catch {}
   },
 
   setLabSuggestion: (s) => set({ labSuggestion: s }),
   clearSuggestion:  ()  => set({ labSuggestion: null }),
+
+  // ── Aeva's Orders ────────────────────────────────────
+  addOrder: ({ topic, drillType, reason, urgency = 'medium' }) => {
+    if (!topic?.trim() || !drillType) return null
+    // Don't create a duplicate pending order for same topic+drillType
+    const existing = get().orders.find(o =>
+      !o.completedAt &&
+      o.topic.toLowerCase() === topic.toLowerCase() &&
+      o.drillType === drillType
+    )
+    if (existing) return null
+
+    const order = {
+      id: `order_${Date.now()}`,
+      topic: topic.trim(),
+      drillType,
+      reason: reason || `Aeva detected you need to work on ${topic}.`,
+      urgency,
+      assignedAt: Date.now(),
+      completedAt: null,
+      score: null,
+    }
+    const updated = [order, ...get().orders].slice(0, 30)
+    saveOrders(updated)
+    set({ orders: updated })
+    return order
+  },
+
+  dismissOrder: (id) => {
+    const updated = get().orders.filter(o => o.id !== id)
+    saveOrders(updated)
+    set({ orders: updated })
+  },
+
+  markOrderComplete: (id, score) => {
+    const updated = get().orders.map(o =>
+      o.id === id ? { ...o, completedAt: Date.now(), score } : o
+    )
+    saveOrders(updated)
+    set({ orders: updated })
+  },
+
+  setActiveOrderId: (id) => set({ activeOrderId: id }),
+
+  setLabTab: (tab) => set({ labTab: tab }),
+
+  clearOrders: () => {
+    saveOrders([])
+    set({ orders: [] })
+  },
 
   getPersonalBest: (topic, drillType) => {
     const relevant = get().drillHistory.filter(h => h.topic.toLowerCase() === topic.toLowerCase() && h.drillType === drillType)

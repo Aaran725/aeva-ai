@@ -351,6 +351,114 @@ function buildDifficultyDirective(neural) {
   return null
 }
 
+/* ─── Aeva's Orders background analysis ─── */
+// Fires every 8 exchanges in tutor mode — identifies gaps and writes a labOrder
+async function analyzeForOrders(messages, struggleZones, addOrder, setOrderToast) {
+  try {
+    const recent = messages.slice(-8).map(m =>
+      `${m.role === 'model' ? 'Aeva' : 'Student'}: ${(m.text || '').slice(0, 200)}`
+    ).join('\n')
+    const struggles = struggleZones.slice(0, 5).join(', ')
+
+    const res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [{
+          role: 'user',
+          content: `Analyze this tutoring conversation and identify ONE specific knowledge gap worth drilling.
+
+Recent conversation:
+${recent}
+
+Known student struggles: ${struggles || 'none yet'}
+
+Drill assignment rules:
+- confuses terms / can't define concepts → "match" or "flashcard"
+- wrong on application questions → "mocktest"
+- can describe but not explain simply → "feynman"
+- gaps in passage/notes context → "cloze"
+- needs timed recall pressure → "speedround"
+- essay/exam question weakness → "shortanswer"
+
+Return ONLY JSON. If no clear gap, return {"skip":true}.
+{"topic":"specific concept 1-4 words","drillType":"flashcard"|"speedround"|"mocktest"|"feynman"|"match"|"cloze"|"shortanswer","reason":"Aeva speaking in first person: one sentence explaining why you assigned this specific drill","urgency":"high"|"medium"|"low"}`,
+        }],
+        temperature: 0.15,
+        max_tokens: 160,
+        response_format: { type: 'json_object' },
+      }),
+    })
+    if (!res.ok) return
+    const json = await res.json()
+    const result = JSON.parse(json.choices?.[0]?.message?.content || '{}')
+    if (result.skip || !result.topic || !result.drillType) return
+
+    const validDrills = ['flashcard', 'speedround', 'mocktest', 'feynman', 'match', 'cloze', 'shortanswer']
+    if (!validDrills.includes(result.drillType)) return
+
+    const order = addOrder({
+      topic: result.topic.trim().slice(0, 50),
+      drillType: result.drillType,
+      reason: result.reason || `I've noticed you could strengthen your understanding of ${result.topic}.`,
+      urgency: ['high', 'medium', 'low'].includes(result.urgency) ? result.urgency : 'medium',
+    })
+    if (order) setOrderToast(order)
+  } catch { /* silent — never surface to user */ }
+}
+
+/* ─── Order toast component (shown in chat) ─── */
+const ORDER_TOAST_DRILLS = { flashcard: '⚡', speedround: '⏱', mocktest: '🎯', feynman: '🧪', match: '🔗', cloze: '✍️', shortanswer: '🧩' }
+const ORDER_TOAST_LABELS = { flashcard: 'Flashcard Sprint', speedround: 'Speed Round', mocktest: 'Mock Test', feynman: 'Feynman Test', match: 'Match Grid', cloze: 'Fill the Gaps', shortanswer: 'Short Answer' }
+
+function OrderToast({ order, onJump, onDismiss }) {
+  useEffect(() => {
+    const t = setTimeout(onDismiss, 9000)
+    return () => clearTimeout(t)
+  }, [order.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <motion.div
+      initial={{ y: 80, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: 80, opacity: 0 }}
+      transition={{ type: 'spring', stiffness: 360, damping: 28 }}
+      style={{
+        position: 'absolute', bottom: 96, left: 16, right: 16,
+        zIndex: 100, maxWidth: 480, margin: '0 auto',
+        padding: '13px 15px', borderRadius: 16,
+        background: 'rgba(8,10,28,0.97)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
+        border: '1px solid rgba(59,130,246,0.40)',
+        boxShadow: '0 8px 40px rgba(0,0,0,0.65), 0 0 0 1px rgba(59,130,246,0.10)',
+        display: 'flex', alignItems: 'center', gap: 12,
+        fontFamily: "'Inter', system-ui, sans-serif",
+      }}
+    >
+      <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(59,130,246,0.20)', border: '1px solid rgba(59,130,246,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
+        {ORDER_TOAST_DRILLS[order.drillType] || '📋'}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 10.5, fontWeight: 700, color: '#60A5FA', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>
+          Aeva assigned you a drill
+        </div>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.82)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {ORDER_TOAST_LABELS[order.drillType]} · <span style={{ fontWeight: 700 }}>{order.topic}</span>
+        </div>
+      </div>
+      <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+        onClick={onJump}
+        style={{ flexShrink: 0, padding: '7px 12px', borderRadius: 9, background: 'rgba(59,130,246,0.28)', border: '1px solid rgba(59,130,246,0.55)', color: '#93C5FD', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: "'Inter', system-ui, sans-serif" }}>
+        Jump to it →
+      </motion.button>
+      <button onClick={onDismiss}
+        style={{ flexShrink: 0, background: 'none', border: 'none', color: 'rgba(255,255,255,0.28)', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center' }}>
+        <X size={13} />
+      </button>
+    </motion.div>
+  )
+}
+
 /* ─── Background session summarisation ─── */
 // Fires every 6 exchanges — fire-and-forget, never blocks the main response.
 async function summariseSessionBackground(messages, userName, topics, addMemory) {
@@ -1723,11 +1831,13 @@ function MobileBottomBar({ onChat, onLab, onArcade, onDrillCount }) {
 /* ═══ DASHBOARD VIEW ══════════════════════════════ */
 function DashboardView({ onChatOpen, onSignOut }) {
   const { openArcade } = useArcadeStore()
-  const { openLab } = useLabStore()
+  const { openLab, orders: labOrders } = useLabStore()
   const { getDueCount } = useSRStore()
   const { sessions } = useLibraryStore()
   const { name } = useUser()
   const srDueCount = getDueCount()
+  const pendingOrderCount = labOrders.filter(o => !o.completedAt).length
+  const labBadgeCount = srDueCount + pendingOrderCount
   const [fingerprintOpen, setFingerprintOpen] = useState(false)
   const [palaceOpen, setPalaceOpen] = useState(false)
   const [libraryOpen, setLibraryOpen] = useState(false)
@@ -1827,10 +1937,10 @@ function DashboardView({ onChatOpen, onSignOut }) {
 
                     <motion.button whileHover={{ scale: 1.03, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.97 }} onClick={openLab} style={{ ...nb, position: 'relative' }}>
                       <FlaskConical size={13} />Lab
-                      {srDueCount > 0 && (
+                      {labBadgeCount > 0 && (
                         <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400 }}
-                          style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 99, background: '#4ADE80', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: '#0a160a', padding: '0 3px' }}>
-                          {srDueCount}
+                          style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 99, background: pendingOrderCount > 0 ? '#60A5FA' : '#4ADE80', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: '#050a1a', padding: '0 3px', boxShadow: pendingOrderCount > 0 ? '0 0 8px rgba(96,165,250,0.60)' : '0 0 8px rgba(74,222,128,0.60)' }}>
+                          {labBadgeCount}
                         </motion.div>
                       )}
                     </motion.button>
@@ -1936,7 +2046,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
           onChat={onChatOpen}
           onLab={openLab}
           onArcade={openArcade}
-          onDrillCount={srDueCount}
+          onDrillCount={labBadgeCount}
         />
       )}
 
@@ -2757,7 +2867,7 @@ function ChatView({ onBack }) {
     cleanText, interruptActive, quickActions, streakCount, missionExchanges,
     applyTimeoutPenalty, clearQuickActions, proTip,
   } = useArcadeStore()
-  const { labOpen, openLab, setLabSuggestion } = useLabStore()
+  const { labOpen, openLab, setLabSuggestion, addOrder, orders, setLabTab } = useLabStore()
   const {
     orbPersonality,
     updateFromExchange,
@@ -2799,6 +2909,7 @@ function ChatView({ onBack }) {
   const [visualInsights, setVisualInsights] = useState([])
   const [chatDocOpen, setChatDocOpen] = useState(false)
   const lensInputRef = useRef(null)
+  const [orderToast, setOrderToast] = useState(null)
   const [drillOpen, setDrillOpen] = useState(false)
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [socraticActive, setSocraticActive] = useState(false)
@@ -3098,6 +3209,11 @@ function ChatView({ onBack }) {
             Object.keys(sessionConceptsRef.current).slice(0, 6),
             addMemory,
           )
+        }
+
+        // Aeva's Orders analysis every 8 exchanges — fire-and-forget
+        if (exchangeCountRef.current % 8 === 0 && messages.length >= 6) {
+          analyzeForOrders(messages, struggleZones, addOrder, setOrderToast)
         }
         // XP every 5 Socratic exchanges (resets when mode is toggled)
         if (socraticActive) {
@@ -4041,6 +4157,22 @@ function ChatView({ onBack }) {
       {/* Appearance settings */}
       <AnimatePresence>
         {chatAppSettingsOpen && <AppSettingsPanel onClose={() => setChatAppSettingsOpen(false)} />}
+      </AnimatePresence>
+
+      {/* Aeva's Orders toast */}
+      <AnimatePresence>
+        {orderToast && (
+          <OrderToast
+            key={orderToast.id}
+            order={orderToast}
+            onDismiss={() => setOrderToast(null)}
+            onJump={() => {
+              setOrderToast(null)
+              setLabTab('orders')
+              openLab()
+            }}
+          />
+        )}
       </AnimatePresence>
 
       {/* Library Modal */}
