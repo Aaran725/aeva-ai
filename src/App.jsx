@@ -35,6 +35,7 @@ import Mirror from './Mirror'
 import OrbSelector from './OrbSelector'
 import ShowEm from './ShowEm'
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
+import { useMemoryStore } from './memoryStore'
 import './index.css'
 
 /* ─── Groq API ─── */
@@ -347,6 +348,34 @@ function buildDifficultyDirective(neural) {
   if (avgResponseLength > 120 && (depth || 50) > 65)
     return '🚀 DIFFICULTY SIGNAL — DEEPLY ENGAGED: Long, thoughtful replies and high depth score. Skip the basics. Go deeper — add nuance, challenge their assumptions, discuss edge cases and implications.'
   return null
+}
+
+/* ─── Background session summarisation ─── */
+// Fires every 6 exchanges — fire-and-forget, never blocks the main response.
+async function summariseSessionBackground(messages, userName, topics, addMemory) {
+  try {
+    const lines = messages.slice(-12).map(m =>
+      `${m.role === 'model' ? 'Aeva' : userName}: ${m.text?.slice(0, 280)}`
+    ).join('\n')
+
+    const res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [{
+          role: 'user',
+          content: `Summarise this tutoring session in exactly 2 sentences. Be specific: name the topic, what the student understood, and any difficulty. No filler.\n\nSession:\n${lines}`,
+        }],
+        temperature: 0.2,
+        max_tokens: 90,
+      }),
+    })
+    if (!res.ok) return
+    const json = await res.json()
+    const summary = json.choices?.[0]?.message?.content?.trim()
+    if (summary) addMemory({ summary, topics, exchanges: messages.length })
+  } catch { /* silent — never surface to user */ }
 }
 
 /* ─── Stream Aeva response ─── */
@@ -2742,6 +2771,7 @@ function ChatView({ onBack }) {
     depth,
   } = useNeuralStore()
   const { saveWorldMemory } = useArcadeStore()
+  const { addMemory, buildRecallBlock, memories: sessionMemories } = useMemoryStore()
   const isMission = !!activeMode
   const sendTimeRef = useRef(null)
 
@@ -3047,6 +3077,15 @@ function ChatView({ onBack }) {
         updateMastery(criticResult)
         exchangeCountRef.current += 1
         advanceSessionState(exchangeCountRef.current, criticResult)
+
+        // Background summarisation every 6 exchanges — non-blocking, silent
+        if (exchangeCountRef.current % 6 === 0 && messages.length >= 4) {
+          summariseSessionBackground(
+            messages, name,
+            Object.keys(sessionConceptsRef.current).slice(0, 6),
+            addMemory,
+          )
+        }
         // XP every 5 Socratic exchanges (resets when mode is toggled)
         if (socraticActive) {
           socraticExchangeRef.current += 1
@@ -3099,7 +3138,9 @@ function ChatView({ onBack }) {
           feedbackPrefix = `🚨 FEEDBACK REQUIRED: ${name} just answered your question. The critic assessment is: ${understanding.toUpperCase()}.\nYou MUST begin your response with exactly this tag (fill in the curly braces): ${tag}\nDo NOT skip this. Do NOT start with anything else. The tag renders as a visual banner — it is the most important part of your response.\n\n`
         }
 
-        systemPrompt = feedbackPrefix + orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, buildMemoryBlock(name), extras, T.aevaLanguageDirective)
+        const recallBlock = buildRecallBlock(name)
+        const fullMemory  = recallBlock + buildMemoryBlock(name)
+        systemPrompt = feedbackPrefix + orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, fullMemory, extras, T.aevaLanguageDirective)
 
         if (socraticActive) {
           systemPrompt += '\n\nSOCRATIC MODE: You must NEVER state facts, answers, or explanations directly. Respond ONLY with 1-3 targeted questions that guide the student to discover the answer themselves. If they arrive at the correct answer, confirm warmly and deepen with another question. If wrong, ask a question that exposes the specific gap without revealing the answer. Never say "the answer is", never explain anything outright. Make them think every time.'
@@ -3486,9 +3527,23 @@ function ChatView({ onBack }) {
                     <p style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 24, fontWeight: 400, color: isLight ? 'rgba(0,0,0,0.42)' : 'rgba(255,255,255,0.45)', lineHeight: 1.3, letterSpacing: '0.01em', marginBottom: 4 }}>
                       Hey {name},
                     </p>
-                    <h1 style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif", fontSize: 'clamp(28px, 6vw, 44px)', fontWeight: 900, color: isLight ? 'rgba(0,0,0,0.88)' : 'rgba(255,255,255,0.95)', lineHeight: 1.05, letterSpacing: '-0.05em', margin: '0 0 20px' }}>
+                    <h1 style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif", fontSize: 'clamp(28px, 6vw, 44px)', fontWeight: 900, color: isLight ? 'rgba(0,0,0,0.88)' : 'rgba(255,255,255,0.95)', lineHeight: 1.05, letterSpacing: '-0.05em', margin: '0 0 12px' }}>
                       {T.whatCanIHelpWith}
                     </h1>
+                    {/* Cross-session memory pill — visible once Aeva has memories */}
+                    {sessionMemories.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.35, duration: 0.4 }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 99, marginBottom: 16, background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.22)', cursor: 'default' }}
+                      >
+                        <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 2.4, repeat: Infinity }}
+                          style={{ width: 5, height: 5, borderRadius: '50%', background: '#818CF8', flexShrink: 0 }} />
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(165,180,252,0.80)', letterSpacing: '0.01em' }}>
+                          Aeva remembers {sessionMemories.length} {sessionMemories.length === 1 ? 'session' : 'sessions'}
+                        </span>
+                      </motion.div>
+                    )}
                   </div>
                   {/* Suggestion chips — customisable */}
                   <motion.div
