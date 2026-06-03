@@ -337,7 +337,7 @@ You can control the learning platform directly. When the conversation warrants i
 
 Available commands (copy exactly, fill in the values):
 ⚡CMD:{"type":"open_lab"} — open the Lab immediately
-⚡CMD:{"type":"open_lab_drill","topic":"TOPIC","reason":"WHY"} — open Lab and pre-load a drill on that topic
+⚡CMD:{"type":"open_lab_drill","topic":"TOPIC","drillType":"TYPE","reason":"WHY"} — open Lab and pre-load a drill on that topic (drillType: "flashcard"|"speedround"|"mocktest"|"feynman"|"match"|"cloze"|"shortanswer")
 ⚡CMD:{"type":"add_lab_task","title":"TITLE","description":"DESC"} — add a task to the student's Lab queue
 ⚡CMD:{"type":"open_arcade"} — open the Arcade
 ⚡CMD:{"type":"lock_arcade","reason":"REASON"} — lock the Arcade until further notice
@@ -346,7 +346,7 @@ Available commands (copy exactly, fill in the values):
 ⚡CMD:{"type":"intervention","title":"TITLE","message":"MESSAGE","task":"quiz","topic":"TOPIC"} — full-screen takeover with a 3-question quiz they must pass
 
 When to use them — act on your own judgment, don't wait to be asked:
-- Student is struggling with a concept → fire open_lab_drill on that exact topic. Say "I'm pulling up a drill right now."
+- Student gets something wrong OR shows confusion → fire open_lab_drill immediately. Don't wait for 2+ mistakes. Say "I'm pulling up a drill on this right now." Pick the best drillType: flashcard for definitions, feynman for understanding, mocktest for application, speedround for recall, shortanswer for exam-style.
 - Student asks for a game or challenge → fire open_arcade. Say "Opening Arcade."
 - You spot a gap worth fixing independently → add_lab_task. Say "I've added this to your Lab."
 - Student keeps avoiding work → lock_arcade with a reason. Assert control.
@@ -3427,8 +3427,8 @@ function ChatView({ onBack }) {
           )
         }
 
-        // Aeva's Orders analysis every 8 exchanges — fire-and-forget
-        if (ec % 8 === 0 && messages.length >= 6) {
+        // Aeva's Orders analysis every 4 exchanges — fire-and-forget
+        if (ec % 4 === 0 && messages.length >= 4) {
           analyzeForOrders(messages, struggleZones, addOrder, setOrderToast)
         }
         // XP every 5 Socratic exchanges (resets when mode is toggled)
@@ -3611,16 +3611,23 @@ function ChatView({ onBack }) {
         const cmdIdx = rawResponse.indexOf('⚡CMD:')
         if (cmdIdx !== -1) {
           try {
+            // Bracket-counting extractor — handles nested strings and objects safely
             const jsonStart = rawResponse.indexOf('{', cmdIdx)
-            const jsonEnd   = rawResponse.indexOf('}', jsonStart) + 1
-            const action    = JSON.parse(rawResponse.slice(jsonStart, jsonEnd))
+            let cmdDepth = 0, cmdEnd = -1
+            for (let ci = jsonStart; ci < rawResponse.length; ci++) {
+              if (rawResponse[ci] === '{') cmdDepth++
+              else if (rawResponse[ci] === '}') { cmdDepth--; if (cmdDepth === 0) { cmdEnd = ci + 1; break } }
+            }
+            const action = JSON.parse(rawResponse.slice(jsonStart, cmdEnd === -1 ? undefined : cmdEnd))
             let label = ''
 
             if (action.type === 'open_lab') {
               openLab()
               label = 'Opened Lab'
             } else if (action.type === 'open_lab_drill') {
-              setLabSuggestion({ topic: action.topic || 'this topic', drillType: 'flashcard', reason: action.reason || 'Aeva queued a drill.' })
+              const validDrills = ['flashcard', 'speedround', 'mocktest', 'feynman', 'match', 'cloze', 'shortanswer']
+              const drillType = validDrills.includes(action.drillType) ? action.drillType : 'flashcard'
+              setLabSuggestion({ topic: action.topic || 'this topic', drillType, reason: action.reason || 'Aeva queued a drill.' })
               openLab()
               label = `Drill queued · ${action.topic || 'topic'}`
             } else if (action.type === 'add_lab_task') {
