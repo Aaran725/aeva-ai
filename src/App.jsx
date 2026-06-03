@@ -12,6 +12,7 @@ import { useLabStore } from './labStore'
 import { useAevaControlStore } from './aevaControlStore'
 import { useRoadmapStore } from './roadmapStore'
 import AevaIntervention from './AevaIntervention'
+import AevaViz from './AevaViz'
 import { useNeuralStore } from './neuralStore'
 import ArcadeHub from './ArcadeHub'
 import LabHub from './LabHub'
@@ -339,7 +340,34 @@ When to use them — act on your own judgment, don't wait to be asked:
 - Student is overconfident about something they clearly don't understand → intervention with task:"quiz" on that topic. Make them prove it.
 - Student hasn't engaged seriously in this session → intervention with task:"acknowledge" with a direct message.
 
-FREQUENCY RULE: Fire at most ONE command per conversation — use it when the moment genuinely calls for it, not to show off. A command should feel inevitable, not reflexive. If in doubt, don't. When you do fire one, don't announce it beforehand — include the tag and describe the action conversationally in past tense or present continuous ("I've opened your Lab", "Opening Arcade now", "I've queued a drill").`
+FREQUENCY RULE: Fire at most ONE command per conversation — use it when the moment genuinely calls for it, not to show off. A command should feel inevitable, not reflexive. If in doubt, don't. When you do fire one, don't announce it beforehand — include the tag and describe the action conversationally in past tense or present continuous ("I've opened your Lab", "Opening Arcade now", "I've queued a drill").
+
+━━━ VISUAL OUTPUT — GRAPHS & DIAGRAMS ━━━
+When a graph, chart, or diagram would genuinely help understanding, end your response with a ⚡VIZ tag on its own line. The platform renders it as a live interactive visual.
+
+Supported types — use the EXACT format shown:
+
+⚡VIZ:{"type":"function","expr":"x**2+5*x+6","xMin":-6,"xMax":2,"title":"y = x² + 5x + 6"}
+⚡VIZ:{"type":"functions","fns":[{"expr":"x**2","label":"y=x²","color":"#818CF8"},{"expr":"2*x+1","label":"y=2x+1","color":"#F97316"}],"xMin":-4,"xMax":4,"title":"Two functions"}
+⚡VIZ:{"type":"points","pts":[{"x":1,"y":2,"label":"A"},{"x":-3,"y":4,"label":"B"}],"xMin":-5,"xMax":5,"title":"Coordinate plane"}
+⚡VIZ:{"type":"vectors","vecs":[{"tail":[0,0],"tip":[3,4],"label":"v","color":"#818CF8"}],"title":"Vector diagram"}
+⚡VIZ:{"type":"bar","data":[{"label":"A","value":40},{"label":"B","value":65},{"label":"C","value":28}],"title":"Comparison"}
+⚡VIZ:{"type":"numberline","min":-4,"max":4,"points":[{"value":2,"label":"x=2","color":"#818CF8"}],"title":"Solution on number line"}
+
+Expression rules (critical — wrong syntax breaks the graph):
+- Exponents: x**2 not x^2
+- Multiply: 2*x not 2x
+- Trig: sin, cos, tan (no Math. prefix — handled automatically)
+- Square root: sqrt(x)
+- Constants: pi, e
+- Valid: x**2+5*x+6, sin(x)*cos(x), sqrt(x**2+1), 1/(x+1)
+
+When to add a visual:
+- Equation or function being discussed → plot it
+- Comparing two things with numbers → bar chart
+- Inequality or solution set → number line
+- Coordinate geometry, vectors → coordinate plane
+- Don't add a visual for every response — only when it genuinely clarifies`
 }
 
 /* ─── Trend / scaffold / difficulty helpers ─── */
@@ -2297,6 +2325,7 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
 
   const clean = text
     .replace(/⚡CMD:\{[^}]*\}/g, '')
+    .replace(/^⚡VIZ:.*$/gm, '')
     .replace(/\[TERM:[^\]]*\]/g, '')
     .replace(/\[SUMMARY:[^\]]*\]/g, '')
     .replace(/\[CORRECT\]/g, '[CORRECT:]')  // normalise bare tags
@@ -2839,6 +2868,7 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false }) {
               </div>
             )}
             <MarkdownRenderer text={msg.text} streaming={!!msg.streaming} cursorColor={isLight ? 'rgba(99,102,241,0.8)' : 'rgba(139,143,255,0.9)'} isLight={isLight} />
+            {msg.aevaViz && <AevaViz config={msg.aevaViz} />}
             {msg.aevaAction && (
               <motion.div
                 initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.25 }}
@@ -3533,6 +3563,33 @@ function ChatView({ onBack }) {
             }
           } catch { /* malformed action tag — ignore */ }
         }
+
+        // ── VIZ tag parser ───────────────────────────────────────────────
+        const vizIdx = rawResponse.indexOf('⚡VIZ:')
+        if (vizIdx !== -1) {
+          try {
+            const start = rawResponse.indexOf('{', vizIdx)
+            if (start !== -1) {
+              let depth = 0, end = -1
+              for (let i = start; i < rawResponse.length; i++) {
+                if (rawResponse[i] === '{' || rawResponse[i] === '[') depth++
+                else if (rawResponse[i] === '}' || rawResponse[i] === ']') {
+                  depth--
+                  if (depth === 0) { end = i + 1; break }
+                }
+              }
+              if (end !== -1) {
+                const vizConfig = JSON.parse(rawResponse.slice(start, end))
+                setMessages(prev => {
+                  const copy = [...prev]
+                  copy[copy.length - 1] = { ...copy[copy.length - 1], aevaViz: vizConfig }
+                  return copy
+                })
+              }
+            }
+          } catch { /* malformed VIZ tag — ignore */ }
+        }
+        // ─────────────────────────────────────────────────────────────────
       }
       // ────────────────────────────────────────────────────────────────────────
 
