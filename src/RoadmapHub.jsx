@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText, BookOpen, Zap, Target, ClipboardList, Check, Lock } from 'lucide-react'
+import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText, BookOpen, Zap, Target, ClipboardList, Check, Lock, Clock, Trophy } from 'lucide-react'
 import { useRoadmapStore } from './roadmapStore'
 import { useLabStore } from './labStore'
 import { useXPStore } from './xpStore'
@@ -168,9 +168,11 @@ function HomeView({ onCreate, onOpen }) {
       style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: roadmaps.length ? 'flex-start' : 'center', padding: 24, gap: 12, overflowY: 'auto' }}>
       {roadmaps.length === 0 ? (
         <div style={{ textAlign: 'center', maxWidth: 320 }}>
-          <div style={{ fontSize: 40, marginBottom: 16 }}>🗺️</div>
+          <div style={{ width: 64, height: 64, borderRadius: 20, background: 'linear-gradient(135deg,rgba(79,70,229,0.18),rgba(124,58,237,0.18))', border: '1px solid rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+            <Map size={28} color="#818CF8" />
+          </div>
           <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', letterSpacing: '-0.03em', marginBottom: 8 }}>No roadmaps yet</div>
-          <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)', lineHeight: 1.6, marginBottom: 28 }}>Create a roadmap and Aeva builds your entire exam prep path — missions, drills, everything.</div>
+          <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)', lineHeight: 1.6, marginBottom: 28 }}>Create a roadmap and Aeva builds your entire exam prep path — designed to get you 90%+ on the day.</div>
           <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} onClick={onCreate}
             style={{ padding: '13px 28px', borderRadius: 14, background: 'linear-gradient(135deg, #4F46E5, #7C3AED)', border: 'none', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
             Create first roadmap
@@ -183,33 +185,70 @@ function HomeView({ onCreate, onOpen }) {
             const daysLeft = Math.max(0, Math.ceil((new Date(r.examDate) - Date.now()) / 86400000))
             const completed = r.nodes?.filter(n => n.status === 'complete').length || 0
             const total = r.nodes?.length || 0
+            const isAllDone = total > 0 && completed === total
+            const availNode = r.nodes?.find(n => n.status === 'available')
+            const currentPhase = isAllDone ? 'Complete' : (availNode?.phase || null)
+            const pc = currentPhase && !isAllDone ? (PHASE_CFG[currentPhase] || null) : null
+            const accentColor = isAllDone ? '#4ADE80' : (pc?.color || '#6366F1')
+            const remMins = r.nodes?.filter(n => n.status !== 'complete').reduce((s, n) => s + (n.estimatedMinutes || 20), 0) || 0
+            const remH = Math.floor(remMins / 60), remM = remMins % 60
+
             return (
               <div key={r.id} style={{ width: '100%', maxWidth: 480 }}>
                 <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
-                  style={{ padding: '16px 18px', borderRadius: 18, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <div onClick={() => { setActive(r.id); onOpen() }} style={{ flex: 1 }}>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 3 }}>{r.title}</div>
-                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)' }}>{daysLeft}d left · {completed}/{total} steps</div>
+                  style={{ borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', overflow: 'hidden', position: 'relative' }}>
+
+                  {/* Phase colour accent top bar */}
+                  <div style={{ height: 3, background: `linear-gradient(90deg, ${accentColor}, ${accentColor}44)` }} />
+
+                  <div style={{ padding: '16px 18px 18px' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <div onClick={() => { setActive(r.id); onOpen() }} style={{ flex: 1 }}>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', marginBottom: 5, letterSpacing: '-0.02em' }}>{r.title}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                          {currentPhase && (
+                            <span style={{ fontSize: 10.5, fontWeight: 700, color: accentColor, background: `${accentColor}15`, padding: '2px 8px', borderRadius: 99, border: `1px solid ${accentColor}30` }}>
+                              {isAllDone ? '🎉 Complete' : currentPhase}
+                            </span>
+                          )}
+                          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>{completed}/{total} steps · {daysLeft}d left</span>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 14 }}>
+                        <div style={{ fontSize: 22, fontWeight: 900, color: r.readiness >= 60 ? '#4ADE80' : '#fff', letterSpacing: '-0.04em' }}>{r.readiness}%</div>
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.30)', fontWeight: 600 }}>ready</div>
+                      </div>
                     </div>
-                    <motion.button whileHover={{ color: '#F87171' }} whileTap={{ scale: 0.9 }}
-                      onClick={() => setConfirmDelete(confirmDelete === r.id ? null : r.id)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.25)', padding: '2px 6px', fontSize: 16, lineHeight: 1 }}>
-                      ···
-                    </motion.button>
+
+                    {/* Progress bar */}
+                    <div onClick={() => { setActive(r.id); onOpen() }}>
+                      <div style={{ height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginBottom: 6 }}>
+                        <motion.div initial={{ width: 0 }} animate={{ width: `${r.readiness}%` }}
+                          transition={{ duration: 0.7, ease: 'easeOut' }}
+                          style={{ height: '100%', borderRadius: 99, background: `linear-gradient(90deg, ${accentColor}, ${accentColor}99)` }} />
+                      </div>
+                      {remMins > 0 && (
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 500 }}>
+                          <Clock size={10} /> ~{remH > 0 ? `${remH}h ${remM}m` : `${remM}m`} remaining
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  {/* Progress bar */}
-                  <div style={{ height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg,#6366F1,#8B5CF6)', width: `${r.readiness}%`, transition: 'width 0.5s ease' }} />
-                  </div>
-                  {/* Delete confirm */}
+
+                  {/* Delete button */}
+                  <motion.button whileHover={{ color: '#F87171' }} whileTap={{ scale: 0.9 }}
+                    onClick={() => setConfirmDelete(confirmDelete === r.id ? null : r.id)}
+                    style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.20)', padding: '2px 6px', fontSize: 16, lineHeight: 1 }}>
+                    ···
+                  </motion.button>
+
                   <AnimatePresence>
                     {confirmDelete === r.id && (
                       <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-                        style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                        style={{ padding: '0 18px 14px', display: 'flex', gap: 8 }}>
                         <motion.button whileTap={{ scale: 0.96 }} onClick={() => { deleteRoadmap(r.id); setConfirmDelete(null) }}
                           style={{ flex: 1, padding: '8px 0', borderRadius: 10, background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.35)', color: '#F87171', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-                          Delete roadmap
+                          Delete
                         </motion.button>
                         <motion.button whileTap={{ scale: 0.96 }} onClick={() => setConfirmDelete(null)}
                           style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.50)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -453,6 +492,14 @@ const NODE_CFG = {
   mock:  { label: 'Mock Test',       color: '#EF4444', light: '#F87171', shadow: '#991B1B', Icon: ClipboardList },
 }
 
+/* ── Phase config ────────────────────────────────────────────────────────── */
+const PHASE_CFG = {
+  'Foundation':  { color: '#3B82F6', light: '#60A5FA' },
+  'Core Topics': { color: '#8B5CF6', light: '#A78BFA' },
+  'Practice':    { color: '#F59E0B', light: '#FCD34D' },
+  'Exam Prep':   { color: '#EF4444', light: '#F87171' },
+}
+
 /* X position pattern — creates the winding snake */
 const X_PATTERN = [50, 65, 72, 62, 50, 38, 28, 38]
 const NODE_SPACING = 148  // px between nodes vertically
@@ -497,6 +544,11 @@ function PathView() {
   const daysLeft   = Math.max(0, Math.ceil((new Date(roadmap.examDate) - Date.now()) / 86400000))
   const available  = nodes.find(n => n.status === 'available')
   const containerH = nodes.length * NODE_SPACING + TOP_PAD + 120
+
+  // All nodes done → trophy screen
+  if (nodes.every(n => n.status === 'complete')) {
+    return <CompletionView roadmap={roadmap} daysLeft={daysLeft} />
+  }
 
   const getX = (i) => (X_PATTERN[i % X_PATTERN.length] / 100) * cw
   const getY = (i) => i * NODE_SPACING + TOP_PAD + NODE_R
@@ -640,6 +692,30 @@ function PathView() {
         </div>
       </div>
 
+      {/* ── Stats strip ──────────────────────────────────────────────────── */}
+      {(() => {
+        const doneNodes = nodes.filter(n => n.status === 'complete')
+        const remMins   = nodes.filter(n => n.status !== 'complete').reduce((s, n) => s + (n.estimatedMinutes || 20), 0)
+        const earnedXP  = doneNodes.reduce((s, n) => s + (n.xp || 50), 0)
+        const remH = Math.floor(remMins / 60), remM = remMins % 60
+        const stats = [
+          { label: 'STEPS',     value: `${doneNodes.length}/${nodes.length}` },
+          { label: 'XP',        value: earnedXP.toString() },
+          { label: 'TIME LEFT', value: remH > 0 ? `${remH}h ${remM}m` : `${remM}m` },
+          { label: 'READY',     value: `${roadmap.readiness}%`, green: roadmap.readiness >= 60 },
+        ]
+        return (
+          <div style={{ display: 'flex', flexShrink: 0, padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', marginTop: 14 }}>
+            {stats.map((s, i) => (
+              <div key={s.label} style={{ flex: 1, textAlign: 'center', borderRight: i < stats.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', padding: '2px 0' }}>
+                <div style={{ fontSize: 15, fontWeight: 900, color: s.green ? '#4ADE80' : '#fff', letterSpacing: '-0.03em' }}>{s.value}</div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)', fontWeight: 700, letterSpacing: '0.10em', marginTop: 2 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
+
       {/* ── Path ─────────────────────────────────────────────────────────── */}
       <div ref={containerRef} style={{ flex: 1, position: 'relative', minHeight: containerH, margin: '24px 0 40px' }}>
         {/* SVG connecting curves */}
@@ -650,19 +726,36 @@ function PathView() {
             const cy = (y1 + y2) / 2
             const d  = `M ${x1} ${y1} C ${x1} ${cy} ${x2} ${cy} ${x2} ${y2}`
             const done = node.status === 'complete'
+            const pc   = PHASE_CFG[node.phase] || null
+            const lineColor = done ? 'rgba(74,222,128,0.65)' : pc ? `${pc.color}55` : 'rgba(99,102,241,0.35)'
             return (
               <g key={i}>
-                {/* Rail — faint background track */}
-                <path d={d} fill="none"
-                  stroke="rgba(255,255,255,0.07)" strokeWidth={5} strokeLinecap="round" />
-                {/* Progress line */}
-                <path d={d} fill="none"
-                  stroke={done ? 'rgba(74,222,128,0.60)' : 'rgba(99,102,241,0.30)'}
-                  strokeWidth={4} strokeDasharray="8 6" strokeLinecap="round" />
+                <path d={d} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={5} strokeLinecap="round" />
+                <path d={d} fill="none" stroke={lineColor}
+                  strokeWidth={4} strokeDasharray={done ? 'none' : '8 6'} strokeLinecap="round" />
               </g>
             )
           })}
         </svg>
+
+        {/* Phase banners — float in the gap at each phase transition */}
+        {nodes.map((node, i) => {
+          if (!node.phase || i === 0) return null
+          if (node.phase === nodes[i - 1]?.phase) return null
+          const bannerY = getY(i - 1) + NODE_R + 12
+          const pc = PHASE_CFG[node.phase] || PHASE_CFG['Core Topics']
+          return (
+            <div key={`pb_${i}`} style={{
+              position: 'absolute', top: bannerY, left: '50%', transform: 'translateX(-50%)',
+              display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px',
+              borderRadius: 99, background: `${pc.color}14`, border: `1px solid ${pc.color}38`,
+              zIndex: 2, whiteSpace: 'nowrap', pointerEvents: 'none',
+            }}>
+              <div style={{ width: 5, height: 5, borderRadius: '50%', background: pc.color, flexShrink: 0 }} />
+              <span style={{ fontSize: 9.5, fontWeight: 800, color: pc.color, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{node.phase}</span>
+            </div>
+          )
+        })}
 
         {/* Nodes */}
         {nodes.map((node, i) => {
@@ -743,9 +836,33 @@ function PathView() {
                         boxShadow: `0 16px 48px rgba(0,0,0,0.70), 0 0 0 1px ${cfg.color}18`,
                         padding: '14px 16px 16px',
                       }}>
+                      {/* Phase badge */}
+                      {node.phase && (() => {
+                        const pc = PHASE_CFG[node.phase] || PHASE_CFG['Core Topics']
+                        return (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 99, background: `${pc.color}18`, border: `1px solid ${pc.color}38`, marginBottom: 8 }}>
+                            <div style={{ width: 4, height: 4, borderRadius: '50%', background: pc.color }} />
+                            <span style={{ fontSize: 9.5, fontWeight: 800, color: pc.color, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{node.phase}</span>
+                          </div>
+                        )
+                      })()}
                       {/* Topic + type */}
-                      <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginBottom: 2, letterSpacing: '-0.02em' }}>{node.topic}</div>
-                      <div style={{ fontSize: 11, color: cfg.light, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>{cfg.label}</div>
+                      <div style={{ fontSize: 14.5, fontWeight: 800, color: '#fff', marginBottom: 2, letterSpacing: '-0.02em' }}>{node.topic}</div>
+                      <div style={{ fontSize: 10.5, color: cfg.light, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>{cfg.label}</div>
+                      {/* Difficulty dots + time + XP */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                        <div style={{ display: 'flex', gap: 3 }}>
+                          {[1,2,3,4,5].map(d => (
+                            <div key={d} style={{ width: 7, height: 7, borderRadius: '50%', background: d <= (node.difficulty || 1) ? cfg.color : 'rgba(255,255,255,0.10)' }} />
+                          ))}
+                        </div>
+                        {node.estimatedMinutes && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'rgba(255,255,255,0.38)', fontWeight: 600 }}>
+                            <Clock size={10} />{node.estimatedMinutes}m
+                          </div>
+                        )}
+                        <div style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 800, color: cfg.color }}>+{node.xp || 50} XP</div>
+                      </div>
                       <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.42)', marginBottom: 14, lineHeight: 1.55 }}>{node.description || 'Click below to begin this step.'}</div>
 
                       {isStarted ? (
@@ -816,6 +933,55 @@ function PathView() {
             </div>
           )
         })}
+      </div>
+    </motion.div>
+  )
+}
+
+function CompletionView({ roadmap, daysLeft }) {
+  const totalXP   = roadmap.nodes?.reduce((s, n) => s + (n.xp || 50), 0) || 0
+  const nodeCount = roadmap.nodes?.length || 0
+
+  return (
+    <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+      style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', textAlign: 'center', overflowY: 'auto' }}>
+
+      {/* Trophy */}
+      <motion.div
+        animate={{ scale: [1, 1.10, 1], rotate: [0, -3, 3, 0] }}
+        transition={{ duration: 3, repeat: Infinity, repeatDelay: 1 }}
+        style={{
+          width: 90, height: 90, borderRadius: 28, marginBottom: 28,
+          background: 'linear-gradient(145deg, #FBBF24 0%, #F59E0B 55%, #D97706 100%)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 10px 0 #92400E, 0 18px 40px rgba(251,191,36,0.35)',
+        }}>
+        <Trophy size={42} color="#fff" strokeWidth={2} />
+      </motion.div>
+
+      <div style={{ fontSize: 26, fontWeight: 900, color: '#fff', letterSpacing: '-0.04em', marginBottom: 10 }}>Roadmap Complete!</div>
+      <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.48)', lineHeight: 1.7, maxWidth: 290, marginBottom: 32 }}>
+        You've mastered all {nodeCount} steps of your prep path. Based on your work, you're on track to score{' '}
+        <span style={{ color: '#4ADE80', fontWeight: 800 }}>90%+</span>
+        {daysLeft > 0 ? ` in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}` : ' on exam day'}.
+      </div>
+
+      {/* Stats row */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 36 }}>
+        {[
+          { value: '100%',    label: 'READINESS', color: '#FBBF24', bg: 'rgba(251,191,36,0.08)',  border: 'rgba(251,191,36,0.22)' },
+          { value: totalXP,   label: 'XP EARNED',  color: '#818CF8', bg: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.22)' },
+          { value: nodeCount, label: 'STEPS DONE', color: '#4ADE80', bg: 'rgba(74,222,128,0.08)', border: 'rgba(74,222,128,0.22)' },
+        ].map(s => (
+          <div key={s.label} style={{ padding: '14px 16px', borderRadius: 18, background: s.bg, border: `1px solid ${s.border}`, textAlign: 'center', minWidth: 80 }}>
+            <div style={{ fontSize: 22, fontWeight: 900, color: s.color, letterSpacing: '-0.03em' }}>{s.value}</div>
+            <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.32)', fontWeight: 700, letterSpacing: '0.10em', marginTop: 4 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.28)', fontWeight: 500 }}>
+        Keep chatting with Aeva to stay sharp before exam day 🎯
       </div>
     </motion.div>
   )
