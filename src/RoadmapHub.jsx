@@ -1,7 +1,9 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText } from 'lucide-react'
 import { useRoadmapStore } from './roadmapStore'
+import { useLabStore } from './labStore'
+import { useXPStore } from './xpStore'
 
 const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
@@ -304,11 +306,240 @@ function GeneratingView({ onDone }) {
   )
 }
 
+/* ── Node config ─────────────────────────────────────────────────────────── */
+const NODE_CFG = {
+  learn: { label: 'Learn with Aeva', color: '#6366F1', bg: 'rgba(99,102,241,0.18)', emoji: '📖' },
+  drill: { label: 'Drill',           color: '#F97316', bg: 'rgba(249,115,22,0.18)',  emoji: '⚡' },
+  check: { label: 'Knowledge Check', color: '#8B5CF6', bg: 'rgba(139,92,246,0.18)', emoji: '🎯' },
+  mock:  { label: 'Mock Test',       color: '#EF4444', bg: 'rgba(239,68,68,0.18)',   emoji: '📝' },
+}
+
+/* X position pattern — creates the winding snake */
+const X_PATTERN = [50, 68, 74, 63, 50, 37, 26, 37]
+const NODE_SPACING = 118  // px between nodes vertically
+const NODE_R       = 32   // node circle radius
+const TOP_PAD      = 24
+
 function PathView() {
+  const { getActive, completeNode } = useRoadmapStore()
+  const { openLab, setLabSuggestion, addOrder } = useLabStore()
+  const { addXP } = useXPStore()
+  const roadmap = getActive()
+  const [selected, setSelected] = useState(null)
+  const containerRef = useRef(null)
+  const [cw, setCw] = useState(360)
+
+  useEffect(() => {
+    if (containerRef.current) setCw(containerRef.current.offsetWidth)
+  }, [])
+
+  if (!roadmap?.nodes?.length) return (
+    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>
+      No roadmap loaded
+    </div>
+  )
+
+  const nodes       = roadmap.nodes
+  const completed   = nodes.filter(n => n.status === 'complete').length
+  const daysLeft    = Math.max(0, Math.ceil((new Date(roadmap.examDate) - Date.now()) / 86400000))
+  const available   = nodes.find(n => n.status === 'available')
+  const containerH  = nodes.length * NODE_SPACING + TOP_PAD + 80
+
+  const getX = (i) => (X_PATTERN[i % X_PATTERN.length] / 100) * cw
+  const getY = (i) => i * NODE_SPACING + TOP_PAD + NODE_R
+
+  const handleStart = (node) => {
+    setSelected(null)
+    if (node.type === 'learn' || node.type === 'check') {
+      setLabSuggestion({ topic: node.topic, drillType: 'flashcard', reason: `Aeva roadmap: ${node.description || node.topic}` })
+      openLab()
+    } else if (node.type === 'drill') {
+      setLabSuggestion({ topic: node.topic, drillType: 'flashcard', reason: `Drill: ${node.topic}` })
+      openLab()
+    } else if (node.type === 'mock') {
+      addOrder({ title: `Mock Test: ${roadmap.title}`, description: `Complete a full mock test covering all topics in ${roadmap.title}.`, subject: roadmap.title })
+      openLab()
+    }
+    // Mark complete + award XP after brief delay
+    setTimeout(() => {
+      completeNode(roadmap.id, node.id)
+      addXP('DRILL_COMPLETE')
+    }, 800)
+  }
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)' }}>Path view coming next</div>
+      style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+
+      {/* ── Mission card ─────────────────────────────────────────────────── */}
+      <div style={{ flexShrink: 0, padding: '16px 20px 0' }}>
+        <div style={{
+          borderRadius: 20, padding: '18px 20px',
+          background: 'linear-gradient(135deg, rgba(79,70,229,0.55) 0%, rgba(124,58,237,0.45) 100%)',
+          border: '1px solid rgba(99,102,241,0.35)',
+          boxShadow: '0 8px 32px rgba(99,102,241,0.20)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', marginBottom: 4 }}>Today's Mission</div>
+              <div style={{ fontSize: 17, fontWeight: 900, color: '#fff', letterSpacing: '-0.03em' }}>
+                {available ? `Master ${available.topic}` : '🎉 Roadmap complete!'}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
+              <div style={{ fontSize: 18, fontWeight: 900, color: '#fff' }}>{daysLeft}d</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>until exam</div>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600 }}>Readiness</span>
+              <span style={{ fontSize: 11, color: '#fff', fontWeight: 800 }}>{roadmap.readiness}%</span>
+            </div>
+            <div style={{ height: 7, borderRadius: 99, background: 'rgba(255,255,255,0.15)', overflow: 'hidden' }}>
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${roadmap.readiness}%` }}
+                transition={{ duration: 0.8, ease: 'easeOut' }}
+                style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #818CF8, #C4B5FD)' }}
+              />
+            </div>
+          </div>
+
+          {/* Mission tasks */}
+          {available && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginTop: 14 }}>
+              {['learn', 'drill', 'check'].map((type, i) => {
+                const cfg = NODE_CFG[type]
+                return (
+                  <motion.button key={type}
+                    whileHover={{ scale: 1.02, background: 'rgba(255,255,255,0.14)' }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleStart({ ...available, type })}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '10px 14px', borderRadius: 11,
+                      background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.12)',
+                      cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                    }}>
+                    <span style={{ fontSize: 15 }}>{cfg.emoji}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{cfg.label}</div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>{available.topic}</div>
+                    </div>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: cfg.color }}>+{type === 'check' ? 40 : type === 'drill' ? 30 : 50} XP</div>
+                  </motion.button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Path ─────────────────────────────────────────────────────────── */}
+      <div ref={containerRef} style={{ flex: 1, position: 'relative', minHeight: containerH, margin: '24px 0 40px' }}>
+        {/* SVG connecting lines */}
+        <svg style={{ position: 'absolute', inset: 0, width: '100%', height: containerH, pointerEvents: 'none' }}>
+          {nodes.slice(0, -1).map((node, i) => {
+            const x1 = getX(i), y1 = getY(i)
+            const x2 = getX(i + 1), y2 = getY(i + 1)
+            const done = node.status === 'complete'
+            return (
+              <line key={i} x1={x1} y1={y1} x2={x2} y2={y2}
+                stroke={done ? 'rgba(74,222,128,0.55)' : 'rgba(99,102,241,0.22)'}
+                strokeWidth={3} strokeDasharray="7 5" strokeLinecap="round" />
+            )
+          })}
+        </svg>
+
+        {/* Nodes */}
+        {nodes.map((node, i) => {
+          const x = getX(i), y = getY(i)
+          const cfg = NODE_CFG[node.type] || NODE_CFG.learn
+          const isComplete  = node.status === 'complete'
+          const isAvailable = node.status === 'available'
+          const isSelected  = selected?.id === node.id
+
+          return (
+            <div key={node.id} style={{ position: 'absolute', left: x, top: y, transform: 'translate(-50%, -50%)', zIndex: isSelected ? 10 : 1 }}>
+              {/* Glow ring on available */}
+              {isAvailable && (
+                <motion.div animate={{ scale: [1, 1.35, 1], opacity: [0.4, 0.7, 0.4] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  style={{ position: 'absolute', inset: -10, borderRadius: '50%', background: `radial-gradient(circle, ${cfg.color}40 0%, transparent 70%)`, pointerEvents: 'none' }} />
+              )}
+
+              {/* Circle */}
+              <motion.button
+                whileHover={isAvailable || isComplete ? { scale: 1.10 } : {}}
+                whileTap={isAvailable ? { scale: 0.94 } : {}}
+                onClick={() => isAvailable ? setSelected(isSelected ? null : node) : null}
+                style={{
+                  width: NODE_R * 2, height: NODE_R * 2, borderRadius: '50%',
+                  background: isComplete ? 'linear-gradient(135deg,#16a34a,#4ADE80)'
+                    : isAvailable ? `linear-gradient(135deg,${cfg.color},${cfg.color}cc)`
+                    : 'rgba(255,255,255,0.08)',
+                  border: isComplete ? '3px solid rgba(74,222,128,0.60)'
+                    : isAvailable ? `3px solid ${cfg.color}`
+                    : '3px solid rgba(255,255,255,0.12)',
+                  boxShadow: isAvailable ? `0 0 20px ${cfg.color}55` : isComplete ? '0 0 16px rgba(74,222,128,0.35)' : 'none',
+                  cursor: isAvailable ? 'pointer' : 'default',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 16, transition: 'all 0.25s',
+                }}>
+                {isComplete ? '✓' : cfg.emoji}
+              </motion.button>
+
+              {/* Topic label */}
+              <div style={{
+                position: 'absolute', top: NODE_R * 2 + 6,
+                left: '50%', transform: 'translateX(-50%)',
+                whiteSpace: 'nowrap', textAlign: 'center',
+                fontSize: 11, fontWeight: isAvailable ? 700 : 500,
+                color: isComplete ? '#4ADE80' : isAvailable ? '#fff' : 'rgba(255,255,255,0.30)',
+              }}>
+                {node.topic}
+              </div>
+
+              {/* Popup card on selected available node */}
+              <AnimatePresence>
+                {isSelected && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.88, y: 8 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.88, y: 8 }}
+                    transition={{ type: 'spring', stiffness: 340, damping: 24 }}
+                    style={{
+                      position: 'absolute', top: NODE_R * 2 + 36,
+                      left: '50%', transform: 'translateX(-50%)',
+                      width: 200, borderRadius: 16, zIndex: 20,
+                      background: 'rgba(10,11,28,0.98)',
+                      border: `1px solid ${cfg.color}55`,
+                      boxShadow: `0 12px 40px rgba(0,0,0,0.60), 0 0 0 1px ${cfg.color}22`,
+                      padding: '14px 16px',
+                    }}>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginBottom: 2 }}>{node.topic}</div>
+                    <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.45)', marginBottom: 12, lineHeight: 1.5 }}>{node.description || cfg.label}</div>
+                    <motion.button
+                      whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                      onClick={() => handleStart(node)}
+                      style={{
+                        width: '100%', padding: '9px 0', borderRadius: 10, border: 'none',
+                        background: `linear-gradient(135deg, ${cfg.color}, ${cfg.color}bb)`,
+                        color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                        fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      }}>
+                      Start +{node.xp || 50} XP
+                    </motion.button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )
+        })}
+      </div>
     </motion.div>
   )
 }
