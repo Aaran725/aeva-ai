@@ -337,7 +337,7 @@ When to use them — act on your own judgment, don't wait to be asked:
 - Student is overconfident about something they clearly don't understand → intervention with task:"quiz" on that topic. Make them prove it.
 - Student hasn't engaged seriously in this session → intervention with task:"acknowledge" with a direct message.
 
-Be decisive. You own the platform. Act like it.`
+FREQUENCY RULE: Fire at most ONE command per conversation — use it when the moment genuinely calls for it, not to show off. A command should feel inevitable, not reflexive. If in doubt, don't. When you do fire one, don't announce it beforehand — include the tag and describe the action conversationally in past tense or present continuous ("I've opened your Lab", "Opening Arcade now", "I've queued a drill").`
 }
 
 /* ─── Trend / scaffold / difficulty helpers ─── */
@@ -3455,11 +3455,14 @@ function ChatView({ onBack }) {
             }
 
             if (label) {
+              // Bubble chip
               setMessages(prev => {
                 const copy = [...prev]
                 copy[copy.length - 1] = { ...copy[copy.length - 1], aevaAction: { ...action, label } }
                 return copy
               })
+              // Prominent toast
+              useAevaControlStore.getState().showCommandToast(label, action.type)
             }
           } catch { /* malformed action tag — ignore */ }
         }
@@ -4513,6 +4516,88 @@ function XPToast() {
   )
 }
 
+/* ── Aeva Command Toast ──────────────────────────────────────────────────── */
+const CMD_ICONS = {
+  open_lab:        '🧪',
+  open_lab_drill:  '⚡',
+  add_lab_task:    '📋',
+  open_arcade:     '🎮',
+  lock_arcade:     '🔒',
+  set_mandate:     '🎯',
+  intervention:    '🚨',
+}
+const CMD_VERBS = {
+  open_lab:        'Taking you to Lab',
+  open_lab_drill:  'Drill loaded',
+  add_lab_task:    'Task queued',
+  open_arcade:     'Opening Arcade',
+  lock_arcade:     'Arcade locked',
+  set_mandate:     'Mandate set',
+  intervention:    'Intervention incoming',
+}
+
+function AevaCommandToast() {
+  const { commandToast, clearCommandToast } = useAevaControlStore()
+
+  useEffect(() => {
+    if (!commandToast) return
+    const t = setTimeout(clearCommandToast, 3200)
+    return () => clearTimeout(t)
+  }, [commandToast?.id])
+
+  return (
+    <AnimatePresence>
+      {commandToast && (
+        <motion.div
+          key={commandToast.id}
+          initial={{ opacity: 0, y: -72, scale: 0.94 }}
+          animate={{ opacity: 1, y: 0,   scale: 1 }}
+          exit={{   opacity: 0, y: -72, scale: 0.94 }}
+          transition={{ type: 'spring', stiffness: 340, damping: 28 }}
+          style={{
+            position: 'fixed', top: 18, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 8000, pointerEvents: 'none',
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '11px 20px 11px 14px',
+            borderRadius: 99,
+            background: 'rgba(8,10,26,0.97)',
+            border: '1px solid rgba(99,102,241,0.45)',
+            boxShadow: '0 8px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(99,102,241,0.15), 0 0 24px rgba(99,102,241,0.18)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            fontFamily: "'Inter', system-ui, sans-serif",
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {/* Pulsing dot */}
+          <motion.div
+            animate={{ scale: [1, 1.35, 1], opacity: [0.7, 1, 0.7] }}
+            transition={{ duration: 1.2, repeat: Infinity }}
+            style={{ width: 7, height: 7, borderRadius: '50%', background: '#818CF8', flexShrink: 0, boxShadow: '0 0 8px rgba(129,140,248,0.80)' }}
+          />
+          {/* Aeva logo */}
+          <div style={{ width: 22, height: 22, borderRadius: 7, background: 'linear-gradient(135deg, #2D308E 0%, #6366F1 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(99,102,241,0.40)' }}>
+            <Star size={9} color="white" fill="white" />
+          </div>
+          {/* Verb */}
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.02em' }}>
+            {CMD_VERBS[commandToast.type] || 'Aeva acted'}
+          </span>
+          {/* Detail */}
+          {commandToast.label && (
+            <>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.28)', fontWeight: 400 }}>·</span>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.50)', fontWeight: 500, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {commandToast.label}
+              </span>
+            </>
+          )}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
 /* ── Inactivity auto-trigger ─────────────────────────────────────────────── */
 function useInactivityIntervention() {
   useEffect(() => {
@@ -4628,6 +4713,8 @@ export default function App() {
   return (
     <UserContext.Provider value={userValue}>
       <XPToast />
+      {/* Aeva Command Toast — slides from top when Aeva fires a command */}
+      <AevaCommandToast />
       {/* Aeva Intervention — renders above everything, no escape */}
       <AnimatePresence>
         <AevaIntervention key="intervention" />
