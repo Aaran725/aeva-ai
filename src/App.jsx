@@ -549,7 +549,10 @@ async function summariseSessionBackground(messages, userName, topics, addMemory)
 }
 
 /* ─── Stream Aeva response ─── */
-async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}) {
+async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _attempt = 0) {
+  const MAX_RETRIES = 3
+  const RETRY_DELAYS = [2500, 5000, 10000]
+
   const messages = [
     { role: 'system', content: systemPrompt },
     ...history.map(m => ({ role: m.role === 'model' ? 'assistant' : 'user', content: m.text })),
@@ -571,6 +574,15 @@ async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}) {
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
     body: JSON.stringify(body),
   })
+
+  if (res.status === 429) {
+    if (_attempt >= MAX_RETRIES) throw new Error('Groq error 429')
+    const delay = RETRY_DELAYS[_attempt] ?? 10000
+    opts.onRetry?.(_attempt + 1, MAX_RETRIES, Math.round(delay / 1000))
+    await new Promise(r => setTimeout(r, delay))
+    if (signal?.aborted) return
+    return streamGroq(history, systemPrompt, onChunk, signal, opts, _attempt + 1)
+  }
 
   if (!res.ok) throw new Error(`Groq error ${res.status}`)
 
@@ -3424,7 +3436,16 @@ function ChatView({ onBack }) {
           })
         },
         controller.signal,
-        streamOpts,
+        {
+          ...streamOpts,
+          onRetry: (attempt, max, secs) => {
+            setMessages(prev => {
+              const copy = [...prev]
+              copy[copy.length - 1] = { ...copy[copy.length - 1], text: `⏳ Groq is busy — retrying in ${secs}s… (${attempt}/${max})` }
+              return copy
+            })
+          },
+        },
       )
 
       // Post-process for chaos/vitals/fallacy/interrupt
