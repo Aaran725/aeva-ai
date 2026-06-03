@@ -4679,6 +4679,16 @@ export default function App() {
     if (activeMode) setView('chat')
   }, [activeMode])
 
+  // Navigate to ChatView when roadmap launches a node (Lab or Learn)
+  const _pendingChatOpen   = useAevaControlStore(s => s.pendingChatOpen)
+  const _pendingChatPrompt = useAevaControlStore(s => s.pendingChatPrompt)
+  useEffect(() => {
+    if (_pendingChatOpen || _pendingChatPrompt) {
+      setView('chat')
+      if (_pendingChatOpen) useAevaControlStore.getState().clearChatView()
+    }
+  }, [_pendingChatOpen, _pendingChatPrompt])
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setAuthUser(data.session?.user ?? null)

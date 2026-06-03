@@ -444,7 +444,7 @@ function PathView() {
   const { getActive, completeNode, closeRoadmapHub } = useRoadmapStore()
   const { openLab, setLabSuggestion, addOrder } = useLabStore()
   const { addXP } = useXPStore()
-  const { setPendingChatPrompt } = useAevaControlStore()
+  const { setPendingChatPrompt, requestChatView } = useAevaControlStore()
   const roadmap = getActive()
   const [selected, setSelected]     = useState(null)
   const [startedIds, setStartedIds] = useState(new Set())
@@ -495,10 +495,12 @@ function PathView() {
     } else if (node.type === 'drill') {
       setLabSuggestion({ topic: node.topic, drillType: 'flashcard', reason: `Roadmap drill: ${node.topic} — ${roadmap.title}` })
       openLab()
+      requestChatView()
       closeRoadmapHub()
     } else if (node.type === 'check') {
       setLabSuggestion({ topic: node.topic, drillType: 'quiz', reason: `Knowledge check: ${node.topic} — ${roadmap.title}` })
       openLab()
+      requestChatView()
       closeRoadmapHub()
     } else if (node.type === 'mock') {
       addOrder({
@@ -507,6 +509,7 @@ function PathView() {
         subject: roadmap.title,
       })
       openLab()
+      requestChatView()
       closeRoadmapHub()
     }
   }
@@ -582,11 +585,11 @@ function PathView() {
                         setPendingChatPrompt(`Teach me "${t.topic}" for my ${roadmap.title}. I have ${daysLeft} days until the exam.`)
                         closeRoadmapHub()
                       } else if (t.type === 'drill') {
-                        setLabSuggestion({ topic: t.topic, drillType: 'flashcard', reason: `Daily mission drill: ${t.topic}` }); openLab(); closeRoadmapHub()
+                        setLabSuggestion({ topic: t.topic, drillType: 'flashcard', reason: `Daily mission drill: ${t.topic}` }); openLab(); requestChatView(); closeRoadmapHub()
                       } else if (t.type === 'check') {
-                        setLabSuggestion({ topic: t.topic, drillType: 'quiz', reason: `Daily mission check: ${t.topic}` }); openLab(); closeRoadmapHub()
+                        setLabSuggestion({ topic: t.topic, drillType: 'quiz', reason: `Daily mission check: ${t.topic}` }); openLab(); requestChatView(); closeRoadmapHub()
                       } else if (t.type === 'mock') {
-                        addOrder({ title: `Mock Test — ${roadmap.title}`, description: `Full mock test on ${roadmap.title}.`, subject: roadmap.title }); openLab(); closeRoadmapHub()
+                        addOrder({ title: `Mock Test — ${roadmap.title}`, description: `Full mock test on ${roadmap.title}.`, subject: roadmap.title }); openLab(); requestChatView(); closeRoadmapHub()
                       }
                     }}
                     style={{

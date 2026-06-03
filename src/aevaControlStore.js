@@ -11,6 +11,7 @@ const DEFAULT = {
   activeIntervention: null, // { title, message, task, topic, triggeredAt }
   commandToast: null,       // { label, type, id } — shown briefly when Aeva fires a command
   pendingChatPrompt: null,  // string — auto-sent to Aeva chat when set, cleared after send
+  pendingChatOpen:   false, // true → App navigates to ChatView (for Lab launches from roadmap)
 }
 
 export const useAevaControlStore = create((set, get) => ({
@@ -53,6 +54,8 @@ export const useAevaControlStore = create((set, get) => ({
 
   setPendingChatPrompt: (text) => set({ pendingChatPrompt: text }),
   clearPendingChatPrompt: () => set({ pendingChatPrompt: null }),
+  requestChatView: () => set({ pendingChatOpen: true }),
+  clearChatView:   () => set({ pendingChatOpen: false }),
 
   showCommandToast: (label, type = 'action') => {
     set({ commandToast: { label, type, id: Date.now() } })
