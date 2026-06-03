@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, TrendingUp, Sigma, GitBranch, Clock3, Table2, HelpCircle,
-  Puzzle, Lightbulb, ChevronDown, LayoutGrid,
+  Puzzle, Lightbulb, ChevronDown, LayoutGrid, Sparkles,
 } from 'lucide-react'
 import { Mafs, Coordinates, Plot } from 'mafs'
 import 'mafs/core.css'
@@ -110,6 +110,72 @@ function Card({ block, children, badge, noPad = false }) {
         )}
       </AnimatePresence>
     </motion.div>
+  )
+}
+
+/* ── Aeva Hint Strip ─────────────────────────────────────────────────────── */
+const HINT_STYLE = {
+  praise: { bg: 'rgba(74,222,128,0.09)',  border: 'rgba(74,222,128,0.28)',  color: '#4ADE80', glow: 'rgba(74,222,128,0.15)' },
+  guide:  { bg: 'rgba(129,140,248,0.09)', border: 'rgba(129,140,248,0.28)', color: '#818CF8', glow: 'rgba(129,140,248,0.15)' },
+  nudge:  { bg: 'rgba(251,191,36,0.09)',  border: 'rgba(251,191,36,0.28)',  color: '#FBBF24', glow: 'rgba(251,191,36,0.15)' },
+}
+
+function AevaHintStrip() {
+  const { aevaHint, dismissHint } = useCanvasStore()
+
+  return (
+    <AnimatePresence>
+      {aevaHint && (
+        <motion.div
+          key={aevaHint.text}
+          initial={{ opacity: 0, y: -8, height: 0 }}
+          animate={{ opacity: 1, y: 0, height: 'auto' }}
+          exit={{ opacity: 0, y: -8, height: 0 }}
+          transition={{ duration: 0.22 }}
+          style={{ overflow: 'hidden', flexShrink: 0 }}
+        >
+          {(() => {
+            const s = HINT_STYLE[aevaHint.type] || HINT_STYLE.guide
+            return (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '10px 20px',
+                background: s.bg,
+                borderBottom: `1px solid ${s.border}`,
+                boxShadow: `inset 0 -1px 0 ${s.glow}`,
+              }}>
+                {/* Aeva icon */}
+                <div style={{
+                  width: 28, height: 28, borderRadius: 9, flexShrink: 0,
+                  background: `${s.color}18`, border: `1px solid ${s.color}35`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Sparkles size={13} color={s.color} strokeWidth={2} />
+                </div>
+
+                {/* Text */}
+                <span style={{
+                  flex: 1, fontSize: 13, fontWeight: 600,
+                  color: 'rgba(255,255,255,0.78)', lineHeight: 1.4,
+                }}>
+                  <span style={{ color: s.color, fontWeight: 800 }}>Aeva · </span>
+                  {aevaHint.text}
+                </span>
+
+                {/* Dismiss */}
+                <button onClick={dismissHint} style={{
+                  flexShrink: 0, background: 'none', border: 'none',
+                  color: 'rgba(255,255,255,0.25)', cursor: 'pointer', padding: 4,
+                  display: 'flex', alignItems: 'center',
+                }}>
+                  <X size={12} />
+                </button>
+              </div>
+            )
+          })()}
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
 
@@ -501,9 +567,32 @@ function QuizBlock({ block }) {
   const handleAnswer = (i) => {
     if (selected !== null) return
     setSelected(i)
-    if (i === q.answer) setScore(s => s + 1)
+    const correct = i === q.answer
+    if (correct) {
+      setScore(s => s + 1)
+      useCanvasStore.getState().updateMastery(10)
+      useCanvasStore.getState().setAevaHint({ text: 'Correct. Keep that momentum.', type: 'praise' })
+    } else {
+      useCanvasStore.getState().updateMastery(-5)
+      useCanvasStore.getState().setAevaHint({ text: `Not quite — the answer was "${q.options[q.answer]}". Notice why?`, type: 'guide' })
+    }
   }
-  const next  = () => { if (qIdx < questions.length - 1) { setQIdx(qi => qi + 1); setSelected(null) } else setDone(true) }
+  const next  = () => {
+    if (qIdx < questions.length - 1) { setQIdx(qi => qi + 1); setSelected(null) }
+    else {
+      setDone(true)
+      const finalScore = (score + (selected === q.answer ? 1 : 0))
+      const pct = Math.round((finalScore / questions.length) * 100)
+      if (pct === 100) {
+        useCanvasStore.getState().updateMastery(10)  // bonus for perfect
+        useCanvasStore.getState().setAevaHint({ text: 'Perfect score. You\'ve got this concept locked in.', type: 'praise' })
+      } else if (pct >= 60) {
+        useCanvasStore.getState().setAevaHint({ text: 'Good work. Review the ones you missed — the gaps are small.', type: 'guide' })
+      } else {
+        useCanvasStore.getState().setAevaHint({ text: 'Those questions reveal gaps worth fixing. Try the quiz again after reviewing.', type: 'nudge' })
+      }
+    }
+  }
   const reset = () => { setQIdx(0); setSelected(null); setScore(0); setDone(false) }
 
   const badge = !done && (
@@ -628,7 +717,14 @@ function ChallengeBlock({ block }) {
 
   const check = () => {
     const u = norm(input), a = norm(answer)
-    setResult(u === a || a.includes(u) || u.includes(a) ? 'correct' : 'wrong')
+    const correct = u === a || a.includes(u) || u.includes(a)
+    setResult(correct ? 'correct' : 'wrong')
+    if (correct) {
+      useCanvasStore.getState().updateMastery(15)
+      useCanvasStore.getState().setAevaHint({ text: 'Challenge solved. Try adjusting the sliders and see if the answer changes.', type: 'praise' })
+    } else {
+      useCanvasStore.getState().setAevaHint({ text: `Not quite. The answer is "${answer}" — trace through the steps to see why.`, type: 'guide' })
+    }
   }
 
   const reset = () => { setInput(''); setResult(null); setHintsShown(0) }
@@ -820,11 +916,14 @@ function renderBlock(block, ctx, onUpdate, i) {
 
 /* ── Main AevaCanvas ─────────────────────────────────────────────────────── */
 export default function AevaCanvas() {
-  const { canvasOpen, currentCanvas, closeCanvas, updateCtx } = useCanvasStore()
+  const { canvasOpen, currentCanvas, closeCanvas, updateCtx, mastery } = useCanvasStore()
 
   if (!canvasOpen || !currentCanvas) return null
 
   const { topic, blocks = [], ctx = {} } = currentCanvas
+
+  // Mastery colour: red → amber → green
+  const masteryColor = mastery >= 70 ? '#4ADE80' : mastery >= 40 ? '#FBBF24' : '#F87171'
 
   return (
     <motion.div
@@ -843,13 +942,13 @@ export default function AevaCanvas() {
       <div style={{
         flexShrink: 0,
         padding: '0 20px',
-        height: 64,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
         background: 'rgba(7,8,14,0.85)',
         backdropFilter: 'blur(24px)',
+        minHeight: 64,
       }}>
-        {/* Left: logo + topic */}
+        {/* Left: logo + topic + mastery */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{
             width: 36, height: 36, borderRadius: 12, flexShrink: 0,
@@ -863,28 +962,45 @@ export default function AevaCanvas() {
             <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.2 }}>
               {topic || 'Aeva Canvas'}
             </div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', fontWeight: 600, letterSpacing: '0.10em', textTransform: 'uppercase', marginTop: 1 }}>
-              {blocks.length} interactive block{blocks.length !== 1 ? 's' : ''}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+              {/* Mastery bar */}
+              <div style={{ width: 72, height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                <motion.div
+                  animate={{ width: `${mastery}%` }}
+                  transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+                  style={{ height: '100%', borderRadius: 99, background: masteryColor, boxShadow: `0 0 6px ${masteryColor}` }}
+                />
+              </div>
+              <span style={{ fontSize: 10, fontWeight: 700, color: masteryColor }}>{mastery}%</span>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.20)', fontWeight: 500 }}>mastery</span>
             </div>
           </div>
         </div>
 
-        {/* Right: close */}
-        <motion.button
-          whileHover={{ scale: 1.08, background: 'rgba(255,255,255,0.12)' }}
-          whileTap={{ scale: 0.93 }}
-          onClick={closeCanvas}
-          style={{
-            width: 36, height: 36, borderRadius: '50%',
-            background: 'rgba(255,255,255,0.07)',
-            border: '1px solid rgba(255,255,255,0.12)',
-            color: 'rgba(255,255,255,0.55)',
-            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          <X size={15} />
-        </motion.button>
+        {/* Right: block count + close */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)', fontWeight: 600, letterSpacing: '0.10em', textTransform: 'uppercase' }}>
+            {blocks.length} block{blocks.length !== 1 ? 's' : ''}
+          </span>
+          <motion.button
+            whileHover={{ scale: 1.08, background: 'rgba(255,255,255,0.12)' }}
+            whileTap={{ scale: 0.93 }}
+            onClick={closeCanvas}
+            style={{
+              width: 36, height: 36, borderRadius: '50%',
+              background: 'rgba(255,255,255,0.07)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              color: 'rgba(255,255,255,0.55)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <X size={15} />
+          </motion.button>
+        </div>
       </div>
+
+      {/* ── Aeva hint strip (between header and blocks) ── */}
+      <AevaHintStrip />
 
       {/* ── Scrollable blocks ── */}
       <div style={{
