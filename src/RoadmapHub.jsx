@@ -238,7 +238,7 @@ function HomeView({ onCreate, onOpen }) {
                   {/* Delete button */}
                   <motion.button whileHover={{ color: '#F87171' }} whileTap={{ scale: 0.9 }}
                     onClick={() => setConfirmDelete(confirmDelete === r.id ? null : r.id)}
-                    style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.20)', padding: '2px 6px', fontSize: 16, lineHeight: 1 }}>
+                    style={{ position: 'absolute', top: 20, right: 14, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.20)', padding: '2px 6px', fontSize: 16, lineHeight: 1 }}>
                     ···
                   </motion.button>
 
@@ -502,7 +502,7 @@ const PHASE_CFG = {
 
 /* X position pattern — creates the winding snake */
 const X_PATTERN = [50, 65, 72, 62, 50, 38, 28, 38]
-const NODE_SPACING = 148  // px between nodes vertically
+const NODE_SPACING = 172  // px between nodes vertically (extra room for labels + phase banners)
 const NODE_R       = 38   // node circle radius (76px diameter)
 const TOP_PAD      = 32
 
@@ -510,7 +510,7 @@ function PathView() {
   const { getActive, completeNode, closeRoadmapHub, startNodeSession, endNodeSession } = useRoadmapStore()
   const { openLab, addOrder, setLabTab, setPendingAutoStart } = useLabStore()
   const { addXP } = useXPStore()
-  const { setPendingChatPrompt, requestChatView } = useAevaControlStore()
+  const { setPendingChatPrompt } = useAevaControlStore()
   const roadmap = getActive()
   const [selected, setSelected]     = useState(null)
   const [startedIds, setStartedIds] = useState(new Set())
@@ -530,8 +530,8 @@ function PathView() {
     if (!scrollRef.current || !roadmap?.nodes) return
     const idx = roadmap.nodes.findIndex(n => n.status === 'available')
     if (idx < 0) return
-    const y = idx * NODE_SPACING + TOP_PAD
-    setTimeout(() => scrollRef.current?.scrollTo({ top: Math.max(0, y - 220), behavior: 'smooth' }), 300)
+    const y = idx * NODE_SPACING + TOP_PAD + NODE_R
+    setTimeout(() => scrollRef.current?.scrollTo({ top: Math.max(0, y - 240), behavior: 'smooth' }), 300)
   }, [roadmap?.id])
 
   if (!roadmap?.nodes?.length) return (
@@ -592,10 +592,8 @@ function PathView() {
     setSelected(null)
   }
 
-  const mission     = roadmap.dailyMission
+  const mission      = roadmap.dailyMission
   const missionTasks = mission?.tasks || []
-  const missionDate  = mission?.date
-  const isToday      = missionDate === new Date().toDateString()
 
   return (
     <motion.div ref={scrollRef} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -732,7 +730,7 @@ function PathView() {
               <g key={i}>
                 <path d={d} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={5} strokeLinecap="round" />
                 <path d={d} fill="none" stroke={lineColor}
-                  strokeWidth={4} strokeDasharray={done ? 'none' : '8 6'} strokeLinecap="round" />
+                  strokeWidth={4} strokeDasharray={done ? undefined : '8 6'} strokeLinecap="round" />
               </g>
             )
           })}
@@ -742,7 +740,7 @@ function PathView() {
         {nodes.map((node, i) => {
           if (!node.phase || i === 0) return null
           if (node.phase === nodes[i - 1]?.phase) return null
-          const bannerY = getY(i - 1) + NODE_R + 12
+          const bannerY = Math.round((getY(i - 1) + getY(i)) / 2) - 11  // centred in gap between the two nodes
           const pc = PHASE_CFG[node.phase] || PHASE_CFG['Core Topics']
           return (
             <div key={`pb_${i}`} style={{
