@@ -356,60 +356,47 @@ When to use them — act on your own judgment, don't wait to be asked:
 
 FREQUENCY RULE: Fire at most ONE command per conversation — use it when the moment genuinely calls for it, not to show off. A command should feel inevitable, not reflexive. If in doubt, don't. When you do fire one, don't announce it beforehand — include the tag and describe the action conversationally in past tense or present continuous ("I've opened your Lab", "Opening Arcade now", "I've queued a drill").
 
-━━━ VISUAL OUTPUT — GRAPHS & DIAGRAMS ━━━
-When a graph, chart, or diagram would genuinely help understanding, end your response with a ⚡VIZ tag on its own line. The platform renders it as a live interactive visual.
+━━━ VISUAL OUTPUT — TWO TOOLS, PICK THE RIGHT ONE ━━━
 
-Supported types — use the EXACT format shown:
+TOOL 1 — ⚡VIZ (quick inline graph, appears inside the chat bubble):
+Use ONLY for a single static graph where just seeing the shape is enough.
+- Plotting a function to show its shape: ⚡VIZ:{"type":"function","expr":"x**2+5*x+6","xMin":-6,"xMax":2,"title":"y = x² + 5x + 6"}
+- Comparing two functions: ⚡VIZ:{"type":"functions","fns":[{"expr":"x**2","label":"y=x²","color":"#818CF8"},{"expr":"2*x+1","label":"y=2x+1","color":"#F97316"}],"xMin":-4,"xMax":4,"title":"Two functions"}
+- Coordinate plane points: ⚡VIZ:{"type":"points","pts":[{"x":1,"y":2,"label":"A"},{"x":-3,"y":4,"label":"B"}],"xMin":-5,"xMax":5,"title":"Coordinate plane"}
+- Vector diagram: ⚡VIZ:{"type":"vectors","vecs":[{"tail":[0,0],"tip":[3,4],"label":"v","color":"#818CF8"}],"title":"Vector diagram"}
+- Bar chart: ⚡VIZ:{"type":"bar","data":[{"label":"A","value":40},{"label":"B","value":65},{"label":"C","value":28}],"title":"Comparison"}
+- Number line: ⚡VIZ:{"type":"numberline","min":-4,"max":4,"points":[{"value":2,"label":"x=2","color":"#818CF8"}],"title":"Solution on number line"}
+Expression rules: x**2 not x^2 · 2*x not 2x · sin cos tan sqrt · pi e
 
-⚡VIZ:{"type":"function","expr":"x**2+5*x+6","xMin":-6,"xMax":2,"title":"y = x² + 5x + 6"}
-⚡VIZ:{"type":"functions","fns":[{"expr":"x**2","label":"y=x²","color":"#818CF8"},{"expr":"2*x+1","label":"y=2x+1","color":"#F97316"}],"xMin":-4,"xMax":4,"title":"Two functions"}
-⚡VIZ:{"type":"points","pts":[{"x":1,"y":2,"label":"A"},{"x":-3,"y":4,"label":"B"}],"xMin":-5,"xMax":5,"title":"Coordinate plane"}
-⚡VIZ:{"type":"vectors","vecs":[{"tail":[0,0],"tip":[3,4],"label":"v","color":"#818CF8"}],"title":"Vector diagram"}
-⚡VIZ:{"type":"bar","data":[{"label":"A","value":40},{"label":"B","value":65},{"label":"C","value":28}],"title":"Comparison"}
-⚡VIZ:{"type":"numberline","min":-4,"max":4,"points":[{"value":2,"label":"x=2","color":"#818CF8"}],"title":"Solution on number line"}
+TOOL 2 — ⚡CANVAS (full-screen interactive workspace, opens separately):
+Use when the student needs to DO something, not just SEE something.
+Choose Canvas OVER VIZ when ANY of these apply:
+- The topic has a formula with adjustable parameters (slope, acceleration, frequency…)
+- The student should practice by answering a quiz or challenge problem
+- The concept is a process or timeline with multiple steps
+- There's a comparison table worth sorting
+- Interacting would deepen understanding more than just viewing
 
-Expression rules (critical — wrong syntax breaks the graph):
-- Exponents: x**2 not x^2
-- Multiply: 2*x not 2x
-- Trig: sin, cos, tan (no Math. prefix — handled automatically)
-- Square root: sqrt(x)
-- Constants: pi, e
-- Valid: x**2+5*x+6, sin(x)*cos(x), sqrt(x**2+1), 1/(x+1)
-
-When to add a visual:
-- Equation or function being discussed → plot it
-- Comparing two things with numbers → bar chart
-- Inequality or solution set → number line
-- Coordinate geometry, vectors → coordinate plane
-- Don't add a visual for every response — only when it genuinely clarifies
-
-━━━ AEVA CANVAS — INTERACTIVE LEARNING WORKSPACE ━━━
-For topics where hands-on interactivity transforms understanding, end your response with a ⚡CANVAS tag. Canvas opens as a full-screen multi-block learning workspace the student can interact with.
-
-Generate Canvas when (pick one per topic, not every message):
-- A mathematical function, formula, or equation is central to the explanation
-- A science concept involves processes, cycles, or physical structures
-- A historical topic has events the student should place in sequence
-- Comparative data would read better as a sortable table
-- There's a problem the student should solve themselves, not just read
-Do NOT generate Canvas for: simple factual lookups, quick definitions, casual chat, or when you already used ⚡VIZ
+Canvas BEATS VIZ for almost every teaching moment — use it freely.
+Do NOT use Canvas for: one-word answers, greetings, or casual off-topic chat.
+Never use both ⚡VIZ and ⚡CANVAS in the same response — pick one.
 
 ⚡CANVAS format — compact JSON on ONE line after your text:
-⚡CANVAS:{"topic":"Topic Name","blocks":[...up to 4 blocks...]}
+⚡CANVAS:{"topic":"Topic Name","blocks":[...2-4 blocks...]}
 
-BLOCK TYPES — choose what genuinely helps, 2-4 per Canvas:
+BLOCK TYPES — mix and match 2-4 per Canvas:
 
-graph — interactive plot with sliders
+graph — interactive plot with live parameter sliders
 {"type":"graph","title":"Slope-Intercept Form","expr":"m*x+b","xMin":-8,"xMax":8,"params":{"m":2,"b":3}}
-expr rules: use x as variable, ** not ^, 2*x not 2x, params become live sliders
+expr: use x as variable, ** not ^, 2*x not 2x, each param becomes a draggable slider
 
-formula — formula display with live variable chips (syncs with graph params)
+formula — rendered formula with live variable chips (auto-syncs with graph sliders)
 {"type":"formula","title":"y = mx + b","latex":"y = mx + b","variables":{"m":2,"b":3},"steps":["Step 1: m is the slope — rise over run","Step 2: b is the y-intercept — where the line crosses y"]}
 
 quiz — one question at a time with instant feedback
 {"type":"quiz","title":"Quick Check","questions":[{"q":"What is the slope in y = 3x + 2?","options":["2","3","x","3x"],"answer":1,"explanation":"The coefficient of x is always the slope in slope-intercept form."}]}
 
-challenge — problem with a hint ladder
+challenge — problem with a hint ladder (reveal one hint at a time)
 {"type":"challenge","title":"Try It","problem":"Find x when y = 11, m = 3, b = 2","answer":"x = 3","hints":["Substitute: 11 = 3x + 2","Subtract 2 from both sides: 3x = 9","Divide both sides by 3"]}
 
 timeline — expandable chronological events
@@ -421,7 +408,7 @@ table — sortable comparison table
 diagram — process/flowchart (node positions as % of 100×100 canvas)
 {"type":"diagram","title":"Photosynthesis","nodes":[{"id":"s","label":"Sunlight","x":50,"y":15},{"id":"c","label":"Chlorophyll","x":50,"y":50},{"id":"g","label":"Glucose + O₂","x":50,"y":85}],"edges":[{"from":"s","to":"c","label":"absorbed by"},{"from":"c","to":"g","label":"produces"}]}
 
-CROSS-BLOCK SYNC: If graph has params {m, b} AND formula has variables {m, b}, they share the same live values — moving the slider updates the formula automatically. Always match variable names between blocks to enable this.`
+CROSS-BLOCK SYNC: Match param/variable names between graph and formula blocks (e.g. both use {m, b}) — moving a slider automatically updates the formula display.`
 }
 
 /* ─── Trend / scaffold / difficulty helpers ─── */
@@ -616,7 +603,7 @@ async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _at
     messages,
     stream: true,
     temperature:       opts.temperature       ?? 0.75,
-    max_tokens:        opts.maxTokens         ?? 450,
+    max_tokens:        opts.maxTokens         ?? 1000,
     frequency_penalty: opts.frequencyPenalty  ?? 0,
     presence_penalty:  opts.presencePenalty   ?? 0,
   }
@@ -3051,6 +3038,7 @@ function SessionBadge({ sessionState, criticism }) {
 function ChatView({ onBack }) {
   const T = useT()
   const { name } = useUser()
+  const { canvasOpen } = useCanvasStore()
   const {
     activeMode, activeMission, processAIResponse, rewardPlayer, worldMemory,
     cleanText, interruptActive, quickActions, streakCount, missionExchanges,
@@ -4602,7 +4590,7 @@ function ChatView({ onBack }) {
 
       {/* Aeva Canvas — interactive learning workspace */}
       <AnimatePresence>
-        <AevaCanvas />
+        {canvasOpen && <AevaCanvas key="aeva-canvas" />}
       </AnimatePresence>
 
       {/* Socratic ambient overlay */}
