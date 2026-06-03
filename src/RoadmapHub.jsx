@@ -441,7 +441,7 @@ const NODE_R       = 38   // node circle radius (76px diameter)
 const TOP_PAD      = 32
 
 function PathView() {
-  const { getActive, completeNode, closeRoadmapHub } = useRoadmapStore()
+  const { getActive, completeNode, closeRoadmapHub, startNodeSession, endNodeSession } = useRoadmapStore()
   const { openLab, setLabSuggestion, addOrder } = useLabStore()
   const { addXP } = useXPStore()
   const { setPendingChatPrompt, requestChatView } = useAevaControlStore()
@@ -485,6 +485,7 @@ function PathView() {
   const launchNode = (node) => {
     setSelected(null)
     setStartedIds(prev => new Set([...prev, node.id]))
+    startNodeSession(roadmap.id, node)
 
     if (node.type === 'learn') {
       // Close hub → Aeva chat fires a curated teaching session
@@ -517,6 +518,7 @@ function PathView() {
   const markDone = (node) => {
     completeNode(roadmap.id, node.id)
     addXP('DRILL_COMPLETE')
+    endNodeSession()
     setStartedIds(prev => { const n = new Set(prev); n.delete(node.id); return n })
     setSelected(null)
   }

@@ -3071,6 +3071,18 @@ function ChatView({ onBack }) {
     }
   }, [input])
 
+  // Roadmap active session — pill shown while user works on a node
+  const activeNodeSession = useRoadmapStore(s => s.activeNodeSession)
+  const endNodeSession    = useRoadmapStore(s => s.endNodeSession)
+  const completeRoadmapNode = useRoadmapStore(s => s.completeNode)
+  const { addXP: addXPFromChat } = useXPStore()
+  const markRoadmapNodeDone = () => {
+    if (!activeNodeSession) return
+    completeRoadmapNode(activeNodeSession.roadmapId, activeNodeSession.nodeId)
+    addXPFromChat('DRILL_COMPLETE')
+    endNodeSession()
+  }
+
   // Fire any roadmap-triggered chat prompt (learn node → curated Aeva session)
   const pendingChatPrompt = useAevaControlStore(s => s.pendingChatPrompt)
   const clearPendingChatPrompt = useAevaControlStore(s => s.clearPendingChatPrompt)
@@ -3627,6 +3639,52 @@ function ChatView({ onBack }) {
     >
       {/* Mission glow overlay */}
       {missionGlow && <div aria-hidden style={missionGlow} />}
+
+      {/* Roadmap session pill — floats bottom-right while working on a node */}
+      <AnimatePresence>
+        {activeNodeSession && (
+          <motion.div
+            initial={{ opacity: 0, y: 24, scale: 0.92 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 24, scale: 0.92 }}
+            transition={{ type: 'spring', stiffness: 340, damping: 28 }}
+            style={{
+              position: 'absolute', bottom: 100, right: 20, zIndex: 200,
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 14px 10px 12px',
+              borderRadius: 99,
+              background: 'rgba(8,9,24,0.96)',
+              border: '1px solid rgba(99,102,241,0.45)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.55), 0 0 0 1px rgba(99,102,241,0.15)',
+              backdropFilter: 'blur(20px)',
+              fontFamily: "'Inter', system-ui, sans-serif",
+            }}
+          >
+            {/* Pulsing dot */}
+            <motion.div
+              animate={{ opacity: [1, 0.3, 1] }}
+              transition={{ duration: 1.6, repeat: Infinity }}
+              style={{ width: 7, height: 7, borderRadius: '50%', background: '#818CF8', flexShrink: 0 }}
+            />
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.75)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {activeNodeSession.topic}
+            </div>
+            <motion.button
+              whileHover={{ scale: 1.05, background: 'rgba(99,102,241,0.85)' }}
+              whileTap={{ scale: 0.97 }}
+              onClick={markRoadmapNodeDone}
+              style={{
+                padding: '5px 12px', borderRadius: 99, border: 'none',
+                background: 'rgba(99,102,241,0.65)',
+                color: '#fff', fontSize: 12, fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              Done ✓
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main layout — split for debate mode */}
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', position: 'relative', zIndex: 1 }}>

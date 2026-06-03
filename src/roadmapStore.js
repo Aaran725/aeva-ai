@@ -5,7 +5,7 @@ const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) } catch 
 const save = (s) => { try { localStorage.setItem(KEY, JSON.stringify({ roadmaps: s.roadmaps, activeRoadmapId: s.activeRoadmapId })) } catch {} }
 const uid  = () => Math.random().toString(36).slice(2, 10)
 
-const DEFAULT = { roadmaps: [], activeRoadmapId: null, roadmapOpen: false }
+const DEFAULT = { roadmaps: [], activeRoadmapId: null, roadmapOpen: false, activeNodeSession: null }
 
 export const useRoadmapStore = create((set, get) => {
   const stored = load()
@@ -44,6 +44,11 @@ export const useRoadmapStore = create((set, get) => {
     },
 
     setActive: (id) => { set(s => { const u = { ...s, activeRoadmapId: id }; save(u); return u }) },
+
+    startNodeSession: (roadmapId, node) => set({
+      activeNodeSession: { roadmapId, nodeId: node.id, topic: node.topic, type: node.type, xp: node.xp || 50 }
+    }),
+    endNodeSession: () => set({ activeNodeSession: null }),
 
     deleteRoadmap: (id) => {
       set(s => {
