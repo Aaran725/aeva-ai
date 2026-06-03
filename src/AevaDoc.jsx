@@ -9,9 +9,10 @@
  */
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import katex from 'katex'
 import {
-  X, Upload, FileText, MessageSquare, Send, Loader,
-  Star, AlertCircle, BookOpen, RotateCcw, ChevronDown,
+  X, Upload, FileText, Send, Loader,
+  Star, AlertCircle, RotateCcw, ChevronDown,
 } from 'lucide-react'
 
 const GROQ_KEY  = import.meta.env.VITE_GROQ_API_KEY
@@ -62,7 +63,13 @@ Your role:
 - Adjust depth to the level: ${scanCtx.level}
 - Keep responses focused — 2-5 sentences unless more detail is genuinely needed
 - Use markdown (bold, bullets) for clarity
-- If asked to check an answer, do so honestly and explain why`
+- If asked to check an answer, do so honestly and explain why
+
+Formatting rules:
+- For multi-step solutions, number each step as "1: Step Title" (e.g. "1: Assume the form")
+- Wrap ALL maths in LaTeX: inline with $...$ and display equations with \\[...\\]
+- Never write bare equations as plain text — always use LaTeX delimiters
+- Keep steps short and clear`
 }
 
 // ─── Streaming helper ─────────────────────────────────────────────────────────
@@ -130,52 +137,124 @@ function getChips(scanCtx) {
   ]
 }
 
-// ─── Simple markdown renderer ─────────────────────────────────────────────────
+// ─── KaTeX helpers ────────────────────────────────────────────────────────────
 
-function DocMarkdown({ text }) {
-  const lines = text.split('\n')
-  return (
-    <div style={{ fontSize: 13.5, lineHeight: 1.65, color: 'rgba(255,255,255,0.90)' }}>
-      {lines.map((line, i) => {
-        if (line.startsWith('### ')) return <div key={i} style={{ fontWeight: 800, fontSize: 14, marginTop: 10, marginBottom: 2, color: '#fff' }}>{line.slice(4)}</div>
-        if (line.startsWith('## '))  return <div key={i} style={{ fontWeight: 800, fontSize: 15, marginTop: 10, marginBottom: 2, color: '#fff' }}>{line.slice(3)}</div>
-        if (line.startsWith('# '))   return <div key={i} style={{ fontWeight: 900, fontSize: 16, marginTop: 10, marginBottom: 4, color: '#fff' }}>{line.slice(2)}</div>
-        if (line.startsWith('- ') || line.startsWith('• ')) {
-          return (
-            <div key={i} style={{ display: 'flex', gap: 8, marginTop: 3 }}>
-              <span style={{ color: '#8B8FFF', flexShrink: 0, marginTop: 1 }}>•</span>
-              <span>{renderInline(line.slice(2))}</span>
-            </div>
-          )
-        }
-        if (/^\d+\. /.test(line)) {
-          const match = line.match(/^(\d+)\. (.*)/)
-          return (
-            <div key={i} style={{ display: 'flex', gap: 8, marginTop: 3 }}>
-              <span style={{ color: '#8B8FFF', flexShrink: 0, minWidth: 16 }}>{match[1]}.</span>
-              <span>{renderInline(match[2])}</span>
-            </div>
-          )
-        }
-        if (!line.trim()) return <div key={i} style={{ height: 6 }} />
-        return <div key={i} style={{ marginTop: 1 }}>{renderInline(line)}</div>
-      })}
-    </div>
-  )
+function renderMathSafe(tex, displayMode = false) {
+  try {
+    return katex.renderToString(tex, { throwOnError: false, displayMode, output: 'html' })
+  } catch {
+    return `<span style="color:#F87171">${tex}</span>`
+  }
 }
 
-function renderInline(text) {
+// Split text on inline $...$ math, return array of {type, content}
+function splitInlineMath(text) {
+  const segs = []
+  const re = /\$([^$\n]+?)\$/g
+  let last = 0, m
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) segs.push({ type: 'text', content: text.slice(last, m.index) })
+    segs.push({ type: 'inline-math', content: m[1] })
+    last = m.index + m[0].length
+  }
+  if (last < text.length) segs.push({ type: 'text', content: text.slice(last) })
+  return segs
+}
+
+// Render a run of plain text with bold/code markup
+function renderPlain(text) {
   const parts = []
-  const re = /(\*\*(.+?)\*\*|`(.+?)`)/g
+  const re = /\*\*(.+?)\*\*|`(.+?)`/g
   let last = 0, m, k = 0
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) parts.push(<span key={k++}>{text.slice(last, m.index)}</span>)
-    if (m[2]) parts.push(<strong key={k++} style={{ fontWeight: 700, color: '#fff' }}>{m[2]}</strong>)
-    else if (m[3]) parts.push(<code key={k++} style={{ fontFamily: 'monospace', fontSize: '0.87em', background: 'rgba(255,255,255,0.12)', borderRadius: 4, padding: '1px 5px' }}>{m[3]}</code>)
+    if (m[1] !== undefined) parts.push(<strong key={k++} style={{ fontWeight: 700, color: 'rgba(255,255,255,0.98)' }}>{m[1]}</strong>)
+    else if (m[2] !== undefined) parts.push(<code key={k++} style={{ fontFamily: 'monospace', fontSize: '0.88em', background: 'rgba(255,255,255,0.11)', borderRadius: 4, padding: '1px 5px', color: '#A5B4FC' }}>{m[2]}</code>)
     last = m.index + m[0].length
   }
   if (last < text.length) parts.push(<span key={k++}>{text.slice(last)}</span>)
-  return parts.length > 0 ? parts : text
+  return parts.length ? parts : text
+}
+
+// Render an inline line with math + bold/code
+function renderInline(text) {
+  const segs = splitInlineMath(text)
+  return segs.map((seg, i) => {
+    if (seg.type === 'inline-math') {
+      return <span key={i} dangerouslySetInnerHTML={{ __html: renderMathSafe(seg.content, false) }} />
+    }
+    return <span key={i}>{renderPlain(seg.content)}</span>
+  })
+}
+
+// ─── Markdown + KaTeX renderer ────────────────────────────────────────────────
+
+function DocMarkdown({ text }) {
+  // First, split on block-level math: \[...\] or $$...$$
+  const blockRe = /\\\[([\s\S]*?)\\\]|\$\$([\s\S]*?)\$\$/g
+  const topSegs = []
+  let last = 0, m
+  while ((m = blockRe.exec(text)) !== null) {
+    if (m.index > last) topSegs.push({ type: 'md', content: text.slice(last, m.index) })
+    topSegs.push({ type: 'block-math', content: (m[1] ?? m[2]).trim() })
+    last = m.index + m[0].length
+  }
+  if (last < text.length) topSegs.push({ type: 'md', content: text.slice(last) })
+
+  return (
+    <div style={{ fontSize: 14, lineHeight: 1.72, color: 'rgba(255,255,255,0.88)', fontFamily: "'Inter', system-ui, sans-serif" }}>
+      {topSegs.map((seg, si) => {
+        if (seg.type === 'block-math') {
+          return (
+            <div key={si}
+              style={{ margin: '14px 0', padding: '14px 18px', borderRadius: 14, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.20)', textAlign: 'center', overflowX: 'auto' }}
+              dangerouslySetInnerHTML={{ __html: renderMathSafe(seg.content, true) }}
+            />
+          )
+        }
+        // Render markdown lines
+        const lines = seg.content.split('\n')
+        return lines.map((line, li) => {
+          const key = `${si}-${li}`
+
+          // Numbered step heading: "1: Title" or "Step 1: Title"
+          const stepMatch = line.match(/^(?:Step\s+)?(\d+):\s+(.+)/)
+          if (stepMatch && line.length < 80) {
+            return (
+              <div key={key} style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 18, marginBottom: 4 }}>
+                <div style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 7, background: 'rgba(99,102,241,0.20)', border: '1px solid rgba(99,102,241,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#A5B4FC' }}>{stepMatch[1]}</div>
+                <span style={{ fontWeight: 700, fontSize: 14.5, color: 'rgba(255,255,255,0.96)' }}>{renderInline(stepMatch[2])}</span>
+              </div>
+            )
+          }
+
+          if (line.startsWith('### ')) return <div key={key} style={{ fontWeight: 800, fontSize: 14, marginTop: 16, marginBottom: 3, color: '#C4B5FD', letterSpacing: '-0.01em' }}>{renderInline(line.slice(4))}</div>
+          if (line.startsWith('## '))  return <div key={key} style={{ fontWeight: 800, fontSize: 15, marginTop: 18, marginBottom: 4, color: 'rgba(255,255,255,0.96)', letterSpacing: '-0.02em' }}>{renderInline(line.slice(3))}</div>
+          if (line.startsWith('# '))   return <div key={key} style={{ fontWeight: 900, fontSize: 16, marginTop: 18, marginBottom: 6, color: '#fff', letterSpacing: '-0.02em' }}>{renderInline(line.slice(2))}</div>
+
+          if (line.startsWith('- ') || line.startsWith('• ')) {
+            return (
+              <div key={key} style={{ display: 'flex', gap: 9, marginTop: 4 }}>
+                <span style={{ color: '#818CF8', flexShrink: 0, marginTop: 3, fontSize: 10 }}>●</span>
+                <span>{renderInline(line.slice(2))}</span>
+              </div>
+            )
+          }
+          if (/^\d+\. /.test(line)) {
+            const lm = line.match(/^(\d+)\. (.*)/)
+            return (
+              <div key={key} style={{ display: 'flex', gap: 9, marginTop: 4 }}>
+                <span style={{ color: '#818CF8', flexShrink: 0, minWidth: 18, fontSize: 13, fontWeight: 700 }}>{lm[1]}.</span>
+                <span>{renderInline(lm[2])}</span>
+              </div>
+            )
+          }
+          if (!line.trim()) return <div key={key} style={{ height: 8 }} />
+          return <div key={key} style={{ marginTop: 2 }}>{renderInline(line)}</div>
+        })
+      })}
+    </div>
+  )
 }
 
 // ─── Upload Zone ──────────────────────────────────────────────────────────────
@@ -586,7 +665,7 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
 
           {/* Messages */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 8px', display: 'flex', flexDirection: 'column', gap: 14, minHeight: 0 }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '22px 22px 8px', display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
 
             {!file && (
               /* Empty state hint */
@@ -600,27 +679,39 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
             )}
 
             {messages.map((msg, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', gap: 8 }}>
-                {msg.role === 'assistant' && (
-                  <div style={{ width: 26, height: 26, borderRadius: 8, background: 'linear-gradient(135deg, #2D308E 0%, #6366F1 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
-                    <Star size={11} color="white" fill="white" />
+              <div key={i}>
+                {msg.role === 'user' ? (
+                  /* User bubble — right-aligned pill */
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 2 }}>
+                    <div style={{
+                      maxWidth: '78%', padding: '10px 16px',
+                      borderRadius: '18px 18px 4px 18px',
+                      background: 'linear-gradient(135deg, rgba(99,102,241,0.55), rgba(139,92,246,0.50))',
+                      border: '1px solid rgba(99,102,241,0.38)',
+                    }}>
+                      <span style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.93)', lineHeight: 1.55, fontWeight: 500 }}>{msg.content}</span>
+                    </div>
+                  </div>
+                ) : (
+                  /* Aeva response — full-width structured card */
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    {/* Avatar */}
+                    <div style={{ width: 28, height: 28, borderRadius: 9, background: 'linear-gradient(135deg, #2D308E 0%, #6366F1 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 3, boxShadow: '0 2px 10px rgba(99,102,241,0.35)' }}>
+                      <Star size={11} color="white" fill="white" />
+                    </div>
+                    {/* Content card */}
+                    <div style={{
+                      flex: 1, minWidth: 0,
+                      padding: '14px 18px',
+                      borderRadius: '4px 18px 18px 18px',
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      borderLeft: '2px solid rgba(99,102,241,0.45)',
+                    }}>
+                      <DocMarkdown text={msg.content || '…'} />
+                    </div>
                   </div>
                 )}
-                <div style={{
-                  maxWidth: '82%', padding: '11px 15px',
-                  borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '4px 18px 18px 18px',
-                  background: msg.role === 'user'
-                    ? 'linear-gradient(135deg, rgba(99,102,241,0.55), rgba(139,92,246,0.50))'
-                    : 'rgba(255,255,255,0.07)',
-                  border: msg.role === 'user'
-                    ? '1px solid rgba(99,102,241,0.40)'
-                    : '1px solid rgba(255,255,255,0.09)',
-                }}>
-                  {msg.role === 'user'
-                    ? <span style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.92)', lineHeight: 1.5, fontWeight: 500 }}>{msg.content}</span>
-                    : <DocMarkdown text={msg.content || '…'} />
-                  }
-                </div>
               </div>
             ))}
 
