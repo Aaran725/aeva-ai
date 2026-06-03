@@ -4,6 +4,7 @@ import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText, BookOp
 import { useRoadmapStore } from './roadmapStore'
 import { useLabStore } from './labStore'
 import { useXPStore } from './xpStore'
+import { useAevaControlStore } from './aevaControlStore'
 
 const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
@@ -440,11 +441,13 @@ const NODE_R       = 38   // node circle radius (76px diameter)
 const TOP_PAD      = 32
 
 function PathView() {
-  const { getActive, completeNode } = useRoadmapStore()
+  const { getActive, completeNode, closeRoadmapHub } = useRoadmapStore()
   const { openLab, setLabSuggestion, addOrder } = useLabStore()
   const { addXP } = useXPStore()
+  const { setPendingChatPrompt } = useAevaControlStore()
   const roadmap = getActive()
-  const [selected, setSelected] = useState(null)
+  const [selected, setSelected]     = useState(null)
+  const [startedIds, setStartedIds] = useState(new Set())
   const containerRef = useRef(null)
   const scrollRef    = useRef(null)
   const [cw, setCw]  = useState(360)
@@ -471,32 +474,45 @@ function PathView() {
     </div>
   )
 
-  const nodes       = roadmap.nodes
-  const completed   = nodes.filter(n => n.status === 'complete').length
-  const daysLeft    = Math.max(0, Math.ceil((new Date(roadmap.examDate) - Date.now()) / 86400000))
-  const available   = nodes.find(n => n.status === 'available')
-  const containerH  = nodes.length * NODE_SPACING + TOP_PAD + 120
+  const nodes      = roadmap.nodes
+  const daysLeft   = Math.max(0, Math.ceil((new Date(roadmap.examDate) - Date.now()) / 86400000))
+  const available  = nodes.find(n => n.status === 'available')
+  const containerH = nodes.length * NODE_SPACING + TOP_PAD + 120
 
   const getX = (i) => (X_PATTERN[i % X_PATTERN.length] / 100) * cw
   const getY = (i) => i * NODE_SPACING + TOP_PAD + NODE_R
 
-  const handleStart = (node) => {
+  const launchNode = (node) => {
     setSelected(null)
-    if (node.type === 'learn' || node.type === 'check') {
-      setLabSuggestion({ topic: node.topic, drillType: 'flashcard', reason: `Aeva roadmap: ${node.description || node.topic}` })
-      openLab()
+    setStartedIds(prev => new Set([...prev, node.id]))
+
+    if (node.type === 'learn') {
+      // Close hub → Aeva chat fires a curated teaching session
+      setPendingChatPrompt(
+        `Teach me "${node.topic}" for my ${roadmap.title}. ${node.description ? node.description + ' ' : ''}I have ${daysLeft} days until the exam. Start from the core concepts, use examples, and check my understanding as we go.`
+      )
+      closeRoadmapHub()
     } else if (node.type === 'drill') {
-      setLabSuggestion({ topic: node.topic, drillType: 'flashcard', reason: `Drill: ${node.topic}` })
+      setLabSuggestion({ topic: node.topic, drillType: 'flashcard', reason: `Roadmap drill: ${node.topic} — ${roadmap.title}` })
+      openLab()
+    } else if (node.type === 'check') {
+      setLabSuggestion({ topic: node.topic, drillType: 'quiz', reason: `Knowledge check: ${node.topic} — ${roadmap.title}` })
       openLab()
     } else if (node.type === 'mock') {
-      addOrder({ title: `Mock Test: ${roadmap.title}`, description: `Complete a full mock test covering all topics in ${roadmap.title}.`, subject: roadmap.title })
+      addOrder({
+        title: `Mock Test — ${roadmap.title}`,
+        description: `Full mock test covering all topics in ${roadmap.title}. ${daysLeft} days until exam. Be strict with marking.`,
+        subject: roadmap.title,
+      })
       openLab()
     }
-    // Mark complete + award XP after brief delay
-    setTimeout(() => {
-      completeNode(roadmap.id, node.id)
-      addXP('DRILL_COMPLETE')
-    }, 800)
+  }
+
+  const markDone = (node) => {
+    completeNode(roadmap.id, node.id)
+    addXP('DRILL_COMPLETE')
+    setStartedIds(prev => { const n = new Set(prev); n.delete(node.id); return n })
+    setSelected(null)
   }
 
   const mission     = roadmap.dailyMission
@@ -556,7 +572,20 @@ function PathView() {
                   <motion.button key={task.id}
                     whileHover={!done ? { scale: 1.02, background: 'rgba(255,255,255,0.14)' } : {}}
                     whileTap={!done ? { scale: 0.98 } : {}}
-                    onClick={() => !done && handleStart({ id: task.id, topic: task.topic, type: task.type, xp: 40 })}
+                    onClick={() => {
+                      if (done) return
+                      const t = { id: task.id, topic: task.topic, type: task.type }
+                      if (t.type === 'learn') {
+                        setPendingChatPrompt(`Teach me "${t.topic}" for my ${roadmap.title}. I have ${daysLeft} days until the exam.`)
+                        closeRoadmapHub()
+                      } else if (t.type === 'drill') {
+                        setLabSuggestion({ topic: t.topic, drillType: 'flashcard', reason: `Daily mission drill: ${t.topic}` }); openLab()
+                      } else if (t.type === 'check') {
+                        setLabSuggestion({ topic: t.topic, drillType: 'quiz', reason: `Daily mission check: ${t.topic}` }); openLab()
+                      } else if (t.type === 'mock') {
+                        addOrder({ title: `Mock Test — ${roadmap.title}`, description: `Full mock test on ${roadmap.title}.`, subject: roadmap.title }); openLab()
+                      }
+                    }}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10,
                       padding: '10px 14px', borderRadius: 11,
@@ -669,38 +698,83 @@ function PathView() {
                 {node.topic}
               </div>
 
-              {/* Popup card on selected available node */}
+              {/* Popup card — floats above the node */}
               <AnimatePresence>
-                {isSelected && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.88, y: 8 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.88, y: 8 }}
-                    transition={{ type: 'spring', stiffness: 340, damping: 24 }}
-                    style={{
-                      position: 'absolute', top: NODE_R * 2 + 36,
-                      left: '50%', transform: 'translateX(-50%)',
-                      width: 200, borderRadius: 16, zIndex: 20,
-                      background: 'rgba(10,11,28,0.98)',
-                      border: `1px solid ${cfg.color}55`,
-                      boxShadow: `0 12px 40px rgba(0,0,0,0.60), 0 0 0 1px ${cfg.color}22`,
-                      padding: '14px 16px',
-                    }}>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginBottom: 2 }}>{node.topic}</div>
-                    <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.45)', marginBottom: 12, lineHeight: 1.5 }}>{node.description || cfg.label}</div>
-                    <motion.button
-                      whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-                      onClick={() => handleStart(node)}
+                {isSelected && (() => {
+                  const isStarted = startedIds.has(node.id)
+                  return (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.88, y: 6 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.88, y: 6 }}
+                      transition={{ type: 'spring', stiffness: 360, damping: 26 }}
                       style={{
-                        width: '100%', padding: '9px 0', borderRadius: 10, border: 'none',
-                        background: `linear-gradient(135deg, ${cfg.color}, ${cfg.color}bb)`,
-                        color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                        fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        position: 'absolute',
+                        bottom: NODE_R * 2 + 18,
+                        left: '50%', transform: 'translateX(-50%)',
+                        width: 216, borderRadius: 16, zIndex: 20,
+                        background: 'rgba(8,9,24,0.97)',
+                        border: `1px solid ${cfg.color}50`,
+                        boxShadow: `0 16px 48px rgba(0,0,0,0.70), 0 0 0 1px ${cfg.color}18`,
+                        padding: '14px 16px 16px',
                       }}>
-                      Start +{node.xp || 50} XP
-                    </motion.button>
-                  </motion.div>
-                )}
+                      {/* Topic + type */}
+                      <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginBottom: 2, letterSpacing: '-0.02em' }}>{node.topic}</div>
+                      <div style={{ fontSize: 11, color: cfg.light, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>{cfg.label}</div>
+                      <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.42)', marginBottom: 14, lineHeight: 1.55 }}>{node.description || 'Click below to begin this step.'}</div>
+
+                      {isStarted ? (
+                        /* Already launched — show Mark Done */
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                          <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                            onClick={() => markDone(node)}
+                            style={{
+                              width: '100%', padding: '10px 0', borderRadius: 10, border: 'none',
+                              background: 'linear-gradient(135deg,#16a34a,#22C55E)',
+                              color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                              fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                            }}>
+                            <Check size={14} strokeWidth={3} /> Mark as Done · +{node.xp || 50} XP
+                          </motion.button>
+                          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                            onClick={() => launchNode(node)}
+                            style={{
+                              width: '100%', padding: '8px 0', borderRadius: 10, border: `1px solid ${cfg.color}40`,
+                              background: 'transparent', color: cfg.light, fontSize: 12, fontWeight: 600,
+                              cursor: 'pointer', fontFamily: 'inherit',
+                            }}>
+                            Go again
+                          </motion.button>
+                        </div>
+                      ) : (
+                        /* Not started yet — launch button */
+                        <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                          onClick={() => launchNode(node)}
+                          style={{
+                            width: '100%', padding: '10px 0', borderRadius: 10, border: 'none',
+                            background: `linear-gradient(135deg, ${cfg.color}, ${cfg.shadow})`,
+                            boxShadow: `0 4px 14px ${cfg.color}55`,
+                            color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                            fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                          }}>
+                          <Icon size={14} strokeWidth={2.5} />
+                          {node.type === 'learn' ? 'Ask Aeva' : node.type === 'drill' ? 'Start Drill' : node.type === 'check' ? 'Take Quiz' : 'Start Mock Test'}
+                          <span style={{ opacity: 0.75, fontSize: 11 }}>+{node.xp || 50} XP</span>
+                        </motion.button>
+                      )}
+
+                      {/* Down-pointing caret */}
+                      <div style={{
+                        position: 'absolute', bottom: -9, left: '50%', transform: 'translateX(-50%)',
+                        width: 0, height: 0,
+                        borderLeft: '9px solid transparent',
+                        borderRight: '9px solid transparent',
+                        borderTop: `9px solid rgba(8,9,24,0.97)`,
+                        filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.3))',
+                      }} />
+                    </motion.div>
+                  )
+                })()}
               </AnimatePresence>
             </div>
           )

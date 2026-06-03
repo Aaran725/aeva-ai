@@ -10,6 +10,7 @@ const DEFAULT = {
   xpMultiplier: 1,
   activeIntervention: null, // { title, message, task, topic, triggeredAt }
   commandToast: null,       // { label, type, id } — shown briefly when Aeva fires a command
+  pendingChatPrompt: null,  // string — auto-sent to Aeva chat when set, cleared after send
 }
 
 export const useAevaControlStore = create((set, get) => ({
@@ -49,6 +50,9 @@ export const useAevaControlStore = create((set, get) => ({
       return updated
     })
   },
+
+  setPendingChatPrompt: (text) => set({ pendingChatPrompt: text }),
+  clearPendingChatPrompt: () => set({ pendingChatPrompt: null }),
 
   showCommandToast: (label, type = 'action') => {
     set({ commandToast: { label, type, id: Date.now() } })
