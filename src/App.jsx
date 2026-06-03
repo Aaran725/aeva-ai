@@ -355,6 +355,11 @@ function buildDifficultyDirective(neural) {
 // Fires every 8 exchanges in tutor mode — identifies gaps and writes a labOrder
 async function analyzeForOrders(messages, struggleZones, addOrder, setOrderToast) {
   try {
+    // Academic relevance gate — skip if the recent conversation isn't about learning/studying
+    const recentText = messages.slice(-8).map(m => m.text || '').join(' ').toLowerCase()
+    const isAcademic = /\b(explain|understand|learn|study|topic|concept|problem|solve|define|theory|method|why|how|what|question|answer|exam|test|homework|revision|essay|calculate|formula|equation|biology|chemistry|physics|history|math|algebra|geometry|english|science|calculus|programming|coding|economics|psychology|literature|grammar|syntax|proof|theorem|derivative|integral|reaction|molecule|force|voltage|current|cell|dna|gene|syntax|algorithm)\b/.test(recentText)
+    if (!isAcademic) return
+
     const recent = messages.slice(-8).map(m =>
       `${m.role === 'model' ? 'Aeva' : 'Student'}: ${(m.text || '').slice(0, 200)}`
     ).join('\n')
@@ -2893,7 +2898,7 @@ function ChatView({ onBack }) {
     depth,
   } = useNeuralStore()
   const { saveWorldMemory } = useArcadeStore()
-  const { addMemory, buildRecallBlock, memories: sessionMemories } = useMemoryStore()
+  const { addMemory, buildRecallBlock, memories: sessionMemories, saveQuickMemory } = useMemoryStore()
   const isMission = !!activeMode
   const sendTimeRef = useRef(null)
 
@@ -2939,22 +2944,36 @@ function ChatView({ onBack }) {
   // Keep masteryMapRef in sync for session-end save
   useEffect(() => { masteryMapRef.current = masteryMap }, [masteryMap])
 
-  // Save session summary when ChatView unmounts
+  // Save session summary when ChatView unmounts or tab is hidden
   useEffect(() => {
-    return () => {
-      if (exchangeCountRef.current < 2) return
-      const topics = Object.keys(masteryMapRef.current)
-      const primaryTopic = topics.sort((a, b) => (masteryMapRef.current[b] || 0) - (masteryMapRef.current[a] || 0))[0] || null
+    const doSessionSave = () => {
       saveWorldMemory('lastTutorSession', {
         date: Date.now(),
-        topics: topics.slice(0, 6),
-        primaryTopic,
+        topics: Object.keys(masteryMapRef.current).slice(0, 6),
+        primaryTopic: Object.keys(masteryMapRef.current)[0] || null,
         exchanges: exchangeCountRef.current,
         mastered: masteredTopics.slice(-4),
         struggled: struggleZones.slice(-3),
       })
+      // Also capture in cross-session memory (no API call — uses session tracking data)
+      saveQuickMemory({
+        sessionConcepts: sessionConceptsRef.current,
+        exchanges: exchangeCountRef.current,
+      })
     }
-  }, [])
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden' && exchangeCountRef.current >= 2) {
+        doSessionSave()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility)
+      if (exchangeCountRef.current >= 2) doSessionSave()
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Proactive opener removed — chat always starts with the empty state UI
   // (big orb + chips) until the user sends their first message.
@@ -3202,8 +3221,10 @@ function ChatView({ onBack }) {
         exchangeCountRef.current += 1
         advanceSessionState(exchangeCountRef.current, criticResult)
 
-        // Background summarisation every 6 exchanges — non-blocking, silent
-        if (exchangeCountRef.current % 6 === 0 && messages.length >= 4) {
+        // Background summarisation: first save at exchange 2 (captures short sessions),
+        // then every 6 thereafter. Non-blocking, silent.
+        const ec = exchangeCountRef.current
+        if ((ec === 2 || (ec > 2 && ec % 6 === 0)) && messages.length >= 3) {
           summariseSessionBackground(
             messages, name,
             Object.keys(sessionConceptsRef.current).slice(0, 6),
@@ -3212,7 +3233,7 @@ function ChatView({ onBack }) {
         }
 
         // Aeva's Orders analysis every 8 exchanges — fire-and-forget
-        if (exchangeCountRef.current % 8 === 0 && messages.length >= 6) {
+        if (ec % 8 === 0 && messages.length >= 6) {
           analyzeForOrders(messages, struggleZones, addOrder, setOrderToast)
         }
         // XP every 5 Socratic exchanges (resets when mode is toggled)

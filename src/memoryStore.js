@@ -46,23 +46,54 @@ export const useMemoryStore = create((set, get) => ({
    * Returns empty string if no memories exist yet.
    */
   buildRecallBlock: (userName) => {
-    const memories = get().memories.slice(0, 3)  // only last 3 sessions
+    const memories = get().memories.slice(0, 4)  // last 4 sessions
     if (!memories.length) return ''
 
     const lines = memories.map(m => {
       const date = new Date(m.date).toLocaleDateString('en-GB', {
         weekday: 'short', day: 'numeric', month: 'short',
       })
-      return `  • ${date}: ${m.summary}`
+      return `  • ${date} (${m.exchanges} exchanges): ${m.summary}`
     }).join('\n')
 
     return `
-┌── CROSS-SESSION MEMORY — ${userName}'s previous sessions ──────────────────┐
+┌── CROSS-SESSION MEMORY — what ${userName} has worked on before ─────────────┐
 ${lines}
-└── Apply this context naturally. Never say "I remember" or announce the memory.
-    Just use it — notice patterns, continue threads, reference past progress. ──┘
+└─────────────────────────────────────────────────────────────────────────────┘
+IMPORTANT: Use this memory actively. If ${userName} mentions something they've studied before, acknowledge the continuity. If they're revisiting a struggle zone, note it and dig deeper this time. If they've made progress since last session, say so. Never announce "I remember" — just act like a tutor who was there.
 
 `
+  },
+
+  /**
+   * Save a quick summary without an AI call — built from session tracking data.
+   * Used as a fallback for sessions that end before the AI summariser fires.
+   * Deduplicates: won't add a second entry for the same calendar day.
+   */
+  saveQuickMemory: ({ sessionConcepts, exchanges }) => {
+    if (exchanges < 2) return
+    const topics = Object.keys(sessionConcepts)
+    if (topics.length === 0) return
+
+    // Don't overwrite an AI-generated summary from the same day
+    const today = new Date().toDateString()
+    const alreadyToday = get().memories.some(m => new Date(m.date).toDateString() === today)
+    if (alreadyToday) return
+
+    const mastered  = topics.filter(t => ['mastery', 'solid'].includes(sessionConcepts[t]))
+    const struggled = topics.filter(t => sessionConcepts[t] === 'none')
+    const partial   = topics.filter(t => sessionConcepts[t] === 'partial')
+
+    const parts = []
+    if (mastered.length)  parts.push(`understood ${mastered.join(', ')}`)
+    if (partial.length)   parts.push(`partially covered ${partial.join(', ')}`)
+    if (struggled.length) parts.push(`struggled with ${struggled.join(', ')}`)
+
+    const summary = parts.length > 0
+      ? `${exchanges}-exchange session: ${parts.join('; ')}.`
+      : `${exchanges}-exchange session on ${topics.join(', ')}.`
+
+    get().addMemory({ summary, topics, exchanges })
   },
 
   clearMemories: () => {

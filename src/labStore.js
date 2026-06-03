@@ -136,13 +136,25 @@ export const useLabStore = create((set, get) => ({
   // ── Aeva's Orders ────────────────────────────────────
   addOrder: ({ topic, drillType, reason, urgency = 'medium' }) => {
     if (!topic?.trim() || !drillType) return null
+    const topicLower = topic.toLowerCase()
+    const DAY = 24 * 60 * 60 * 1000
+
     // Don't create a duplicate pending order for same topic+drillType
     const existing = get().orders.find(o =>
       !o.completedAt &&
-      o.topic.toLowerCase() === topic.toLowerCase() &&
+      o.topic.toLowerCase() === topicLower &&
       o.drillType === drillType
     )
     if (existing) return null
+
+    // Don't re-assign a topic+drillType that was completed within the last 24 hours
+    const recentlyDone = get().orders.find(o =>
+      o.completedAt &&
+      o.topic.toLowerCase() === topicLower &&
+      o.drillType === drillType &&
+      (Date.now() - o.completedAt) < DAY
+    )
+    if (recentlyDone) return null
 
     const order = {
       id: `order_${Date.now()}`,
