@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText } from 'lucide-react'
 import { useRoadmapStore } from './roadmapStore'
@@ -66,7 +66,8 @@ Rules:
 
 export default function RoadmapHub() {
   const { roadmapOpen, closeRoadmapHub, roadmaps, getActive } = useRoadmapStore()
-  const [view, setView] = useState('home') // home | create | generating | path
+  const [view, setView]         = useState('home') // home | create | generating | path
+  const [pendingForm, setPending] = useState(null)  // holds form data during generation
 
   const active = getActive()
 
@@ -129,8 +130,8 @@ export default function RoadmapHub() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         <AnimatePresence mode="wait">
           {view === 'home'       && <HomeView       key="home"       onCreate={() => setView('create')} onOpen={() => setView('path')} />}
-          {view === 'create'     && <CreateView     key="create"     onGenerate={() => setView('path')} />}
-          {view === 'generating' && <GeneratingView key="generating" onDone={() => setView('path')} />}
+          {view === 'create'     && <CreateView     key="create"     onGenerate={(fd) => { setPending(fd); setView('generating') }} />}
+          {view === 'generating' && <GeneratingView key="generating" formData={pendingForm} onDone={() => { setPending(null); setView('path') }} />}
           {view === 'path'       && <PathView       key="path" />}
         </AnimatePresence>
       </div>
@@ -139,10 +140,12 @@ export default function RoadmapHub() {
 }
 
 function HomeView({ onCreate, onOpen }) {
-  const { roadmaps, setActive } = useRoadmapStore()
+  const { roadmaps, setActive, deleteRoadmap } = useRoadmapStore()
+  const [confirmDelete, setConfirmDelete] = useState(null)
+
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-      style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: roadmaps.length ? 'flex-start' : 'center', padding: 24, gap: 16 }}>
+      style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: roadmaps.length ? 'flex-start' : 'center', padding: 24, gap: 12, overflowY: 'auto' }}>
       {roadmaps.length === 0 ? (
         <div style={{ textAlign: 'center', maxWidth: 320 }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>🗺️</div>
@@ -154,28 +157,64 @@ function HomeView({ onCreate, onOpen }) {
           </motion.button>
         </div>
       ) : (
-        roadmaps.map(r => (
-          <motion.div key={r.id} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
-            onClick={() => { setActive(r.id); onOpen() }}
-            style={{ width: '100%', maxWidth: 480, padding: '18px 20px', borderRadius: 18, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{r.title}</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)' }}>Readiness {r.readiness}% · {r.nodes?.length || 0} steps</div>
-          </motion.div>
-        ))
+        <>
+          <div style={{ width: '100%', maxWidth: 480, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.30)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 4 }}>Your Roadmaps</div>
+          {roadmaps.map(r => {
+            const daysLeft = Math.max(0, Math.ceil((new Date(r.examDate) - Date.now()) / 86400000))
+            const completed = r.nodes?.filter(n => n.status === 'complete').length || 0
+            const total = r.nodes?.length || 0
+            return (
+              <div key={r.id} style={{ width: '100%', maxWidth: 480 }}>
+                <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
+                  style={{ padding: '16px 18px', borderRadius: 18, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div onClick={() => { setActive(r.id); onOpen() }} style={{ flex: 1 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 3 }}>{r.title}</div>
+                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)' }}>{daysLeft}d left · {completed}/{total} steps</div>
+                    </div>
+                    <motion.button whileHover={{ color: '#F87171' }} whileTap={{ scale: 0.9 }}
+                      onClick={() => setConfirmDelete(confirmDelete === r.id ? null : r.id)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.25)', padding: '2px 6px', fontSize: 16, lineHeight: 1 }}>
+                      ···
+                    </motion.button>
+                  </div>
+                  {/* Progress bar */}
+                  <div style={{ height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg,#6366F1,#8B5CF6)', width: `${r.readiness}%`, transition: 'width 0.5s ease' }} />
+                  </div>
+                  {/* Delete confirm */}
+                  <AnimatePresence>
+                    {confirmDelete === r.id && (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                        style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                        <motion.button whileTap={{ scale: 0.96 }} onClick={() => { deleteRoadmap(r.id); setConfirmDelete(null) }}
+                          style={{ flex: 1, padding: '8px 0', borderRadius: 10, background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.35)', color: '#F87171', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                          Delete roadmap
+                        </motion.button>
+                        <motion.button whileTap={{ scale: 0.96 }} onClick={() => setConfirmDelete(null)}
+                          style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.50)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                          Cancel
+                        </motion.button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              </div>
+            )
+          })}
+        </>
       )}
     </motion.div>
   )
 }
 
 function CreateView({ onGenerate }) {
-  const { createRoadmap, updateRoadmap, getActive } = useRoadmapStore()
-  const [title, setTitle]           = useState('')
-  const [examDate, setExamDate]     = useState('')
-  const [info, setInfo]             = useState('')
-  const [dragOver, setDragOver]     = useState(false)
-  const [loading, setLoading]       = useState(false)
-  const [error, setError]           = useState('')
-  const fileRef                     = useRef(null)
+  const [title, setTitle]       = useState('')
+  const [examDate, setExamDate] = useState('')
+  const [info, setInfo]         = useState('')
+  const [dragOver, setDragOver] = useState(false)
+  const [error, setError]       = useState('')
+  const fileRef                 = useRef(null)
 
   const handleFile = (f) => {
     if (!f) return
@@ -184,19 +223,10 @@ function CreateView({ onGenerate }) {
     reader.readAsText(f)
   }
 
-  const handleGenerate = async () => {
+  const handleGenerate = () => {
     if (!title.trim() || !examDate) { setError('Add a title and exam date to continue.'); return }
     setError('')
-    setLoading(true)
-    try {
-      const id = createRoadmap({ title: title.trim(), examDate, assessmentInfo: info })
-      const { overview, nodes } = await generateRoadmapNodes(title.trim(), examDate, info)
-      updateRoadmap(id, { overview, nodes })
-      onGenerate()
-    } catch (e) {
-      setError('Generation failed — check your connection and try again.')
-    }
-    setLoading(false)
+    onGenerate({ title: title.trim(), examDate, info })
   }
 
   const field = {
@@ -277,17 +307,13 @@ function CreateView({ onGenerate }) {
         <motion.button
           whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
           onClick={handleGenerate}
-          disabled={loading}
           style={{
             width: '100%', padding: '15px 0', borderRadius: 14, border: 'none',
-            background: loading ? 'rgba(99,102,241,0.30)' : 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)',
-            color: '#fff', fontSize: 15, fontWeight: 700, cursor: loading ? 'default' : 'pointer',
+            background: 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)',
+            color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
             fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           }}>
-          {loading
-            ? <><motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff' }} /> Building roadmap…</>
-            : <><Sparkles size={15} /> Generate Roadmap</>
-          }
+          <Sparkles size={15} /> Generate Roadmap
         </motion.button>
 
       </div>
@@ -295,15 +321,108 @@ function CreateView({ onGenerate }) {
   )
 }
 
-function GeneratingView({ onDone }) {
+const GEN_STEPS = [
+  'Extracting topics…',
+  'Mapping prerequisites…',
+  'Estimating workload…',
+  'Building your path…',
+  'Generating daily mission…',
+]
+
+function GeneratingView({ formData, onDone }) {
+  const { createRoadmap, updateRoadmap, setDailyMission } = useRoadmapStore()
+  const [step, setStep] = useState(0)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!formData) return
+    let cancelled = false
+    const stepInterval = setInterval(() => setStep(s => Math.min(s + 1, GEN_STEPS.length - 1)), 1800)
+
+    const run = async () => {
+      try {
+        const id = createRoadmap({ title: formData.title, examDate: formData.examDate, assessmentInfo: formData.info })
+        const { overview, nodes } = await generateRoadmapNodes(formData.title, formData.examDate, formData.info)
+        if (cancelled) return
+        updateRoadmap(id, { overview, nodes })
+        // Generate daily mission
+        const roadmapSnap = { title: formData.title, examDate: formData.examDate, nodes, learningProfile: {} }
+        const mission = await generateDailyMission(roadmapSnap)
+        if (cancelled) return
+        setDailyMission(id, mission)
+        clearInterval(stepInterval)
+        onDone()
+      } catch (e) {
+        if (!cancelled) setError('Generation failed — check your connection and try again.')
+        clearInterval(stepInterval)
+      }
+    }
+    run()
+    return () => { cancelled = true; clearInterval(stepInterval) }
+  }, [])
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+      style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, padding: 32 }}>
       <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}
-        style={{ width: 40, height: 40, borderRadius: '50%', border: '3px solid rgba(99,102,241,0.2)', borderTopColor: '#6366F1' }} />
-      <div style={{ fontSize: 15, fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}>Aeva is building your roadmap…</div>
+        style={{ width: 44, height: 44, borderRadius: '50%', border: '3px solid rgba(99,102,241,0.2)', borderTopColor: '#6366F1' }} />
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 17, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', marginBottom: 8 }}>Aeva is building your roadmap</div>
+        <motion.div key={step} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+          style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', fontWeight: 500 }}>
+          {GEN_STEPS[step]}
+        </motion.div>
+      </div>
+      {/* Step dots */}
+      <div style={{ display: 'flex', gap: 6 }}>
+        {GEN_STEPS.map((_, i) => (
+          <motion.div key={i} animate={{ background: i <= step ? '#6366F1' : 'rgba(255,255,255,0.15)' }}
+            style={{ width: 6, height: 6, borderRadius: '50%' }} />
+        ))}
+      </div>
+      {error && <div style={{ fontSize: 13, color: '#F87171', fontWeight: 500, textAlign: 'center' }}>{error}</div>}
     </motion.div>
   )
+}
+
+async function generateDailyMission(roadmap) {
+  const daysLeft   = Math.max(1, Math.ceil((new Date(roadmap.examDate) - Date.now()) / 86400000))
+  const available  = roadmap.nodes?.find(n => n.status === 'available')
+  const weak       = roadmap.learningProfile?.weak || []
+  const completed  = roadmap.nodes?.filter(n => n.status === 'complete').map(n => n.topic) || []
+
+  const prompt = `You are Aeva. Generate today's study mission for a student.
+
+Exam: "${roadmap.title}" — ${daysLeft} days away
+Current focus topic: "${available?.topic || 'review'}"
+Weak areas: ${weak.length ? weak.join(', ') : 'none detected yet'}
+Completed: ${completed.length} topics
+
+Return ONLY valid JSON:
+{
+  "objective": "single clear mission objective (one sentence)",
+  "estimatedMinutes": 20,
+  "tasks": [
+    { "id": "t1", "type": "learn",     "topic": "exact topic", "label": "Learn with Aeva",   "status": "pending" },
+    { "id": "t2", "type": "drill",     "topic": "exact topic", "label": "Recall Drill",       "status": "pending" },
+    { "id": "t3", "type": "check",     "topic": "exact topic", "label": "Knowledge Check",    "status": "pending" }
+  ]
+}
+
+Rules: 2-4 tasks. Focus on current topic. If weak areas exist, add a review task for the weakest.`
+
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
+    body: JSON.stringify({
+      model: 'llama-3.1-8b-instant',
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+      temperature: 0.4, max_tokens: 400,
+    }),
+  })
+  const data = await res.json()
+  return JSON.parse(data.choices[0].message.content)
 }
 
 /* ── Node config ─────────────────────────────────────────────────────────── */
@@ -327,11 +446,24 @@ function PathView() {
   const roadmap = getActive()
   const [selected, setSelected] = useState(null)
   const containerRef = useRef(null)
-  const [cw, setCw] = useState(360)
+  const scrollRef    = useRef(null)
+  const [cw, setCw]  = useState(360)
 
-  useEffect(() => {
-    if (containerRef.current) setCw(containerRef.current.offsetWidth)
+  useLayoutEffect(() => {
+    if (!containerRef.current) return
+    const ro = new ResizeObserver(([e]) => setCw(e.contentRect.width))
+    ro.observe(containerRef.current)
+    return () => ro.disconnect()
   }, [])
+
+  // Scroll to current available node on mount
+  useEffect(() => {
+    if (!scrollRef.current || !roadmap?.nodes) return
+    const idx = roadmap.nodes.findIndex(n => n.status === 'available')
+    if (idx < 0) return
+    const y = idx * NODE_SPACING + TOP_PAD
+    setTimeout(() => scrollRef.current?.scrollTo({ top: Math.max(0, y - 220), behavior: 'smooth' }), 300)
+  }, [roadmap?.id])
 
   if (!roadmap?.nodes?.length) return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>
@@ -367,8 +499,13 @@ function PathView() {
     }, 800)
   }
 
+  const mission     = roadmap.dailyMission
+  const missionTasks = mission?.tasks || []
+  const missionDate  = mission?.date
+  const isToday      = missionDate === new Date().toDateString()
+
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    <motion.div ref={scrollRef} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
 
       {/* ── Mission card ─────────────────────────────────────────────────── */}
@@ -408,31 +545,39 @@ function PathView() {
             </div>
           </div>
 
-          {/* Mission tasks */}
-          {available && (
+          {/* Mission tasks — use generated daily mission if available */}
+          {(missionTasks.length > 0 || available) && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginTop: 14 }}>
-              {['learn', 'drill', 'check'].map((type, i) => {
-                const cfg = NODE_CFG[type]
+              {(missionTasks.length > 0 ? missionTasks : ['learn','drill','check'].map((type,i) => ({ id: `t${i}`, type, topic: available?.topic, label: NODE_CFG[type].label, status: 'pending' }))).map(task => {
+                const cfg = NODE_CFG[task.type] || NODE_CFG.learn
+                const done = task.status === 'complete'
                 return (
-                  <motion.button key={type}
-                    whileHover={{ scale: 1.02, background: 'rgba(255,255,255,0.14)' }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => handleStart({ ...available, type })}
+                  <motion.button key={task.id}
+                    whileHover={!done ? { scale: 1.02, background: 'rgba(255,255,255,0.14)' } : {}}
+                    whileTap={!done ? { scale: 0.98 } : {}}
+                    onClick={() => !done && handleStart({ id: task.id, topic: task.topic, type: task.type, xp: 40 })}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10,
                       padding: '10px 14px', borderRadius: 11,
-                      background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.12)',
-                      cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                      background: done ? 'rgba(74,222,128,0.08)' : 'rgba(255,255,255,0.10)',
+                      border: done ? '1px solid rgba(74,222,128,0.25)' : '1px solid rgba(255,255,255,0.12)',
+                      cursor: done ? 'default' : 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                      opacity: done ? 0.7 : 1,
                     }}>
-                    <span style={{ fontSize: 15 }}>{cfg.emoji}</span>
+                    <span style={{ fontSize: 15 }}>{done ? '✓' : cfg.emoji}</span>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{cfg.label}</div>
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>{available.topic}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: done ? '#4ADE80' : '#fff' }}>{task.label}</div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>{task.topic}</div>
                     </div>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: cfg.color }}>+{type === 'check' ? 40 : type === 'drill' ? 30 : 50} XP</div>
+                    {!done && <div style={{ fontSize: 11, fontWeight: 800, color: cfg.color }}>+{task.type === 'check' ? 40 : task.type === 'drill' ? 30 : 50} XP</div>}
                   </motion.button>
                 )
               })}
+              {mission?.estimatedMinutes && (
+                <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.35)', fontWeight: 500, marginTop: 4, paddingLeft: 2 }}>
+                  ⏱ Est. {mission.estimatedMinutes} min
+                </div>
+              )}
             </div>
           )}
         </div>

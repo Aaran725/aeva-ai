@@ -53,6 +53,33 @@ export const useRoadmapStore = create((set, get) => {
       })
     },
 
+    updateLearningProfile: (roadmapId, { weak, mastered, misconception }) => {
+      set(s => {
+        const roadmaps = s.roadmaps.map(r => {
+          if (r.id !== roadmapId) return r
+          const lp = r.learningProfile || { mastered: [], weak: [], misconceptions: [] }
+          return {
+            ...r,
+            learningProfile: {
+              mastered:      mastered    ? [...new Set([...lp.mastered, mastered])]           : lp.mastered,
+              weak:          weak        ? [...new Set([...lp.weak, weak])]                   : lp.weak,
+              misconceptions: misconception ? [...new Set([...lp.misconceptions, misconception])] : lp.misconceptions,
+            },
+          }
+        })
+        const u = { ...s, roadmaps }; save(u); return u
+      })
+    },
+
+    setDailyMission: (roadmapId, mission) => {
+      set(s => {
+        const roadmaps = s.roadmaps.map(r =>
+          r.id === roadmapId ? { ...r, dailyMission: { ...mission, date: new Date().toDateString() } } : r
+        )
+        const u = { ...s, roadmaps }; save(u); return u
+      })
+    },
+
     getActive: () => {
       const s = get()
       return s.roadmaps.find(r => r.id === s.activeRoadmapId) || s.roadmaps[0] || null

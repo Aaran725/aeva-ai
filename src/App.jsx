@@ -1726,9 +1726,10 @@ function PersonalProgressCard() {
 
 /* ═══ DASHBOARD VIEW ══════════════════════════════ */
 /* ═══ MOBILE DRAWER ══════════════════════════════ */
-function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings, onProfile, onShowEm, onDocs, onSignOut }) {
+function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings, onProfile, onShowEm, onDocs, onRoadmap, onSignOut }) {
   const T = useT()
   const items = [
+    { label: 'Roadmaps',     icon: <span style={{ fontSize: 17 }}>🗺️</span>,   color: '#A78BFA', bg: 'rgba(124,58,237,0.10)', border: 'rgba(124,58,237,0.22)', action: onRoadmap },
     { label: T.library,      icon: <BookOpen size={17} />,  color: '#A78BFA', bg: 'rgba(167,139,250,0.10)', border: 'rgba(167,139,250,0.22)', action: onLibrary },
     { label: T.secondBrain,  icon: <Brain size={17} />,     color: '#8B8FFF', bg: 'rgba(139,143,255,0.10)', border: 'rgba(139,143,255,0.22)', action: onBrain },
     { label: T.mirror,       icon: <span style={{ fontSize: 17 }}>🪞</span>, color: '#D8B4FE', bg: 'rgba(139,92,246,0.10)', border: 'rgba(139,92,246,0.22)', action: onMirror },
@@ -2075,6 +2076,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
           onMirror={() => setMirrorOpen(true)}
           onSettings={() => setAppSettingsOpen(true)}
           onProfile={() => setProfileOpen(true)}
+          onRoadmap={() => { setDrawerOpen(false); openRoadmapHub() }}
           onShowEm={() => { setDrawerOpen(false); setShowEmOpen(true) }}
           onDocs={() => { setDrawerOpen(false); setDocOpen(true) }}
           onSignOut={onSignOut}
@@ -3407,6 +3409,29 @@ function ChatView({ onBack }) {
         } else {
           touchConceptNode(criticResult.topic, 50)
         }
+
+        // ── Roadmap adaptive update ──────────────────────────────────────────
+        const activeRoadmap = useRoadmapStore.getState().getActive()
+        if (activeRoadmap?.nodes && criticResult?.topic) {
+          const topic = criticResult.topic.toLowerCase()
+          const match = activeRoadmap.nodes.find(n => {
+            const nt = n.topic.toLowerCase()
+            return nt.includes(topic) || topic.includes(nt)
+          })
+          if (match) {
+            if (understanding === 'mastery' || understanding === 'solid') {
+              useRoadmapStore.getState().updateLearningProfile(activeRoadmap.id, { mastered: match.topic })
+            } else if (understanding === 'none') {
+              useRoadmapStore.getState().updateLearningProfile(activeRoadmap.id, { weak: match.topic })
+              if (exchangeCountRef.current % 5 === 0) {
+                addOrder({ title: `Recovery: ${match.topic}`, description: `Aeva detected confusion with "${match.topic}" during your roadmap session. Review before moving on.`, subject: activeRoadmap.title })
+              }
+            } else if (understanding === 'partial') {
+              useRoadmapStore.getState().updateLearningProfile(activeRoadmap.id, { weak: match.topic })
+            }
+          }
+        }
+        // ────────────────────────────────────────────────────────────────────
       }
     } catch (err) {
       if (err.name !== 'AbortError') {
