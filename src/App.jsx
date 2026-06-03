@@ -45,8 +45,20 @@ import { useMemoryStore } from './memoryStore'
 import './index.css'
 
 /* ─── Groq API ─── */
-const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY
+const GROQ_KEYS = [
+  import.meta.env.VITE_GROQ_API_KEY,
+  import.meta.env.VITE_GROQ_API_KEY_2,
+  import.meta.env.VITE_GROQ_API_KEY_3,
+].filter(Boolean)
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
+
+// Round-robin key index (module-level so it persists across calls)
+let _groqKeyIdx = 0
+function nextGroqKey() {
+  const key = GROQ_KEYS[_groqKeyIdx % GROQ_KEYS.length]
+  _groqKeyIdx++
+  return key
+}
 
 /* ─── Chat customisation ─── */
 const CHIP_DEFAULTS = [
@@ -194,7 +206,7 @@ async function runCritic(history, userMessage) {
 
     const res = await fetch(GROQ_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
         messages: [
@@ -423,7 +435,7 @@ async function analyzeForOrders(messages, struggleZones, addOrder, setOrderToast
 
     const res = await fetch(GROQ_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
       body: JSON.stringify({
         model: 'llama-3.1-8b-instant',
         messages: [{
@@ -530,7 +542,7 @@ async function summariseSessionBackground(messages, userName, topics, addMemory)
 
     const res = await fetch(GROQ_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
         messages: [{
@@ -550,8 +562,7 @@ async function summariseSessionBackground(messages, userName, topics, addMemory)
 
 /* ─── Stream Aeva response ─── */
 async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _attempt = 0) {
-  const MAX_RETRIES = 3
-  const RETRY_DELAYS = [2500, 5000, 10000]
+  const MAX_RETRIES = GROQ_KEYS.length * 2  // try each key twice before giving up
 
   const messages = [
     { role: 'system', content: systemPrompt },
@@ -568,18 +579,24 @@ async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _at
     presence_penalty:  opts.presencePenalty   ?? 0,
   }
 
+  const key = nextGroqKey()
+
   const res = await fetch(GROQ_URL, {
     method: 'POST',
     signal,
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
     body: JSON.stringify(body),
   })
 
   if (res.status === 429) {
     if (_attempt >= MAX_RETRIES) throw new Error('Groq error 429')
-    const delay = RETRY_DELAYS[_attempt] ?? 10000
-    opts.onRetry?.(_attempt + 1, MAX_RETRIES, Math.round(delay / 1000))
-    await new Promise(r => setTimeout(r, delay))
+    // If we still have unused keys to try, switch immediately; otherwise wait 2s
+    const hasMoreKeys = _attempt < GROQ_KEYS.length - 1
+    if (!hasMoreKeys) {
+      const secs = 2
+      opts.onRetry?.(_attempt + 1, MAX_RETRIES, secs)
+      await new Promise(r => setTimeout(r, secs * 1000))
+    }
     if (signal?.aborted) return
     return streamGroq(history, systemPrompt, onChunk, signal, opts, _attempt + 1)
   }
@@ -2648,7 +2665,7 @@ ${conversationText}${visualContext}`
 
     fetch(GROQ_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
       body: JSON.stringify({
         model: 'llama-3.1-8b-instant',
         messages: [{ role: 'user', content: prompt }],

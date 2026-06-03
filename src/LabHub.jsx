@@ -7,7 +7,7 @@ import { useSRStore } from './srStore'
 import { useRoadmapStore } from './roadmapStore'
 import { useXPStore } from './xpStore'
 
-const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY
+const _GROQ_KEYS=[import.meta.env.VITE_GROQ_API_KEY,import.meta.env.VITE_GROQ_API_KEY_2,import.meta.env.VITE_GROQ_API_KEY_3].filter(Boolean);let _ki=0;const gKey=()=>_GROQ_KEYS[_ki++%_GROQ_KEYS.length]
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 
 /* ─── AI content generator ─── */
@@ -65,7 +65,7 @@ Return ONLY valid JSON: {"questions":[{"q":"question text","modelAnswer":"ideal 
 
   const res = await fetch(GROQ_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
     body: JSON.stringify({
       model: 'llama-3.1-8b-instant',
       messages: [
@@ -87,7 +87,7 @@ async function generateDrillAnalysis(drillType, topic, wrongItems) {
   const itemText = wrongItems.map((w, i) => `${i + 1}. Q: "${w.q}" — Your answer was wrong. Correct: "${w.correct}"`).join('\n')
   const res = await fetch(GROQ_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
     body: JSON.stringify({
       model: 'llama-3.1-8b-instant',
       messages: [
@@ -105,7 +105,7 @@ async function generateDrillAnalysis(drillType, topic, wrongItems) {
 async function gradeFeynmanExplanation(topic, userExplanation, keyPoints, commonMistakes) {
   const res = await fetch(GROQ_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
     body: JSON.stringify({
       model: 'llama-3.1-8b-instant',
       messages: [
@@ -1077,7 +1077,7 @@ function ClozeDrill({ data, topic, onExit }) {
 async function gradeShortAnswer(topic, question, modelAnswer, keyPoints, userAnswer) {
   const res = await fetch(GROQ_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
     body: JSON.stringify({
       model: 'llama-3.1-8b-instant',
       messages: [

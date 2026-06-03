@@ -6,7 +6,7 @@ import { useLabStore } from './labStore'
 import { useXPStore } from './xpStore'
 import { useAevaControlStore } from './aevaControlStore'
 
-const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY
+const _GROQ_KEYS=[import.meta.env.VITE_GROQ_API_KEY,import.meta.env.VITE_GROQ_API_KEY_2,import.meta.env.VITE_GROQ_API_KEY_3].filter(Boolean);let _ki=0;const gKey=()=>_GROQ_KEYS[_ki++%_GROQ_KEYS.length]
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 
 async function generateRoadmapNodes(title, examDate, assessmentInfo) {
@@ -46,7 +46,7 @@ Rules:
 
   const res = await fetch(GROQ_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
     body: JSON.stringify({
       model: 'llama-3.3-70b-versatile',
       messages: [{ role: 'user', content: prompt }],
@@ -417,7 +417,7 @@ Rules: 2-4 tasks. Focus on current topic. If weak areas exist, add a review task
 
   const res = await fetch(GROQ_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
     body: JSON.stringify({
       model: 'llama-3.1-8b-instant',
       messages: [{ role: 'user', content: prompt }],
