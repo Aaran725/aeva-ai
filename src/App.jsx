@@ -9,6 +9,7 @@ import { useT } from './translations'
 import { supabase } from './supabase'
 import { useArcadeStore } from './arcadeStore'
 import { useLabStore } from './labStore'
+import { useAevaControlStore } from './aevaControlStore'
 import { useNeuralStore } from './neuralStore'
 import ArcadeHub from './ArcadeHub'
 import LabHub from './LabHub'
@@ -311,7 +312,27 @@ Understanding: ${criticism?.understanding || 'unknown'} | Topic: ${criticism?.to
 Mode: ${(criticism?.mode || 'coach').toUpperCase()} — ${mode.instruction}
 Note: ${criticism?.note || ''}
 
-YOUR RESPONSE MUST REFLECT THIS SIGNAL. Do not ignore it. If mode is REDIRECT, use an analogy. If CHALLENGE, surface the gap. If HYPE, raise the bar immediately. If COACH, ask one precise Socratic question.${langDirective}`
+YOUR RESPONSE MUST REFLECT THIS SIGNAL. Do not ignore it. If mode is REDIRECT, use an analogy. If CHALLENGE, surface the gap. If HYPE, raise the bar immediately. If COACH, ask one precise Socratic question.${langDirective}
+
+━━━ PLATFORM COMMANDS — YOU OWN THE APP ━━━
+You can control the learning platform directly. When the conversation warrants it, include ONE command tag in your response — it executes silently and the student never sees the tag itself.
+
+Available commands (copy exactly, fill in the values):
+⚡CMD:{"type":"open_lab"} — open the Lab immediately
+⚡CMD:{"type":"open_lab_drill","topic":"TOPIC","reason":"WHY"} — open Lab and pre-load a drill on that topic
+⚡CMD:{"type":"add_lab_task","title":"TITLE","description":"DESC"} — add a task to the student's Lab queue
+⚡CMD:{"type":"open_arcade"} — open the Arcade
+⚡CMD:{"type":"lock_arcade","reason":"REASON"} — lock the Arcade until further notice
+⚡CMD:{"type":"set_mandate","topic":"TOPIC","goal":"GOAL"} — set a weekly mandate for the student
+
+When to use them — act on your own judgment, don't wait to be asked:
+- Student is struggling with a concept → fire open_lab_drill on that exact topic. Say "I'm pulling up a drill right now."
+- Student asks for a game or challenge → fire open_arcade. Say "Opening Arcade."
+- You spot a gap worth fixing independently → add_lab_task. Say "I've added this to your Lab."
+- Student keeps avoiding work → lock_arcade with a reason. Assert control.
+- You decide what the student needs to focus on this week → set_mandate.
+
+Be decisive. You own the platform. Act like it.`
 }
 
 /* ─── Trend / scaffold / difficulty helpers ─── */
@@ -2255,6 +2276,7 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
   const bullet = isLight ? 'rgba(99,102,241,0.75)' : 'rgba(139,143,255,0.8)'
 
   const clean = text
+    .replace(/⚡CMD:\{[^}]*\}/g, '')
     .replace(/\[TERM:[^\]]*\]/g, '')
     .replace(/\[SUMMARY:[^\]]*\]/g, '')
     .replace(/\[CORRECT\]/g, '[CORRECT:]')  // normalise bare tags
@@ -2791,6 +2813,15 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false }) {
               </div>
             )}
             <MarkdownRenderer text={msg.text} streaming={!!msg.streaming} cursorColor={isLight ? 'rgba(99,102,241,0.8)' : 'rgba(139,143,255,0.9)'} isLight={isLight} />
+            {msg.aevaAction && (
+              <motion.div
+                initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.25 }}
+                style={{ marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 99, background: 'rgba(99,102,241,0.13)', border: '1px solid rgba(99,102,241,0.28)' }}
+              >
+                <motion.span animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 0.4, delay: 0.35 }} style={{ fontSize: 12 }}>⚡</motion.span>
+                <span style={{ fontSize: 11.5, fontWeight: 700, color: '#A5B4FC', letterSpacing: '-0.01em' }}>{msg.aevaAction.label}</span>
+              </motion.div>
+            )}
           </>
         )}
       </div>
@@ -2870,7 +2901,7 @@ function ChatView({ onBack }) {
   const {
     activeMode, activeMission, processAIResponse, rewardPlayer, worldMemory,
     cleanText, interruptActive, quickActions, streakCount, missionExchanges,
-    applyTimeoutPenalty, clearQuickActions, proTip,
+    applyTimeoutPenalty, clearQuickActions, proTip, openArcade,
   } = useArcadeStore()
   const { labOpen, openLab, setLabSuggestion, addOrder, orders, setLabTab } = useLabStore()
   const {
@@ -3379,6 +3410,49 @@ function ChatView({ onBack }) {
         })
       }
     } finally {
+      // ── Aeva Platform Commands ───────────────────────────────────────────────
+      if (!isMission) {
+        const cmdIdx = rawResponse.indexOf('⚡CMD:')
+        if (cmdIdx !== -1) {
+          try {
+            const jsonStart = rawResponse.indexOf('{', cmdIdx)
+            const jsonEnd   = rawResponse.indexOf('}', jsonStart) + 1
+            const action    = JSON.parse(rawResponse.slice(jsonStart, jsonEnd))
+            let label = ''
+
+            if (action.type === 'open_lab') {
+              openLab()
+              label = 'Opened Lab'
+            } else if (action.type === 'open_lab_drill') {
+              setLabSuggestion({ topic: action.topic || 'this topic', drillType: 'flashcard', reason: action.reason || 'Aeva queued a drill.' })
+              openLab()
+              label = `Drill queued · ${action.topic || 'topic'}`
+            } else if (action.type === 'add_lab_task') {
+              addOrder({ title: action.title || 'Task', description: action.description || '', subject: action.subject || 'General' })
+              label = `Task added · ${action.title || 'task'}`
+            } else if (action.type === 'open_arcade') {
+              openArcade()
+              label = 'Opened Arcade'
+            } else if (action.type === 'lock_arcade') {
+              useAevaControlStore.getState().lockFeature('arcade', action.reason || '')
+              label = `Arcade locked`
+            } else if (action.type === 'set_mandate') {
+              useAevaControlStore.getState().setMandate(action.topic || '', action.goal || '')
+              label = `Mandate set · ${action.topic || ''}`
+            }
+
+            if (label) {
+              setMessages(prev => {
+                const copy = [...prev]
+                copy[copy.length - 1] = { ...copy[copy.length - 1], aevaAction: { ...action, label } }
+                return copy
+              })
+            }
+          } catch { /* malformed action tag — ignore */ }
+        }
+      }
+      // ────────────────────────────────────────────────────────────────────────
+
       setIsThinking(false)
       setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, streaming: false } : m))
       inputRef.current?.focus()

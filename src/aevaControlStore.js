@@ -1,0 +1,53 @@
+import { create } from 'zustand'
+
+const KEY = 'aeva_control_v1'
+const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) } catch { return null } }
+const save = (s) => { try { localStorage.setItem(KEY, JSON.stringify({ lockedFeatures: s.lockedFeatures, mandate: s.mandate, xpMultiplier: s.xpMultiplier })) } catch {} }
+
+const DEFAULT = {
+  lockedFeatures: {},  // { arcade: { reason: '...' lockedAt: ms } }
+  mandate: null,       // { topic, goal, setAt }
+  xpMultiplier: 1,
+}
+
+export const useAevaControlStore = create((set, get) => ({
+  ...DEFAULT,
+  ...(load() || {}),
+
+  lockFeature: (feature, reason = '') => {
+    set(s => {
+      const updated = { ...s, lockedFeatures: { ...s.lockedFeatures, [feature]: { reason, lockedAt: Date.now() } } }
+      save(updated)
+      return updated
+    })
+  },
+
+  unlockFeature: (feature) => {
+    set(s => {
+      const lf = { ...s.lockedFeatures }
+      delete lf[feature]
+      const updated = { ...s, lockedFeatures: lf }
+      save(updated)
+      return updated
+    })
+  },
+
+  setMandate: (topic, goal) => {
+    set(s => {
+      const updated = { ...s, mandate: { topic, goal, setAt: Date.now() } }
+      save(updated)
+      return updated
+    })
+  },
+
+  clearMandate: () => {
+    set(s => {
+      const updated = { ...s, mandate: null }
+      save(updated)
+      return updated
+    })
+  },
+
+  isLocked: (feature) => !!get().lockedFeatures[feature],
+  getLockReason: (feature) => get().lockedFeatures[feature]?.reason || '',
+}))
