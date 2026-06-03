@@ -10,10 +10,12 @@ import { supabase } from './supabase'
 import { useArcadeStore } from './arcadeStore'
 import { useLabStore } from './labStore'
 import { useAevaControlStore } from './aevaControlStore'
+import { useRoadmapStore } from './roadmapStore'
 import AevaIntervention from './AevaIntervention'
 import { useNeuralStore } from './neuralStore'
 import ArcadeHub from './ArcadeHub'
 import LabHub from './LabHub'
+import RoadmapHub from './RoadmapHub'
 import { ChaosEventBanner, MissionVitalsBar, DebateLogicFeed, ThemedChatBubble, MissionBadge, ProTipBanner } from './SimCockpit'
 import LearningFingerprint from './LearningFingerprint'
 import MemoryPalace from './MemoryPalace'
@@ -1863,6 +1865,7 @@ function MobileBottomBar({ onChat, onLab, onArcade, onDrillCount }) {
 function DashboardView({ onChatOpen, onSignOut }) {
   const { openArcade } = useArcadeStore()
   const { openLab, orders: labOrders } = useLabStore()
+  const { openRoadmapHub } = useRoadmapStore()
   const { getDueCount } = useSRStore()
   const { sessions } = useLibraryStore()
   const { name } = useUser()
@@ -1909,6 +1912,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
       {/* Portals */}
       <ArcadeHub />
       <LabHub />
+      <RoadmapHub />
 
       <div style={{ position: 'relative' }}>
         {/* ── Desktop header (hidden on mobile) ── */}
@@ -1974,6 +1978,12 @@ function DashboardView({ onChatOpen, onSignOut }) {
                           {labBadgeCount}
                         </motion.div>
                       )}
+                    </motion.button>
+
+                    {/* Roadmaps */}
+                    <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={openRoadmapHub}
+                      style={{ ...nb, background: 'rgba(124,58,237,0.18)', border: '1px solid rgba(124,58,237,0.35)', color: 'rgba(255,255,255,0.88)', fontWeight: 600 }}>
+                      <span style={{ fontSize: 12 }}>🗺️</span>Roadmaps
                     </motion.button>
 
                     {/* Arcade — only one that stands out */}
