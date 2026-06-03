@@ -2193,11 +2193,27 @@ function parseInline(text, isLight = false) {
   let key = 0
 
   while (remaining.length > 0) {
+    // Inline math $...$ — checked BEFORE bold/italic so $x*y$ doesn't break on *
+    const mathMatch = remaining.match(/^(.*?)\$([^$\n]+?)\$/)
+    if (mathMatch) {
+      if (mathMatch[1]) parts.push(<span key={key++}>{mathMatch[1]}</span>)
+      try {
+        const html = katex.renderToString(mathMatch[2], { throwOnError: false, displayMode: false })
+        parts.push(
+          <span key={key++} dangerouslySetInnerHTML={{ __html: html }}
+            style={{ verticalAlign: 'middle', display: 'inline-block', padding: '0 1px' }} />
+        )
+      } catch {
+        parts.push(<span key={key++} style={{ fontFamily: 'monospace', fontSize: '0.9em' }}>{mathMatch[2]}</span>)
+      }
+      remaining = remaining.slice(mathMatch[0].length)
+      continue
+    }
     // Bold **text**
     const boldMatch = remaining.match(/^(.*?)\*\*(.+?)\*\*/)
     if (boldMatch) {
       if (boldMatch[1]) parts.push(<span key={key++}>{boldMatch[1]}</span>)
-      parts.push(<strong key={key++} style={{ fontWeight: 700, color: 'inherit' }}>{boldMatch[2]}</strong>)
+      parts.push(<strong key={key++} style={{ fontWeight: 700, color: 'inherit' }}>{parseInline(boldMatch[2], isLight)}</strong>)
       remaining = remaining.slice(boldMatch[0].length)
       continue
     }
@@ -2205,21 +2221,8 @@ function parseInline(text, isLight = false) {
     const italicMatch = remaining.match(/^(.*?)(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/)
     if (italicMatch) {
       if (italicMatch[1]) parts.push(<span key={key++}>{italicMatch[1]}</span>)
-      parts.push(<em key={key++} style={{ opacity: 0.82, fontStyle: 'italic' }}>{italicMatch[2]}</em>)
+      parts.push(<em key={key++} style={{ opacity: 0.82, fontStyle: 'italic' }}>{parseInline(italicMatch[2], isLight)}</em>)
       remaining = remaining.slice(italicMatch[0].length)
-      continue
-    }
-    // Inline math $...$
-    const mathMatch = remaining.match(/^(.*?)\$([^$\n]+?)\$/)
-    if (mathMatch) {
-      if (mathMatch[1]) parts.push(<span key={key++}>{mathMatch[1]}</span>)
-      try {
-        const html = katex.renderToString(mathMatch[2], { throwOnError: false, displayMode: false })
-        parts.push(<span key={key++} dangerouslySetInnerHTML={{ __html: html }} style={{ verticalAlign: 'middle' }} />)
-      } catch {
-        parts.push(<span key={key++} style={{ fontFamily: 'monospace', fontSize: '0.9em' }}>{mathMatch[2]}</span>)
-      }
-      remaining = remaining.slice(mathMatch[0].length)
       continue
     }
     // Inline code `code`
@@ -2361,7 +2364,13 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
       try {
         const html = katex.renderToString(mathContent, { throwOnError: false, displayMode: true })
         elements.push(
-          <div key={`dmath-${startI}`} style={{ overflowX: 'auto', margin: '10px 0', padding: '10px 4px', textAlign: 'center' }}
+          <div key={`dmath-${startI}`}
+            style={{
+              overflowX: 'auto', margin: '12px 0', padding: '14px 16px',
+              textAlign: 'center', borderRadius: 10,
+              background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)',
+              border: isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.08)',
+            }}
             dangerouslySetInnerHTML={{ __html: html }} />
         )
       } catch {
