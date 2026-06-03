@@ -4,6 +4,8 @@ import { X, FlaskConical, ChevronRight, RotateCcw, CheckCircle2, XCircle, ArrowR
 import { DRILLS, DIFFICULTIES, useLabStore } from './labStore'
 import { useNeuralStore } from './neuralStore'
 import { useSRStore } from './srStore'
+import { useRoadmapStore } from './roadmapStore'
+import { useXPStore } from './xpStore'
 
 const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
@@ -135,7 +137,18 @@ Return ONLY this JSON:
 
 /* ═══ DRILL COMPLETE SCREEN ══════════════════════════ */
 function DrillComplete({ score, wrongItems = [], onExit, onRetry, onGoHarder, topic, drillType }) {
-  const { difficulty, setDifficulty } = useLabStore()
+  const { difficulty, setDifficulty, closeLab, exitDrill } = useLabStore()
+  const { activeNodeSession, endNodeSession, completeNode, openRoadmapHub } = useRoadmapStore()
+  const { addXP } = useXPStore()
+
+  const handleNodeDone = () => {
+    completeNode(activeNodeSession.roadmapId, activeNodeSession.nodeId)
+    addXP('DRILL_COMPLETE')
+    endNodeSession()
+    exitDrill()
+    closeLab()
+    openRoadmapHub()
+  }
   const pct = Math.round((score.correct / score.total) * 100)
   const grade = pct >= 90 ? { label: 'Mastery', color: '#4ADE80', emoji: '🏆' }
     : pct >= 70 ? { label: 'Solid', color: '#60A5FA', emoji: '✅' }
@@ -200,6 +213,25 @@ function DrillComplete({ score, wrongItems = [], onExit, onRetry, onGoHarder, to
             Go harder →
           </button>
         </motion.div>
+      )}
+
+      {/* Roadmap node completion — shown when launched from a roadmap */}
+      {activeNodeSession && (
+        <motion.button
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+          whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+          onClick={handleNodeDone}
+          style={{
+            width: '100%', padding: '13px 16px', borderRadius: 13, border: 'none',
+            background: 'linear-gradient(135deg, #16a34a, #22C55E)',
+            boxShadow: '0 4px 16px rgba(34,197,94,0.35)',
+            color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            fontFamily: "'Inter', system-ui, sans-serif",
+          }}>
+          <CheckCircle2 size={16} strokeWidth={2.5} />
+          Done · Next Node
+        </motion.button>
       )}
 
       <div style={{ display: 'flex', gap: 10, width: '100%' }}>
@@ -1842,6 +1874,19 @@ export default function LabHub() {
     currentTopic, drillData, drillLoading,
     orders, setActiveOrderId, startDrill, setDrillData,
   } = useLabStore()
+  const { activeNodeSession, endNodeSession, completeNode, openRoadmapHub } = useRoadmapStore()
+  const { addXP: addXPLab } = useXPStore()
+
+  const handleLabNodeDone = () => {
+    if (activeNodeSession) {
+      completeNode(activeNodeSession.roadmapId, activeNodeSession.nodeId)
+      addXPLab('DRILL_COMPLETE')
+      endNodeSession()
+    }
+    exitDrill()
+    closeLab()
+    openRoadmapHub()
+  }
 
   const inputRef = useRef(null)
 
@@ -1904,8 +1949,25 @@ export default function LabHub() {
                     </div>
                   </div>
                 </div>
-                {/* Right side: scan pill + close */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                {/* Right side: roadmap pill + scan pill + close */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {activeNodeSession && (
+                    <motion.button
+                      initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}
+                      whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                      onClick={handleLabNodeDone}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        padding: '6px 14px', borderRadius: 99, border: 'none',
+                        background: 'linear-gradient(135deg, #16a34a, #22C55E)',
+                        boxShadow: '0 3px 10px rgba(34,197,94,0.35)',
+                        color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                        fontFamily: "'Inter', system-ui, sans-serif",
+                      }}>
+                      <CheckCircle2 size={13} strokeWidth={2.5} />
+                      Done · Next Node
+                    </motion.button>
+                  )}
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 99, background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.22)' }}>
                     <motion.div animate={{ opacity: [0.4, 1, 0.4], scale: [1, 1.2, 1] }} transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
                       style={{ width: 5, height: 5, borderRadius: '50%', background: '#3B82F6', boxShadow: '0 0 6px #3B82F6' }} />

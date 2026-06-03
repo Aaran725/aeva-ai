@@ -67,7 +67,10 @@ Rules:
 
 export default function RoadmapHub() {
   const { roadmapOpen, closeRoadmapHub, roadmaps, getActive } = useRoadmapStore()
-  const [view, setView]         = useState('home') // home | create | generating | path
+  const [view, setView] = useState(() => {
+    const active = useRoadmapStore.getState().getActive()
+    return active?.nodes?.length ? 'path' : 'home'
+  })
   const [pendingForm, setPending] = useState(null)  // holds form data during generation
 
   const active = getActive()
