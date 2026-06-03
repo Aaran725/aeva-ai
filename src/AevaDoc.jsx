@@ -7,7 +7,7 @@
  *   Lens = single maths problem → solve step-by-step or analyse structure
  *   AevaDoc = whole document/homework → free tutoring conversation alongside it
  */
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import katex from 'katex'
 import {
@@ -259,7 +259,7 @@ function DocMarkdown({ text }) {
 
 // ─── Upload Zone ──────────────────────────────────────────────────────────────
 
-function UploadZone({ onFile, dragOver, setDragOver, fileInputRef }) {
+function UploadZone({ onFile, dragOver, setDragOver, fileInputRef, compact = false }) {
   const handleDrop = (e) => {
     e.preventDefault()
     setDragOver(false)
@@ -278,7 +278,7 @@ function UploadZone({ onFile, dragOver, setDragOver, fileInputRef }) {
       style={{
         flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         border: '2px dashed rgba(255,255,255,0.12)', borderRadius: 20,
-        cursor: 'pointer', userSelect: 'none', gap: 16, padding: 40,
+        cursor: 'pointer', userSelect: 'none', gap: compact ? 10 : 16, padding: compact ? 16 : 40,
       }}
     >
       <motion.div
@@ -306,20 +306,33 @@ function UploadZone({ onFile, dragOver, setDragOver, fileInputRef }) {
         Browse files
       </motion.div>
 
-      {/* Distinction note */}
-      <div style={{ marginTop: 8, padding: '8px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.30)', textAlign: 'center', lineHeight: 1.6 }}>
-          <span style={{ color: 'rgba(255,255,255,0.50)', fontWeight: 600 }}>Lens</span> solves a single maths problem •{' '}
-          <span style={{ color: 'rgba(255,255,255,0.50)', fontWeight: 600 }}>Docs</span> tutors you through a whole document
+      {/* Distinction note — desktop only */}
+      {!compact && (
+        <div style={{ marginTop: 8, padding: '8px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.30)', textAlign: 'center', lineHeight: 1.6 }}>
+            <span style={{ color: 'rgba(255,255,255,0.50)', fontWeight: 600 }}>Lens</span> solves a single maths problem •{' '}
+            <span style={{ color: 'rgba(255,255,255,0.50)', fontWeight: 600 }}>Docs</span> tutors you through a whole document
+          </div>
         </div>
-      </div>
+      )}
     </motion.div>
   )
 }
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
+function useIsMobile() {
+  const [mob, setMob] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
+  useEffect(() => {
+    const fn = () => setMob(window.innerWidth < 768)
+    window.addEventListener('resize', fn)
+    return () => window.removeEventListener('resize', fn)
+  }, [])
+  return mob
+}
+
 export default function AevaDoc({ onClose, name = 'Student' }) {
+  const isMobile = useIsMobile()
   const [file, setFile]           = useState(null)
   const [fileUrl, setFileUrl]     = useState(null)
   const [isPdf, setIsPdf]         = useState(false)
@@ -572,21 +585,26 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
       </div>
 
       {/* ── Body ────────────────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: isMobile ? 'column' : 'row', overflow: 'hidden', minHeight: 0 }}>
 
-        {/* ── Left: Document panel ──────────────────────────────────────────── */}
+        {/* ── Doc panel (left on desktop, top on mobile) ────────────────────── */}
         <AnimatePresence initial={false}>
           {!docCollapsed && (
             <motion.div
               key="doc-panel"
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: file ? '55%' : '50%', opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
+              initial={isMobile ? { height: 0, opacity: 0 } : { width: 0, opacity: 0 }}
+              animate={isMobile
+                ? { height: file ? '42%' : '38%', opacity: 1 }
+                : { width: file ? '55%' : '50%', opacity: 1 }
+              }
+              exit={isMobile ? { height: 0, opacity: 0 } : { width: 0, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 280, damping: 30 }}
               style={{
                 flexShrink: 0, overflow: 'hidden',
-                borderRight: '1px solid rgba(255,255,255,0.07)',
+                borderRight: isMobile ? 'none' : '1px solid rgba(255,255,255,0.07)',
+                borderBottom: isMobile ? '1px solid rgba(255,255,255,0.07)' : 'none',
                 display: 'flex', flexDirection: 'column',
+                ...(isMobile ? { width: '100%' } : {}),
               }}
             >
               {/* Hidden file input */}
@@ -605,7 +623,7 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
               <div style={{ flex: 1, padding: 20, display: 'flex', flexDirection: 'column', overflowY: 'auto', minHeight: 0 }}>
                 {!file ? (
                   /* Upload zone */
-                  <UploadZone onFile={handleFile} dragOver={dragOver} setDragOver={setDragOver} fileInputRef={fileInputRef} />
+                  <UploadZone onFile={handleFile} dragOver={dragOver} setDragOver={setDragOver} fileInputRef={fileInputRef} compact={isMobile} />
                 ) : isPdf ? (
                   /* PDF viewer */
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -645,8 +663,8 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
           )}
         </AnimatePresence>
 
-        {/* Collapse toggle (only when file loaded) */}
-        {file && (
+        {/* Collapse toggle (desktop only) */}
+        {file && !isMobile && (
           <motion.button
             whileHover={{ background: 'rgba(255,255,255,0.08)' }}
             onClick={() => setDocCollapsed(p => !p)}
