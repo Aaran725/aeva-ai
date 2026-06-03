@@ -1,13 +1,45 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, TrendingUp, Sigma, GitBranch, Clock3, Table2, HelpCircle,
-  Puzzle, Lightbulb, ChevronDown, LayoutGrid, Sparkles,
+  Puzzle, Lightbulb, ChevronDown, LayoutGrid, Sparkles, Trophy, Target,
 } from 'lucide-react'
 import { Mafs, Coordinates, Plot } from 'mafs'
 import 'mafs/core.css'
 import katex from 'katex'
 import { useCanvasStore } from './canvasStore'
+
+/* ── Groq helper (small model, fast) ────────────────────────────────────── */
+const _CKEYS = [
+  import.meta.env.VITE_GROQ_API_KEY,
+  import.meta.env.VITE_GROQ_API_KEY_2,
+  import.meta.env.VITE_GROQ_API_KEY_3,
+].filter(Boolean)
+let _ci = 0
+const _ck = () => _CKEYS.length ? _CKEYS[_ci++ % _CKEYS.length] : ''
+
+async function canvasExplain(changes, topic) {
+  const key = _ck()
+  if (!key) return null
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [{
+          role: 'user',
+          content: `Topic: "${topic}". Parameter changed: ${changes.join(', ')}. Write exactly ONE sentence under 20 words explaining what this change means visually or mathematically. Be specific with the numbers. No fluff.`,
+        }],
+        temperature: 0.25,
+        max_tokens: 55,
+      }),
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.choices?.[0]?.message?.content?.trim() || null
+  } catch { return null }
+}
 
 /* ── Safe math evaluator ─────────────────────────────────────────────────── */
 function makeFn(expr) {
@@ -26,13 +58,15 @@ function makeFn(expr) {
 
 /* ── Block metadata ──────────────────────────────────────────────────────── */
 const BLOCK_META = {
-  graph:     { Icon: TrendingUp, color: '#818CF8', accent: '#6366F1' },
-  formula:   { Icon: Sigma,      color: '#C4B5FD', accent: '#8B5CF6' },
-  diagram:   { Icon: GitBranch,  color: '#67E8F9', accent: '#06B6D4' },
-  timeline:  { Icon: Clock3,     color: '#FCD34D', accent: '#F59E0B' },
-  table:     { Icon: Table2,     color: '#6EE7B7', accent: '#10B981' },
-  quiz:      { Icon: HelpCircle, color: '#F9A8D4', accent: '#EC4899' },
-  challenge: { Icon: Puzzle,     color: '#FED7AA', accent: '#F97316' },
+  graph:       { Icon: TrendingUp, color: '#818CF8', accent: '#6366F1' },
+  formula:     { Icon: Sigma,      color: '#C4B5FD', accent: '#8B5CF6' },
+  diagram:     { Icon: GitBranch,  color: '#67E8F9', accent: '#06B6D4' },
+  timeline:    { Icon: Clock3,     color: '#FCD34D', accent: '#F59E0B' },
+  table:       { Icon: Table2,     color: '#6EE7B7', accent: '#10B981' },
+  quiz:        { Icon: HelpCircle, color: '#F9A8D4', accent: '#EC4899' },
+  challenge:   { Icon: Puzzle,     color: '#FED7AA', accent: '#F97316' },
+  explanation: { Icon: Sparkles,   color: '#A5F3FC', accent: '#0EA5E9' },
+  mission:     { Icon: Target,     color: '#FDE68A', accent: '#D97706' },
 }
 
 /* ── Card wrapper ────────────────────────────────────────────────────────── */
@@ -898,6 +932,221 @@ function DiagramBlock({ block }) {
   )
 }
 
+/* ── EXPLANATION BLOCK ───────────────────────────────────────────────────── */
+// Shows a static intro text, then AI-regenerates whenever slider values
+// change by ≥1 unit (debounced 1.2 s). This is the "living" Canvas feature.
+function ExplanationBlock({ block, ctx }) {
+  const { text: initial = '', topic = '' } = block
+  const { color, accent } = BLOCK_META.explanation
+
+  const [text, setText]       = useState(initial)
+  const [loading, setLoading] = useState(false)
+  const [wasUpdated, setWasUpdated] = useState(false)
+  const ctxRef  = useRef(ctx)
+  const timerRef = useRef(null)
+
+  useEffect(() => {
+    const prev = ctxRef.current
+    const curr = ctx
+    ctxRef.current = curr
+
+    // Detect significant numeric changes (≥ 0.9 units)
+    const changes = Object.entries(curr)
+      .filter(([k, v]) => typeof v === 'number' && Math.abs(v - (prev[k] ?? v)) >= 0.9)
+      .map(([k, v]) => `${k}: ${(prev[k] ?? v).toFixed(1)} → ${v.toFixed(1)}`)
+
+    if (!changes.length) return
+
+    setLoading(true)
+    setWasUpdated(false)
+    let cancelled = false
+    clearTimeout(timerRef.current)
+
+    timerRef.current = setTimeout(async () => {
+      if (cancelled) return
+      const result = await canvasExplain(changes, topic)
+      if (cancelled) return
+      if (result) { setText(result); setWasUpdated(true) }
+      setLoading(false)
+    }, 1200)
+
+    return () => { cancelled = true; clearTimeout(timerRef.current) }
+  }, [ctx]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <Card block={block}>
+      {/* Live indicator */}
+      {(loading || wasUpdated) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+          {loading ? (
+            <>
+              <motion.div
+                animate={{ opacity: [0.4, 1, 0.4] }}
+                transition={{ duration: 0.9, repeat: Infinity }}
+                style={{ width: 6, height: 6, borderRadius: '50%', background: accent }}
+              />
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: `${accent}cc`, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                Aeva is thinking…
+              </span>
+            </>
+          ) : (
+            <>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: accent, boxShadow: `0 0 6px ${accent}` }} />
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: `${accent}cc`, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                Live update
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Text — shimmer when loading, else real content */}
+      {loading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[100, 85, 55].map((w, i) => (
+            <motion.div key={i}
+              animate={{ opacity: [0.25, 0.55, 0.25] }}
+              transition={{ duration: 1.1, repeat: Infinity, delay: i * 0.12 }}
+              style={{ height: 11, width: `${w}%`, borderRadius: 6, background: 'rgba(255,255,255,0.08)' }}
+            />
+          ))}
+        </div>
+      ) : (
+        <AnimatePresence mode="wait">
+          <motion.p
+            key={text}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            style={{
+              fontSize: 14, lineHeight: 1.7, margin: 0,
+              color: wasUpdated ? '#fff' : 'rgba(255,255,255,0.62)',
+              fontWeight: wasUpdated ? 500 : 400,
+            }}
+          >
+            {text}
+          </motion.p>
+        </AnimatePresence>
+      )}
+    </Card>
+  )
+}
+
+/* ── MISSION BLOCK ───────────────────────────────────────────────────────── */
+function MissionBlock({ block }) {
+  const { goal = '', hint = '', reward = 20 } = block
+  const { color, accent } = BLOCK_META.mission
+  const [showHint, setShowHint] = useState(false)
+  const [done, setDone]         = useState(false)
+
+  const complete = () => {
+    setDone(true)
+    useCanvasStore.getState().updateMastery(reward)
+    useCanvasStore.getState().setAevaHint({
+      text: `Mission complete! +${reward}% mastery. Explore what else you can discover.`,
+      type: 'praise',
+    })
+  }
+
+  return (
+    <Card block={block}>
+      {done ? (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          style={{ textAlign: 'center', padding: '10px 0 6px' }}
+        >
+          <motion.div
+            initial={{ scale: 0 }} animate={{ scale: [0, 1.25, 1] }}
+            transition={{ type: 'spring', stiffness: 300, damping: 18 }}
+            style={{ fontSize: 44, marginBottom: 12 }}
+          >
+            🏆
+          </motion.div>
+          <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', marginBottom: 4 }}>
+            Mission Complete
+          </div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 16px', borderRadius: 99, background: `${accent}18`, border: `1px solid ${accent}35`, marginBottom: 16 }}>
+            <Trophy size={13} color={color} />
+            <span style={{ fontSize: 13, fontWeight: 800, color }}> +{reward}% mastery</span>
+          </div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.40)' }}>
+            Keep exploring — try changing parameters and see what happens.
+          </div>
+        </motion.div>
+      ) : (
+        <>
+          {/* Goal */}
+          <div style={{
+            padding: '14px 16px', borderRadius: 14, marginBottom: 14,
+            background: `${accent}09`, border: `1px solid ${accent}22`,
+          }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: accent, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>
+              Your goal
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.82)', lineHeight: 1.6 }}>
+              {goal}
+            </div>
+          </div>
+
+          {/* Hint */}
+          {hint && (
+            <>
+              <button onClick={() => setShowHint(h => !h)} style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: 'none', border: 'none', cursor: 'pointer',
+                padding: '4px 0', marginBottom: 10, fontFamily: 'inherit',
+              }}>
+                <Lightbulb size={13} color={`${accent}aa`} />
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: `${accent}cc` }}>
+                  {showHint ? 'Hide hint' : 'Show hint'}
+                </span>
+              </button>
+              <AnimatePresence>
+                {showHint && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                    style={{ overflow: 'hidden', marginBottom: 14 }}
+                  >
+                    <div style={{
+                      padding: '10px 14px', borderRadius: 11,
+                      background: `${accent}08`, border: `1px solid ${accent}20`,
+                      fontSize: 13, color: 'rgba(255,255,255,0.52)', lineHeight: 1.6,
+                    }}>
+                      💡 {hint}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </>
+          )}
+
+          {/* Reward + Complete */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Trophy size={13} color={color} />
+              <span style={{ fontSize: 12.5, fontWeight: 700, color, fontFamily: 'monospace' }}>+{reward}% mastery</span>
+            </div>
+            <motion.button
+              whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+              onClick={complete}
+              style={{
+                padding: '10px 22px', borderRadius: 12,
+                background: `linear-gradient(135deg, ${accent}, ${color}99)`,
+                border: 'none', color: '#07080e',
+                fontSize: 13.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              Mark Complete ✓
+            </motion.button>
+          </div>
+        </>
+      )}
+    </Card>
+  )
+}
+
 /* ── Block router ────────────────────────────────────────────────────────── */
 function renderBlock(block, ctx, onUpdate, i) {
   const key   = `${block.type}-${i}`
@@ -908,9 +1157,11 @@ function renderBlock(block, ctx, onUpdate, i) {
     case 'timeline':  return <TimelineBlock  key={key} {...props} />
     case 'table':     return <TableBlock     key={key} {...props} />
     case 'quiz':      return <QuizBlock      key={key} {...props} />
-    case 'challenge': return <ChallengeBlock key={key} {...props} />
-    case 'diagram':   return <DiagramBlock   key={key} {...props} />
-    default:          return null
+    case 'challenge':   return <ChallengeBlock   key={key} {...props} />
+    case 'diagram':     return <DiagramBlock     key={key} {...props} />
+    case 'explanation': return <ExplanationBlock key={key} {...props} />
+    case 'mission':     return <MissionBlock     key={key} {...props} />
+    default:            return null
   }
 }
 

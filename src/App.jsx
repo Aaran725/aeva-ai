@@ -394,6 +394,14 @@ table — sortable comparison table
 diagram — flowchart with arrows (positions as % of a 100×100 grid)
 {"type":"diagram","title":"Photosynthesis","nodes":[{"id":"s","label":"Sunlight","x":50,"y":15},{"id":"c","label":"Chlorophyll","x":50,"y":50},{"id":"g","label":"Glucose","x":50,"y":85}],"edges":[{"from":"s","to":"c","label":"absorbed"},{"from":"c","to":"g","label":"produces"}]}
 
+explanation — reactive text block that AI-updates automatically when sliders change (ALWAYS include when there's a graph block)
+{"type":"explanation","title":"What's Happening","topic":"Linear Equations","text":"A slope of 2 means the line rises 2 units for every 1 unit to the right. The y-intercept of 3 is where the line crosses the y-axis."}
+The topic field is required — it's used to generate live contextual updates when the student moves sliders. Keep text short (1-2 sentences).
+
+mission — a concrete goal the student should try using the canvas blocks above
+{"type":"mission","title":"Try This","goal":"Drag the slope slider to −3 and observe how the line changes direction","hint":"Negative slope means the line falls from left to right","reward":20}
+Always add a mission when there's a graph/formula block. Make the goal specific and achievable with the current canvas blocks.
+
 CROSS-BLOCK SYNC: When graph has params and formula has variables with the SAME keys (e.g. both use "m" and "b"), the slider in graph automatically updates the formula display. Always match keys when pairing graph+formula.
 
 ⚡VIZ (inline static graph only — rarely needed):
