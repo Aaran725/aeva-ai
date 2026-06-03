@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText } from 'lucide-react'
+import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText, BookOpen, Zap, Target, ClipboardList, Check, Lock } from 'lucide-react'
 import { useRoadmapStore } from './roadmapStore'
 import { useLabStore } from './labStore'
 import { useXPStore } from './xpStore'
@@ -427,17 +427,17 @@ Rules: 2-4 tasks. Focus on current topic. If weak areas exist, add a review task
 
 /* ── Node config ─────────────────────────────────────────────────────────── */
 const NODE_CFG = {
-  learn: { label: 'Learn with Aeva', color: '#6366F1', bg: 'rgba(99,102,241,0.18)', emoji: '📖' },
-  drill: { label: 'Drill',           color: '#F97316', bg: 'rgba(249,115,22,0.18)',  emoji: '⚡' },
-  check: { label: 'Knowledge Check', color: '#8B5CF6', bg: 'rgba(139,92,246,0.18)', emoji: '🎯' },
-  mock:  { label: 'Mock Test',       color: '#EF4444', bg: 'rgba(239,68,68,0.18)',   emoji: '📝' },
+  learn: { label: 'Learn with Aeva', color: '#6366F1', light: '#818CF8', shadow: '#3730A3', Icon: BookOpen },
+  drill: { label: 'Drill',           color: '#F97316', light: '#FB923C', shadow: '#9A3412', Icon: Zap },
+  check: { label: 'Knowledge Check', color: '#8B5CF6', light: '#A78BFA', shadow: '#5B21B6', Icon: Target },
+  mock:  { label: 'Mock Test',       color: '#EF4444', light: '#F87171', shadow: '#991B1B', Icon: ClipboardList },
 }
 
 /* X position pattern — creates the winding snake */
-const X_PATTERN = [50, 68, 74, 63, 50, 37, 26, 37]
-const NODE_SPACING = 118  // px between nodes vertically
-const NODE_R       = 32   // node circle radius
-const TOP_PAD      = 24
+const X_PATTERN = [50, 65, 72, 62, 50, 38, 28, 38]
+const NODE_SPACING = 148  // px between nodes vertically
+const NODE_R       = 38   // node circle radius (76px diameter)
+const TOP_PAD      = 32
 
 function PathView() {
   const { getActive, completeNode } = useRoadmapStore()
@@ -475,7 +475,7 @@ function PathView() {
   const completed   = nodes.filter(n => n.status === 'complete').length
   const daysLeft    = Math.max(0, Math.ceil((new Date(roadmap.examDate) - Date.now()) / 86400000))
   const available   = nodes.find(n => n.status === 'available')
-  const containerH  = nodes.length * NODE_SPACING + TOP_PAD + 80
+  const containerH  = nodes.length * NODE_SPACING + TOP_PAD + 120
 
   const getX = (i) => (X_PATTERN[i % X_PATTERN.length] / 100) * cw
   const getY = (i) => i * NODE_SPACING + TOP_PAD + NODE_R
@@ -551,6 +551,7 @@ function PathView() {
               {(missionTasks.length > 0 ? missionTasks : ['learn','drill','check'].map((type,i) => ({ id: `t${i}`, type, topic: available?.topic, label: NODE_CFG[type].label, status: 'pending' }))).map(task => {
                 const cfg = NODE_CFG[task.type] || NODE_CFG.learn
                 const done = task.status === 'complete'
+                const TaskIcon = cfg.Icon
                 return (
                   <motion.button key={task.id}
                     whileHover={!done ? { scale: 1.02, background: 'rgba(255,255,255,0.14)' } : {}}
@@ -564,7 +565,9 @@ function PathView() {
                       cursor: done ? 'default' : 'pointer', fontFamily: 'inherit', textAlign: 'left',
                       opacity: done ? 0.7 : 1,
                     }}>
-                    <span style={{ fontSize: 15 }}>{done ? '✓' : cfg.emoji}</span>
+                    <div style={{ width: 28, height: 28, borderRadius: 8, background: done ? 'rgba(74,222,128,0.18)' : `${cfg.color}28`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {done ? <Check size={14} color="#4ADE80" strokeWidth={3} /> : <TaskIcon size={14} color={cfg.color} strokeWidth={2.2} />}
+                    </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: done ? '#4ADE80' : '#fff' }}>{task.label}</div>
                       <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>{task.topic}</div>
@@ -585,16 +588,24 @@ function PathView() {
 
       {/* ── Path ─────────────────────────────────────────────────────────── */}
       <div ref={containerRef} style={{ flex: 1, position: 'relative', minHeight: containerH, margin: '24px 0 40px' }}>
-        {/* SVG connecting lines */}
+        {/* SVG connecting curves */}
         <svg style={{ position: 'absolute', inset: 0, width: '100%', height: containerH, pointerEvents: 'none' }}>
           {nodes.slice(0, -1).map((node, i) => {
-            const x1 = getX(i), y1 = getY(i)
+            const x1 = getX(i),     y1 = getY(i)
             const x2 = getX(i + 1), y2 = getY(i + 1)
+            const cy = (y1 + y2) / 2
+            const d  = `M ${x1} ${y1} C ${x1} ${cy} ${x2} ${cy} ${x2} ${y2}`
             const done = node.status === 'complete'
             return (
-              <line key={i} x1={x1} y1={y1} x2={x2} y2={y2}
-                stroke={done ? 'rgba(74,222,128,0.55)' : 'rgba(99,102,241,0.22)'}
-                strokeWidth={3} strokeDasharray="7 5" strokeLinecap="round" />
+              <g key={i}>
+                {/* Rail — faint background track */}
+                <path d={d} fill="none"
+                  stroke="rgba(255,255,255,0.07)" strokeWidth={5} strokeLinecap="round" />
+                {/* Progress line */}
+                <path d={d} fill="none"
+                  stroke={done ? 'rgba(74,222,128,0.60)' : 'rgba(99,102,241,0.30)'}
+                  strokeWidth={4} strokeDasharray="8 6" strokeLinecap="round" />
+              </g>
             )
           })}
         </svg>
@@ -603,47 +614,57 @@ function PathView() {
         {nodes.map((node, i) => {
           const x = getX(i), y = getY(i)
           const cfg = NODE_CFG[node.type] || NODE_CFG.learn
+          const { Icon } = cfg
           const isComplete  = node.status === 'complete'
           const isAvailable = node.status === 'available'
           const isSelected  = selected?.id === node.id
 
+          // 3D gradient + bottom shadow colours
+          const nodeBg     = isComplete ? 'linear-gradient(180deg,#86EFAC 0%,#22C55E 55%,#15803D 100%)'
+            : isAvailable  ? `linear-gradient(180deg,${cfg.light} 0%,${cfg.color} 55%,${cfg.shadow} 100%)`
+            :                'linear-gradient(180deg,#4B5563 0%,#374151 55%,#1F2937 100%)'
+          const nodeShadow = isComplete ? '0 7px 0 #166534, 0 14px 28px rgba(34,197,94,0.30)'
+            : isAvailable  ? `0 7px 0 ${cfg.shadow}, 0 14px 28px ${cfg.color}44`
+            :                '0 5px 0 #111827'
+
           return (
             <div key={node.id} style={{ position: 'absolute', left: x, top: y, transform: 'translate(-50%, -50%)', zIndex: isSelected ? 10 : 1 }}>
-              {/* Glow ring on available */}
+              {/* Soft glow behind available node */}
               {isAvailable && (
-                <motion.div animate={{ scale: [1, 1.35, 1], opacity: [0.4, 0.7, 0.4] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  style={{ position: 'absolute', inset: -10, borderRadius: '50%', background: `radial-gradient(circle, ${cfg.color}40 0%, transparent 70%)`, pointerEvents: 'none' }} />
+                <motion.div animate={{ opacity: [0.45, 0.75, 0.45] }} transition={{ duration: 2.2, repeat: Infinity }}
+                  style={{ position: 'absolute', inset: -14, borderRadius: '50%', background: `radial-gradient(circle, ${cfg.color}50 0%, transparent 70%)`, pointerEvents: 'none' }} />
               )}
 
-              {/* Circle */}
+              {/* 3D circle */}
               <motion.button
-                whileHover={isAvailable || isComplete ? { scale: 1.10 } : {}}
-                whileTap={isAvailable ? { scale: 0.94 } : {}}
+                whileHover={isAvailable || isComplete ? { translateY: -2, boxShadow: isComplete ? '0 9px 0 #166534, 0 18px 32px rgba(34,197,94,0.35)' : `0 9px 0 ${cfg.shadow}, 0 18px 32px ${cfg.color}55` } : {}}
+                whileTap={isAvailable ? { translateY: 3, boxShadow: isComplete ? '0 4px 0 #166534' : `0 4px 0 ${cfg.shadow}` } : {}}
                 onClick={() => isAvailable ? setSelected(isSelected ? null : node) : null}
                 style={{
                   width: NODE_R * 2, height: NODE_R * 2, borderRadius: '50%',
-                  background: isComplete ? 'linear-gradient(135deg,#16a34a,#4ADE80)'
-                    : isAvailable ? `linear-gradient(135deg,${cfg.color},${cfg.color}cc)`
-                    : 'rgba(255,255,255,0.08)',
-                  border: isComplete ? '3px solid rgba(74,222,128,0.60)'
-                    : isAvailable ? `3px solid ${cfg.color}`
-                    : '3px solid rgba(255,255,255,0.12)',
-                  boxShadow: isAvailable ? `0 0 20px ${cfg.color}55` : isComplete ? '0 0 16px rgba(74,222,128,0.35)' : 'none',
+                  background: nodeBg, border: 'none',
+                  boxShadow: nodeShadow,
                   cursor: isAvailable ? 'pointer' : 'default',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 16, transition: 'all 0.25s',
+                  opacity: (!isComplete && !isAvailable) ? 0.55 : 1,
+                  transition: 'opacity 0.2s',
                 }}>
-                {isComplete ? '✓' : cfg.emoji}
+                {isComplete
+                  ? <Check size={22} color="#fff" strokeWidth={3} />
+                  : isAvailable
+                    ? <Icon size={20} color="#fff" strokeWidth={2.2} />
+                    : <Lock size={16} color="rgba(255,255,255,0.55)" strokeWidth={2} />
+                }
               </motion.button>
 
               {/* Topic label */}
               <div style={{
-                position: 'absolute', top: NODE_R * 2 + 6,
+                position: 'absolute', top: NODE_R * 2 + 14,
                 left: '50%', transform: 'translateX(-50%)',
                 whiteSpace: 'nowrap', textAlign: 'center',
-                fontSize: 11, fontWeight: isAvailable ? 700 : 500,
-                color: isComplete ? '#4ADE80' : isAvailable ? '#fff' : 'rgba(255,255,255,0.30)',
+                fontSize: 11.5, fontWeight: isAvailable ? 700 : 500,
+                color: isComplete ? '#4ADE80' : isAvailable ? '#fff' : 'rgba(255,255,255,0.28)',
+                letterSpacing: isAvailable ? '-0.01em' : 0,
               }}>
                 {node.topic}
               </div>
