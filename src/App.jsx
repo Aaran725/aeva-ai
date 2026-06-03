@@ -3072,13 +3072,15 @@ function ChatView({ onBack }) {
   }, [input])
 
   // Fire any roadmap-triggered chat prompt (learn node → curated Aeva session)
+  const pendingChatPrompt = useAevaControlStore(s => s.pendingChatPrompt)
+  const clearPendingChatPrompt = useAevaControlStore(s => s.clearPendingChatPrompt)
   useEffect(() => {
-    const { pendingChatPrompt, clearPendingChatPrompt } = useAevaControlStore.getState()
     if (!pendingChatPrompt) return
+    const text = pendingChatPrompt
     clearPendingChatPrompt()
-    setTimeout(() => sendWithText(pendingChatPrompt), 120)
+    setTimeout(() => sendWithText(text), 120)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [pendingChatPrompt])
 
   const toggleSocratic = () => {
     setSocraticActive(prev => {
