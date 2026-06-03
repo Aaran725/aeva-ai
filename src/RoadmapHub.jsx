@@ -11,38 +11,54 @@ const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 
 async function generateRoadmapNodes(title, examDate, assessmentInfo) {
   const daysLeft = Math.max(1, Math.ceil((new Date(examDate) - Date.now()) / 86400000))
-  const prompt = `You are Aeva, an AI tutor. Generate a structured exam preparation roadmap.
+  const prompt = `You are Aeva, an expert AI tutor. Generate a comprehensive exam preparation roadmap engineered to achieve 90%+ on the test.
 
 Exam: "${title}"
 Date: ${examDate} (${daysLeft} days away)${assessmentInfo ? `\n\nAssessment info:\n${assessmentInfo}` : ''}
 
 Return ONLY valid JSON:
 {
-  "overview": "2-sentence description of what this exam covers and what matters most",
+  "overview": "2-sentence description: what this exam tests and the critical factors for scoring 90%+",
   "nodes": [
     {
       "id": "n1",
       "topic": "Topic Name",
       "type": "learn",
-      "difficulty": 2,
+      "phase": "Foundation",
+      "difficulty": 1,
       "estimatedMinutes": 20,
       "xp": 50,
-      "description": "One sentence: what the student gains from this step"
+      "description": "One sentence: exactly what the student will learn or practise in this step"
     }
   ]
 }
 
-Rules:
-- 10-14 nodes total
-- Cover all major topics from the assessment info (or infer from title)
-- Each main topic: 1 learn node + 1 drill node minimum
-- type must be one of: learn, drill, check, mock
-- First node: type "learn", easiest foundational topic
-- Last node: type "mock"
-- difficulty 1-5
-- xp: learn=50, drill=30, check=40, mock=100
-- Topic names: 2-4 words max
-- Order by prerequisites (foundations first)`
+CRITICAL RULES — follow exactly. Deviating reduces exam score:
+
+NODE COUNT: 18-22 nodes total. More is better than fewer.
+
+PHASES — every node must have a phase, exactly one of:
+  "Foundation"  — essential background without which nothing else works (2-4 nodes, type=learn only)
+  "Core Topics" — deep coverage of every major exam topic (10-14 nodes)
+  "Practice"    — cross-topic application and harder problems (3-5 nodes)
+  "Exam Prep"   — exam technique and full mock (2-3 nodes)
+
+CORE TOPICS RULE (most important): For EVERY major topic that could appear on the exam, create exactly 3 nodes in this order:
+  1. learn  — understand the concept (difficulty 2-3)
+  2. drill  — rapid-fire recall practice (difficulty 2-3)
+  3. check  — short-answer quiz to confirm mastery (difficulty 3-4)
+Do NOT skip any of the 3 for any major topic. This is what delivers 90%+.
+
+FIXED STRUCTURE:
+  - Node 1: type="learn", phase="Foundation", difficulty=1, most foundational concept
+  - Second-to-last node: type="learn", topic="Exam Strategy & Technique", phase="Exam Prep", description="Timing plans, command word interpretation, common mark-scheme traps, and how to maximise marks under pressure."
+  - Last node: type="mock", phase="Exam Prep", difficulty=5, xp=100
+
+TYPE VALUES: exactly one of: learn, drill, check, mock
+DIFFICULTY: Foundation=1-2, Core Topics=2-3, Practice=3-4, Exam Prep=4-5
+XP: learn=50, drill=30, check=40, mock=100
+TOPIC NAMES: 3-6 words, specific not vague (e.g. "Quadratic Formula & Discriminant" not "Algebra")
+ORDER: strict prerequisites — foundational concepts always before applications`
 
   const res = await fetch(GROQ_URL, {
     method: 'POST',
@@ -51,8 +67,8 @@ Rules:
       model: 'llama-3.3-70b-versatile',
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
-      temperature: 0.4,
-      max_tokens: 1800,
+      temperature: 0.3,
+      max_tokens: 3200,
     }),
   })
   const data = await res.json()
@@ -754,6 +770,18 @@ function PathView() {
                             }}>
                             Go again
                           </motion.button>
+                        </div>
+                      ) : node.type === 'mock' && roadmap.readiness < 60 ? (
+                        /* Readiness gate — mock locked until 60% */
+                        <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.22)' }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 700, color: '#F87171', marginBottom: 4 }}>🔒 Not ready yet</div>
+                          <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.40)', lineHeight: 1.55 }}>
+                            Complete more steps to reach <span style={{ color: '#F87171', fontWeight: 700 }}>60% readiness</span> before the mock. You're at {roadmap.readiness}% now.
+                          </div>
+                          <div style={{ marginTop: 10, height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                            <div style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg,#F97316,#EF4444)', width: `${(roadmap.readiness / 60) * 100}%`, transition: 'width 0.5s ease' }} />
+                          </div>
+                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginTop: 4, textAlign: 'right' }}>{roadmap.readiness}/60% needed</div>
                         </div>
                       ) : (
                         /* Not started yet — launch button */
