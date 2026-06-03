@@ -298,27 +298,27 @@ function FlashcardDrill({ data, topic, onExit }) {
         </div>
       </div>
 
-      {/* Card */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', perspective: 1000 }}>
+      {/* Card — large centered */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', perspective: 1200, minHeight: 300 }}>
         <motion.div
           onClick={() => setFlipped(f => !f)}
           animate={{ rotateY: flipped ? 180 : 0 }}
-          transition={{ duration: 0.45, ease: 'easeInOut' }}
-          style={{ width: '100%', minHeight: 200, position: 'relative', transformStyle: 'preserve-3d', cursor: 'pointer' }}
+          transition={{ duration: 0.50, ease: [0.4, 0, 0.2, 1] }}
+          style={{ width: '100%', maxWidth: 560, minHeight: 280, position: 'relative', transformStyle: 'preserve-3d', cursor: 'pointer' }}
         >
           {/* Front */}
-          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.28)', borderRadius: 20, padding: '28px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 12 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(59,130,246,0.70)', textTransform: 'uppercase' }}>Question</span>
-            <p style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.92)', lineHeight: 1.55, margin: 0, fontFamily: "'Inter', system-ui, sans-serif" }}>
+          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.28)', borderRadius: 24, padding: '40px 36px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 16 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(59,130,246,0.70)', textTransform: 'uppercase' }}>Question</span>
+            <p style={{ fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.94)', lineHeight: 1.5, margin: 0, fontFamily: "'Inter', system-ui, sans-serif" }}>
               {card?.front}
             </p>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', marginTop: 8 }}>tap to reveal</span>
+            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.26)', marginTop: 4 }}>tap to reveal</span>
           </div>
 
           {/* Back */}
-          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: 'rgba(6,182,212,0.10)', border: '1px solid rgba(6,182,212,0.30)', borderRadius: 20, padding: '28px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 12 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(6,182,212,0.70)', textTransform: 'uppercase' }}>Answer</span>
-            <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.88)', lineHeight: 1.65, margin: 0, fontFamily: "'Georgia', serif" }}>
+          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: 'rgba(6,182,212,0.10)', border: '1px solid rgba(6,182,212,0.30)', borderRadius: 24, padding: '40px 36px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 16 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(6,182,212,0.70)', textTransform: 'uppercase' }}>Answer</span>
+            <p style={{ fontSize: 18, color: 'rgba(255,255,255,0.90)', lineHeight: 1.65, margin: 0, fontFamily: "'Georgia', serif" }}>
               {card?.back}
             </p>
           </div>
@@ -326,20 +326,20 @@ function FlashcardDrill({ data, topic, onExit }) {
       </div>
 
       {/* Keyboard hint */}
-      <div style={{ textAlign: 'center', fontSize: 10.5, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.04em' }}>
+      <div style={{ textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,0.20)', letterSpacing: '0.04em' }}>
         ⌨ Space · ← Missed · → Got it
       </div>
 
       {/* Actions */}
       <AnimatePresence>
         {flipped && (
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            style={{ display: 'flex', gap: 10 }}>
-            <button onClick={() => handleResult('missed')} style={{ flex: 1, padding: '13px', borderRadius: 14, border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.12)', color: '#FCA5A5', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
-              <XCircle size={15} /> Missed it
+          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            style={{ display: 'flex', gap: 12, maxWidth: 480, margin: '0 auto', width: '100%' }}>
+            <button onClick={() => handleResult('missed')} style={{ flex: 1, padding: '15px', borderRadius: 16, border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.12)', color: '#FCA5A5', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <XCircle size={16} /> Missed it
             </button>
-            <button onClick={() => handleResult('got')} style={{ flex: 1, padding: '13px', borderRadius: 14, border: '1px solid rgba(74,222,128,0.35)', background: 'rgba(74,222,128,0.12)', color: '#86EFAC', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
-              <CheckCircle2 size={15} /> Got it
+            <button onClick={() => handleResult('got')} style={{ flex: 1, padding: '15px', borderRadius: 16, border: '1px solid rgba(74,222,128,0.35)', background: 'rgba(74,222,128,0.12)', color: '#86EFAC', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <CheckCircle2 size={16} /> Got it
             </button>
           </motion.div>
         )}
@@ -601,58 +601,67 @@ function SpeedRoundDrill({ data, topic, onExit }) {
   const card = cards[idx]
   const pct = (idx / cards.length) * 100
   const timerColor = timeLeft > 10 ? '#F97316' : timeLeft > 5 ? '#FBBF24' : '#EF4444'
+  const RING_R = 22
+  const RING_C = 2 * Math.PI * RING_R
+  const ringOffset = RING_C * (1 - timeLeft / 15)
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, padding: '0 4px' }}>
-      {/* Header: progress + timer */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ flex: 1, height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.07)' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 18 }}>
+      {/* Header: progress + SVG ring timer */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ flex: 1, height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.07)' }}>
           <motion.div animate={{ width: `${pct}%` }} transition={{ duration: 0.3 }}
             style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #F97316, #FB923C)' }} />
         </div>
-        <motion.div
-          key={timeLeft}
-          animate={timeLeft <= 5 ? { scale: [1, 1.2, 1] } : {}}
-          transition={{ duration: 0.3 }}
-          style={{
-            minWidth: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: `${timerColor}18`, border: `1.5px solid ${timerColor}50`,
-            fontSize: 18, fontWeight: 800, color: timerColor, fontFamily: 'monospace', flexShrink: 0,
-          }}
-        >{timeLeft}</motion.div>
+        {/* SVG ring timer */}
+        <motion.div animate={timeLeft <= 5 ? { scale: [1, 1.12, 1] } : {}} transition={{ duration: 0.3 }}
+          style={{ flexShrink: 0, position: 'relative', width: 56, height: 56 }}>
+          <svg width={56} height={56} style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)' }}>
+            <circle cx={28} cy={28} r={RING_R} fill="none" stroke={`${timerColor}22`} strokeWidth={4} />
+            <motion.circle
+              cx={28} cy={28} r={RING_R} fill="none"
+              stroke={timerColor} strokeWidth={4}
+              strokeLinecap="round"
+              strokeDasharray={RING_C}
+              animate={{ strokeDashoffset: ringOffset }}
+              transition={{ duration: 0.5, ease: 'linear' }}
+            />
+          </svg>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: timerColor, fontFamily: 'monospace' }}>{timeLeft}</div>
+        </motion.div>
       </div>
 
       {/* Card */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', perspective: 1000 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', perspective: 1200, minHeight: 260 }}>
         <motion.div
           onClick={() => { if (!flipped) { clearInterval(timerRef.current); setFlipped(true) } }}
           animate={{ rotateY: flipped ? 180 : 0 }}
-          transition={{ duration: 0.4, ease: 'easeInOut' }}
-          style={{ width: '100%', minHeight: 180, position: 'relative', transformStyle: 'preserve-3d', cursor: flipped ? 'default' : 'pointer' }}
+          transition={{ duration: 0.45, ease: 'easeInOut' }}
+          style={{ width: '100%', maxWidth: 560, minHeight: 240, position: 'relative', transformStyle: 'preserve-3d', cursor: flipped ? 'default' : 'pointer' }}
         >
-          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: timedOut ? 'rgba(239,68,68,0.10)' : 'rgba(249,115,22,0.10)', border: `1px solid ${timedOut ? 'rgba(239,68,68,0.30)' : 'rgba(249,115,22,0.28)'}`, borderRadius: 20, padding: '24px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 10 }}>
-            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(249,115,22,0.70)', textTransform: 'uppercase' }}>
+          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: timedOut ? 'rgba(239,68,68,0.10)' : 'rgba(249,115,22,0.10)', border: `1px solid ${timedOut ? 'rgba(239,68,68,0.30)' : 'rgba(249,115,22,0.28)'}`, borderRadius: 24, padding: '36px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 14 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(249,115,22,0.70)', textTransform: 'uppercase' }}>
               {idx + 1} / {cards.length}
             </span>
-            <p style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.92)', lineHeight: 1.55, margin: 0 }}>{card?.front}</p>
-            {!flipped && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)' }}>tap to reveal</span>}
+            <p style={{ fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.94)', lineHeight: 1.50, margin: 0 }}>{card?.front}</p>
+            {!flipped && <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.26)' }}>tap to reveal</span>}
           </div>
-          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: 'rgba(6,182,212,0.10)', border: '1px solid rgba(6,182,212,0.28)', borderRadius: 20, padding: '24px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 10 }}>
-            {timedOut && <span style={{ fontSize: 10, fontWeight: 700, color: '#F87171', letterSpacing: '0.10em', textTransform: 'uppercase' }}>⏱ Time's up</span>}
-            <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.88)', lineHeight: 1.65, margin: 0 }}>{card?.back}</p>
+          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: 'rgba(6,182,212,0.10)', border: '1px solid rgba(6,182,212,0.28)', borderRadius: 24, padding: '36px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 14 }}>
+            {timedOut && <span style={{ fontSize: 11, fontWeight: 700, color: '#F87171', letterSpacing: '0.10em', textTransform: 'uppercase' }}>⏱ Time's up</span>}
+            <p style={{ fontSize: 18, color: 'rgba(255,255,255,0.90)', lineHeight: 1.65, margin: 0 }}>{card?.back}</p>
           </div>
         </motion.div>
       </div>
 
       <AnimatePresence>
         {flipped && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            style={{ display: 'flex', gap: 10 }}>
-            <button onClick={() => handleResult('missed')} style={{ flex: 1, padding: '12px', borderRadius: 14, border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.12)', color: '#FCA5A5', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              <XCircle size={14} /> Missed
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            style={{ display: 'flex', gap: 12, maxWidth: 480, margin: '0 auto', width: '100%' }}>
+            <button onClick={() => handleResult('missed')} style={{ flex: 1, padding: '14px', borderRadius: 16, border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.12)', color: '#FCA5A5', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+              <XCircle size={15} /> Missed
             </button>
-            <button onClick={() => handleResult('got')} style={{ flex: 1, padding: '12px', borderRadius: 14, border: '1px solid rgba(74,222,128,0.35)', background: 'rgba(74,222,128,0.12)', color: '#86EFAC', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              <CheckCircle2 size={14} /> Got it
+            <button onClick={() => handleResult('got')} style={{ flex: 1, padding: '14px', borderRadius: 16, border: '1px solid rgba(74,222,128,0.35)', background: 'rgba(74,222,128,0.12)', color: '#86EFAC', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+              <CheckCircle2 size={15} /> Got it
             </button>
           </motion.div>
         )}
@@ -730,7 +739,8 @@ function MockTestDrill({ data, topic, onExit }) {
         </p>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+      {/* 2×2 options grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         {q?.options.map((opt, i) => {
           const isSelected = selected === i
           const isCorrect = selected !== null && i === q.correct
@@ -738,40 +748,53 @@ function MockTestDrill({ data, topic, onExit }) {
           return (
             <motion.button
               key={i}
-              whileHover={selected === null ? { scale: 1.015 } : {}}
-              whileTap={selected === null ? { scale: 0.985 } : {}}
+              whileHover={selected === null ? { scale: 1.02, y: -2 } : {}}
+              whileTap={selected === null ? { scale: 0.98 } : {}}
               onClick={() => choose(i)}
               style={{
-                padding: '13px 16px', borderRadius: 12, textAlign: 'left',
+                padding: '18px 16px', borderRadius: 16, textAlign: 'left',
                 cursor: selected === null ? 'pointer' : 'default',
-                fontSize: 14, fontWeight: 500, lineHeight: 1.4,
+                fontSize: 14, fontWeight: 500, lineHeight: 1.45,
                 fontFamily: "'Inter', system-ui, sans-serif",
-                background: isCorrect ? 'rgba(74,222,128,0.14)' : isWrong ? 'rgba(239,68,68,0.14)' : isSelected ? 'rgba(6,182,212,0.14)' : 'rgba(255,255,255,0.05)',
-                border: isCorrect ? '1px solid rgba(74,222,128,0.40)' : isWrong ? '1px solid rgba(239,68,68,0.40)' : isSelected ? '1px solid rgba(6,182,212,0.40)' : '1px solid rgba(255,255,255,0.10)',
-                color: isCorrect ? '#86EFAC' : isWrong ? '#FCA5A5' : 'rgba(255,255,255,0.80)',
+                background: isCorrect ? 'rgba(74,222,128,0.14)' : isWrong ? 'rgba(239,68,68,0.14)' : 'rgba(255,255,255,0.05)',
+                border: isCorrect ? '1.5px solid rgba(74,222,128,0.50)' : isWrong ? '1.5px solid rgba(239,68,68,0.50)' : '1px solid rgba(255,255,255,0.10)',
+                color: isCorrect ? '#86EFAC' : isWrong ? '#FCA5A5' : 'rgba(255,255,255,0.82)',
                 transition: 'all 0.15s',
+                display: 'flex', alignItems: 'flex-start', gap: 10,
               }}
             >
-              <span style={{ fontWeight: 700, marginRight: 10, opacity: 0.55 }}>
-                {['A', 'B', 'C', 'D'][i]}.
+              <span style={{ fontWeight: 800, fontSize: 13, color: isCorrect ? '#4ADE80' : isWrong ? '#F87171' : 'rgba(255,255,255,0.30)', flexShrink: 0, marginTop: 1 }}>
+                {['A', 'B', 'C', 'D'][i]}
               </span>
-              {opt}
+              <span>{opt}</span>
             </motion.button>
           )
         })}
       </div>
 
-      {selected !== null && (
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-          <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.45)', marginBottom: 10, lineHeight: 1.55, fontStyle: 'italic' }}>
-            {q?.explanation}
-          </div>
-          <button onClick={next} style={{ width: '100%', padding: '13px', borderRadius: 13, background: 'linear-gradient(135deg, rgba(6,182,212,0.25), rgba(59,130,246,0.20))', border: '1px solid rgba(6,182,212,0.40)', color: 'rgba(255,255,255,0.92)', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
-            {idx + 1 === questions.length ? 'See Results' : 'Next Question'}
-            <ArrowRight size={14} />
-          </button>
-        </motion.div>
-      )}
+      {/* Explanation slides up after answer */}
+      <AnimatePresence>
+        {selected !== null && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, marginTop: 0 }}
+            animate={{ opacity: 1, height: 'auto', marginTop: 4 }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.28, ease: 'easeOut' }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div style={{ padding: '14px 16px', borderRadius: 14, background: selected === q.correct ? 'rgba(74,222,128,0.08)' : 'rgba(239,68,68,0.08)', border: `1px solid ${selected === q.correct ? 'rgba(74,222,128,0.22)' : 'rgba(239,68,68,0.22)'}`, marginBottom: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: selected === q.correct ? '#4ADE80' : '#F87171', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>
+                {selected === q.correct ? '✓ Correct' : '✗ Incorrect'}
+              </div>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.68)', lineHeight: 1.6 }}>{q?.explanation}</div>
+            </div>
+            <button onClick={next} style={{ width: '100%', padding: '14px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(6,182,212,0.22), rgba(59,130,246,0.18))', border: '1px solid rgba(6,182,212,0.40)', color: 'rgba(255,255,255,0.92)', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+              {idx + 1 === questions.length ? 'See Results' : 'Next Question'}
+              <ArrowRight size={14} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -815,18 +838,24 @@ function FeynmanDrill({ data, topic, onExit }) {
         <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(139,92,246,0.10)', border: '1px solid rgba(139,92,246,0.22)', fontSize: 13.5, color: 'rgba(255,255,255,0.80)', lineHeight: 1.60 }}>
           {result.feedback}
         </div>
-        {/* Covered */}
-        {result.covered?.length > 0 && (
+        {/* Key-point chips lit up: green = covered, red = missing */}
+        {(result.covered?.length > 0 || result.missing?.length > 0) && (
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#4ADE80', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 6 }}>✓ You covered</div>
-            {result.covered.map((p, i) => <div key={i} style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.65)', marginBottom: 4, paddingLeft: 10, borderLeft: '2px solid rgba(74,222,128,0.4)' }}>{p}</div>)}
-          </div>
-        )}
-        {/* Missing */}
-        {result.missing?.length > 0 && (
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#F87171', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 6 }}>✗ You missed</div>
-            {result.missing.map((p, i) => <div key={i} style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.65)', marginBottom: 4, paddingLeft: 10, borderLeft: '2px solid rgba(239,68,68,0.4)' }}>{p}</div>)}
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(139,92,246,0.60)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 10 }}>Key Points</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+              {(result.covered || []).map((p, i) => (
+                <motion.div key={`c${i}`} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: i * 0.06 }}
+                  style={{ padding: '6px 13px', borderRadius: 99, fontSize: 12.5, fontWeight: 600, background: 'rgba(74,222,128,0.14)', border: '1px solid rgba(74,222,128,0.40)', color: '#86EFAC', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <CheckCircle2 size={12} /> {p}
+                </motion.div>
+              ))}
+              {(result.missing || []).map((p, i) => (
+                <motion.div key={`m${i}`} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: (result.covered?.length || 0) * 0.06 + i * 0.06 }}
+                  style={{ padding: '6px 13px', borderRadius: 99, fontSize: 12.5, fontWeight: 600, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#FCA5A5', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <XCircle size={12} /> {p}
+                </motion.div>
+              ))}
+            </div>
           </div>
         )}
         <div style={{ display: 'flex', gap: 10, paddingTop: 8 }}>
@@ -842,14 +871,29 @@ function FeynmanDrill({ data, topic, onExit }) {
   }
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(139,92,246,0.10)', border: '1px solid rgba(139,92,246,0.22)' }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(139,92,246,0.80)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 6 }}>Feynman Challenge</div>
-        <p style={{ fontSize: 14.5, fontWeight: 600, color: 'rgba(255,255,255,0.92)', lineHeight: 1.55, margin: 0 }}>{data.prompt}</p>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ padding: '16px 18px', borderRadius: 16, background: 'rgba(139,92,246,0.10)', border: '1px solid rgba(139,92,246,0.22)' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(139,92,246,0.80)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 8 }}>Feynman Challenge</div>
+        <p style={{ fontSize: 15.5, fontWeight: 600, color: 'rgba(255,255,255,0.94)', lineHeight: 1.55, margin: 0 }}>{data.prompt}</p>
       </div>
-      <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.38)', lineHeight: 1.5 }}>
+      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
         Write as if teaching someone with zero background. Simple language, real examples, no jargon. Aeva will find the gaps.
       </div>
+
+      {/* Key-point reference chips */}
+      {data.keyPoints?.length > 0 && (
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(139,92,246,0.55)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 7 }}>Cover these points →</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {data.keyPoints.map((pt, i) => (
+              <div key={i} style={{ padding: '5px 12px', borderRadius: 99, fontSize: 12, fontWeight: 500, background: 'rgba(139,92,246,0.10)', border: '1px solid rgba(139,92,246,0.22)', color: 'rgba(167,139,250,0.70)' }}>
+                {pt}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <textarea
         ref={textareaRef}
         value={explanation}
@@ -857,14 +901,14 @@ function FeynmanDrill({ data, topic, onExit }) {
         placeholder="Start explaining..."
         autoFocus
         style={{
-          flex: 1, minHeight: 160, padding: '14px 16px', borderRadius: 14,
+          flex: 1, minHeight: 200, padding: '16px 18px', borderRadius: 16,
           background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(139,92,246,0.25)',
-          color: 'rgba(255,255,255,0.88)', fontSize: 14, lineHeight: 1.65,
+          color: 'rgba(255,255,255,0.88)', fontSize: 14.5, lineHeight: 1.70,
           fontFamily: "'Inter', system-ui, sans-serif", resize: 'none', outline: 'none',
         }}
       />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 11, color: wordCount < 20 ? 'rgba(255,255,255,0.28)' : 'rgba(139,92,246,0.70)', fontWeight: 500 }}>
+        <span style={{ fontSize: 12, color: wordCount < 20 ? 'rgba(255,255,255,0.28)' : 'rgba(139,92,246,0.70)', fontWeight: 500 }}>
           {wordCount} words {wordCount < 20 ? `(${20 - wordCount} more to unlock)` : '— ready to grade'}
         </span>
         <motion.button
@@ -873,7 +917,7 @@ function FeynmanDrill({ data, topic, onExit }) {
           onClick={handleSubmit}
           disabled={wordCount < 20 || grading}
           style={{
-            padding: '10px 20px', borderRadius: 12,
+            padding: '11px 22px', borderRadius: 13,
             background: wordCount >= 20 ? 'linear-gradient(135deg, rgba(139,92,246,0.35), rgba(99,102,241,0.25))' : 'rgba(255,255,255,0.05)',
             border: `1px solid ${wordCount >= 20 ? 'rgba(139,92,246,0.45)' : 'rgba(255,255,255,0.08)'}`,
             color: wordCount >= 20 ? '#C4B5FD' : 'rgba(255,255,255,0.25)',
@@ -900,6 +944,7 @@ function ClozeDrill({ data, topic, onExit }) {
   const [inputs, setInputs] = useState(Array(answers.length).fill(''))
   const [submitted, setSubmitted] = useState(false)
   const [results, setResults] = useState([])
+  const [shownHints, setShownHints] = useState({})
 
   const handleSubmit = () => {
     const res = answers.map((ans, i) => ({
@@ -930,42 +975,66 @@ function ClozeDrill({ data, topic, onExit }) {
 
   let blankIdx = 0
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 22 }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(16,185,129,0.70)', letterSpacing: '0.10em', textTransform: 'uppercase' }}>Fill the Gaps — {topic}</div>
-      <div style={{ padding: '18px 20px', borderRadius: 16, background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.20)', lineHeight: 2.0, fontSize: 14.5, color: 'rgba(255,255,255,0.82)' }}>
+      <div style={{ padding: '20px 22px', borderRadius: 18, background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.20)', lineHeight: 2.2, fontSize: 15, color: 'rgba(255,255,255,0.85)' }}>
         {parts.map((part, pi) => {
           const idx = blankIdx
           if (pi < parts.length - 1) blankIdx++
+          const res = submitted ? results[idx] : null
+          const inputColor = res?.correct ? 'rgba(74,222,128,0.22)' : res ? 'rgba(239,68,68,0.18)' : 'rgba(16,185,129,0.12)'
+          const borderColor = res?.correct ? 'rgba(74,222,128,0.55)' : res ? 'rgba(239,68,68,0.50)' : 'rgba(16,185,129,0.35)'
+          const textColor = res?.correct ? '#86EFAC' : res ? '#FCA5A5' : 'rgba(255,255,255,0.90)'
           return (
             <span key={pi}>
               {part}
               {pi < parts.length - 1 && (
-                <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', margin: '0 3px', verticalAlign: 'middle' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, margin: '0 4px', verticalAlign: 'middle' }}>
                   <input
-                    value={inputs[idx] || ''}
-                    onChange={e => setInputs(prev => { const n = [...prev]; n[idx] = e.target.value; return n })}
-                    placeholder={hints[idx] ? `(${hints[idx]})` : '…'}
+                    value={submitted ? (results[idx]?.correct ? inputs[idx] : `${inputs[idx]} (${answers[idx]})`) : (inputs[idx] || '')}
+                    onChange={e => !submitted && setInputs(prev => { const n = [...prev]; n[idx] = e.target.value; return n })}
+                    readOnly={submitted}
+                    placeholder="…"
                     style={{
-                      width: Math.max(90, (answers[idx]?.length || 8) * 9),
-                      padding: '3px 8px', borderRadius: 6,
-                      background: 'rgba(16,185,129,0.12)', border: '1.5px solid rgba(16,185,129,0.35)',
-                      color: 'rgba(255,255,255,0.90)', fontSize: 13.5, fontFamily: 'monospace',
-                      outline: 'none', textAlign: 'center',
+                      width: Math.max(100, (answers[idx]?.length || 8) * 10),
+                      padding: '3px 10px', borderRadius: 8,
+                      background: inputColor, border: `1.5px solid ${borderColor}`,
+                      color: textColor, fontSize: 13.5, fontFamily: 'monospace',
+                      outline: 'none', textAlign: 'center', transition: 'all 0.2s',
                     }}
                   />
+                  {/* Hint button — only before submit */}
+                  {!submitted && hints[idx] && (
+                    <button
+                      onClick={() => setShownHints(h => ({ ...h, [idx]: !h[idx] }))}
+                      title="Show hint"
+                      style={{ width: 20, height: 20, borderRadius: '50%', border: '1px solid rgba(16,185,129,0.35)', background: 'rgba(16,185,129,0.10)', color: 'rgba(16,185,129,0.70)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 700 }}>
+                      ?
+                    </button>
+                  )}
+                  {!submitted && shownHints[idx] && (
+                    <span style={{ fontSize: 11, color: 'rgba(16,185,129,0.60)', fontStyle: 'italic', whiteSpace: 'nowrap' }}>{hints[idx]}</span>
+                  )}
                 </span>
               )}
             </span>
           )
         })}
       </div>
-      <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.28)', textAlign: 'center' }}>
-        {inputs.filter(v => v.trim()).length} / {answers.length} filled
-      </div>
+      {!submitted && (
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.30)', textAlign: 'center' }}>
+          {inputs.filter(v => v.trim()).length} / {answers.length} filled
+        </div>
+      )}
+      {submitted && (
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', textAlign: 'center' }}>
+          {results.filter(r => r.correct).length}/{answers.length} correct — blanks shown in <span style={{ color: '#86EFAC' }}>green</span> or <span style={{ color: '#FCA5A5' }}>red with correction</span>
+        </div>
+      )}
       <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
         onClick={handleSubmit}
-        disabled={inputs.some(v => !v.trim())}
-        style={{ padding: '13px', borderRadius: 14, background: inputs.every(v => v.trim()) ? 'rgba(16,185,129,0.20)' : 'rgba(255,255,255,0.05)', border: `1px solid ${inputs.every(v => v.trim()) ? 'rgba(16,185,129,0.40)' : 'rgba(255,255,255,0.09)'}`, color: inputs.every(v => v.trim()) ? '#6EE7B7' : 'rgba(255,255,255,0.25)', fontSize: 14, fontWeight: 700, cursor: inputs.every(v => v.trim()) ? 'pointer' : 'not-allowed', fontFamily: "'Inter', system-ui, sans-serif" }}>
+        disabled={inputs.some(v => !v.trim()) || submitted}
+        style={{ padding: '14px', borderRadius: 16, background: inputs.every(v => v.trim()) && !submitted ? 'rgba(16,185,129,0.20)' : 'rgba(255,255,255,0.05)', border: `1px solid ${inputs.every(v => v.trim()) && !submitted ? 'rgba(16,185,129,0.40)' : 'rgba(255,255,255,0.09)'}`, color: inputs.every(v => v.trim()) && !submitted ? '#6EE7B7' : 'rgba(255,255,255,0.25)', fontSize: 14, fontWeight: 700, cursor: inputs.every(v => v.trim()) && !submitted ? 'pointer' : 'not-allowed', fontFamily: "'Inter', system-ui, sans-serif" }}>
         Check My Answers
       </motion.button>
     </div>
@@ -997,26 +1066,39 @@ function ShortAnswerDrill({ data, topic, onExit }) {
   const [answers, setAnswers] = useState(Array(questions.length).fill(''))
   const [grades, setGrades] = useState([])
   const [grading, setGrading] = useState(false)
+  const [currentGrade, setCurrentGrade] = useState(null) // inline feedback for current Q
   const [done, setDone] = useState(false)
+
+  const GRADE_COL = { Excellent: '#4ADE80', Good: '#60A5FA', Partial: '#FBBF24', Weak: '#F87171' }
 
   const handleGrade = async () => {
     const q = questions[idx]
     setGrading(true)
     try {
       const result = await gradeShortAnswer(currentTopic, q.q, q.modelAnswer, q.keyPoints, answers[idx])
+      setCurrentGrade(result)
       const newGrades = [...grades, result]
       setGrades(newGrades)
       if (idx + 1 >= questions.length) {
-        const avg = Math.round(newGrades.reduce((s, g) => s + g.score, 0) / newGrades.length)
         const correct = newGrades.filter(g => g.score >= 70).length
         setDrillScore({ correct, total: questions.length })
         recordDrillResult({ topic: currentTopic, drillType: 'shortanswer', correct, total: questions.length })
-        setDone(true)
-      } else {
-        setIdx(i => i + 1)
       }
-    } catch { setGrades(g => [...g, { score: 0, covered: [], missing: q.keyPoints, feedback: 'Could not grade.', grade: 'Weak' }]) }
+    } catch {
+      const fallback = { score: 0, covered: [], missing: q.keyPoints, feedback: 'Could not grade.', grade: 'Weak' }
+      setCurrentGrade(fallback)
+      setGrades(g => [...g, fallback])
+    }
     setGrading(false)
+  }
+
+  const handleNext = () => {
+    setCurrentGrade(null)
+    if (idx + 1 >= questions.length) {
+      setDone(true)
+    } else {
+      setIdx(i => i + 1)
+    }
   }
 
   if (done) {
@@ -1027,61 +1109,89 @@ function ShortAnswerDrill({ data, topic, onExit }) {
         wrongItems={grades.filter(g => g.score < 70).map((g, i) => ({ q: questions[i]?.q || '', correct: g.feedback }))}
         topic={topic} drillType="shortanswer"
         onExit={onExit}
-        onRetry={() => { setIdx(0); setAnswers(Array(questions.length).fill('')); setGrades([]); setDone(false) }}
+        onRetry={() => { setIdx(0); setAnswers(Array(questions.length).fill('')); setGrades([]); setCurrentGrade(null); setDone(false) }}
         onGoHarder={onExit}
       />
     )
   }
 
   const q = questions[idx]
-  const lastGrade = grades[idx - 1]
-  const GRADE_COL = { Excellent: '#4ADE80', Good: '#60A5FA', Partial: '#FBBF24', Weak: '#F87171' }
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(245,158,11,0.70)', letterSpacing: '0.10em', textTransform: 'uppercase' }}>Short Answer — {idx + 1}/{questions.length}</span>
-        {grades.length > 0 && <span style={{ fontSize: 11, fontWeight: 700, color: '#60A5FA' }}>Avg: {Math.round(grades.reduce((s, g) => s + g.score, 0) / grades.length)}%</span>}
+        {grades.length > 0 && <span style={{ fontSize: 12, fontWeight: 700, color: '#60A5FA' }}>Avg: {Math.round(grades.reduce((s, g) => s + g.score, 0) / grades.length)}%</span>}
       </div>
 
-      {/* Previous grade feedback */}
+      <div style={{ padding: '16px 18px', borderRadius: 16, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(245,158,11,0.60)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Question</div>
+        <div style={{ fontSize: 15, color: 'rgba(255,255,255,0.90)', lineHeight: 1.6, fontWeight: 500 }}>{q?.q}</div>
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {q?.keyPoints?.map((pt, i) => (
+          <div key={i} style={{ padding: '4px 10px', borderRadius: 99, fontSize: 11.5, fontWeight: 500, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.20)', color: 'rgba(252,211,77,0.60)' }}>{pt}</div>
+        ))}
+      </div>
+
+      <textarea
+        value={answers[idx] || ''}
+        onChange={e => !currentGrade && setAnswers(prev => { const n = [...prev]; n[idx] = e.target.value; return n })}
+        readOnly={!!currentGrade}
+        placeholder="Write your answer here — aim for 2-4 clear sentences…"
+        rows={5}
+        style={{ resize: currentGrade ? 'none' : 'vertical', padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.05)', border: '1.5px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.85)', fontSize: 14, fontFamily: "'Inter', system-ui, sans-serif", lineHeight: 1.65, outline: 'none' }}
+        onFocus={e => !currentGrade && (e.target.style.borderColor = 'rgba(245,158,11,0.40)')}
+        onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.10)'}
+      />
+
+      {/* Inline grade feedback */}
       <AnimatePresence>
-        {lastGrade && (
-          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: `1px solid ${GRADE_COL[lastGrade.grade] || '#60A5FA'}33` }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: GRADE_COL[lastGrade.grade] || '#60A5FA' }}>{lastGrade.grade} ({lastGrade.score}%) — </span>
-            <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.55)' }}>{lastGrade.feedback}</span>
+        {currentGrade && (
+          <motion.div initial={{ opacity: 0, y: 10, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0 }}
+            style={{ overflow: 'hidden' }}>
+            <div style={{ padding: '16px 18px', borderRadius: 16, background: `${GRADE_COL[currentGrade.grade] || '#60A5FA'}12`, border: `1px solid ${GRADE_COL[currentGrade.grade] || '#60A5FA'}35`, marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: 15, fontWeight: 800, color: GRADE_COL[currentGrade.grade] || '#60A5FA' }}>{currentGrade.grade}</span>
+                <span style={{ fontSize: 22, fontWeight: 800, color: GRADE_COL[currentGrade.grade] || '#60A5FA' }}>{currentGrade.score}%</span>
+              </div>
+              <div style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.72)', lineHeight: 1.6, marginBottom: 10 }}>{currentGrade.feedback}</div>
+              {/* Covered/missing chips */}
+              {(currentGrade.covered?.length > 0 || currentGrade.missing?.length > 0) && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                  {(currentGrade.covered || []).map((pt, i) => (
+                    <span key={i} style={{ padding: '3px 10px', borderRadius: 99, fontSize: 11.5, fontWeight: 600, background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.30)', color: '#86EFAC', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <CheckCircle2 size={11} /> {pt}
+                    </span>
+                  ))}
+                  {(currentGrade.missing || []).map((pt, i) => (
+                    <span key={i} style={{ padding: '3px 10px', borderRadius: 99, fontSize: 11.5, fontWeight: 600, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.28)', color: '#FCA5A5', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <XCircle size={11} /> {pt}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+              onClick={handleNext}
+              style={{ width: '100%', padding: '14px', borderRadius: 14, background: 'rgba(245,158,11,0.18)', border: '1px solid rgba(245,158,11,0.38)', color: '#FCD34D', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: "'Inter', system-ui, sans-serif" }}>
+              {idx + 1 < questions.length ? 'Next Question →' : 'See Results'}
+            </motion.button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)' }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(245,158,11,0.60)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Question</div>
-        <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.88)', lineHeight: 1.6, fontWeight: 500 }}>{q?.q}</div>
-      </div>
-
-      <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.28)' }}>Key points to cover: {q?.keyPoints?.join(' · ')}</div>
-
-      <textarea
-        value={answers[idx] || ''}
-        onChange={e => setAnswers(prev => { const n = [...prev]; n[idx] = e.target.value; return n })}
-        placeholder="Write your answer here — aim for 2-4 clear sentences…"
-        rows={5}
-        style={{ resize: 'vertical', padding: '12px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1.5px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.85)', fontSize: 13.5, fontFamily: "'Inter', system-ui, sans-serif", lineHeight: 1.6, outline: 'none' }}
-        onFocus={e => e.target.style.borderColor = 'rgba(245,158,11,0.40)'}
-        onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.10)'}
-      />
-
-      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-        onClick={handleGrade}
-        disabled={!answers[idx]?.trim() || grading}
-        style={{ padding: '13px', borderRadius: 14, background: answers[idx]?.trim() ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.05)', border: `1px solid ${answers[idx]?.trim() ? 'rgba(245,158,11,0.38)' : 'rgba(255,255,255,0.09)'}`, color: answers[idx]?.trim() ? '#FCD34D' : 'rgba(255,255,255,0.25)', fontSize: 14, fontWeight: 700, cursor: answers[idx]?.trim() && !grading ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: "'Inter', system-ui, sans-serif" }}>
-        {grading ? (
-          <><motion.div animate={{ rotate: 360 }} transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }} style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(252,211,77,0.2)', borderTopColor: '#FCD34D' }} /> Grading…</>
-        ) : (
-          idx + 1 < questions.length ? 'Submit & Next →' : 'Submit & See Results'
-        )}
-      </motion.button>
+      {!currentGrade && (
+        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+          onClick={handleGrade}
+          disabled={!answers[idx]?.trim() || grading}
+          style={{ padding: '14px', borderRadius: 14, background: answers[idx]?.trim() ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.05)', border: `1px solid ${answers[idx]?.trim() ? 'rgba(245,158,11,0.38)' : 'rgba(255,255,255,0.09)'}`, color: answers[idx]?.trim() ? '#FCD34D' : 'rgba(255,255,255,0.25)', fontSize: 14, fontWeight: 700, cursor: answers[idx]?.trim() && !grading ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: "'Inter', system-ui, sans-serif" }}>
+          {grading ? (
+            <><motion.div animate={{ rotate: 360 }} transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }} style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(252,211,77,0.2)', borderTopColor: '#FCD34D' }} /> Grading…</>
+          ) : 'Submit Answer'}
+        </motion.button>
+      )}
     </div>
   )
 }
@@ -1147,9 +1257,9 @@ function MatchGridDrill({ data, topic, onExit }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, flex: 1 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         {/* Terms column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {terms.map((term, i) => {
             const isMatched = matched.includes(term)
             const isSel = selectedTerm === i
@@ -1157,19 +1267,22 @@ function MatchGridDrill({ data, topic, onExit }) {
             return (
               <motion.button
                 key={term}
-                whileHover={!isMatched ? { scale: 1.02 } : {}}
+                whileHover={!isMatched ? { scale: 1.02, y: -2 } : {}}
                 whileTap={!isMatched ? { scale: 0.97 } : {}}
+                animate={isWrong_ ? { x: [0, -8, 8, -6, 6, -3, 3, 0] } : {}}
+                transition={isWrong_ ? { duration: 0.45, ease: 'easeInOut' } : {}}
                 onClick={() => !isMatched && setSelectedTerm(i === selectedTerm ? null : i)}
                 style={{
-                  padding: '10px 12px', borderRadius: 10, textAlign: 'left',
-                  fontSize: 12.5, fontWeight: 700, lineHeight: 1.35,
+                  padding: '14px 16px', borderRadius: 14, textAlign: 'left',
+                  fontSize: 13.5, fontWeight: 700, lineHeight: 1.35,
                   fontFamily: "'Inter', system-ui, sans-serif",
                   cursor: isMatched ? 'default' : 'pointer',
                   opacity: isMatched ? 0.45 : 1,
                   background: isMatched ? 'rgba(74,222,128,0.12)' : isWrong_ ? 'rgba(239,68,68,0.18)' : isSel ? 'rgba(236,72,153,0.22)' : 'rgba(255,255,255,0.06)',
-                  border: isMatched ? '1px solid rgba(74,222,128,0.30)' : isWrong_ ? '1px solid rgba(239,68,68,0.45)' : isSel ? '1px solid rgba(236,72,153,0.55)' : '1px solid rgba(255,255,255,0.10)',
-                  color: isMatched ? '#86EFAC' : isSel ? '#F9A8D4' : 'rgba(255,255,255,0.82)',
-                  transition: 'all 0.15s',
+                  border: isMatched ? '1.5px solid rgba(74,222,128,0.35)' : isWrong_ ? '1.5px solid rgba(239,68,68,0.50)' : isSel ? '1.5px solid rgba(236,72,153,0.60)' : '1px solid rgba(255,255,255,0.10)',
+                  color: isMatched ? '#86EFAC' : isSel ? '#F9A8D4' : 'rgba(255,255,255,0.85)',
+                  transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+                  minHeight: 56,
                 }}
               >
                 {term}
@@ -1179,7 +1292,7 @@ function MatchGridDrill({ data, topic, onExit }) {
         </div>
 
         {/* Definitions column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {defs.map((def, i) => {
             const matchedTerm = pairs.find(p => p.definition === def)?.term
             const isMatched = matched.includes(matchedTerm)
@@ -1188,20 +1301,22 @@ function MatchGridDrill({ data, topic, onExit }) {
             return (
               <motion.button
                 key={def}
-                whileHover={!isMatched ? { scale: 1.02 } : {}}
+                whileHover={!isMatched ? { scale: 1.02, y: -2 } : {}}
                 whileTap={!isMatched ? { scale: 0.97 } : {}}
+                animate={isWrong_ ? { x: [0, -8, 8, -6, 6, -3, 3, 0] } : {}}
+                transition={isWrong_ ? { duration: 0.45, ease: 'easeInOut' } : {}}
                 onClick={() => !isMatched && setSelectedDef(i === selectedDef ? null : i)}
                 style={{
-                  padding: '10px 12px', borderRadius: 10, textAlign: 'left',
-                  fontSize: 11.5, fontWeight: 500, lineHeight: 1.45,
+                  padding: '14px 16px', borderRadius: 14, textAlign: 'left',
+                  fontSize: 12.5, fontWeight: 500, lineHeight: 1.50,
                   fontFamily: "'Georgia', serif",
                   cursor: isMatched ? 'default' : 'pointer',
                   opacity: isMatched ? 0.45 : 1,
                   background: isMatched ? 'rgba(74,222,128,0.08)' : isWrong_ ? 'rgba(239,68,68,0.14)' : isSel ? 'rgba(236,72,153,0.16)' : 'rgba(255,255,255,0.04)',
-                  border: isMatched ? '1px solid rgba(74,222,128,0.25)' : isWrong_ ? '1px solid rgba(239,68,68,0.40)' : isSel ? '1px solid rgba(236,72,153,0.48)' : '1px solid rgba(255,255,255,0.08)',
-                  color: isMatched ? '#86EFAC' : isSel ? '#F9A8D4' : 'rgba(255,255,255,0.65)',
-                  transition: 'all 0.15s',
-                  flex: 1,
+                  border: isMatched ? '1.5px solid rgba(74,222,128,0.28)' : isWrong_ ? '1.5px solid rgba(239,68,68,0.45)' : isSel ? '1.5px solid rgba(236,72,153,0.50)' : '1px solid rgba(255,255,255,0.08)',
+                  color: isMatched ? '#86EFAC' : isSel ? '#F9A8D4' : 'rgba(255,255,255,0.68)',
+                  transition: 'background 0.15s, border-color 0.15s, color 0.15s',
+                  minHeight: 56,
                 }}
               >
                 {def}
@@ -1744,98 +1859,92 @@ export default function LabHub() {
     <AnimatePresence>
       {labOpen && (
         <>
-          {/* Backdrop */}
-          <motion.div
-            key="lab-backdrop"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            onClick={() => { if (!activeDrill) closeLab() }}
-            style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(4,6,20,0.55)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
-          />
-
-          {/* Panel */}
+          {/* Full-screen Lab */}
           <motion.div
             key="lab-panel"
-            initial={{ x: '-100%', opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: '-100%', opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+            initial={{ opacity: 0, scale: 0.985 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.985 }}
+            transition={{ duration: 0.20, ease: 'easeOut' }}
             style={{
-              position: 'fixed', top: 0, left: 0, bottom: 0,
-              width: 'min(520px, 96vw)', zIndex: 201,
-              background: 'rgba(6,8,24,0.82)',
-              backdropFilter: 'blur(48px)', WebkitBackdropFilter: 'blur(48px)',
-              borderRight: '1px solid rgba(59,130,246,0.14)',
-              boxShadow: '20px 0 80px rgba(0,0,0,0.55)',
+              position: 'fixed', inset: 0, zIndex: 201,
+              background: 'rgb(5,7,22)',
               display: 'flex', flexDirection: 'column',
               fontFamily: "'Inter', system-ui, sans-serif",
+              overflow: 'hidden',
             }}
           >
             {/* Glow accents */}
-            <div aria-hidden style={{ position: 'absolute', top: -40, left: -40, width: 240, height: 240, borderRadius: '50%', background: 'radial-gradient(circle, rgba(59,130,246,0.18) 0%, transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
-            <div aria-hidden style={{ position: 'absolute', bottom: -30, right: -30, width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle, rgba(6,182,212,0.12) 0%, transparent 70%)', filter: 'blur(35px)', pointerEvents: 'none' }} />
+            <div aria-hidden style={{ position: 'absolute', top: -80, left: '10%', width: 420, height: 420, borderRadius: '50%', background: 'radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%)', filter: 'blur(60px)', pointerEvents: 'none' }} />
+            <div aria-hidden style={{ position: 'absolute', bottom: -80, right: '8%', width: 360, height: 360, borderRadius: '50%', background: 'radial-gradient(circle, rgba(6,182,212,0.08) 0%, transparent 70%)', filter: 'blur(50px)', pointerEvents: 'none' }} />
 
             {/* Header */}
-            <div style={{ padding: '26px 22px 16px', borderBottom: '1px solid rgba(59,130,246,0.10)', flexShrink: 0, position: 'relative', zIndex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: 11, background: 'linear-gradient(135deg, #1D4ED8, #0891B2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <FlaskConical size={16} color="white" />
+            <div style={{ borderBottom: '1px solid rgba(59,130,246,0.10)', flexShrink: 0, position: 'relative', zIndex: 1 }}>
+              <div style={{ maxWidth: 1100, margin: '0 auto', padding: '18px 32px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                {/* Logo */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 12, background: 'linear-gradient(135deg, #1D4ED8, #0891B2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <FlaskConical size={17} color="white" />
                   </div>
                   <div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.03em' }}>Training Lab</div>
+                    <div style={{ fontSize: 17, fontWeight: 800, color: 'rgba(255,255,255,0.94)', letterSpacing: '-0.03em' }}>Training Lab</div>
                     <div style={{ fontSize: 11, color: 'rgba(59,130,246,0.70)', marginTop: 1, fontWeight: 600 }}>
                       {activeDrill ? `${DRILLS[activeDrill]?.title} — ${currentTopic}` : 'Drill & Mastery Hub'}
                     </div>
                   </div>
                 </div>
-                <motion.button whileHover={{ scale: 1.08, rotate: 90 }} whileTap={{ scale: 0.92 }}
-                  onClick={() => { exitDrill(); closeLab() }}
-                  style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(255,255,255,0.45)' }}>
-                  <X size={14} />
-                </motion.button>
-              </div>
-
-              {/* Scan indicator */}
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 99, background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.22)' }}>
-                <motion.div animate={{ opacity: [0.4, 1, 0.4], scale: [1, 1.2, 1] }} transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-                  style={{ width: 5, height: 5, borderRadius: '50%', background: '#3B82F6', boxShadow: '0 0 6px #3B82F6' }} />
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#60A5FA', letterSpacing: '0.10em', textTransform: 'uppercase' }}>Scan Mode Active</span>
+                {/* Right side: scan pill + close */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 99, background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.22)' }}>
+                    <motion.div animate={{ opacity: [0.4, 1, 0.4], scale: [1, 1.2, 1] }} transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+                      style={{ width: 5, height: 5, borderRadius: '50%', background: '#3B82F6', boxShadow: '0 0 6px #3B82F6' }} />
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#60A5FA', letterSpacing: '0.10em', textTransform: 'uppercase' }}>Scan Mode</span>
+                  </div>
+                  <motion.button whileHover={{ scale: 1.08, rotate: 90 }} whileTap={{ scale: 0.92 }}
+                    onClick={() => { exitDrill(); closeLab() }}
+                    style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(255,255,255,0.50)' }}>
+                    <X size={15} />
+                  </motion.button>
+                </div>
               </div>
             </div>
 
             {/* Tab bar */}
             {!activeDrill && (
-              <div style={{ display: 'flex', padding: '10px 18px 0', gap: 2, borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0, position: 'relative', zIndex: 1 }}>
-                {tabs.map(tab => {
-                  const isActive = labTab === tab.id
-                  return (
-                    <button key={tab.id} onClick={() => setLabTab(tab.id)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 5,
-                        padding: '7px 12px', borderRadius: '8px 8px 0 0',
-                        background: isActive ? 'rgba(59,130,246,0.12)' : 'transparent',
-                        border: 'none', borderBottom: isActive ? '2px solid #3B82F6' : '2px solid transparent',
-                        color: isActive ? '#60A5FA' : 'rgba(255,255,255,0.38)',
-                        fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                        transition: 'all 0.15s', position: 'relative',
-                        fontFamily: "'Inter', system-ui, sans-serif",
-                      }}>
-                      {tab.icon}
-                      {tab.label}
-                      {tab.badge && (
-                        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400 }}
-                          style={{ minWidth: 16, height: 16, borderRadius: 99, background: '#4ADE80', color: '#0a160a', fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px', marginLeft: 2 }}>
-                          {tab.badge}
-                        </motion.div>
-                      )}
-                    </button>
-                  )
-                })}
+              <div style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0, position: 'relative', zIndex: 1 }}>
+                <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 28px', display: 'flex', gap: 2 }}>
+                  {tabs.map(tab => {
+                    const isActive = labTab === tab.id
+                    return (
+                      <button key={tab.id} onClick={() => setLabTab(tab.id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          padding: '10px 16px', borderRadius: '10px 10px 0 0',
+                          background: isActive ? 'rgba(59,130,246,0.12)' : 'transparent',
+                          border: 'none', borderBottom: isActive ? '2px solid #3B82F6' : '2px solid transparent',
+                          color: isActive ? '#60A5FA' : 'rgba(255,255,255,0.38)',
+                          fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                          transition: 'all 0.15s', position: 'relative',
+                          fontFamily: "'Inter', system-ui, sans-serif",
+                        }}>
+                        {tab.icon}
+                        {tab.label}
+                        {tab.badge && (
+                          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400 }}
+                            style={{ minWidth: 18, height: 18, borderRadius: 99, background: '#4ADE80', color: '#0a160a', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', marginLeft: 2 }}>
+                            {tab.badge}
+                          </motion.div>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             )}
 
             {/* Body */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px 28px', position: 'relative', zIndex: 1 }}>
+            <div style={{ flex: 1, overflowY: 'auto', position: 'relative', zIndex: 1 }}>
+              <div style={{ maxWidth: activeDrill ? 760 : 1100, margin: '0 auto', padding: '24px 32px 48px' }}>
 
               {/* Active drill */}
               {activeDrill && (
@@ -1867,16 +1976,10 @@ export default function LabHub() {
               {!activeDrill && labTab === 'drill'  && <DrillTab />}
               {!activeDrill && labTab === 'orders' && <OrdersTab onLaunchOrder={handleLaunchOrder} />}
               {!activeDrill && labTab === 'stats'  && <StatsTab />}
-            </div>
 
-            {/* Footer */}
-            {!activeDrill && (
-              <div style={{ padding: '12px 22px 20px', borderTop: '1px solid rgba(59,130,246,0.08)', flexShrink: 0, position: 'relative', zIndex: 1, textAlign: 'center' }}>
-                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.20)', margin: 0, lineHeight: 1.55 }}>
-                  The Lab builds the skills the Arcade demands.
-                </p>
-              </div>
-            )}
+              </div>{/* /maxWidth wrapper */}
+            </div>{/* /body scroll */}
+
           </motion.div>
         </>
       )}
