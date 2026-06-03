@@ -155,6 +155,7 @@ export const useArcadeStore = create((set, get) => ({
   cleanText: (text) => text
     .replace(/⚡CMD:\{[^}]*\}/g, '')
     .replace(/^⚡VIZ:.*$/gm, '')
+    .replace(/^⚡CANVAS:.*$/gm, '')
     .replace(/\[INTERRUPT:\]/gi, '')
     .replace(/\[BREAKING:\s*[^\]]+\]/gi, '')
     .replace(/\[FALLACY:\s*[^\]]+\]/gi, '')

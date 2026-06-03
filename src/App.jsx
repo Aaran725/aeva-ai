@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, createContext, useContext } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import { ArrowUp, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Users, FileText } from 'lucide-react'
+import { ArrowUp, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, ChevronRight, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Users, FileText, LayoutGrid } from 'lucide-react'
 import { useAppSettings, SECTION_BG_PRESETS, CARD_STYLES, FONT_STYLES } from './appSettings'
 import { useLanguageStore } from './languageStore'
 import { useT } from './translations'
@@ -13,6 +13,8 @@ import { useAevaControlStore } from './aevaControlStore'
 import { useRoadmapStore } from './roadmapStore'
 import AevaIntervention from './AevaIntervention'
 import AevaViz from './AevaViz'
+import AevaCanvas from './AevaCanvas'
+import { useCanvasStore } from './canvasStore'
 import { useNeuralStore } from './neuralStore'
 import ArcadeHub from './ArcadeHub'
 import LabHub from './LabHub'
@@ -379,7 +381,47 @@ When to add a visual:
 - Comparing two things with numbers → bar chart
 - Inequality or solution set → number line
 - Coordinate geometry, vectors → coordinate plane
-- Don't add a visual for every response — only when it genuinely clarifies`
+- Don't add a visual for every response — only when it genuinely clarifies
+
+━━━ AEVA CANVAS — INTERACTIVE LEARNING WORKSPACE ━━━
+For topics where hands-on interactivity transforms understanding, end your response with a ⚡CANVAS tag. Canvas opens as a full-screen multi-block learning workspace the student can interact with.
+
+Generate Canvas when (pick one per topic, not every message):
+- A mathematical function, formula, or equation is central to the explanation
+- A science concept involves processes, cycles, or physical structures
+- A historical topic has events the student should place in sequence
+- Comparative data would read better as a sortable table
+- There's a problem the student should solve themselves, not just read
+Do NOT generate Canvas for: simple factual lookups, quick definitions, casual chat, or when you already used ⚡VIZ
+
+⚡CANVAS format — compact JSON on ONE line after your text:
+⚡CANVAS:{"topic":"Topic Name","blocks":[...up to 4 blocks...]}
+
+BLOCK TYPES — choose what genuinely helps, 2-4 per Canvas:
+
+graph — interactive plot with sliders
+{"type":"graph","title":"Slope-Intercept Form","expr":"m*x+b","xMin":-8,"xMax":8,"params":{"m":2,"b":3}}
+expr rules: use x as variable, ** not ^, 2*x not 2x, params become live sliders
+
+formula — formula display with live variable chips (syncs with graph params)
+{"type":"formula","title":"y = mx + b","latex":"y = mx + b","variables":{"m":2,"b":3},"steps":["Step 1: m is the slope — rise over run","Step 2: b is the y-intercept — where the line crosses y"]}
+
+quiz — one question at a time with instant feedback
+{"type":"quiz","title":"Quick Check","questions":[{"q":"What is the slope in y = 3x + 2?","options":["2","3","x","3x"],"answer":1,"explanation":"The coefficient of x is always the slope in slope-intercept form."}]}
+
+challenge — problem with a hint ladder
+{"type":"challenge","title":"Try It","problem":"Find x when y = 11, m = 3, b = 2","answer":"x = 3","hints":["Substitute: 11 = 3x + 2","Subtract 2 from both sides: 3x = 9","Divide both sides by 3"]}
+
+timeline — expandable chronological events
+{"type":"timeline","title":"Key Events","events":[{"date":"1939","label":"WWII Begins","desc":"Germany invades Poland; UK and France declare war."}]}
+
+table — sortable comparison table
+{"type":"table","title":"Comparison","headers":["Type","Formula","Use When"],"rows":[["Speed","d÷t","velocity is constant"],["Acceleration","Δv÷t","velocity is changing"]]}
+
+diagram — process/flowchart (node positions as % of 100×100 canvas)
+{"type":"diagram","title":"Photosynthesis","nodes":[{"id":"s","label":"Sunlight","x":50,"y":15},{"id":"c","label":"Chlorophyll","x":50,"y":50},{"id":"g","label":"Glucose + O₂","x":50,"y":85}],"edges":[{"from":"s","to":"c","label":"absorbed by"},{"from":"c","to":"g","label":"produces"}]}
+
+CROSS-BLOCK SYNC: If graph has params {m, b} AND formula has variables {m, b}, they share the same live values — moving the slider updates the formula automatically. Always match variable names between blocks to enable this.`
 }
 
 /* ─── Trend / scaffold / difficulty helpers ─── */
@@ -2355,6 +2397,7 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
   const clean = text
     .replace(/⚡CMD:\{[^}]*\}/g, '')
     .replace(/^⚡VIZ:.*$/gm, '')
+    .replace(/^⚡CANVAS:.*$/gm, '')
     .replace(/\[TERM:[^\]]*\]/g, '')
     .replace(/\[SUMMARY:[^\]]*\]/g, '')
     .replace(/\[CORRECT\]/g, '[CORRECT:]')  // normalise bare tags
@@ -2898,6 +2941,31 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false }) {
             )}
             <MarkdownRenderer text={msg.text} streaming={!!msg.streaming} cursorColor={isLight ? 'rgba(99,102,241,0.8)' : 'rgba(139,143,255,0.9)'} isLight={isLight} />
             {msg.aevaViz && <AevaViz config={msg.aevaViz} />}
+            {msg.aevaCanvas && !msg.streaming && (
+              <motion.button
+                initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.35, duration: 0.28 }}
+                whileHover={{ scale: 1.02, background: 'rgba(99,102,241,0.20)' }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => useCanvasStore.getState().setCanvas(msg.aevaCanvas)}
+                style={{
+                  marginTop: 12, width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '12px 14px', borderRadius: 16, cursor: 'pointer',
+                  background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.35)',
+                  fontFamily: 'inherit', textAlign: 'left',
+                }}>
+                <div style={{ width: 32, height: 32, borderRadius: 10, background: 'linear-gradient(135deg,#4F46E5,#7C3AED)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 12px rgba(99,102,241,0.35)' }}>
+                  <LayoutGrid size={14} color="white" strokeWidth={2.2} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: '#A5B4FC', letterSpacing: '-0.02em' }}>Open Canvas</div>
+                  <div style={{ fontSize: 11, color: 'rgba(165,180,252,0.50)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {msg.aevaCanvas.topic} · {msg.aevaCanvas.blocks?.length || 0} interactive blocks
+                  </div>
+                </div>
+                <ChevronRight size={14} color="rgba(165,180,252,0.45)" />
+              </motion.button>
+            )}
             {msg.aevaAction && (
               <motion.div
                 initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.25 }}
@@ -3626,6 +3694,32 @@ function ChatView({ onBack }) {
               }
             }
           } catch { /* malformed VIZ tag — ignore */ }
+        }
+
+        // ── CANVAS tag parser ────────────────────────────────────────────
+        const canvasIdx = rawResponse.indexOf('⚡CANVAS:')
+        if (canvasIdx !== -1) {
+          try {
+            const start = rawResponse.indexOf('{', canvasIdx)
+            if (start !== -1) {
+              let depth = 0, end = -1
+              for (let i = start; i < rawResponse.length; i++) {
+                if (rawResponse[i] === '{' || rawResponse[i] === '[') depth++
+                else if (rawResponse[i] === '}' || rawResponse[i] === ']') {
+                  depth--
+                  if (depth === 0) { end = i + 1; break }
+                }
+              }
+              if (end !== -1) {
+                const canvasConfig = JSON.parse(rawResponse.slice(start, end))
+                setMessages(prev => {
+                  const copy = [...prev]
+                  copy[copy.length - 1] = { ...copy[copy.length - 1], aevaCanvas: canvasConfig }
+                  return copy
+                })
+              }
+            }
+          } catch { /* malformed CANVAS tag — ignore */ }
         }
         // ─────────────────────────────────────────────────────────────────
       }
@@ -4505,6 +4599,11 @@ function ChatView({ onBack }) {
         )}
       </AnimatePresence>
 
+
+      {/* Aeva Canvas — interactive learning workspace */}
+      <AnimatePresence>
+        <AevaCanvas />
+      </AnimatePresence>
 
       {/* Socratic ambient overlay */}
       <AnimatePresence>
