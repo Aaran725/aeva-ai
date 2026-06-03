@@ -188,7 +188,7 @@ export default function ArcadeHub() {
                   style={{ width: 5, height: 5, borderRadius: '50%', background: '#6366F1' }}
                 />
                 <span style={{ fontSize: 11, fontWeight: 700, color: '#6366F1', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                  4 Missions Available
+                  4 Experiences Available
                 </span>
               </div>
             </div>

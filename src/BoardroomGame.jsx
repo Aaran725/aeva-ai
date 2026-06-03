@@ -119,6 +119,26 @@ const DECK = [
     ],
   },
   {
+    id: 'whistleblower',
+    character: { name: 'Anonymous', role: 'Internal report — submitted 11:42pm', avatar: '🔊' },
+    situation: "Anonymous internal report: your VP of Sales has been misrepresenting product capabilities to close deals. 7 of your last 13 enterprise contracts were closed by this person. Legal says the exposure is real.",
+    choices: [
+      { text: 'Investigate internally first — keep it contained', tag: 'Quiet probe', effects: { cash: 0, morale: -18, product: 0, trust: -20 }, note: "Word leaks within the week. The secrecy makes it worse than the original allegation. Three customers reach out asking directly." },
+      { text: 'Terminate immediately — zero tolerance, public statement', tag: 'Immediate firing', effects: { cash: -22, morale: +10, product: 0, trust: +10 }, note: "Sales collapses for two quarters. Two of those seven deals reach out to renegotiate terms. Pipeline drops 40%. Team respects the call." },
+      { text: 'Address it in an all-hands — radical transparency now', tag: 'All-hands now', effects: { cash: -8, morale: +22, product: 0, trust: -12 }, note: "Team rallies around the honesty. Two enterprise customers read the leaked summary and immediately pause their contracts. The rest stay — for now." },
+    ],
+  },
+  {
+    id: 'payroll_crisis',
+    character: { name: 'Maya Patel', role: 'CFO', avatar: '⏰' },
+    situation: "Payroll is Friday. You're $44,000 short. The bank declined the credit line extension this morning. Three options — all of them follow you.",
+    choices: [
+      { text: "Cover the gap from your own salary — personally", tag: 'Self-fund gap', effects: { cash: +8, morale: +20, product: 0, trust: +10 }, note: "Team finds out. The loyalty this buys is worth more than the money. You personally can't pay rent for two months. Worth it." },
+      { text: 'Emergency bridge from your lead investor', tag: 'Emergency bridge', effects: { cash: +22, morale: -8, product: 0, trust: -22 }, note: '"This can\'t happen again. Consider this a yellow card." The money arrives. The relationship now has a debt that isn\'t in the cap table.' },
+      { text: 'Delay payroll by 5 days — buy time to find a solution', tag: 'Delay payroll', effects: { cash: -5, morale: -30, product: -8, trust: -18 }, note: "Seven engineers send resignations by Tuesday. The rest hold a meeting without you. It takes 6 months and two new hires to get back to where you were." },
+    ],
+  },
+  {
     id: 'expansion',
     character: { name: 'Sarah Chen', role: 'CFO', avatar: '🌍' },
     situation: "Inbound interest from 40+ companies in Europe. Opening a London office costs $1.2M/year fully loaded. Alternatively: hire 2 remote EU reps for $280k total.",
@@ -132,6 +152,16 @@ const DECK = [
 
 // ─── Special events (fixed to specific days) ─────────────────────────────────
 const SPECIAL_EVENTS = {
+  2: {
+    id: 'first_resignation',
+    character: { name: 'Jake Morrisey', role: 'Lead Designer — 18 months', avatar: '📩' },
+    situation: "Just accepted an offer at Figma. $175k vs your $130k. He's giving two weeks' notice in person. Three other designers have been talking to the same recruiter. He's sitting across from you right now.",
+    choices: [
+      { text: 'Match Figma — break the pay band today', tag: 'Counter at full ask', effects: { cash: -14, morale: +12, product: +10, trust: -8 }, note: "He stays. Word spreads in 48 hours. Four other employees send Glassdoor salary comparisons to their managers. Your pay structure is effectively dead." },
+      { text: "Accept it — you can't start a counteroffer culture", tag: 'Accept and move on', effects: { cash: 0, morale: -20, product: -14, trust: +5 }, note: "He leaves on good terms. The three designers he mentioned all have recruiter coffee meetings within the week. Product velocity drops." },
+      { text: 'Promote him to Design Lead — title + $25k', tag: 'Title + partial raise', effects: { cash: -8, morale: +8, product: +5, trust: +5 }, note: "He accepts. Six weeks later he's still getting DMs. The title helped. The $50k gap with Figma didn't go anywhere." },
+    ],
+  },
   4: {
     id: 'engineer_poached',
     character: { name: 'Your Lead Engineer', role: 'Incoming message 3 min ago', avatar: '🚨' },
@@ -140,6 +170,16 @@ const SPECIAL_EVENTS = {
       { text: 'Counter at $280k + 0.5% equity acceleration', tag: 'Compete for them', effects: { cash: -18, morale: +20, product: +15, trust: +10 }, note: 'They stay. Rest of engineering team is energised — leadership clearly values people. Two other top performers notice.' },
       { text: "Let them go — you can't win a comp war with Google", tag: 'Accept the loss', effects: { cash: +5, morale: -20, product: -18, trust: -5 }, note: 'They leave. Three junior engineers start interviewing within 2 weeks. The tribal knowledge loss takes 6 months to recover.' },
       { text: 'Promote them to Engineering Director + $40k raise', tag: 'Create a new role', effects: { cash: -10, morale: +15, product: -5, trust: +8 }, note: "They accept the title and impact. Two other senior engineers expect the same treatment. You've created a new compensation tier." },
+    ],
+  },
+  6: {
+    id: 'term_sheet',
+    character: { name: 'Incoming — Series B', role: 'Term sheet — received 9:14am', avatar: '📋' },
+    situation: "First term sheet for your Series B: $6.2M at $28M pre-money. Your last round was $18M. Lead investor wants 2× liquidation preference and broad-based anti-dilution. Your attorney just texted: 'These terms are aggressive. Call me before you sign anything.'",
+    choices: [
+      { text: 'Sign it — $6.2M solves the runway problem today', tag: 'Sign as-is', effects: { cash: +28, morale: +10, product: 0, trust: -18 }, note: "Signed. The 2× liquidation preference means investors get paid in full before you see a dollar at exit. Your team doesn't understand what that means yet." },
+      { text: 'Counter — 1× liquidation, keep anti-dilution', tag: 'Negotiate the terms', effects: { cash: +18, morale: +8, product: 0, trust: +5 }, note: "Two weeks of back-and-forth. They land at 1.25×. You lose some upside. A $40M exit still pays out the team fairly. That matters." },
+      { text: 'Decline — go back to market for cleaner terms', tag: 'Reject and keep looking', effects: { cash: -10, morale: -8, product: 0, trust: +12 }, note: "Two other funds express interest. Takes 6 weeks. One comes in at $5.8M with clean terms. The 6-week burn gap cost you badly." },
     ],
   },
   7: {
@@ -173,15 +213,18 @@ const METERS = [
 ]
 
 const TOTAL_DAYS = 10
-const STARTING_METERS = { cash: 65, morale: 70, product: 60, trust: 65 }
+const STARTING_METERS = { cash: 48, morale: 58, product: 45, trust: 52 }
+
+// Every decision has a real cost — meters drain passively each day regardless of choice.
+const DAILY_BURN = { cash: 4, morale: 2, product: 1, trust: 2 }
 
 // ─── Helper: clamp ────────────────────────────────────────────────────────────
 function clamp(v) { return Math.max(0, Math.min(100, v)) }
 
 // ─── Meter bar ────────────────────────────────────────────────────────────────
 function MeterBar({ meter, value, delta }) {
-  const isLow = value < 25
-  const isCritical = value < 12
+  const isLow = value < 32
+  const isCritical = value < 18
   const col = isLow ? meter.low : meter.color
 
   return (
@@ -234,10 +277,19 @@ function MeterBar({ meter, value, delta }) {
 }
 
 // ─── Choice button ─────────────────────────────────────────────────────────────
+// Deliberately hides exact numbers — direction + magnitude only.
+// This forces genuine decision-making instead of pure optimisation.
 function ChoiceBtn({ choice, onPick, disabled }) {
-  const positives = Object.entries(choice.effects).filter(([, v]) => v > 0)
-  const negatives = Object.entries(choice.effects).filter(([, v]) => v < 0)
+  const nonZero = Object.entries(choice.effects).filter(([, v]) => v !== 0)
   const ICONS = { cash: '💰', morale: '👥', product: '⚡', trust: '🤝' }
+
+  // Returns ↑↑ / ↑ / ↗ or ↓↓ / ↓ / ↘ — rough magnitude, no number
+  function mag(v) {
+    const a = Math.abs(v)
+    if (a >= 18) return v > 0 ? '↑↑' : '↓↓'
+    if (a >= 9)  return v > 0 ? '↑'  : '↓'
+    return v > 0 ? '↗' : '↘'
+  }
 
   return (
     <motion.button
@@ -256,7 +308,7 @@ function ChoiceBtn({ choice, onPick, disabled }) {
         cursor: disabled ? 'default' : 'pointer',
         opacity: disabled ? 0.4 : 1,
         transition: 'border-color 0.15s, background 0.15s',
-        display: 'flex', flexDirection: 'column', gap: 8,
+        display: 'flex', flexDirection: 'column', gap: 10,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
@@ -265,15 +317,17 @@ function ChoiceBtn({ choice, onPick, disabled }) {
           {choice.tag}
         </span>
       </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {positives.map(([k, v]) => (
-          <span key={k} style={{ fontSize: 10.5, color: '#4ADE80', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3 }}>
-            <TrendingUp size={10} />{ICONS[k]} +{v}
-          </span>
-        ))}
-        {negatives.map(([k, v]) => (
-          <span key={k} style={{ fontSize: 10.5, color: '#F87171', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3 }}>
-            <TrendingDown size={10} />{ICONS[k]} {v}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        {nonZero.map(([k, v]) => (
+          <span key={k} style={{
+            fontSize: 11, fontWeight: 800,
+            color: v > 0 ? '#4ADE80' : '#F87171',
+            display: 'flex', alignItems: 'center', gap: 4,
+            background: v > 0 ? 'rgba(74,222,128,0.08)' : 'rgba(248,113,113,0.08)',
+            borderRadius: 6, padding: '2px 7px',
+          }}>
+            {v > 0 ? <TrendingUp size={9} /> : <TrendingDown size={9} />}
+            {ICONS[k]} {mag(v)}
           </span>
         ))}
       </div>
@@ -357,9 +411,10 @@ export default function BoardroomGame({ onClose }) {
     let dead = null
 
     Object.keys(meters).forEach(k => {
-      const raw = clamp(meters[k] + (choice.effects[k] || 0))
+      const effect = choice.effects[k] || 0
+      const raw = clamp(meters[k] + effect - DAILY_BURN[k])
       newMeters[k] = raw
-      newDeltas[k] = choice.effects[k] || 0
+      newDeltas[k] = effect - DAILY_BURN[k]
       if (raw <= 0) dead = k
     })
 

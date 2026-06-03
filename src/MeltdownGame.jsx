@@ -105,6 +105,19 @@ const ROUNDS = [
           { text: 'Send him the comp bands and say you\'ll match Stripe\'s offer.', tag: 'Match offer', health: -12, note: 'He reads it. Replies: "This isn\'t about money." He submits his resignation three days later. Four others follow in six weeks.' },
         ],
       },
+      {
+        id: 'board_confidence',
+        character: { name: 'James Park', avatar: '📞', role: 'Board Member' },
+        urgency: 'CRITICAL',
+        subject: 'Calling you now',
+        preview: "Two other board members want a confidence vote. I need something from you before 5am.",
+        full: "Two board members contacted me separately in the last two hours. They're discussing a formal confidence vote.\n\nI'm not asking you to defend yourself. I'm asking you to give me something I can use to stop this before it becomes official.\n\nI need to hear from you in the next 20 minutes. What's your plan?",
+        choices: [
+          { text: 'Draft a 5-point post-mortem and send it to the full board right now.', tag: 'Post-mortem now', health: +20, note: "It gets forwarded immediately. The board members considering the vote read it. The vote doesn't happen. Speed mattered more than polish." },
+          { text: 'Tell him to wait for the formal board call in 2 days.', tag: 'Wait for board call', health: -18, note: '"That\'s your decision." The next morning, the formal confidence vote request hits your legal email. Scheduled for Friday.' },
+          { text: 'Ask James to vouch for you and buy you 24 hours.', tag: 'Ask for cover', health: +5, note: 'He agrees reluctantly. Tells them you\'re "handling it." Buys exactly one day and uses whatever goodwill he had left for you.' },
+        ],
+      },
     ],
   },
   {
@@ -175,7 +188,7 @@ const ROUNDS = [
   },
 ]
 
-const ROUND_TIME = 90 // seconds per round
+const ROUND_TIME = 65 // seconds per round — tight by design
 
 // ─── Health bar ───────────────────────────────────────────────────────────────
 function HealthBar({ health }) {
@@ -269,7 +282,7 @@ export default function MeltdownGame({ onClose }) {
   const addXP = useXPStore(s => s.addXP)
 
   const [roundIdx, setRoundIdx] = useState(0)
-  const [health, setHealth] = useState(75)
+  const [health, setHealth] = useState(60)
   const [timeLeft, setTimeLeft] = useState(ROUND_TIME)
   const [phase, setPhase] = useState('inbox')     // inbox | reading | consequence | roundEnd | dead | won
   const [activeIdx, setActiveIdx] = useState(null) // which crisis is open
@@ -277,6 +290,7 @@ export default function MeltdownGame({ onClose }) {
   const [choiceMade, setChoiceMade] = useState(null)
   const [timerRunning, setTimerRunning] = useState(true)
   const [timedOut, setTimedOut] = useState(false)
+  const [cascadePenalty, setCascadePenalty] = useState(0) // accumulated from missed crises
   const timerRef = useRef(null)
 
   const round = ROUNDS[roundIdx]
@@ -294,7 +308,8 @@ export default function MeltdownGame({ onClose }) {
 
   // ─── Reset timer on new round ────────────────────────────────────────────
   useEffect(() => {
-    setTimeLeft(ROUND_TIME)
+    // Cascade: each unresolved crisis from prior rounds costs 8s off the next timer
+    setTimeLeft(Math.max(30, ROUND_TIME - cascadePenalty))
     setResolved([])
     setActiveIdx(null)
     setPhase('inbox')
@@ -306,11 +321,15 @@ export default function MeltdownGame({ onClose }) {
   const handleTimeout = () => {
     setTimerRunning(false)
     setTimedOut(true)
-    // Auto-fail unresolved crises: -15 each
+    // Auto-fail unresolved crises: -20 each (was -15)
     const unresolved = round.crises.filter((_, i) => !resolved.includes(i))
-    const penalty = unresolved.length * 15
+    const penalty = unresolved.length * 20
     const newHealth = Math.max(0, health - penalty)
     setHealth(newHealth)
+    // Accumulate cascade penalty: 8s per missed crisis in next round
+    if (unresolved.length > 0) {
+      setCascadePenalty(p => Math.min(p + unresolved.length * 8, 30))
+    }
     if (newHealth <= 0) {
       setPhase('dead')
     } else {
@@ -561,8 +580,13 @@ export default function MeltdownGame({ onClose }) {
               style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
             >
               {timedOut && (
-                <div style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 12, padding: '12px 16px' }}>
+                <div style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 12, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: '#EF4444' }}>⏱ Time ran out — unhandled messages auto-escalated.</span>
+                  {cascadePenalty > 0 && (
+                    <span style={{ fontSize: 11, color: 'rgba(239,68,68,0.70)', fontWeight: 600 }}>
+                      ⚠ Pressure carries forward — next round starts {cascadePenalty}s shorter.
+                    </span>
+                  )}
                 </div>
               )}
               <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6 }}>
@@ -598,7 +622,7 @@ export default function MeltdownGame({ onClose }) {
               </div>
               <div style={{ display: 'flex', gap: 10, width: '100%', maxWidth: 340 }}>
                 <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                  onClick={() => { setRoundIdx(0); setHealth(75); setPhase('inbox') }}
+                  onClick={() => { setRoundIdx(0); setHealth(60); setCascadePenalty(0); setPhase('inbox') }}
                   style={{ flex: 1, padding: '12px', borderRadius: 12, background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.35)', color: '#fff', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
                   Try again
                 </motion.button>
@@ -639,7 +663,7 @@ export default function MeltdownGame({ onClose }) {
               </div>
               <div style={{ display: 'flex', gap: 10, width: '100%', maxWidth: 340 }}>
                 <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                  onClick={() => { setRoundIdx(0); setHealth(75); setPhase('inbox') }}
+                  onClick={() => { setRoundIdx(0); setHealth(60); setCascadePenalty(0); setPhase('inbox') }}
                   style={{ flex: 1, padding: '12px', borderRadius: 12, background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.35)', color: '#fff', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
                   Play again
                 </motion.button>
