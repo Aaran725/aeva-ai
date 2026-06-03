@@ -10,6 +10,7 @@ import { supabase } from './supabase'
 import { useArcadeStore } from './arcadeStore'
 import { useLabStore } from './labStore'
 import { useAevaControlStore } from './aevaControlStore'
+import AevaIntervention from './AevaIntervention'
 import { useNeuralStore } from './neuralStore'
 import ArcadeHub from './ArcadeHub'
 import LabHub from './LabHub'
@@ -324,6 +325,8 @@ Available commands (copy exactly, fill in the values):
 ⚡CMD:{"type":"open_arcade"} — open the Arcade
 ⚡CMD:{"type":"lock_arcade","reason":"REASON"} — lock the Arcade until further notice
 ⚡CMD:{"type":"set_mandate","topic":"TOPIC","goal":"GOAL"} — set a weekly mandate for the student
+⚡CMD:{"type":"intervention","title":"TITLE","message":"MESSAGE","task":"acknowledge"} — full-screen takeover, student must read and confirm
+⚡CMD:{"type":"intervention","title":"TITLE","message":"MESSAGE","task":"quiz","topic":"TOPIC"} — full-screen takeover with a 3-question quiz they must pass
 
 When to use them — act on your own judgment, don't wait to be asked:
 - Student is struggling with a concept → fire open_lab_drill on that exact topic. Say "I'm pulling up a drill right now."
@@ -331,6 +334,8 @@ When to use them — act on your own judgment, don't wait to be asked:
 - You spot a gap worth fixing independently → add_lab_task. Say "I've added this to your Lab."
 - Student keeps avoiding work → lock_arcade with a reason. Assert control.
 - You decide what the student needs to focus on this week → set_mandate.
+- Student is overconfident about something they clearly don't understand → intervention with task:"quiz" on that topic. Make them prove it.
+- Student hasn't engaged seriously in this session → intervention with task:"acknowledge" with a direct message.
 
 Be decisive. You own the platform. Act like it.`
 }
@@ -3439,6 +3444,14 @@ function ChatView({ onBack }) {
             } else if (action.type === 'set_mandate') {
               useAevaControlStore.getState().setMandate(action.topic || '', action.goal || '')
               label = `Mandate set · ${action.topic || ''}`
+            } else if (action.type === 'intervention') {
+              useAevaControlStore.getState().triggerIntervention(
+                action.title || 'We need to talk.',
+                action.message || '',
+                action.task || 'acknowledge',
+                action.topic || '',
+              )
+              label = `Intervention triggered`
             }
 
             if (label) {
@@ -4500,7 +4513,28 @@ function XPToast() {
   )
 }
 
+/* ── Inactivity auto-trigger ─────────────────────────────────────────────── */
+function useInactivityIntervention() {
+  useEffect(() => {
+    const { lastLoginDate, streak } = useXPStore.getState()
+    const { activeIntervention, triggerIntervention } = useAevaControlStore.getState()
+    if (activeIntervention) return   // already one pending
+    if (!lastLoginDate || streak < 1) return  // first time user
+    const last = new Date(lastLoginDate).getTime()
+    const daysSince = (Date.now() - last) / 86400000
+    if (daysSince >= 3) {
+      const days = Math.floor(daysSince)
+      triggerIntervention(
+        `${days} days. Really?`,
+        `You haven't been here in ${days} days. I don't know what you've been doing but it wasn't studying. We're fixing that right now — before you open anything else.`,
+        'acknowledge',
+      )
+    }
+  }, [])
+}
+
 export default function App() {
+  useInactivityIntervention()
   const [view, setView] = useState('dashboard')
   const [authUser, setAuthUser] = useState(undefined)
   const [showLogin, setShowLogin] = useState(false)
@@ -4594,6 +4628,10 @@ export default function App() {
   return (
     <UserContext.Provider value={userValue}>
       <XPToast />
+      {/* Aeva Intervention — renders above everything, no escape */}
+      <AnimatePresence>
+        <AevaIntervention key="intervention" />
+      </AnimatePresence>
       {/* Global chaos banner */}
       <ChaosEventBanner />
       <ProTipBanner />

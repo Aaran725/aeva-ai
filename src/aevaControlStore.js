@@ -5,9 +5,10 @@ const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) } catch 
 const save = (s) => { try { localStorage.setItem(KEY, JSON.stringify({ lockedFeatures: s.lockedFeatures, mandate: s.mandate, xpMultiplier: s.xpMultiplier })) } catch {} }
 
 const DEFAULT = {
-  lockedFeatures: {},  // { arcade: { reason: '...' lockedAt: ms } }
-  mandate: null,       // { topic, goal, setAt }
+  lockedFeatures: {},     // { arcade: { reason: '...' lockedAt: ms } }
+  mandate: null,          // { topic, goal, setAt }
   xpMultiplier: 1,
+  activeIntervention: null, // { title, message, task, topic, triggeredAt }
 }
 
 export const useAevaControlStore = create((set, get) => ({
@@ -50,4 +51,20 @@ export const useAevaControlStore = create((set, get) => ({
 
   isLocked: (feature) => !!get().lockedFeatures[feature],
   getLockReason: (feature) => get().lockedFeatures[feature]?.reason || '',
+
+  triggerIntervention: (title, message, task = 'acknowledge', topic = '') => {
+    set(s => {
+      const updated = { ...s, activeIntervention: { title, message, task, topic, triggeredAt: Date.now() } }
+      save(updated)
+      return updated
+    })
+  },
+
+  dismissIntervention: () => {
+    set(s => {
+      const updated = { ...s, activeIntervention: null }
+      save(updated)
+      return updated
+    })
+  },
 }))
