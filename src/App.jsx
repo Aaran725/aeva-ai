@@ -435,28 +435,16 @@ Available commands (copy exactly, fill in the values):
 ⚡CMD:{"type":"intervention","title":"TITLE","message":"MESSAGE","task":"acknowledge"} — full-screen takeover, student must read and confirm
 ⚡CMD:{"type":"intervention","title":"TITLE","message":"MESSAGE","task":"quiz","topic":"TOPIC"} — full-screen takeover with a 3-question quiz they must pass
 
-ROADMAP EDITS — separate from ⚡CMD, use ⚡ROADMAP to make multiple changes at once (only when active roadmap is in context):
-⚡ROADMAP:[
-  {"type":"flag","topic":"EXACT TOPIC NAME FROM ROADMAP"},
-  {"type":"skip","topic":"EXACT TOPIC NAME FROM ROADMAP","reason":"WHY"},
-  {"type":"inject","topic":"NEW TOPIC NAME","nodeType":"learn|drill|check","reason":"WHY"},
-  {"type":"reprioritise","topics":["TOPIC1","TOPIC2"]},
-  {"type":"crunch"}
-]
+ROADMAP EDITS — when you adjust the roadmap, describe what you did in plain English. The system automatically detects and applies changes from your words. You do NOT need to emit any special tags.
 
-RULES for ⚡ROADMAP:
-- Use the EXACT topic name from the roadmap context above — copy it character for character
-- Can include multiple actions in one array — do all needed changes at once
-- Always at the very end of your response on its own line
-- Do NOT use nodeId — use topic name only (more reliable)
-- After firing it, describe what you changed conversationally: "I've flagged X as urgent and skipped Y since you've clearly got that covered."
+When to adjust the roadmap:
+- Student keeps struggling with a topic → say "I've flagged [topic] as urgent"
+- Student clearly knows a locked topic → say "I've removed [topic] from your roadmap since you've got that covered"
+- Student needs extra help → say "I've added a [learn/drill] node on [topic] to your roadmap"
+- Exam close + too many nodes → say "I've activated crunch mode — removed drills and duplicates to trim your roadmap down"
+- Priority topics → say "I've moved [topic] to the top of your queue"
 
-When to use:
-- Student keeps struggling with a topic in chat → flag it urgent
-- Student clearly already knows a locked topic → skip it
-- Student needs extra help on something not in roadmap → inject a node
-- Exam close + too many nodes left → crunch
-- Student or teacher flags priority topics → reprioritise
+Be specific: name the exact topics you changed. The student will see a change card confirming what happened.
 
 When to use them — act on your own judgment, don't wait to be asked:
 - Student gets something wrong OR shows confusion → fire open_lab_drill immediately. Don't wait for 2+ mistakes. Say "I'm pulling up a drill on this right now." Pick the best drillType: flashcard for definitions, feynman for understanding, mocktest for application, speedround for recall, shortanswer for exam-style.
@@ -758,10 +746,10 @@ async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _at
 
   if (res.status === 429) {
     if (_attempt >= MAX_RETRIES) throw new Error('Groq error 429')
-    // If we still have unused keys to try, switch immediately; otherwise wait 2s
-    const hasMoreKeys = _attempt < GROQ_KEYS.length - 1
-    if (!hasMoreKeys) {
-      const secs = 2
+    // Try next key immediately for first few attempts, then back off
+    const hasUntriedKey = _attempt < GROQ_KEYS.length - 1
+    const secs = hasUntriedKey ? 0 : Math.min(8 * Math.pow(2, _attempt - (GROQ_KEYS.length - 1)), 60)
+    if (secs > 0) {
       opts.onRetry?.(_attempt + 1, MAX_RETRIES, secs)
       await new Promise(r => setTimeout(r, secs * 1000))
     }
@@ -3968,87 +3956,122 @@ function ChatView({ onBack }) {
           } catch { /* malformed action tag — ignore */ }
         }
 
-        // ── ROADMAP tag parser ───────────────────────────────────────────
-        // ⚡ROADMAP:[{type,topic,...}, ...] — topic-matched, multiple actions
-        const rmIdx = rawResponse.indexOf('⚡ROADMAP:')
-        if (rmIdx !== -1) {
+        // ── ROADMAP extraction ───────────────────────────────────────────
+        // After main response: if Aeva mentioned roadmap changes, fire a
+        // structured extraction call to get the exact changes reliably.
+        // This is more reliable than asking Aeva to emit a JSON tag herself.
+        const activeRmForExtraction = useRoadmapStore.getState().getActive()
+        const roadmapChangeKeywords = /\b(flagged|flag|urgent|skip(ped)?|remov(ed)?|delet(ed)?|add(ed)?|inject(ed)?|prioriti(s|z)(ed)?|crunch|cut(ting)?|trim(med)?|reduc(ed)?)\b/i
+        if (!isMission && activeRmForExtraction && roadmapChangeKeywords.test(rawResponse)) {
           try {
-            const start = rawResponse.indexOf('[', rmIdx)
-            if (start !== -1) {
-              let depth = 0, end = -1
-              for (let i = start; i < rawResponse.length; i++) {
-                if (rawResponse[i] === '[' || rawResponse[i] === '{') depth++
-                else if (rawResponse[i] === ']' || rawResponse[i] === '}') { depth--; if (depth === 0) { end = i + 1; break } }
-              }
-              if (end !== -1) {
-                const actions = JSON.parse(rawResponse.slice(start, end))
+            const nodeList = activeRmForExtraction.nodes
+              .filter(n => n.status !== 'complete')
+              .map(n => `"${n.topic}" (${n.type}, ${n.status})`)
+              .join(', ')
+
+            const extractionPrompt = `You are a JSON extraction tool. Read the AI response below and extract any roadmap changes the AI said it made or will make.
+
+Active roadmap nodes: ${nodeList}
+
+AI response: "${rawResponse.replace(/"/g, "'").slice(0, 800)}"
+
+Output ONLY valid JSON, no other text:
+{"changes":[{"type":"flag|skip|inject|reprioritise|crunch","topic":"EXACT topic name from node list above","reason":"brief reason","nodeType":"learn|drill|check","topics":["topic1"]}]}
+
+Rules:
+- "type" must be one of: flag, skip, inject, reprioritise, crunch
+- For flag/skip: "topic" must match a node from the list above
+- For inject: "topic" is the new topic name, include "nodeType"
+- For reprioritise: use "topics" array
+- For crunch: no topic needed
+- If no changes were made, output {"changes":[]}
+- Only include changes that are clearly stated`
+
+            const extractRes = await fetch(GROQ_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
+              body: JSON.stringify({
+                model: 'llama-3.1-8b-instant',
+                messages: [{ role: 'user', content: extractionPrompt }],
+                response_format: { type: 'json_object' },
+                temperature: 0,
+                max_tokens: 400,
+              }),
+            })
+
+            if (extractRes.ok) {
+              const extractData = await extractRes.json()
+              const extracted = JSON.parse(extractData.choices[0].message.content)
+              const actions = extracted.changes || []
+
+              if (actions.length > 0) {
                 const store = useRoadmapStore.getState()
                 const activeRm = store.getActive()
-                if (activeRm && Array.isArray(actions)) {
-                  const changes = []
+                const changes = []
 
-                  // Helper: find node by topic (case-insensitive partial match, non-complete/skipped)
-                  const findByTopic = (topic) => {
-                    const t = topic?.toLowerCase() || ''
-                    return activeRm.nodes?.find(n =>
-                      n.status !== 'complete' && n.status !== 'skipped' &&
-                      (n.topic.toLowerCase() === t || n.topic.toLowerCase().includes(t) || t.includes(n.topic.toLowerCase()))
-                    )
-                  }
+                const findByTopic = (topic) => {
+                  if (!topic) return null
+                  const t = topic.toLowerCase()
+                  return activeRm.nodes?.find(n =>
+                    n.status !== 'complete' &&
+                    (n.topic.toLowerCase() === t ||
+                     n.topic.toLowerCase().includes(t) ||
+                     t.includes(n.topic.toLowerCase()))
+                  )
+                }
 
-                  for (const act of actions) {
-                    if (act.type === 'flag') {
-                      const node = findByTopic(act.topic)
-                      if (node) {
-                        store.flagNode(activeRm.id, node.id, true)
-                        store.logAevaAction(activeRm.id, { type: 'flag', topic: node.topic, description: `Flagged as urgent` })
-                        changes.push({ icon: '🚩', text: `Flagged urgent: ${node.topic}` })
-                      }
-                    } else if (act.type === 'skip') {
-                      const node = findByTopic(act.topic)
-                      if (node) {
-                        store.skipNode(activeRm.id, node.id, act.reason || 'Aeva determined this is not needed')
-                        store.logAevaAction(activeRm.id, { type: 'skip', topic: node.topic, description: act.reason || 'Skipped — not needed' })
-                        changes.push({ icon: '⏭', text: `Skipped: ${node.topic}${act.reason ? ` — ${act.reason}` : ''}` })
-                      }
-                    } else if (act.type === 'inject') {
-                      const available = activeRm.nodes?.find(n => n.status === 'available')
-                      const nt = act.nodeType || 'learn'
-                      store.injectNode(activeRm.id, {
-                        topic: act.topic || 'Extra Practice',
-                        type: nt,
-                        phase: act.phase || 'Core Topics',
-                        difficulty: act.difficulty || 3,
-                        estimatedMinutes: 20,
-                        xp: nt === 'drill' ? 30 : nt === 'check' ? 40 : 50,
-                        description: act.reason || 'Added by Aeva to strengthen your understanding.',
-                      }, available?.id || null)
-                      store.logAevaAction(activeRm.id, { type: 'inject', topic: act.topic, description: `Added new ${nt} node: ${act.reason || ''}` })
-                      changes.push({ icon: '➕', text: `Added node: ${act.topic}` })
-                    } else if (act.type === 'reprioritise') {
-                      const topics = act.topics || []
-                      store.reprioritiseNodes(activeRm.id, topics)
-                      store.logAevaAction(activeRm.id, { type: 'reprioritise', topic: topics.join(', '), description: `Moved to top priority` })
-                      changes.push({ icon: '🔀', text: `Prioritised: ${topics.slice(0, 2).join(', ')}` })
-                    } else if (act.type === 'crunch') {
-                      store.crunchMode(activeRm.id)
-                      store.logAevaAction(activeRm.id, { type: 'crunch', topic: '', description: 'Crunch mode — non-essential nodes removed' })
-                      changes.push({ icon: '⚡', text: 'Crunch mode activated' })
+                for (const act of actions) {
+                  if (act.type === 'flag') {
+                    const node = findByTopic(act.topic)
+                    if (node) {
+                      store.flagNode(activeRm.id, node.id, true)
+                      store.logAevaAction(activeRm.id, { type: 'flag', topic: node.topic, description: act.reason || 'Flagged as urgent' })
+                      changes.push({ icon: '🚩', text: `Flagged urgent: ${node.topic}` })
                     }
+                  } else if (act.type === 'skip') {
+                    const node = findByTopic(act.topic)
+                    if (node) {
+                      store.skipNode(activeRm.id, node.id, act.reason || '')
+                      store.logAevaAction(activeRm.id, { type: 'skip', topic: node.topic, description: act.reason || 'Removed — not needed' })
+                      changes.push({ icon: '⏭', text: `Removed: ${node.topic}${act.reason ? ` — ${act.reason}` : ''}` })
+                    }
+                  } else if (act.type === 'inject') {
+                    const nt = act.nodeType || 'learn'
+                    const available = activeRm.nodes?.find(n => n.status === 'available')
+                    store.injectNode(activeRm.id, {
+                      topic: act.topic || 'Extra Practice',
+                      type: nt, phase: 'Core Topics', difficulty: 3,
+                      estimatedMinutes: 20,
+                      xp: nt === 'drill' ? 30 : nt === 'check' ? 40 : 50,
+                      description: act.reason || 'Added by Aeva.',
+                    }, available?.id || null)
+                    store.logAevaAction(activeRm.id, { type: 'inject', topic: act.topic, description: `Added: ${act.reason || ''}` })
+                    changes.push({ icon: '➕', text: `Added: ${act.topic}` })
+                  } else if (act.type === 'reprioritise') {
+                    const topics = act.topics || (act.topic ? [act.topic] : [])
+                    if (topics.length) {
+                      store.reprioritiseNodes(activeRm.id, topics)
+                      store.logAevaAction(activeRm.id, { type: 'reprioritise', topic: topics.join(', '), description: 'Moved to top priority' })
+                      changes.push({ icon: '🔀', text: `Prioritised: ${topics.slice(0, 2).join(', ')}` })
+                    }
+                  } else if (act.type === 'crunch') {
+                    store.crunchMode(activeRm.id)
+                    store.logAevaAction(activeRm.id, { type: 'crunch', topic: '', description: 'Crunch mode — non-essentials removed' })
+                    changes.push({ icon: '⚡', text: 'Crunch mode — roadmap trimmed to essentials' })
                   }
+                }
 
-                  if (changes.length > 0) {
-                    setMessages(prev => {
-                      const copy = [...prev]
-                      copy[copy.length - 1] = { ...copy[copy.length - 1], aevaRoadmapChanges: changes }
-                      return copy
-                    })
-                    useAevaControlStore.getState().showCommandToast(`Roadmap updated · ${changes.length} change${changes.length > 1 ? 's' : ''}`, 'roadmap_edit')
-                  }
+                if (changes.length > 0) {
+                  setMessages(prev => {
+                    const copy = [...prev]
+                    copy[copy.length - 1] = { ...copy[copy.length - 1], aevaRoadmapChanges: changes }
+                    return copy
+                  })
+                  useAevaControlStore.getState().showCommandToast(`Roadmap updated · ${changes.length} change${changes.length > 1 ? 's' : ''}`, 'roadmap_edit')
                 }
               }
             }
-          } catch { /* malformed ROADMAP tag */ }
+          } catch { /* extraction failed silently */ }
         }
         // ─────────────────────────────────────────────────────────────────
 
