@@ -2311,6 +2311,22 @@ function parseInline(text, isLight = false) {
   let key = 0
 
   while (remaining.length > 0) {
+    // Display math $$...$$ inside inline context — strip delimiters, render inline
+    const dblMatch = remaining.match(/^(.*?)\$\$([^$]+?)\$\$/)
+    if (dblMatch) {
+      if (dblMatch[1]) parts.push(<span key={key++}>{dblMatch[1]}</span>)
+      try {
+        const html = katex.renderToString(dblMatch[2].trim(), { throwOnError: false, displayMode: false })
+        parts.push(
+          <span key={key++} dangerouslySetInnerHTML={{ __html: html }}
+            style={{ verticalAlign: 'middle', display: 'inline-block', padding: '0 2px', fontSize: '1.15em', lineHeight: 1 }} />
+        )
+      } catch {
+        parts.push(<span key={key++} style={{ fontFamily: 'monospace', fontSize: '0.9em' }}>{dblMatch[2]}</span>)
+      }
+      remaining = remaining.slice(dblMatch[0].length)
+      continue
+    }
     // Inline math $...$ — checked BEFORE bold/italic so $x*y$ doesn't break on *
     const mathMatch = remaining.match(/^(.*?)\$([^$\n]+?)\$/)
     if (mathMatch) {
@@ -2331,6 +2347,12 @@ function parseInline(text, isLight = false) {
         } catch {
           parts.push(<span key={key++} style={{ fontFamily: 'monospace', fontSize: '0.9em' }}>{mathContent}</span>)
         }
+        remaining = remaining.slice(mathMatch[0].length)
+        continue
+      } else {
+        // False positive ($20, prose) — render prefix + $content$ as plain text, advance past it
+        if (mathMatch[1]) parts.push(<span key={key++}>{mathMatch[1]}</span>)
+        parts.push(<span key={key++}>${mathContent}$</span>)
         remaining = remaining.slice(mathMatch[0].length)
         continue
       }
