@@ -301,27 +301,25 @@ MARKDOWN RULES (non-negotiable):
 - Numbered lists for steps/sequences. Bullet lists for comparisons/features.
 - Inline code (\`backticks\`) for code, variables, formulas.
 
-MATH NOTATION — read this carefully:
-- Display math $$...$$ MANDATORY for: any equation containing =, any named formula (quadratic, Pythagoras, etc.), any fraction or square root that is the focus of the statement, multi-step derivations. Each equation on its OWN $$...$$ block, never inline.
+MATH NOTATION — applies ONLY when the topic involves maths, science, formulas, or calculations. Do NOT inject LaTeX into general conversation, history, English, advice, or any non-mathematical topic.
+- Display math $$...$$ for: any equation containing =, any named formula (quadratic, Pythagoras, etc.), any fraction or square root that is the focus of the statement, multi-step derivations. Each equation on its OWN $$...$$ block, never inline.
   Example: $$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$
 - Inline math $...$: ONLY for brief mid-sentence references — a variable with a superscript ($x^2$), a short expression ($b^2 - 4ac$), a symbol ($\\theta$, $\\pi$). NEVER use inline math for a full equation.
 - DO NOT wrap bare single letters in LaTeX — write "let x be..." not "let $x$ be..."
-- NEVER write fractions as plain text — always $\\frac{a}{b}$ or $$\\frac{a}{b}$$
+- NEVER write fractions as plain text in a math context — always $\\frac{a}{b}$ or $$\\frac{a}{b}$$
 - Greek letters: $\\alpha$, $\\beta$, $\\theta$, $\\pi$, etc.
 - When walking through steps that reference the formula, put each substituted form on its OWN $$ block, NOT inline.
 
-NEVER DESCRIBE MATH IN WORDS — hard rule. Use LaTeX instead:
+IN A MATH/SCIENCE CONTEXT — never describe equations in words. Use LaTeX instead:
 ✗ "negative b divided by 2a" → ✓ $$\\frac{-b}{2a}$$
 ✗ "the square root of b squared minus 4ac" → ✓ $$\\sqrt{b^2 - 4ac}$$
 ✗ "plus or minus" → ✓ $\\pm$
 ✗ "x squared" → ✓ $x^2$
-✗ "b squared minus 4ac" (in a math context) → ✓ $b^2 - 4ac$
 
-MULTIPLICATION — ALWAYS use \\times, NEVER * or ×:
+IN A MATH CONTEXT — multiplication uses \\times:
 ✗ 5 * 14 = 70   ✓ $$5 \\times 14 = 70$$
-✗ 70 * 3 = 210  ✓ $$70 \\times 3 = 210$$
 
-ARITHMETIC STEPS — every calculation result must be its own $$ block:
+IN A MATH CONTEXT — every calculation result on its own $$ block:
 ✗ "5 × 14 = 70, then 70 × 3 = 210"
 ✓ $$5 \\times 14 = 70$$
 ✓ $$70 \\times 3 = 210$$
@@ -338,7 +336,7 @@ CALLOUT BLOCKS — use these in blockquotes for structure:
 > **Tip:** a memory trick or shortcut
 > **Recall:** connecting to something they already know
 
-Use 1-2 callout blocks per response. Always wrap your core definition in > **Definition:** and a key conceptual insight in > **Key Insight:**
+Use 1-2 callout blocks per response when teaching a concept. Only use them when there is a genuine definition or insight to highlight — do NOT force them into casual conversation or short answers.
 
 FEEDBACK TAGS — use these when ${userName} attempts an answer or exercise:
 - If correct: start your response with \`[CORRECT: one sentence confirming what they got right]\`
@@ -397,9 +395,23 @@ When to use them — act on your own judgment, don't wait to be asked:
 
 FREQUENCY RULE: Fire at most ONE command per conversation — use it when the moment genuinely calls for it, not to show off. A command should feel inevitable, not reflexive. If in doubt, don't. When you do fire one, don't announce it beforehand — include the tag and describe the action conversationally in past tense or present continuous ("I've opened your Lab", "Opening Arcade now", "I've queued a drill").
 
-━━━ AEVA CANVAS — MANDATORY FOR TEACHING ━━━
-You MUST end your response with ⚡CANVAS whenever you explain a math equation, science process, historical topic, or comparison.
-This is not optional. The ONLY exceptions: greetings, one-word answers, casual chat, or follow-up where Canvas was already just generated.
+━━━ AEVA CANVAS — USE WHEN IT GENUINELY HELPS ━━━
+Include ⚡CANVAS only when a visual, interactive, or structured canvas would meaningfully help the student understand — not just because the topic is educational.
+
+GOOD times to use canvas:
+- Student explicitly asks to learn/understand a specific concept (equation, formula, science process, historical event, comparison)
+- Worked example where an interactive graph, diagram, or timeline genuinely adds value
+- Student is stuck and a visual would clearly clarify
+
+NEVER use canvas for:
+- Greetings or any message that is primarily a hello/how are you/what's up
+- Short casual replies ("ok", "thanks", "cool", "what should I do?")
+- Simple factual questions ("what year did X happen?")
+- Motivational messages, study advice, general encouragement
+- Follow-up messages right after a canvas was already shown
+- Any response shorter than 4 sentences of substance
+
+If the student's message could be answered without a visual, skip canvas. Only include it when it would be genuinely more useful than words alone.
 
 ⚡CANVAS format — compact JSON, ONE line, at the very end of your response:
 ⚡CANVAS:{"topic":"Topic Name","blocks":[...blocks...]}
@@ -2335,18 +2347,26 @@ function parseInline(text, isLight = false) {
     // Inline math $...$ — checked BEFORE bold/italic so $x*y$ doesn't break on *
     const mathMatch = remaining.match(/^(.*?)\$([^$\n]+?)\$/)
     if (mathMatch) {
-      if (mathMatch[1]) parts.push(<span key={key++}>{mathMatch[1]}</span>)
-      try {
-        const html = katex.renderToString(mathMatch[2], { throwOnError: false, displayMode: false })
-        parts.push(
-          <span key={key++} dangerouslySetInnerHTML={{ __html: html }}
-            style={{ verticalAlign: 'middle', display: 'inline-block', padding: '0 2px', fontSize: '1.15em', lineHeight: 1 }} />
-        )
-      } catch {
-        parts.push(<span key={key++} style={{ fontFamily: 'monospace', fontSize: '0.9em' }}>{mathMatch[2]}</span>)
+      const mathContent = mathMatch[2]
+      // Reject false positives: "$20, prose text $" — starts with digits+comma, or long prose without math operators
+      const isMath = !(
+        /^\d+[,\s]/.test(mathContent) ||
+        (mathContent.length > 25 && !/[\\^_=+\-/<>{}]/.test(mathContent) && (mathContent.match(/\s/g) || []).length > 3)
+      )
+      if (isMath) {
+        if (mathMatch[1]) parts.push(<span key={key++}>{mathMatch[1]}</span>)
+        try {
+          const html = katex.renderToString(mathContent, { throwOnError: false, displayMode: false })
+          parts.push(
+            <span key={key++} dangerouslySetInnerHTML={{ __html: html }}
+              style={{ verticalAlign: 'middle', display: 'inline-block', padding: '0 2px', fontSize: '1.15em', lineHeight: 1 }} />
+          )
+        } catch {
+          parts.push(<span key={key++} style={{ fontFamily: 'monospace', fontSize: '0.9em' }}>{mathContent}</span>)
+        }
+        remaining = remaining.slice(mathMatch[0].length)
+        continue
       }
-      remaining = remaining.slice(mathMatch[0].length)
-      continue
     }
     // Bold **text**
     const boldMatch = remaining.match(/^(.*?)\*\*(.+?)\*\*/)
@@ -2434,8 +2454,8 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
 
   const clean = text
     .replace(/⚡CMD:\{[^}]*\}/g, '')
-    .replace(/^⚡VIZ:.*$/gm, '')
-    .replace(/^⚡CANVAS:.*$/gm, '')
+    .replace(/⚡VIZ:[\s\S]*$/, '')
+    .replace(/⚡CANVAS:[\s\S]*$/, '')
     .replace(/\[TERM:[^\]]*\]/g, '')
     .replace(/\[SUMMARY:[^\]]*\]/g, '')
     .replace(/\[CORRECT\]/g, '[CORRECT:]')
@@ -3880,8 +3900,18 @@ function ChatView({ onBack }) {
         }
 
         // ── CANVAS tag parser ────────────────────────────────────────────
+        // Suppress canvas for short/casual messages (greetings, one-liners, thanks, etc.)
+        const isCanvasSuppressed = (() => {
+          const t = userText.toLowerCase().trim()
+          if (t.length < 30) {
+            const words = t.replace(/[^a-z\s]/g, '').split(/\s+/).filter(Boolean)
+            const casualWords = new Set(['hello','hi','hey','hiya','sup','yo','greetings','howdy','thanks','thank','bye','goodbye','ok','okay','sure','yes','no','yep','nope','lol','haha','cool','nice','great','awesome','wow','what','how','why'])
+            if (words.every(w => casualWords.has(w))) return true
+          }
+          return false
+        })()
         const canvasIdx = rawResponse.indexOf('⚡CANVAS:')
-        if (canvasIdx !== -1) {
+        if (canvasIdx !== -1 && !isCanvasSuppressed) {
           try {
             const start = rawResponse.indexOf('{', canvasIdx)
             if (start !== -1) {

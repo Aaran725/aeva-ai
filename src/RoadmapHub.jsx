@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText, BookOpen, Zap, Target, ClipboardList, Check, Lock, Clock, Trophy, Trash2 } from 'lucide-react'
+import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText, BookOpen, Zap, Target, ClipboardList, Check, Lock, Clock, Trophy, Trash2, Brain, Dumbbell, GraduationCap, FlaskConical } from 'lucide-react'
 import { useRoadmapStore } from './roadmapStore'
 import { useLabStore } from './labStore'
 import { useXPStore } from './xpStore'
@@ -9,8 +9,18 @@ import { useAevaControlStore } from './aevaControlStore'
 const _GROQ_KEYS=[import.meta.env.VITE_GROQ_API_KEY,import.meta.env.VITE_GROQ_API_KEY_2,import.meta.env.VITE_GROQ_API_KEY_3].filter(Boolean);let _ki=0;const gKey=()=>_GROQ_KEYS[_ki++%_GROQ_KEYS.length]
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 
-async function generateRoadmapNodes(title, examDate, assessmentInfo) {
+async function generateRoadmapNodes(title, examDate, assessmentInfo, options = {}) {
   const daysLeft = Math.max(1, Math.ceil((new Date(examDate) - Date.now()) / 86400000))
+
+  const learnCount   = options.learnCount   ?? 8
+  const practiceCount = options.practiceCount ?? 6
+  const mockCount    = options.mockCount    ?? 2
+  const totalNodes   = learnCount + practiceCount + mockCount
+  const pace         = options.pace         ?? 'balanced'  // 'relaxed' | 'balanced' | 'intensive'
+
+  const minutesMap = { relaxed: { learn: 25, drill: 15, check: 15, mock: 60 }, balanced: { learn: 20, drill: 12, check: 12, mock: 45 }, intensive: { learn: 15, drill: 10, check: 10, mock: 30 } }
+  const mins = minutesMap[pace]
+
   const prompt = `You are Aeva, an expert AI tutor. Generate a comprehensive exam preparation roadmap engineered to achieve 90%+ on the test.
 
 Exam: "${title}"
@@ -33,26 +43,30 @@ Return ONLY valid JSON:
   ]
 }
 
-CRITICAL RULES — follow exactly. Deviating reduces exam score:
+CRITICAL RULES — follow exactly:
 
-NODE COUNT: 18-22 nodes total. More is better than fewer.
+NODE COUNT: Exactly ${totalNodes} nodes total. No more, no fewer.
+
+TYPE DISTRIBUTION — you MUST hit these exact counts:
+  learn nodes: exactly ${learnCount}  (type="learn" — Aeva teaches a concept)
+  practice/drill/check nodes: exactly ${practiceCount}  (spread evenly across type="drill" and type="check")
+  mock test nodes: exactly ${mockCount}  (type="mock")
+
+BALANCE RULE: Spread the ${learnCount} learn nodes across all major topics. Interleave drill/check nodes after learn nodes for the same topic. Place mock nodes near the end.
 
 PHASES — every node must have a phase, exactly one of:
-  "Foundation"  — essential background without which nothing else works (2-4 nodes, type=learn only)
-  "Core Topics" — deep coverage of every major exam topic (10-14 nodes)
-  "Practice"    — cross-topic application and harder problems (3-5 nodes)
-  "Exam Prep"   — exam technique and full mock (2-3 nodes)
-
-CORE TOPICS RULE (most important): For EVERY major topic that could appear on the exam, create exactly 3 nodes in this order:
-  1. learn  — understand the concept (difficulty 2-3)
-  2. drill  — rapid-fire recall practice (difficulty 2-3)
-  3. check  — short-answer quiz to confirm mastery (difficulty 3-4)
-Do NOT skip any of the 3 for any major topic. This is what delivers 90%+.
+  "Foundation"  — essential background (2-3 learn nodes, first in the roadmap)
+  "Core Topics" — deep coverage of every major exam topic (bulk of learn + drill + check nodes)
+  "Practice"    — cross-topic application (harder drill/check nodes)
+  "Exam Prep"   — exam technique, mock tests (last ${Math.max(mockCount + 1, 2)} nodes)
 
 FIXED STRUCTURE:
   - Node 1: type="learn", phase="Foundation", difficulty=1, most foundational concept
   - Second-to-last node: type="learn", topic="Exam Strategy & Technique", phase="Exam Prep", description="Timing plans, command word interpretation, common mark-scheme traps, and how to maximise marks under pressure."
   - Last node: type="mock", phase="Exam Prep", difficulty=5, xp=100
+
+STUDY PACE: ${pace} — set estimatedMinutes accordingly:
+  learn=${mins.learn}min, drill=${mins.drill}min, check=${mins.check}min, mock=${mins.mock}min
 
 TYPE VALUES: exactly one of: learn, drill, check, mock
 DIFFICULTY: Foundation=1-2, Core Topics=2-3, Practice=3-4, Exam Prep=4-5
@@ -289,6 +303,24 @@ function HomeView({ onCreate, onOpen }) {
   )
 }
 
+function NodeCounter({ label, icon, color, bg, border, value, onChange, min = 1, max = 20 }) {
+  return (
+    <div style={{ flex: 1, minWidth: 0, padding: '12px 14px', borderRadius: 12, background: bg, border: `1px solid ${border}`, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ color, display: 'flex' }}>{icon}</span>
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{label}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+        <motion.button whileTap={{ scale: 0.88 }} onClick={() => onChange(Math.max(min, value - 1))}
+          style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}>−</motion.button>
+        <span style={{ flex: 1, textAlign: 'center', fontSize: 20, fontWeight: 800, color, letterSpacing: '-0.02em' }}>{value}</span>
+        <motion.button whileTap={{ scale: 0.88 }} onClick={() => onChange(Math.min(max, value + 1))}
+          style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}>+</motion.button>
+      </div>
+    </div>
+  )
+}
+
 function CreateView({ onGenerate }) {
   const [title, setTitle]       = useState('')
   const [examDate, setExamDate] = useState('')
@@ -296,6 +328,24 @@ function CreateView({ onGenerate }) {
   const [dragOver, setDragOver] = useState(false)
   const [error, setError]       = useState('')
   const fileRef                 = useRef(null)
+
+  // Customisation
+  const [learnCount,    setLearnCount]    = useState(8)
+  const [practiceCount, setPracticeCount] = useState(6)
+  const [mockCount,     setMockCount]     = useState(2)
+  const [pace,          setPace]          = useState('balanced')
+
+  const totalNodes = learnCount + practiceCount + mockCount
+
+  const PRESETS = [
+    { label: 'Balanced',        learn: 8,  practice: 6,  mock: 2 },
+    { label: 'Practice Heavy',  learn: 6,  practice: 10, mock: 2 },
+    { label: 'Exam Focused',    learn: 6,  practice: 5,  mock: 5 },
+    { label: 'Deep Dive',       learn: 14, practice: 8,  mock: 3 },
+  ]
+  const activePreset = PRESETS.findIndex(p => p.learn === learnCount && p.practice === practiceCount && p.mock === mockCount)
+
+  const applyPreset = (p) => { setLearnCount(p.learn); setPracticeCount(p.practice); setMockCount(p.mock) }
 
   const handleFile = (f) => {
     if (!f) return
@@ -307,7 +357,7 @@ function CreateView({ onGenerate }) {
   const handleGenerate = () => {
     if (!title.trim() || !examDate) { setError('Add a title and exam date to continue.'); return }
     setError('')
-    onGenerate({ title: title.trim(), examDate, info })
+    onGenerate({ title: title.trim(), examDate, info, options: { learnCount, practiceCount, mockCount, pace } })
   }
 
   const field = {
@@ -317,10 +367,16 @@ function CreateView({ onGenerate }) {
     outline: 'none', boxSizing: 'border-box',
   }
 
+  // Build the visual proportion bar
+  const total = totalNodes || 1
+  const learnPct    = Math.round(learnCount / total * 100)
+  const practicePct = Math.round(practiceCount / total * 100)
+  const mockPct     = 100 - learnPct - practicePct
+
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
       style={{ flex: 1, padding: '28px 24px 40px', display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: 'auto' }}>
-      <div style={{ width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <div style={{ width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 20 }}>
 
         {/* Title */}
         <div>
@@ -348,6 +404,77 @@ function CreateView({ onGenerate }) {
           </div>
         </div>
 
+        {/* ── Node Mix ── */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
+            <label style={{ fontSize: 11.5, fontWeight: 700, color: 'rgba(255,255,255,0.40)', letterSpacing: '0.10em', textTransform: 'uppercase' }}>
+              Roadmap Mix
+            </label>
+            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.30)', fontWeight: 500 }}>{totalNodes} nodes total</span>
+          </div>
+
+          {/* Preset chips */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+            {PRESETS.map((p, i) => (
+              <motion.button key={p.label} whileTap={{ scale: 0.95 }} onClick={() => applyPreset(p)}
+                style={{
+                  padding: '5px 11px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                  background: activePreset === i ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.05)',
+                  border: activePreset === i ? '1px solid rgba(99,102,241,0.50)' : '1px solid rgba(255,255,255,0.10)',
+                  color: activePreset === i ? '#A5B4FC' : 'rgba(255,255,255,0.45)',
+                }}>
+                {p.label}
+              </motion.button>
+            ))}
+          </div>
+
+          {/* Counters */}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <NodeCounter label="Learn" icon={<GraduationCap size={13} />} color="#818CF8" bg="rgba(99,102,241,0.08)" border="rgba(99,102,241,0.22)" value={learnCount} onChange={setLearnCount} />
+            <NodeCounter label="Practice" icon={<Dumbbell size={13} />} color="#34D399" bg="rgba(52,211,153,0.08)" border="rgba(52,211,153,0.22)" value={practiceCount} onChange={setPracticeCount} />
+            <NodeCounter label="Mock Tests" icon={<FlaskConical size={13} />} color="#F59E0B" bg="rgba(245,158,11,0.08)" border="rgba(245,158,11,0.22)" value={mockCount} onChange={setMockCount} min={1} />
+          </div>
+
+          {/* Proportion bar */}
+          <div style={{ marginTop: 10, height: 6, borderRadius: 6, overflow: 'hidden', display: 'flex', gap: 2 }}>
+            <motion.div animate={{ flex: learnCount }} style={{ background: 'rgba(99,102,241,0.60)', borderRadius: 6, transition: 'flex 0.3s' }} />
+            <motion.div animate={{ flex: practiceCount }} style={{ background: 'rgba(52,211,153,0.60)', borderRadius: 6, transition: 'flex 0.3s' }} />
+            <motion.div animate={{ flex: mockCount }} style={{ background: 'rgba(245,158,11,0.60)', borderRadius: 6, transition: 'flex 0.3s' }} />
+          </div>
+          <div style={{ display: 'flex', gap: 14, marginTop: 6 }}>
+            {[['#818CF8','Learn',learnPct],['#34D399','Practice',practicePct],['#F59E0B','Mock',mockPct]].map(([c,l,p]) => (
+              <span key={l} style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 7, height: 7, borderRadius: 2, background: c, display: 'inline-block' }} />{l} {p}%
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Study Pace ── */}
+        <div>
+          <label style={{ fontSize: 11.5, fontWeight: 700, color: 'rgba(255,255,255,0.40)', letterSpacing: '0.10em', textTransform: 'uppercase', display: 'block', marginBottom: 10 }}>
+            Study Pace
+          </label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[
+              { id: 'relaxed',    label: 'Relaxed',    sub: '20–25 min/node' },
+              { id: 'balanced',   label: 'Balanced',   sub: '12–20 min/node' },
+              { id: 'intensive',  label: 'Intensive',  sub: '10–15 min/node' },
+            ].map(p => (
+              <motion.button key={p.id} whileTap={{ scale: 0.96 }} onClick={() => setPace(p.id)}
+                style={{
+                  flex: 1, padding: '10px 8px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
+                  background: pace === p.id ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.04)',
+                  border: pace === p.id ? '1px solid rgba(99,102,241,0.45)' : '1px solid rgba(255,255,255,0.08)',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: pace === p.id ? '#A5B4FC' : 'rgba(255,255,255,0.55)' }}>{p.label}</span>
+                <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.28)', fontWeight: 500 }}>{p.sub}</span>
+              </motion.button>
+            ))}
+          </div>
+        </div>
+
         {/* Assessment info */}
         <div>
           <label style={{ fontSize: 11.5, fontWeight: 700, color: 'rgba(255,255,255,0.40)', letterSpacing: '0.10em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
@@ -356,7 +483,7 @@ function CreateView({ onGenerate }) {
           <textarea
             value={info} onChange={e => setInfo(e.target.value)}
             placeholder="Paste rubrics, learning outcomes, study guides, teacher instructions…"
-            rows={5}
+            rows={4}
             style={{ ...field, resize: 'vertical', lineHeight: 1.6 }}
           />
         </div>
@@ -368,7 +495,7 @@ function CreateView({ onGenerate }) {
           onDrop={e => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files?.[0]) }}
           onClick={() => fileRef.current?.click()}
           animate={{ borderColor: dragOver ? 'rgba(99,102,241,0.70)' : 'rgba(255,255,255,0.10)', background: dragOver ? 'rgba(99,102,241,0.07)' : 'rgba(255,255,255,0.02)' }}
-          style={{ border: '2px dashed rgba(255,255,255,0.10)', borderRadius: 12, padding: '18px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, cursor: 'pointer', transition: 'all 0.2s' }}>
+          style={{ border: '2px dashed rgba(255,255,255,0.10)', borderRadius: 12, padding: '16px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, cursor: 'pointer', transition: 'all 0.2s' }}>
           <input ref={fileRef} type="file" accept=".txt,.pdf,.md,.csv" style={{ display: 'none' }} onChange={e => handleFile(e.target.files?.[0])} />
           <Upload size={18} color="rgba(255,255,255,0.30)" />
           <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.35)', fontWeight: 500 }}>Drop a file or click to upload</span>
@@ -394,7 +521,7 @@ function CreateView({ onGenerate }) {
             color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
             fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           }}>
-          <Sparkles size={15} /> Generate Roadmap
+          <Sparkles size={15} /> Generate Roadmap · {totalNodes} nodes
         </motion.button>
 
       </div>
@@ -423,7 +550,7 @@ function GeneratingView({ formData, onDone }) {
     const run = async () => {
       try {
         const id = createRoadmap({ title: formData.title, examDate: formData.examDate, assessmentInfo: formData.info })
-        const { overview, nodes } = await generateRoadmapNodes(formData.title, formData.examDate, formData.info)
+        const { overview, nodes } = await generateRoadmapNodes(formData.title, formData.examDate, formData.info, formData.options || {})
         if (cancelled) return
         updateRoadmap(id, { overview, nodes })
         // Generate daily mission
