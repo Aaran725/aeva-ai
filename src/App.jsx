@@ -290,14 +290,24 @@ MARKDOWN RULES (non-negotiable):
 - Numbered lists for steps/sequences. Bullet lists for comparisons/features.
 - Inline code (\`backticks\`) for code, variables, formulas.
 
-MATH NOTATION:
-- Use LaTeX ONLY for real mathematical expressions — not for single plain letters in prose
-- Inline math $...$: for expressions with operators, powers, roots, subscripts, fractions (e.g. $x^2 + 2x$, $\\sqrt{b^2-4ac}$)
-- Display math $$...$$: for standalone full equations (e.g. $$x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$)
-- DO NOT wrap bare single letters in LaTeX just because they're variables — write "let x be..." not "let $x$ be..."
-- DO use LaTeX when the expression has actual notation: $x^2$, $\\frac{a}{b}$, $\\sqrt{x}$, $\\theta$, $\\pm$
-- NEVER write fractions as a/b in math — use $\\frac{a}{b}$
-- Greek letters in equations: $\\alpha$, $\\beta$, $\\theta$, $\\pi$
+MATH NOTATION — read this carefully:
+- Display math $$...$$ MANDATORY for: any equation containing =, any named formula (quadratic, Pythagoras, etc.), any fraction or square root that is the focus of the statement, multi-step derivations. Each equation on its OWN $$...$$ block, never inline.
+  Example: $$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$
+- Inline math $...$: ONLY for brief mid-sentence references — a variable with a superscript ($x^2$), a short expression ($\\Delta = b^2 - 4ac$), a symbol ($\\theta$, $\\pi$). NEVER use inline math for a full equation.
+- DO NOT wrap bare single letters in LaTeX — write "let x be..." not "let $x$ be..."
+- NEVER write fractions as plain text — always $\\frac{a}{b}$ or $$\\frac{a}{b}$$
+- Greek letters: $\\alpha$, $\\beta$, $\\theta$, $\\pi$, etc.
+- When walking through steps that reference the formula, put each substituted form on its OWN $$ block, NOT inline.
+
+CALLOUT BLOCKS — use these in blockquotes for structure:
+> **Definition:** clear 1-sentence definition of the key term
+> **Key Insight:** the "why" behind the concept — the mechanism
+> **Example:** a worked example or concrete case
+> **Note:** an important caveat or extension
+> **Tip:** a memory trick or shortcut
+> **Recall:** connecting to something they already know
+
+Use 1-2 callout blocks per response. Always wrap your core definition in > **Definition:** and a key conceptual insight in > **Key Insight:**
 
 FEEDBACK TAGS — use these when ${userName} attempts an answer or exercise:
 - If correct: start your response with \`[CORRECT: one sentence confirming what they got right]\`
@@ -2299,7 +2309,7 @@ function parseInline(text, isLight = false) {
         const html = katex.renderToString(mathMatch[2], { throwOnError: false, displayMode: false })
         parts.push(
           <span key={key++} dangerouslySetInnerHTML={{ __html: html }}
-            style={{ verticalAlign: 'middle', display: 'inline-block', padding: '0 1px' }} />
+            style={{ verticalAlign: 'middle', display: 'inline-block', padding: '0 2px', fontSize: '1.15em', lineHeight: 1 }} />
         )
       } catch {
         parts.push(<span key={key++} style={{ fontFamily: 'monospace', fontSize: '0.9em' }}>{mathMatch[2]}</span>)
@@ -2476,10 +2486,11 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
         const html = katex.renderToString(mathContent, { throwOnError: false, displayMode: true })
         elements.push(
           <div key={`dmath-${startI}`} style={{
-            overflowX: 'auto', margin: '12px 0', padding: '14px 18px',
-            textAlign: 'center', borderRadius: 14,
-            background: isLight ? 'rgba(99,102,241,0.06)' : 'rgba(99,102,241,0.08)',
-            border: isLight ? '1px solid rgba(99,102,241,0.18)' : '1px solid rgba(99,102,241,0.22)',
+            overflowX: 'auto', margin: '14px 0', padding: '22px 24px',
+            textAlign: 'center', borderRadius: 14, fontSize: 18,
+            background: isLight ? 'rgba(99,102,241,0.06)' : 'rgba(99,102,241,0.09)',
+            border: isLight ? '1px solid rgba(99,102,241,0.22)' : '1px solid rgba(99,102,241,0.28)',
+            boxShadow: isLight ? 'none' : '0 2px 20px rgba(99,102,241,0.08), inset 0 1px 0 rgba(165,170,255,0.06)',
           }}
             dangerouslySetInnerHTML={{ __html: html }}
           />
@@ -2555,22 +2566,57 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
       i++; continue
     }
 
-    // Blockquote > — key insight callout
+    // Blockquote > — typed callout cards OR plain insight strip
     if (/^>/.test(trimmed)) {
       flushList()
       const content = trimmed.replace(/^>\s*/, '')
-      elements.push(
-        <div key={`bq-${i}`} style={{
-          margin: '8px 0', padding: '10px 14px',
-          borderLeft: `3px solid ${isLight ? 'rgba(99,102,241,0.55)' : 'rgba(129,140,248,0.55)'}`,
-          background: isLight ? 'rgba(99,102,241,0.05)' : 'rgba(99,102,241,0.08)',
-          borderRadius: '0 10px 10px 0',
-          fontSize: 14, lineHeight: 1.68, fontStyle: 'italic',
-          color: isLight ? 'rgba(0,0,0,0.80)' : 'rgba(220,220,255,0.90)',
-        }}>
-          {parseInline(content, isLight)}
-        </div>
-      )
+
+      // Detect typed label: **Example:**, **Definition:**, **Key:**, **Note:**, **Warning:**
+      const labelMatch = content.match(/^\*\*(Example|Definition|Key Insight|Key|Note|Warning|Tip|Recall):\*\*\s*(.*)$/i)
+      if (labelMatch) {
+        const label = labelMatch[1]
+        const body  = labelMatch[2]
+        const cfg = {
+          example:     { bg: 'rgba(251,191,36,0.08)',  border: 'rgba(251,191,36,0.30)',  color: '#FBBF24', icon: '◎' },
+          definition:  { bg: 'rgba(96,165,250,0.08)',  border: 'rgba(96,165,250,0.28)',  color: '#60A5FA', icon: '◉' },
+          'key insight':{ bg: 'rgba(139,143,255,0.10)', border: 'rgba(139,143,255,0.34)', color: '#A5B4FC', icon: '◈' },
+          key:         { bg: 'rgba(139,143,255,0.10)', border: 'rgba(139,143,255,0.34)', color: '#A5B4FC', icon: '◈' },
+          note:        { bg: 'rgba(99,102,241,0.08)',  border: 'rgba(99,102,241,0.28)',  color: '#818CF8', icon: '◇' },
+          warning:     { bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.28)', color: '#F87171', icon: '⚠' },
+          tip:         { bg: 'rgba(52,211,153,0.08)',  border: 'rgba(52,211,153,0.28)',  color: '#34D399', icon: '→' },
+          recall:      { bg: 'rgba(251,191,36,0.07)',  border: 'rgba(251,191,36,0.24)',  color: '#FCD34D', icon: '↩' },
+        }[label.toLowerCase()] || { bg: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.28)', color: '#818CF8', icon: '◈' }
+
+        elements.push(
+          <div key={`bq-${i}`} style={{
+            margin: '10px 0', padding: '12px 16px',
+            background: cfg.bg,
+            border: `1px solid ${cfg.border}`,
+            borderLeft: `3px solid ${cfg.border}`,
+            borderRadius: '0 12px 12px 0',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: body ? 5 : 0 }}>
+              <span style={{ fontSize: 11, color: cfg.color }}>{cfg.icon}</span>
+              <span style={{ fontSize: 11, fontWeight: 800, color: cfg.color, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{label}</span>
+            </div>
+            {body && <div style={{ fontSize: 14, lineHeight: 1.70, color: isLight ? 'rgba(0,0,0,0.80)' : 'rgba(255,255,255,0.86)' }}>{parseInline(body, isLight)}</div>}
+          </div>
+        )
+      } else {
+        // Plain blockquote — slim left-border insight strip
+        elements.push(
+          <div key={`bq-${i}`} style={{
+            margin: '8px 0', padding: '10px 14px',
+            borderLeft: `3px solid ${isLight ? 'rgba(99,102,241,0.50)' : 'rgba(129,140,248,0.50)'}`,
+            background: isLight ? 'rgba(99,102,241,0.05)' : 'rgba(99,102,241,0.07)',
+            borderRadius: '0 10px 10px 0',
+            fontSize: 14, lineHeight: 1.68, fontStyle: 'italic',
+            color: isLight ? 'rgba(0,0,0,0.80)' : 'rgba(220,220,255,0.90)',
+          }}>
+            {parseInline(content, isLight)}
+          </div>
+        )
+      }
       i++; continue
     }
 
