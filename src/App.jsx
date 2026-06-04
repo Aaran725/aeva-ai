@@ -310,18 +310,25 @@ MATH NOTATION — read this carefully:
 - Greek letters: $\\alpha$, $\\beta$, $\\theta$, $\\pi$, etc.
 - When walking through steps that reference the formula, put each substituted form on its OWN $$ block, NOT inline.
 
-NEVER DESCRIBE MATH IN WORDS — this is a hard rule. Use LaTeX instead:
+NEVER DESCRIBE MATH IN WORDS — hard rule. Use LaTeX instead:
 ✗ "negative b divided by 2a" → ✓ $$\\frac{-b}{2a}$$
 ✗ "the square root of b squared minus 4ac" → ✓ $$\\sqrt{b^2 - 4ac}$$
 ✗ "plus or minus" → ✓ $\\pm$
 ✗ "x squared" → ✓ $x^2$
-✗ "divided by 2a" → ✓ $\\frac{\\ldots}{2a}$
 ✗ "b squared minus 4ac" (in a math context) → ✓ $b^2 - 4ac$
-When breaking a formula into parts, show EACH PART as its own $$ block, never as prose.
-Example — explaining the quadratic formula in parts:
-The formula has two parts:
-$$\\frac{-b}{2a}$$ — shift along the x-axis
-$$\\frac{\\sqrt{b^2-4ac}}{2a}$$ — the ± spread from that centre
+
+MULTIPLICATION — ALWAYS use \\times, NEVER * or ×:
+✗ 5 * 14 = 70   ✓ $$5 \\times 14 = 70$$
+✗ 70 * 3 = 210  ✓ $$70 \\times 3 = 210$$
+
+ARITHMETIC STEPS — every calculation result must be its own $$ block:
+✗ "5 × 14 = 70, then 70 × 3 = 210"
+✓ $$5 \\times 14 = 70$$
+✓ $$70 \\times 3 = 210$$
+
+When breaking a formula into parts, show EACH PART as its own $$ block with a plain label after it:
+$$\\frac{-b}{2a}$$ — horizontal shift
+$$\\frac{\\sqrt{b^2-4ac}}{2a}$$ — spread from centre
 
 CALLOUT BLOCKS — use these in blockquotes for structure:
 > **Definition:** clear 1-sentence definition of the key term
@@ -2730,6 +2737,36 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
         }}>
           {parseInline(trimmed.slice(1, -1), isLight)}
         </div>
+      )
+      i++; continue
+    }
+
+    // Auto-box bare arithmetic/algebra equations that Aeva forgot to wrap in $$
+    // Matches: "5 * 14 = 70", "70 × 3 = 210", "x + 3 = 7", "2(3) = 6"
+    const bareEqTest = /^[\d\w\s\(\)\.\+\-\*×÷\/\^=]+$/.test(trimmed)
+      && /=/.test(trimmed)
+      && trimmed.length < 72
+      && !/\b(is|are|was|were|the|a|an|of|to|in|on|at|by|for|with|that|this|so|then|and|or|but|since|we|let|note)\b/i.test(trimmed)
+    if (bareEqTest) {
+      flushList()
+      const latexStr = trimmed
+        .replace(/\*/g, ' \\times ')
+        .replace(/×/g, ' \\times ')
+        .replace(/÷/g, ' \\div ')
+      let boxHtml = null
+      try { boxHtml = katex.renderToString(latexStr, { throwOnError: false, displayMode: true }) } catch {}
+      elements.push(
+        <div key={`bareq-${i}`} style={{
+          overflowX: 'auto', margin: '16px 0', padding: '22px 28px',
+          textAlign: 'center', borderRadius: 16, fontSize: 19,
+          background: isLight ? 'rgba(99,102,241,0.07)' : 'rgba(14,16,48,0.80)',
+          border: isLight ? '1px solid rgba(99,102,241,0.22)' : '1px solid rgba(99,102,241,0.30)',
+          boxShadow: isLight ? 'none' : '0 4px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(165,170,255,0.07)',
+          color: isLight ? '#1e1b4b' : 'rgba(255,255,255,0.92)',
+          fontFamily: boxHtml ? undefined : '"JetBrains Mono", monospace',
+        }}
+          {...(boxHtml ? { dangerouslySetInnerHTML: { __html: boxHtml } } : { children: trimmed })}
+        />
       )
       i++; continue
     }
