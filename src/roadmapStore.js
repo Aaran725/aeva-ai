@@ -7,12 +7,11 @@ const uid  = () => Math.random().toString(36).slice(2, 10)
 
 const DEFAULT = { roadmaps: [], activeRoadmapId: null, roadmapOpen: false, activeNodeSession: null }
 
-// Re-compute readiness and unlock chain after any node mutation
+// Re-compute unlock chain after any node mutation
 function recalc(nodes) {
-  // Unlock: if previous node is complete or skipped, next locked becomes available
   const out = [...nodes]
   for (let i = 0; i < out.length - 1; i++) {
-    if ((out[i].status === 'complete' || out[i].status === 'skipped') && out[i + 1].status === 'locked') {
+    if (out[i].status === 'complete' && out[i + 1].status === 'locked') {
       out[i + 1] = { ...out[i + 1], status: 'available' }
     }
   }
@@ -147,14 +146,14 @@ export const useRoadmapStore = create((set, get) => {
       })
     },
 
-    // Mark a node as skipped — Aeva decided student doesn't need it
+    // Remove a node entirely — Aeva decided student doesn't need it
     skipNode: (roadmapId, nodeId, reason = '') => {
       set(s => {
         const roadmaps = s.roadmaps.map(r => {
           if (r.id !== roadmapId) return r
-          let nodes = r.nodes.map(n => n.id === nodeId ? { ...n, status: 'skipped', skippedReason: reason } : n)
+          let nodes = r.nodes.filter(n => n.id !== nodeId)
           nodes = recalc(nodes)
-          const readiness = Math.round(nodes.filter(n => n.status === 'complete').length / nodes.filter(n => n.status !== 'skipped').length * 100)
+          const readiness = Math.round(nodes.filter(n => n.status === 'complete').length / Math.max(nodes.length, 1) * 100)
           return { ...r, nodes, readiness }
         })
         const u = { ...s, roadmaps }; save(u); return u
@@ -202,31 +201,32 @@ export const useRoadmapStore = create((set, get) => {
       })
     },
 
-    // Crunch mode — keep only essentials, skip the rest
+    // Crunch mode — delete non-essentials, keep only what matters
     crunchMode: (roadmapId) => {
       set(s => {
         const roadmaps = s.roadmaps.map(r => {
           if (r.id !== roadmapId) return r
-          // Keep: complete, available, all mock nodes, first check per topic, urgent nodes
-          // Skip: duplicate drills, extra learn nodes beyond 1 per topic
+          // Keep: complete, available, mock nodes, urgent nodes, one check per topic
+          // Delete: all drills, duplicate learns, duplicate checks
           const seenTopicLearn = new Set()
           const seenTopicCheck = new Set()
-          const nodes = r.nodes.map(n => {
-            if (n.status === 'complete' || n.status === 'available' || n.status === 'skipped') return n
-            if (n.urgent) return n
-            if (n.type === 'mock') return n
+          const nodes = r.nodes.filter(n => {
+            if (n.status === 'complete' || n.status === 'available') return true
+            if (n.urgent) return true
+            if (n.type === 'mock') return true
+            if (n.type === 'drill') return false  // delete all drills
             if (n.type === 'check') {
-              if (seenTopicCheck.has(n.topic)) return { ...n, status: 'skipped', skippedReason: 'Crunch mode — skipped duplicate' }
-              seenTopicCheck.add(n.topic); return n
+              if (seenTopicCheck.has(n.topic)) return false
+              seenTopicCheck.add(n.topic); return true
             }
             if (n.type === 'learn') {
-              if (seenTopicLearn.has(n.topic)) return { ...n, status: 'skipped', skippedReason: 'Crunch mode — skipped to save time' }
-              seenTopicLearn.add(n.topic); return n
+              if (seenTopicLearn.has(n.topic)) return false
+              seenTopicLearn.add(n.topic); return true
             }
-            if (n.type === 'drill') return { ...n, status: 'skipped', skippedReason: 'Crunch mode — drills deprioritised' }
-            return n
+            return true
           })
-          return { ...r, nodes: recalc(nodes), crunchMode: true }
+          const readiness = Math.round(nodes.filter(n => n.status === 'complete').length / Math.max(nodes.length, 1) * 100)
+          return { ...r, nodes: recalc(nodes), crunchMode: true, readiness }
         })
         const u = { ...s, roadmaps }; save(u); return u
       })

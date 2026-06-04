@@ -979,23 +979,9 @@ function PathView() {
           const { Icon } = cfg
           const isComplete  = node.status === 'complete'
           const isAvailable = node.status === 'available'
-          const isSkipped   = node.status === 'skipped'
           const isSelected  = selected?.id === node.id
           const isUrgent    = !!node.urgent
           const isInjected  = !!node.injectedByAeva
-
-          if (isSkipped) {
-            return (
-              <div key={node.id} style={{ position: 'absolute', left: x, top: y, transform: 'translate(-50%, -50%)', zIndex: 1, opacity: 0.35 }}>
-                <div style={{ width: NODE_R * 2, height: NODE_R * 2, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px dashed rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>—</span>
-                </div>
-                <div style={{ position: 'absolute', top: NODE_R * 2 + 10, left: '50%', transform: 'translateX(-50%)', whiteSpace: 'nowrap', fontSize: 10, color: 'rgba(255,255,255,0.22)', fontWeight: 500, textDecoration: 'line-through' }}>
-                  {node.topic}
-                </div>
-              </div>
-            )
-          }
 
           // 3D gradient + bottom shadow colours
           const nodeBg     = isComplete ? 'linear-gradient(180deg,#86EFAC 0%,#22C55E 55%,#15803D 100%)'
