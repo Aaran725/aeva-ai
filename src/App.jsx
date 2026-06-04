@@ -2387,11 +2387,9 @@ function MarkdownTable({ lines, isLight = false }) {
 }
 
 function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
-  const txt    = isLight ? 'rgba(0,0,0,0.82)'  : 'rgba(255,255,255,0.82)'
-  const txtH1  = isLight ? 'rgba(0,0,0,0.90)'  : 'rgba(255,255,255,0.95)'
-  const txtH2  = isLight ? 'rgba(0,0,0,0.80)'  : 'rgba(255,255,255,0.90)'
-  const txtP   = isLight ? 'rgba(0,0,0,0.78)'  : 'rgba(255,255,255,0.85)'
-  const bullet = isLight ? 'rgba(99,102,241,0.75)' : 'rgba(139,143,255,0.8)'
+  const txtBody = isLight ? 'rgba(0,0,0,0.82)'  : 'rgba(255,255,255,0.86)'
+  const txtP    = isLight ? 'rgba(0,0,0,0.78)'  : 'rgba(255,255,255,0.82)'
+  const purple  = isLight ? '#5B5BD6'            : '#818CF8'
 
   const clean = text
     .replace(/⚡CMD:\{[^}]*\}/g, '')
@@ -2399,7 +2397,7 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
     .replace(/^⚡CANVAS:.*$/gm, '')
     .replace(/\[TERM:[^\]]*\]/g, '')
     .replace(/\[SUMMARY:[^\]]*\]/g, '')
-    .replace(/\[CORRECT\]/g, '[CORRECT:]')  // normalise bare tags
+    .replace(/\[CORRECT\]/g, '[CORRECT:]')
 
   const lines = clean.split('\n')
   const elements = []
@@ -2411,31 +2409,25 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
     if (listItems.length === 0) return
     if (listType === 'ol') {
       elements.push(
-        <ol key={`list-${elements.length}`} style={{ margin: '8px 0 8px 4px', paddingLeft: 0, display: 'flex', flexDirection: 'column', gap: 5, listStyle: 'none', counterReset: 'aeva-ol' }}>
+        <div key={`list-${elements.length}`} style={{ margin: '6px 0 6px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
           {listItems.map((item, idx) => (
-            <li key={idx} style={{ color: txt, fontSize: 14.5, lineHeight: 1.6, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <span style={{
-                flexShrink: 0, minWidth: 22, height: 22, borderRadius: 6,
-                background: isLight ? 'rgba(99,102,241,0.12)' : 'rgba(139,143,255,0.15)',
-                color: isLight ? 'rgba(99,102,241,0.85)' : 'rgba(165,170,255,0.90)',
-                fontSize: 11.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                marginTop: 1,
-              }}>{idx + 1}</span>
-              <span style={{ paddingTop: 2 }}>{parseInline(item, isLight)}</span>
-            </li>
+            <div key={idx} style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+              <span style={{ color: purple, flexShrink: 0, minWidth: 18, fontSize: 13, fontWeight: 700, lineHeight: 1.7 }}>{idx + 1}.</span>
+              <span style={{ fontSize: 14, color: txtBody, lineHeight: 1.70 }}>{parseInline(item, isLight)}</span>
+            </div>
           ))}
-        </ol>
+        </div>
       )
     } else {
       elements.push(
-        <ul key={`list-${elements.length}`} style={{ margin: '8px 0 8px 4px', paddingLeft: 2, display: 'flex', flexDirection: 'column', gap: 5, listStyle: 'none' }}>
+        <div key={`list-${elements.length}`} style={{ margin: '6px 0 6px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
           {listItems.map((item, idx) => (
-            <li key={idx} style={{ color: txt, fontSize: 14.5, lineHeight: 1.6, display: 'flex', gap: 9, alignItems: 'flex-start' }}>
-              <span style={{ color: bullet, marginTop: 5, flexShrink: 0, width: 5, height: 5, borderRadius: '50%', background: bullet, display: 'inline-block' }} />
-              <span>{parseInline(item, isLight)}</span>
-            </li>
+            <div key={idx} style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+              <span style={{ color: purple, flexShrink: 0, marginTop: 7, fontSize: 9 }}>●</span>
+              <span style={{ fontSize: 14, color: txtBody, lineHeight: 1.70 }}>{parseInline(item, isLight)}</span>
+            </div>
           ))}
-        </ul>
+        </div>
       )
     }
     listItems = []
@@ -2448,21 +2440,19 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
 
     if (trimmed === '') {
       flushList()
-      elements.push(<div key={`gap-${i}`} style={{ height: 8 }} />)
+      elements.push(<div key={`gap-${i}`} style={{ height: 6 }} />)
       i++; continue
     }
 
-    // Horizontal rule ---
-    if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
+    // Horizontal rule
+    if (trimmed === '---' || trimmed === '___') {
       flushList()
       elements.push(
         <div key={`hr-${i}`} style={{
-          margin: '14px 0',
-          height: 1,
+          margin: '12px 0', height: 1,
           background: isLight
-            ? 'linear-gradient(90deg, transparent, rgba(0,0,0,0.12) 20%, rgba(0,0,0,0.12) 80%, transparent)'
-            : 'linear-gradient(90deg, transparent, rgba(255,255,255,0.10) 20%, rgba(255,255,255,0.10) 80%, transparent)',
-          borderRadius: 1,
+            ? 'linear-gradient(90deg, transparent, rgba(0,0,0,0.10) 20%, rgba(0,0,0,0.10) 80%, transparent)'
+            : 'linear-gradient(90deg, transparent, rgba(255,255,255,0.09) 20%, rgba(255,255,255,0.09) 80%, transparent)',
         }} />
       )
       i++; continue
@@ -2474,39 +2464,28 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
       const mathLines = []
       const startI = i
       if (trimmed.replace(/^\$\$/, '').replace(/\$\$$/, '').trim()) {
-        // Single-line $$expr$$
         mathLines.push(trimmed.replace(/^\$\$/, '').replace(/\$\$$/, ''))
         i++
       } else {
         i++
-        while (i < lines.length && !/^\$\$/.test(lines[i].trim())) {
-          mathLines.push(lines[i])
-          i++
-        }
-        i++ // skip closing $$
+        while (i < lines.length && !/^\$\$/.test(lines[i].trim())) { mathLines.push(lines[i]); i++ }
+        i++
       }
       const mathContent = mathLines.join('\n').trim()
       try {
         const html = katex.renderToString(mathContent, { throwOnError: false, displayMode: true })
         elements.push(
           <div key={`dmath-${startI}`} style={{
-            overflowX: 'auto', margin: '14px 0', padding: '18px 20px',
-            textAlign: 'center', borderRadius: 12, position: 'relative',
-            background: isLight ? 'rgba(99,102,241,0.06)' : 'rgba(99,102,241,0.09)',
-            border: isLight ? '1px solid rgba(99,102,241,0.22)' : '1px solid rgba(99,102,241,0.30)',
-            boxShadow: isLight ? 'none' : '0 0 24px rgba(99,102,241,0.08)',
-          }}>
-            <div style={{
-              position: 'absolute', top: 6, right: 10,
-              fontSize: 9, fontWeight: 800, letterSpacing: '0.08em',
-              color: isLight ? 'rgba(99,102,241,0.45)' : 'rgba(139,143,255,0.42)',
-              textTransform: 'uppercase',
-            }}>formula</div>
-            <div dangerouslySetInnerHTML={{ __html: html }} />
-          </div>
+            overflowX: 'auto', margin: '12px 0', padding: '14px 18px',
+            textAlign: 'center', borderRadius: 14,
+            background: isLight ? 'rgba(99,102,241,0.06)' : 'rgba(99,102,241,0.08)',
+            border: isLight ? '1px solid rgba(99,102,241,0.18)' : '1px solid rgba(99,102,241,0.22)',
+          }}
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
         )
       } catch {
-        elements.push(<p key={`dmath-${startI}`} style={{ fontFamily: 'monospace', color: txt }}>{mathContent}</p>)
+        elements.push(<p key={`dmath-${startI}`} style={{ fontFamily: 'monospace', color: txtBody }}>{mathContent}</p>)
       }
       continue
     }
@@ -2518,111 +2497,96 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
       const type = feedbackMatch[1]
       const msg  = feedbackMatch[2] || ''
       const cfg  = {
-        CORRECT:   { bg: 'rgba(74,222,128,0.12)', border: 'rgba(74,222,128,0.32)', color: '#4ADE80', icon: '✓', label: 'Correct' },
-        PARTIAL:   { bg: 'rgba(251,191,36,0.10)', border: 'rgba(251,191,36,0.28)', color: '#FCD34D', icon: '◑', label: 'Partially correct' },
-        INCORRECT: { bg: 'rgba(248,113,113,0.12)', border: 'rgba(248,113,113,0.28)', color: '#F87171', icon: '✗', label: 'Not quite' },
+        CORRECT:   { bg: 'rgba(74,222,128,0.10)', border: 'rgba(74,222,128,0.28)', color: '#4ADE80', icon: '✓', label: 'Correct' },
+        PARTIAL:   { bg: 'rgba(251,191,36,0.09)', border: 'rgba(251,191,36,0.25)', color: '#FCD34D', icon: '◑', label: 'Partially correct' },
+        INCORRECT: { bg: 'rgba(248,113,113,0.10)', border: 'rgba(248,113,113,0.25)', color: '#F87171', icon: '✗', label: 'Not quite' },
       }[type]
       elements.push(
         <div key={`fb-${i}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '8px 0', padding: '10px 14px', background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 12 }}>
-          <span style={{ fontSize: 16, fontWeight: 800, color: cfg.color, flexShrink: 0, lineHeight: 1.4 }}>{cfg.icon}</span>
+          <span style={{ fontSize: 15, fontWeight: 800, color: cfg.color, flexShrink: 0, lineHeight: 1.5 }}>{cfg.icon}</span>
           <div>
-            <span style={{ fontSize: 12, fontWeight: 800, color: cfg.color, letterSpacing: '0.04em', textTransform: 'uppercase' }}>{cfg.label}</span>
-            {msg && <p style={{ margin: '3px 0 0', fontSize: 14, color: isLight ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.82)', lineHeight: 1.6 }}>{parseInline(msg, isLight)}</p>}
+            <span style={{ fontSize: 11.5, fontWeight: 800, color: cfg.color, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{cfg.label}</span>
+            {msg && <div style={{ marginTop: 3, fontSize: 13.5, color: isLight ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.82)', lineHeight: 1.6 }}>{parseInline(msg, isLight)}</div>}
           </div>
         </div>
       )
       i++; continue
     }
 
+    // Markdown table
     if (/^\|/.test(trimmed) && i + 1 < lines.length && /^\|[\s\-:|]+\|/.test(lines[i + 1])) {
       flushList()
       const tableLines = []
-      while (i < lines.length && /^\|/.test(lines[i].trim())) {
-        tableLines.push(lines[i])
-        i++
-      }
-      if (tableLines.length >= 2) {
-        elements.push(<MarkdownTable key={`table-${elements.length}`} lines={tableLines} isLight={isLight} />)
-      }
+      while (i < lines.length && /^\|/.test(lines[i].trim())) { tableLines.push(lines[i]); i++ }
+      if (tableLines.length >= 2) elements.push(<MarkdownTable key={`table-${elements.length}`} lines={tableLines} isLight={isLight} />)
       continue
     }
 
-    if (/^#\s/.test(trimmed)) {
+    // H3 ### — lavender, compact
+    if (/^###\s/.test(trimmed)) {
       flushList()
-      const content = trimmed.replace(/^#+\s/, '')
       elements.push(
-        <div key={`h1-${i}`} style={{
-          fontSize: 15.5, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.3,
-          margin: '16px 0 6px',
-          background: isLight
-            ? 'linear-gradient(90deg, rgba(79,70,229,0.92), rgba(99,102,241,0.78))'
-            : 'linear-gradient(90deg, rgba(165,170,255,1) 0%, rgba(196,181,253,0.88) 100%)',
-          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-          paddingBottom: 7,
-          borderBottom: isLight ? '1px solid rgba(99,102,241,0.18)' : '1px solid rgba(139,143,255,0.20)',
-        }}>
-          {content}
+        <div key={`h3-${i}`} style={{ fontWeight: 700, fontSize: 13.5, marginTop: 14, marginBottom: 2, color: isLight ? '#6D28D9' : '#C4B5FD', letterSpacing: '-0.01em', lineHeight: 1.4 }}>
+          {parseInline(trimmed.replace(/^###\s/, ''), isLight)}
         </div>
       )
       i++; continue
     }
 
-    if (/^##/.test(trimmed)) {
+    // H2 ## — white-ish, medium weight
+    if (/^##\s/.test(trimmed)) {
       flushList()
-      const content = trimmed.replace(/^#+\s/, '')
       elements.push(
-        <div key={`h2-${i}`} style={{
-          fontSize: 14, fontWeight: 700, letterSpacing: '-0.01em',
-          color: isLight ? 'rgba(99,102,241,0.88)' : 'rgba(165,170,255,0.90)',
-          margin: '12px 0 4px',
-          display: 'flex', alignItems: 'center', gap: 7,
+        <div key={`h2-${i}`} style={{ fontWeight: 800, fontSize: 15, marginTop: 18, marginBottom: 4, color: isLight ? 'rgba(0,0,0,0.92)' : 'rgba(255,255,255,0.96)', letterSpacing: '-0.02em', lineHeight: 1.3 }}>
+          {parseInline(trimmed.replace(/^##\s/, ''), isLight)}
+        </div>
+      )
+      i++; continue
+    }
+
+    // H1 # — large and bright
+    if (/^#\s/.test(trimmed)) {
+      flushList()
+      elements.push(
+        <div key={`h1-${i}`} style={{ fontWeight: 900, fontSize: 16.5, marginTop: 18, marginBottom: 6, color: isLight ? '#000' : '#fff', letterSpacing: '-0.03em', lineHeight: 1.25 }}>
+          {parseInline(trimmed.replace(/^#\s/, ''), isLight)}
+        </div>
+      )
+      i++; continue
+    }
+
+    // Blockquote > — key insight callout
+    if (/^>/.test(trimmed)) {
+      flushList()
+      const content = trimmed.replace(/^>\s*/, '')
+      elements.push(
+        <div key={`bq-${i}`} style={{
+          margin: '8px 0', padding: '10px 14px',
+          borderLeft: `3px solid ${isLight ? 'rgba(99,102,241,0.55)' : 'rgba(129,140,248,0.55)'}`,
+          background: isLight ? 'rgba(99,102,241,0.05)' : 'rgba(99,102,241,0.08)',
+          borderRadius: '0 10px 10px 0',
+          fontSize: 14, lineHeight: 1.68, fontStyle: 'italic',
+          color: isLight ? 'rgba(0,0,0,0.80)' : 'rgba(220,220,255,0.90)',
         }}>
-          <span style={{ width: 3, height: 14, borderRadius: 2, background: isLight ? 'rgba(99,102,241,0.55)' : 'rgba(139,143,255,0.55)', flexShrink: 0, display: 'inline-block' }} />
           {parseInline(content, isLight)}
         </div>
       )
       i++; continue
     }
 
-    if (/^>/.test(trimmed)) {
-      flushList()
-      const content = trimmed.replace(/^>\s*/, '')
-      elements.push(
-        <div key={`bq-${i}`} style={{
-          margin: '10px 0', padding: '11px 16px 11px 14px',
-          borderLeft: '3px solid rgba(99,102,241,0.70)',
-          background: isLight ? 'rgba(99,102,241,0.07)' : 'rgba(99,102,241,0.12)',
-          borderRadius: '0 12px 12px 0',
-          display: 'flex', alignItems: 'flex-start', gap: 10,
-        }}>
-          <span style={{ color: isLight ? 'rgba(99,102,241,0.65)' : 'rgba(139,143,255,0.70)', fontSize: 13, flexShrink: 0, marginTop: 1 }}>◈</span>
-          <div style={{
-            fontSize: 14.5, lineHeight: 1.70, fontStyle: 'italic', fontWeight: 500,
-            color: isLight ? 'rgba(0,0,0,0.82)' : 'rgba(220,220,255,0.92)',
-          }}>
-            {parseInline(content, isLight)}
-          </div>
-        </div>
-      )
-      i++; continue
-    }
-
+    // Code block ```
     if (/^```/.test(trimmed)) {
       flushList()
       const lang = trimmed.replace(/^```/, '').trim()
       const codeLines = []
       i++
-      while (i < lines.length && !/^```/.test(lines[i].trim())) {
-        codeLines.push(lines[i])
-        i++
-      }
+      while (i < lines.length && !/^```/.test(lines[i].trim())) { codeLines.push(lines[i]); i++ }
       i++
       elements.push(
         <div key={`code-${elements.length}`} style={{
-          margin: '10px 0', borderRadius: 10,
+          margin: '10px 0', borderRadius: 10, overflow: 'hidden',
           background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(0,0,0,0.35)',
           border: isLight ? '1px solid rgba(0,0,0,0.10)' : '1px solid rgba(255,255,255,0.10)',
-          overflow: 'hidden',
         }}>
           {lang && (
             <div style={{ padding: '5px 12px', background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)', fontSize: 10.5, color: isLight ? 'rgba(0,0,0,0.38)' : 'rgba(255,255,255,0.35)', fontFamily: 'monospace', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{lang}</div>
@@ -2635,6 +2599,24 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
       continue
     }
 
+    // Step heading: "1: Title" or "Step 1: Title" — numbered badge chip
+    const stepMatch = trimmed.match(/^(?:Step\s+)?(\d+):\s+(.+)/)
+    if (stepMatch && trimmed.length < 90) {
+      flushList()
+      elements.push(
+        <div key={`step-${i}`} style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 16, marginBottom: 3 }}>
+          <div style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 7, background: isLight ? 'rgba(99,102,241,0.18)' : 'rgba(99,102,241,0.22)', border: isLight ? '1px solid rgba(99,102,241,0.30)' : '1px solid rgba(99,102,241,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: isLight ? '#5B5BD6' : '#A5B4FC' }}>
+            {stepMatch[1]}
+          </div>
+          <span style={{ fontWeight: 700, fontSize: 14.5, color: isLight ? 'rgba(0,0,0,0.92)' : 'rgba(255,255,255,0.96)', lineHeight: 1.4 }}>
+            {parseInline(stepMatch[2], isLight)}
+          </span>
+        </div>
+      )
+      i++; continue
+    }
+
+    // Ordered list 1. / 1)
     const olMatch = trimmed.match(/^(\d+)[.)]\s+(.*)/)
     if (olMatch) {
       if (listType !== 'ol') { flushList(); listType = 'ol' }
@@ -2642,6 +2624,7 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
       i++; continue
     }
 
+    // Unordered list - / * / •
     const ulMatch = trimmed.match(/^[-*•]\s+(.*)/)
     if (ulMatch) {
       if (listType !== 'ul') { flushList(); listType = 'ul' }
@@ -2649,54 +2632,44 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
       i++; continue
     }
 
-    // Standalone bold line **Concept Name** → accent section heading
+    // Standalone bold line **Concept Name** → section heading (DocMarkdown H2 style)
     const standaloneBoldMatch = trimmed.match(/^\*\*([^*].+?)\*\*$/)
     if (standaloneBoldMatch) {
       flushList()
       elements.push(
-        <div key={`sh-${i}`} style={{
-          fontSize: 15, fontWeight: 800, letterSpacing: '-0.015em', lineHeight: 1.3,
-          margin: '16px 0 6px',
-          background: isLight
-            ? 'linear-gradient(90deg, rgba(79,70,229,0.90), rgba(99,102,241,0.76))'
-            : 'linear-gradient(90deg, rgba(165,170,255,1) 0%, rgba(196,181,253,0.88) 100%)',
-          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-          paddingBottom: 6,
-          borderBottom: isLight ? '1px solid rgba(99,102,241,0.16)' : '1px solid rgba(139,143,255,0.18)',
-        }}>
+        <div key={`sh-${i}`} style={{ fontWeight: 800, fontSize: 15, marginTop: 18, marginBottom: 4, color: isLight ? 'rgba(0,0,0,0.92)' : 'rgba(255,255,255,0.96)', letterSpacing: '-0.02em', lineHeight: 1.3 }}>
           {standaloneBoldMatch[1]}
         </div>
       )
       i++; continue
     }
 
-    // Standalone italic line *question or example* → golden question callout
+    // Standalone italic *text* → question/challenge row (amber tint)
     const isStandaloneItalic = trimmed.startsWith('*') && trimmed.endsWith('*')
       && !trimmed.startsWith('**') && !trimmed.endsWith('**') && trimmed.length > 2
     if (isStandaloneItalic) {
       flushList()
-      const content = trimmed.slice(1, -1)
       elements.push(
         <div key={`qi-${i}`} style={{
-          margin: '10px 0 4px', padding: '10px 14px',
-          borderRadius: 10,
-          background: isLight ? 'rgba(234,179,8,0.07)' : 'rgba(251,191,36,0.07)',
-          border: isLight ? '1px solid rgba(234,179,8,0.20)' : '1px solid rgba(251,191,36,0.17)',
-          borderLeft: isLight ? '3px solid rgba(234,179,8,0.50)' : '3px solid rgba(251,191,36,0.42)',
-          fontSize: 14, color: isLight ? 'rgba(0,0,0,0.72)' : 'rgba(255,255,255,0.76)',
+          marginTop: 10, padding: '9px 13px',
+          borderLeft: isLight ? '2px solid rgba(234,179,8,0.55)' : '2px solid rgba(251,191,36,0.40)',
+          background: isLight ? 'rgba(234,179,8,0.05)' : 'rgba(251,191,36,0.05)',
+          borderRadius: '0 8px 8px 0',
+          fontSize: 14, color: isLight ? 'rgba(0,0,0,0.70)' : 'rgba(255,255,255,0.72)',
           fontStyle: 'italic', lineHeight: 1.65,
         }}>
-          {parseInline(content, isLight)}
+          {parseInline(trimmed.slice(1, -1), isLight)}
         </div>
       )
       i++; continue
     }
 
+    // Default paragraph
     flushList()
     elements.push(
-      <p key={`p-${i}`} style={{ margin: '4px 0', fontSize: 14.5, color: txtP, lineHeight: 1.68 }}>
+      <div key={`p-${i}`} style={{ marginTop: 2, fontSize: 14, color: txtP, lineHeight: 1.72 }}>
         {parseInline(trimmed, isLight)}
-      </p>
+      </div>
     )
     i++
   }
@@ -2704,13 +2677,13 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
   flushList()
 
   return (
-    <div style={{ minWidth: 0 }}>
+    <div style={{ minWidth: 0, fontSize: 14, lineHeight: 1.72, color: txtBody, fontFamily: "'Inter', system-ui, sans-serif" }}>
       {elements}
       {streaming && (
         <motion.span
           animate={{ opacity: [1, 0, 1] }}
           transition={{ duration: 0.75, repeat: Infinity }}
-          style={{ display: 'inline-block', width: 2, height: 14, background: cursorColor || (isLight ? 'rgba(99,102,241,0.7)' : 'rgba(255,255,255,0.6)'), borderRadius: 1, marginLeft: 3, verticalAlign: 'middle' }}
+          style={{ display: 'inline-block', width: 2, height: 13, background: cursorColor || (isLight ? 'rgba(99,102,241,0.7)' : 'rgba(255,255,255,0.55)'), borderRadius: 1, marginLeft: 3, verticalAlign: 'middle' }}
         />
       )}
     </div>
@@ -3010,12 +2983,13 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false }) {
       <div style={{
         maxWidth: 700,
         width: isUser ? 'auto' : '100%',
-        padding: isUser ? '11px 18px' : '18px 22px',
+        padding: isUser ? '11px 18px' : '16px 20px',
         borderRadius: isUser ? '22px 22px 6px 22px' : '6px 22px 22px 22px',
         background: bubbleBg,
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
         border: bubbleBorder,
+        borderLeft: !isUser ? (isLight ? '2px solid rgba(99,102,241,0.42)' : '2px solid rgba(99,102,241,0.55)') : bubbleBorder,
         boxShadow: bubbleShadow,
         color: textColor,
         fontFamily: "'Inter', system-ui, sans-serif",
