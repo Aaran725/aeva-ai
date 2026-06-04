@@ -2033,11 +2033,6 @@ function DashboardView({ onChatOpen, onSignOut }) {
       <div aria-hidden style={{ position: 'absolute', top: '-5%', left: '15%', width: 700, height: 700, borderRadius: '50%', background: 'radial-gradient(circle, rgba(45,48,142,0.22) 0%, transparent 70%)', filter: 'blur(60px)', pointerEvents: 'none' }} />
       <div aria-hidden style={{ position: 'absolute', bottom: '5%', right: '5%', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle, rgba(233,163,100,0.13) 0%, transparent 70%)', filter: 'blur(55px)', pointerEvents: 'none' }} />
 
-      {/* Portals */}
-      <ArcadeHub />
-      <LabHub />
-      <RoadmapHub />
-
       <div style={{ position: 'relative' }}>
         {/* ── Desktop header (hidden on mobile) ── */}
         {!isMobile && (
@@ -5406,6 +5401,10 @@ export default function App() {
       {/* Global chaos banner */}
       <ChaosEventBanner />
       <ProTipBanner />
+      {/* Global hubs — rendered at root so they work from both dashboard AND chat */}
+      <ArcadeHub />
+      <LabHub />
+      <RoadmapHub />
       <AnimatePresence mode="wait" initial={false}>
         {view === 'dashboard'
           ? <DashboardView key="dashboard" onChatOpen={() => setView('chat')} onSignOut={() => supabase.auth.signOut()} />
