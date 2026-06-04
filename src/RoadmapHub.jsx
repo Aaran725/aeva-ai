@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText, BookOpen, Zap, Target, ClipboardList, Check, Lock, Clock, Trophy } from 'lucide-react'
+import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText, BookOpen, Zap, Target, ClipboardList, Check, Lock, Clock, Trophy, Trash2 } from 'lucide-react'
 import { useRoadmapStore } from './roadmapStore'
 import { useLabStore } from './labStore'
 import { useXPStore } from './xpStore'
@@ -195,15 +195,17 @@ function HomeView({ onCreate, onOpen }) {
 
             return (
               <div key={r.id} style={{ width: '100%', maxWidth: 480 }}>
-                <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
-                  style={{ borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', overflow: 'hidden', position: 'relative' }}>
+                {/* Card — overflow:hidden for border-radius clipping only */}
+                <div style={{ borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden', position: 'relative' }}>
 
                   {/* Phase colour accent top bar */}
                   <div style={{ height: 3, background: `linear-gradient(90deg, ${accentColor}, ${accentColor}44)` }} />
 
-                  <div style={{ padding: '16px 18px 18px' }}>
+                  <div style={{ padding: '16px 18px 14px' }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
-                      <div onClick={() => { setActive(r.id); onOpen() }} style={{ flex: 1 }}>
+                      <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
+                        onClick={() => { setActive(r.id); onOpen() }}
+                        style={{ flex: 1, cursor: 'pointer' }}>
                         <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', marginBottom: 5, letterSpacing: '-0.02em' }}>{r.title}</div>
                         <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
                           {currentPhase && (
@@ -213,15 +215,34 @@ function HomeView({ onCreate, onOpen }) {
                           )}
                           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>{completed}/{total} steps · {daysLeft}d left</span>
                         </div>
-                      </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 14 }}>
-                        <div style={{ fontSize: 22, fontWeight: 900, color: r.readiness >= 60 ? '#4ADE80' : '#fff', letterSpacing: '-0.04em' }}>{r.readiness}%</div>
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.30)', fontWeight: 600 }}>ready</div>
+                      </motion.div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 10 }}>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 22, fontWeight: 900, color: r.readiness >= 60 ? '#4ADE80' : '#fff', letterSpacing: '-0.04em' }}>{r.readiness}%</div>
+                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.30)', fontWeight: 600 }}>ready</div>
+                        </div>
+                        {/* Trash button — clearly visible, outside progress tap area */}
+                        <motion.button
+                          whileHover={{ background: 'rgba(239,68,68,0.15)', color: '#F87171' }}
+                          whileTap={{ scale: 0.90 }}
+                          onClick={() => setConfirmDelete(confirmDelete === r.id ? null : r.id)}
+                          style={{
+                            width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+                            background: confirmDelete === r.id ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.06)',
+                            border: confirmDelete === r.id ? '1px solid rgba(239,68,68,0.35)' : '1px solid rgba(255,255,255,0.10)',
+                            color: confirmDelete === r.id ? '#F87171' : 'rgba(255,255,255,0.40)',
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            transition: 'all 0.15s',
+                          }}>
+                          <Trash2 size={13} />
+                        </motion.button>
                       </div>
                     </div>
 
                     {/* Progress bar */}
-                    <div onClick={() => { setActive(r.id); onOpen() }}>
+                    <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
+                      onClick={() => { setActive(r.id); onOpen() }}
+                      style={{ cursor: 'pointer' }}>
                       <div style={{ height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginBottom: 6 }}>
                         <motion.div initial={{ width: 0 }} animate={{ width: `${r.readiness}%` }}
                           transition={{ duration: 0.7, ease: 'easeOut' }}
@@ -232,32 +253,33 @@ function HomeView({ onCreate, onOpen }) {
                           <Clock size={10} /> ~{remH > 0 ? `${remH}h ${remM}m` : `${remM}m`} remaining
                         </div>
                       )}
-                    </div>
+                    </motion.div>
                   </div>
+                </div>
 
-                  {/* Delete button */}
-                  <motion.button whileHover={{ color: '#F87171' }} whileTap={{ scale: 0.9 }}
-                    onClick={() => setConfirmDelete(confirmDelete === r.id ? null : r.id)}
-                    style={{ position: 'absolute', top: 20, right: 14, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.20)', padding: '2px 6px', fontSize: 16, lineHeight: 1 }}>
-                    ···
-                  </motion.button>
-
-                  <AnimatePresence>
-                    {confirmDelete === r.id && (
-                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-                        style={{ padding: '0 18px 14px', display: 'flex', gap: 8 }}>
-                        <motion.button whileTap={{ scale: 0.96 }} onClick={() => { deleteRoadmap(r.id); setConfirmDelete(null) }}
-                          style={{ flex: 1, padding: '8px 0', borderRadius: 10, background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.35)', color: '#F87171', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-                          Delete
+                {/* Confirm panel — OUTSIDE the overflow:hidden card so it's never clipped */}
+                <AnimatePresence>
+                  {confirmDelete === r.id && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      style={{ overflow: 'hidden' }}>
+                      <div style={{ display: 'flex', gap: 8, padding: '8px 0 0' }}>
+                        <motion.button whileTap={{ scale: 0.96 }}
+                          onClick={() => { deleteRoadmap(r.id); setConfirmDelete(null) }}
+                          style={{ flex: 1, padding: '10px 0', borderRadius: 12, background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.38)', color: '#F87171', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                          <Trash2 size={13} /> Delete roadmap
                         </motion.button>
-                        <motion.button whileTap={{ scale: 0.96 }} onClick={() => setConfirmDelete(null)}
-                          style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.50)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        <motion.button whileTap={{ scale: 0.96 }}
+                          onClick={() => setConfirmDelete(null)}
+                          style={{ padding: '10px 18px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.50)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
                           Cancel
                         </motion.button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             )
           })}
