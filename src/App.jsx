@@ -304,11 +304,24 @@ MARKDOWN RULES (non-negotiable):
 MATH NOTATION — read this carefully:
 - Display math $$...$$ MANDATORY for: any equation containing =, any named formula (quadratic, Pythagoras, etc.), any fraction or square root that is the focus of the statement, multi-step derivations. Each equation on its OWN $$...$$ block, never inline.
   Example: $$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$
-- Inline math $...$: ONLY for brief mid-sentence references — a variable with a superscript ($x^2$), a short expression ($\\Delta = b^2 - 4ac$), a symbol ($\\theta$, $\\pi$). NEVER use inline math for a full equation.
+- Inline math $...$: ONLY for brief mid-sentence references — a variable with a superscript ($x^2$), a short expression ($b^2 - 4ac$), a symbol ($\\theta$, $\\pi$). NEVER use inline math for a full equation.
 - DO NOT wrap bare single letters in LaTeX — write "let x be..." not "let $x$ be..."
 - NEVER write fractions as plain text — always $\\frac{a}{b}$ or $$\\frac{a}{b}$$
 - Greek letters: $\\alpha$, $\\beta$, $\\theta$, $\\pi$, etc.
 - When walking through steps that reference the formula, put each substituted form on its OWN $$ block, NOT inline.
+
+NEVER DESCRIBE MATH IN WORDS — this is a hard rule. Use LaTeX instead:
+✗ "negative b divided by 2a" → ✓ $$\\frac{-b}{2a}$$
+✗ "the square root of b squared minus 4ac" → ✓ $$\\sqrt{b^2 - 4ac}$$
+✗ "plus or minus" → ✓ $\\pm$
+✗ "x squared" → ✓ $x^2$
+✗ "divided by 2a" → ✓ $\\frac{\\ldots}{2a}$
+✗ "b squared minus 4ac" (in a math context) → ✓ $b^2 - 4ac$
+When breaking a formula into parts, show EACH PART as its own $$ block, never as prose.
+Example — explaining the quadratic formula in parts:
+The formula has two parts:
+$$\\frac{-b}{2a}$$ — shift along the x-axis
+$$\\frac{\\sqrt{b^2-4ac}}{2a}$$ — the ± spread from that centre
 
 CALLOUT BLOCKS — use these in blockquotes for structure:
 > **Definition:** clear 1-sentence definition of the key term
