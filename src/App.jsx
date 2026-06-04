@@ -252,6 +252,42 @@ Rules:
   }
 }
 
+/* ─── Roadmap context builder — gives Aeva full visibility ─── */
+function buildRoadmapContext(roadmap) {
+  if (!roadmap || !roadmap.nodes?.length) return ''
+  const daysLeft = Math.max(0, Math.ceil((new Date(roadmap.examDate) - Date.now()) / 86400000))
+  const total    = roadmap.nodes.filter(n => n.status !== 'skipped').length
+  const done     = roadmap.nodes.filter(n => n.status === 'complete').length
+  const available = roadmap.nodes.find(n => n.status === 'available')
+  const locked   = roadmap.nodes.filter(n => n.status === 'locked')
+  const skipped  = roadmap.nodes.filter(n => n.status === 'skipped')
+  const urgent   = roadmap.nodes.filter(n => n.urgent && n.status !== 'complete')
+  const lp       = roadmap.learningProfile || {}
+
+  const crunchWarning = daysLeft <= 7 ? ` ⚠️ CRUNCH TIME` : daysLeft <= 3 ? ` 🚨 EXAM IMMINENT` : ''
+
+  const nodeList = locked.slice(0, 8).map(n =>
+    `  [locked${n.urgent ? ' URGENT' : ''}] ${n.id}: "${n.topic}" (${n.type})`
+  ).join('\n')
+
+  return `
+━━━ ACTIVE ROADMAP — YOUR FULL VISIBILITY ━━━
+Subject: ${roadmap.title}
+Exam: ${roadmap.examDate} (${daysLeft} days away${crunchWarning})
+Progress: ${done}/${total} nodes complete (${Math.round(done/Math.max(total,1)*100)}%)${roadmap.crunchMode ? '\n⚡ CRUNCH MODE ACTIVE' : ''}
+
+Current node (available now): ${available ? `"${available.topic}" (${available.type}) [id: ${available.id}]` : 'none — roadmap complete'}
+
+Upcoming locked nodes:
+${nodeList || '  (none remaining)'}
+${skipped.length ? `\nSkipped nodes: ${skipped.length} (${skipped.map(n => `"${n.topic}"`).join(', ')})` : ''}
+${urgent.length ? `\nURGENT nodes: ${urgent.map(n => `"${n.topic}" [${n.id}]`).join(', ')}` : ''}
+${lp.weak?.length ? `\nWeak areas: ${lp.weak.slice(0, 5).join(', ')}` : ''}
+${lp.mastered?.length ? `Mastered: ${lp.mastered.slice(0, 5).join(', ')}` : ''}
+${lp.misconceptions?.length ? `Known misconceptions: ${lp.misconceptions.slice(0, 3).join(', ')}` : ''}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+}
+
 /* ─── Step B: Build dynamic Aeva prompt ─── */
 function buildAevaPrompt(sessionState, criticism, userName, profile, memoryBlock = '', extras = {}, langDirective = '') {
   const state = STATE_CONFIG[sessionState] || STATE_CONFIG.DIAGNOSTIC
@@ -383,6 +419,20 @@ Available commands (copy exactly, fill in the values):
 ⚡CMD:{"type":"set_mandate","topic":"TOPIC","goal":"GOAL"} — set a weekly mandate for the student
 ⚡CMD:{"type":"intervention","title":"TITLE","message":"MESSAGE","task":"acknowledge"} — full-screen takeover, student must read and confirm
 ⚡CMD:{"type":"intervention","title":"TITLE","message":"MESSAGE","task":"quiz","topic":"TOPIC"} — full-screen takeover with a 3-question quiz they must pass
+
+ROADMAP COMMANDS — use these to actively reshape the student's roadmap (only when you have an active roadmap in context):
+⚡CMD:{"type":"roadmap_inject","topic":"TOPIC","nodeType":"learn|drill|check","phase":"Core Topics","difficulty":3,"reason":"WHY"} — insert a new node right after the current available node (use when student clearly needs extra help on a concept)
+⚡CMD:{"type":"roadmap_skip","nodeId":"NODE_ID","reason":"WHY"} — skip a locked node (use when student has clearly mastered that topic already)
+⚡CMD:{"type":"roadmap_flag","nodeId":"NODE_ID"} — mark a node as urgent (use when student keeps struggling with that topic in chat)
+⚡CMD:{"type":"roadmap_reprioritise","topics":["TOPIC1","TOPIC2"]} — move these topic nodes earlier in the queue (use when student or teacher flags certain topics as high priority)
+⚡CMD:{"type":"roadmap_crunch"} — emergency consolidation, skip non-essential nodes to create a survival path (use ONLY when exam is ≤5 days away and too many nodes remain)
+
+When to use roadmap commands:
+- Student keeps asking about a topic that has a locked node → roadmap_flag that node so it's clearly marked urgent
+- Student clearly already knows a topic covered in a future locked node → roadmap_skip it
+- Student is confused about something not in their roadmap → roadmap_inject a remedial node
+- Student mentions teacher said certain topics are most important → roadmap_reprioritise those topics
+- Exam in ≤5 days, many nodes left → roadmap_crunch (tell the student you've done it)
 
 When to use them — act on your own judgment, don't wait to be asked:
 - Student gets something wrong OR shows confusion → fire open_lab_drill immediately. Don't wait for 2+ mistakes. Say "I'm pulling up a drill on this right now." Pick the best drillType: flashcard for definitions, feynman for understanding, mocktest for application, speedround for recall, shortanswer for exam-style.
@@ -3693,7 +3743,8 @@ function ChatView({ onBack }) {
 
         const recallBlock = buildRecallBlock(name)
         const fullMemory  = recallBlock + buildMemoryBlock(name)
-        systemPrompt = feedbackPrefix + orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, fullMemory, extras, T.aevaLanguageDirective)
+        const roadmapCtx  = buildRoadmapContext(useRoadmapStore.getState().getActive())
+        systemPrompt = feedbackPrefix + orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, fullMemory + roadmapCtx, extras, T.aevaLanguageDirective)
 
         if (socraticActive) {
           systemPrompt += '\n\nSOCRATIC MODE: You must NEVER state facts, answers, or explanations directly. Respond ONLY with 1-3 targeted questions that guide the student to discover the answer themselves. If they arrive at the correct answer, confirm warmly and deepen with another question. If wrong, ask a question that exposes the specific gap without revealing the answer. Never say "the answer is", never explain anything outright. Make them think every time.'
@@ -3858,6 +3909,47 @@ function ChatView({ onBack }) {
                 action.topic || '',
               )
               label = `Intervention triggered`
+            } else if (action.type === 'roadmap_inject') {
+              const activeRm = useRoadmapStore.getState().getActive()
+              if (activeRm) {
+                const available = activeRm.nodes?.find(n => n.status === 'available')
+                useRoadmapStore.getState().injectNode(activeRm.id, {
+                  topic: action.topic || 'Extra Practice',
+                  type: action.nodeType || 'learn',
+                  phase: action.phase || 'Core Topics',
+                  difficulty: action.difficulty || 3,
+                  estimatedMinutes: 20,
+                  xp: action.nodeType === 'drill' ? 30 : action.nodeType === 'check' ? 40 : 50,
+                  description: action.reason || 'Aeva added this node to strengthen your understanding.',
+                }, available?.id || null)
+                label = `Node added · ${action.topic || 'Extra Practice'}`
+              }
+            } else if (action.type === 'roadmap_skip') {
+              const activeRm = useRoadmapStore.getState().getActive()
+              if (activeRm && action.nodeId) {
+                useRoadmapStore.getState().skipNode(activeRm.id, action.nodeId, action.reason || '')
+                const node = activeRm.nodes?.find(n => n.id === action.nodeId)
+                label = `Skipped · ${node?.topic || action.nodeId}`
+              }
+            } else if (action.type === 'roadmap_flag') {
+              const activeRm = useRoadmapStore.getState().getActive()
+              if (activeRm && action.nodeId) {
+                useRoadmapStore.getState().flagNode(activeRm.id, action.nodeId, true)
+                const node = activeRm.nodes?.find(n => n.id === action.nodeId)
+                label = `Flagged urgent · ${node?.topic || action.nodeId}`
+              }
+            } else if (action.type === 'roadmap_reprioritise') {
+              const activeRm = useRoadmapStore.getState().getActive()
+              if (activeRm && action.topics?.length) {
+                useRoadmapStore.getState().reprioritiseNodes(activeRm.id, action.topics)
+                label = `Reprioritised · ${action.topics.slice(0, 2).join(', ')}`
+              }
+            } else if (action.type === 'roadmap_crunch') {
+              const activeRm = useRoadmapStore.getState().getActive()
+              if (activeRm) {
+                useRoadmapStore.getState().crunchMode(activeRm.id)
+                label = `Crunch mode activated`
+              }
             }
 
             if (label) {
@@ -5038,22 +5130,32 @@ function XPToast() {
 
 /* ── Aeva Command Toast ──────────────────────────────────────────────────── */
 const CMD_ICONS = {
-  open_lab:        '🧪',
-  open_lab_drill:  '⚡',
-  add_lab_task:    '📋',
-  open_arcade:     '🎮',
-  lock_arcade:     '🔒',
-  set_mandate:     '🎯',
-  intervention:    '🚨',
+  open_lab:              '🧪',
+  open_lab_drill:        '⚡',
+  add_lab_task:          '📋',
+  open_arcade:           '🎮',
+  lock_arcade:           '🔒',
+  set_mandate:           '🎯',
+  intervention:          '🚨',
+  roadmap_inject:        '➕',
+  roadmap_skip:          '⏭️',
+  roadmap_flag:          '🚩',
+  roadmap_reprioritise:  '🔀',
+  roadmap_crunch:        '⚡',
 }
 const CMD_VERBS = {
-  open_lab:        'Taking you to Lab',
-  open_lab_drill:  'Drill loaded',
-  add_lab_task:    'Task queued',
-  open_arcade:     'Opening Arcade',
-  lock_arcade:     'Arcade locked',
-  set_mandate:     'Mandate set',
-  intervention:    'Intervention incoming',
+  open_lab:              'Taking you to Lab',
+  open_lab_drill:        'Drill loaded',
+  add_lab_task:          'Task queued',
+  open_arcade:           'Opening Arcade',
+  lock_arcade:           'Arcade locked',
+  set_mandate:           'Mandate set',
+  intervention:          'Intervention incoming',
+  roadmap_inject:        'Roadmap updated',
+  roadmap_skip:          'Node skipped',
+  roadmap_flag:          'Flagged urgent',
+  roadmap_reprioritise:  'Roadmap reprioritised',
+  roadmap_crunch:        'Crunch mode on',
 }
 
 function AevaCommandToast() {

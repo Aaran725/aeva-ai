@@ -661,6 +661,7 @@ function PathView() {
   const { addXP } = useXPStore()
   const { setPendingChatPrompt } = useAevaControlStore()
   const roadmap = getActive()
+  const [askAevaFlash, setAskAevaFlash] = useState(false)
   const [selected, setSelected]     = useState(null)
   const [startedIds, setStartedIds] = useState(new Set())
   const containerRef = useRef(null)
@@ -863,6 +864,40 @@ function PathView() {
         )
       })()}
 
+      {/* ── Ask Aeva button ──────────────────────────────────────────────── */}
+      <div style={{ flexShrink: 0, padding: '12px 20px 0' }}>
+        <motion.button
+          whileHover={{ scale: 1.02, background: 'rgba(99,102,241,0.22)' }}
+          whileTap={{ scale: 0.97 }}
+          animate={askAevaFlash ? { boxShadow: ['0 0 0 0 rgba(99,102,241,0)', '0 0 0 8px rgba(99,102,241,0.25)', '0 0 0 0 rgba(99,102,241,0)'] } : {}}
+          onClick={() => {
+            const done     = nodes.filter(n => n.status === 'complete').length
+            const total    = nodes.filter(n => n.status !== 'skipped').length
+            const lp       = roadmap.learningProfile || {}
+            const weakStr  = lp.weak?.length ? ` My weak areas are: ${lp.weak.slice(0,3).join(', ')}.` : ''
+            const urgStr   = nodes.filter(n => n.urgent).map(n => n.topic).join(', ')
+            setPendingChatPrompt(
+              `Aeva, review my roadmap for "${roadmap.title}". I've done ${done}/${total} nodes. Exam is in ${daysLeft} days.${weakStr}${urgStr ? ` Urgent topics: ${urgStr}.` : ''} Analyse my progress, tell me if I'm on track, and make any adjustments to my roadmap you think are needed — skip nodes I don't need, flag urgent ones, add any missing topics.`
+            )
+            setAskAevaFlash(true)
+            setTimeout(() => { setAskAevaFlash(false); closeRoadmapHub() }, 600)
+          }}
+          style={{
+            width: '100%', padding: '11px 16px', borderRadius: 14, cursor: 'pointer', fontFamily: 'inherit',
+            background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.30)',
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+          <div style={{ width: 30, height: 30, borderRadius: 10, background: 'linear-gradient(135deg,#4F46E5,#7C3AED)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Sparkles size={14} color="#fff" />
+          </div>
+          <div style={{ flex: 1, textAlign: 'left' }}>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: '#A5B4FC' }}>Ask Aeva to review my roadmap</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>She'll adjust nodes, flag urgent topics, skip what you don't need</div>
+          </div>
+          <div style={{ fontSize: 18, opacity: 0.6 }}>→</div>
+        </motion.button>
+      </div>
+
       {/* ── Path ─────────────────────────────────────────────────────────── */}
       <div ref={containerRef} style={{ flex: 1, position: 'relative', minHeight: containerH, margin: '24px 0 40px' }}>
         {/* SVG connecting curves */}
@@ -911,7 +946,23 @@ function PathView() {
           const { Icon } = cfg
           const isComplete  = node.status === 'complete'
           const isAvailable = node.status === 'available'
+          const isSkipped   = node.status === 'skipped'
           const isSelected  = selected?.id === node.id
+          const isUrgent    = !!node.urgent
+          const isInjected  = !!node.injectedByAeva
+
+          if (isSkipped) {
+            return (
+              <div key={node.id} style={{ position: 'absolute', left: x, top: y, transform: 'translate(-50%, -50%)', zIndex: 1, opacity: 0.35 }}>
+                <div style={{ width: NODE_R * 2, height: NODE_R * 2, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px dashed rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>—</span>
+                </div>
+                <div style={{ position: 'absolute', top: NODE_R * 2 + 10, left: '50%', transform: 'translateX(-50%)', whiteSpace: 'nowrap', fontSize: 10, color: 'rgba(255,255,255,0.22)', fontWeight: 500, textDecoration: 'line-through' }}>
+                  {node.topic}
+                </div>
+              </div>
+            )
+          }
 
           // 3D gradient + bottom shadow colours
           const nodeBg     = isComplete ? 'linear-gradient(180deg,#86EFAC 0%,#22C55E 55%,#15803D 100%)'
@@ -927,6 +978,12 @@ function PathView() {
               {isAvailable && (
                 <motion.div animate={{ opacity: [0.45, 0.75, 0.45] }} transition={{ duration: 2.2, repeat: Infinity }}
                   style={{ position: 'absolute', inset: -14, borderRadius: '50%', background: `radial-gradient(circle, ${cfg.color}50 0%, transparent 70%)`, pointerEvents: 'none' }} />
+              )}
+
+              {/* Urgent ring */}
+              {isUrgent && !isComplete && (
+                <motion.div animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 1.4, repeat: Infinity }}
+                  style={{ position: 'absolute', inset: -4, borderRadius: '50%', border: '2px solid #F59E0B', pointerEvents: 'none', zIndex: 2 }} />
               )}
 
               {/* 3D circle */}
@@ -951,13 +1008,23 @@ function PathView() {
                 }
               </motion.button>
 
+              {/* Urgent badge */}
+              {isUrgent && !isComplete && (
+                <div style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#F59E0B', border: '2px solid rgba(8,9,24,1)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3, fontSize: 9, fontWeight: 900, color: '#000' }}>!</div>
+              )}
+
+              {/* Injected-by-Aeva badge */}
+              {isInjected && !isComplete && (
+                <div style={{ position: 'absolute', top: -4, left: -4, width: 16, height: 16, borderRadius: '50%', background: '#818CF8', border: '2px solid rgba(8,9,24,1)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3, fontSize: 8 }}>✦</div>
+              )}
+
               {/* Topic label */}
               <div style={{
                 position: 'absolute', top: NODE_R * 2 + 14,
                 left: '50%', transform: 'translateX(-50%)',
                 whiteSpace: 'nowrap', textAlign: 'center',
                 fontSize: 11.5, fontWeight: isAvailable ? 700 : 500,
-                color: isComplete ? '#4ADE80' : isAvailable ? '#fff' : 'rgba(255,255,255,0.28)',
+                color: isComplete ? '#4ADE80' : isUrgent ? '#FCD34D' : isAvailable ? '#fff' : 'rgba(255,255,255,0.28)',
                 letterSpacing: isAvailable ? '-0.01em' : 0,
               }}>
                 {node.topic}
