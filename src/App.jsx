@@ -2833,215 +2833,331 @@ function DeepDiveCard({ term, definition, onClose }) {
 /* ═══ STUDY GUIDE MODAL ═══════════════════════════ */
 function StudyGuideModal({ messages, visualInsights = [], onClose }) {
   const { name } = useUser()
-  const [summary, setSummary] = useState(null)
+  const { recordCard } = useSRStore()
+  const { saveSession } = useLibraryStore()
+  const [guide, setGuide] = useState(null)   // parsed JSON guide
   const [loading, setLoading] = useState(true)
+  const [saved, setSaved] = useState(false)
+  const [cardsAdded, setCardsAdded] = useState(false)
+  const [expandedConcept, setExpandedConcept] = useState(null)
 
-  // Generate an AI summary of the current session on mount
+  const exchangeCount = messages.filter(m => m.role === 'user').length
+
   useEffect(() => {
     const aiMessages = messages.filter(m => m.role === 'model' && m.text.length > 30)
     if (aiMessages.length === 0) { setLoading(false); return }
 
-    const conversationText = messages
-      .slice(-20)
-      .map(m => `${m.role === 'user' ? name : 'Aeva'}: ${m.text}`)
+    const conversationText = messages.slice(-24)
+      .map(m => `${m.role === 'user' ? name : 'Aeva'}: ${m.text?.slice(0, 400)}`)
       .join('\n\n')
 
     const visualContext = visualInsights.length > 0
-      ? `\n\nVisual Insights from Aeva Lens:\n${visualInsights.map((v, i) => `${i + 1}. [${v.topic}] ${v.coreInsight} Struggle: ${v.strugglePoint}`).join('\n')}`
+      ? `\nLens insights: ${visualInsights.map(v => `[${v.topic}] ${v.coreInsight}`).join('; ')}`
       : ''
 
-    const prompt = `Generate a clean, structured study guide from this tutoring session.
+    const prompt = `Extract a structured study guide from this tutoring session. Output ONLY valid JSON.
 
-Use EXACTLY this format:
-## Core Insight
-> One sentence capturing the central idea of what was covered.
+Format:
+{
+  "topic": "2-4 word topic name",
+  "coreInsight": "One clear sentence capturing the key takeaway",
+  "concepts": [
+    { "term": "Term name", "definition": "One clear sentence definition" }
+  ],
+  "formulas": [
+    { "name": "Formula name", "formula": "The formula itself", "note": "When/how to use it" }
+  ],
+  "nextSteps": ["Action 1", "Action 2", "Action 3"],
+  "examTip": "One high-value exam tip for this topic, or null if not applicable"
+}
 
-## Key Concepts
-- **Term**: brief definition
-- **Term**: brief definition
-(3–5 bullet points max)
+Rules:
+- concepts: 3-6 items, only terms actually discussed
+- formulas: only if real formulas/equations were discussed, else empty array
+- nextSteps: exactly 3 concrete actions
+- Keep everything SHORT and specific
 
-## Visual Summary
-(Include a markdown comparison table if any comparisons were made. Otherwise omit this section.)
-
-## Formulas & Rules
-(Include only if formulas, equations, or rules were discussed. Otherwise omit.)
-
-## Next Steps
-1. First thing to study or practice
-2. Second thing
-3. Third thing
-
-Keep every section SHORT. Total length: under 300 words.
-
-Conversation:
-${conversationText}${visualContext}`
+Conversation:${visualContext}
+${conversationText}`
 
     fetch(GROQ_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
       body: JSON.stringify({
         model: 'llama-3.1-8b-instant',
         messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3,
-        max_tokens: 600,
+        temperature: 0.2,
+        max_tokens: 700,
+        response_format: { type: 'json_object' },
       }),
     })
       .then(r => r.json())
       .then(json => {
-        setSummary(json.choices?.[0]?.message?.content || null)
+        try {
+          const parsed = JSON.parse(json.choices?.[0]?.message?.content || '{}')
+          setGuide(parsed)
+        } catch { setGuide(null) }
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // PDF export — opens a clean printable window
+  const handleAddFlashcards = () => {
+    if (!guide?.concepts?.length) return
+    guide.concepts.forEach(c => {
+      recordCard(guide.topic || 'General', c.term, c.definition, 'got')
+    })
+    setCardsAdded(true)
+  }
+
+  const handleSave = () => {
+    if (!guide) return
+    saveSession({
+      type: 'study_guide',
+      topic: guide.topic || 'Study Session',
+      coreInsight: guide.coreInsight,
+      analysis: guide,
+      rawText: null,
+    })
+    setSaved(true)
+  }
+
   const handleExport = () => {
-    if (!summary) return
-    const mdToHtml = (md) => md
-      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-      .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
-      .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
-      .replace(/^- \*\*(.+?)\*\*: (.+)$/gm, '<li><strong>$1</strong>: $2</li>')
-      .replace(/^- (.+)$/gm, '<li>$1</li>')
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      .replace(/`(.+?)`/g, '<code>$1</code>')
-      .replace(/\n\n/g, '</p><p>')
+    if (!guide) return
+    const lines = [
+      `Study Guide — ${guide.topic || 'Session'}`,
+      `${name} · ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`,
+      '',
+      'CORE INSIGHT',
+      guide.coreInsight || '',
+      '',
+      guide.concepts?.length ? 'KEY CONCEPTS' : '',
+      ...(guide.concepts || []).map(c => `• ${c.term}: ${c.definition}`),
+      '',
+      guide.formulas?.length ? 'FORMULAS' : '',
+      ...(guide.formulas || []).map(f => `${f.name}: ${f.formula}${f.note ? ' — ' + f.note : ''}`),
+      '',
+      'NEXT STEPS',
+      ...(guide.nextSteps || []).map((s, i) => `${i + 1}. ${s}`),
+      guide.examTip ? `\nEXAM TIP\n${guide.examTip}` : '',
+    ].filter(Boolean).join('\n')
 
-    const win = window.open('', '_blank', 'width=800,height=900')
-    win.document.write(`<!DOCTYPE html><html><head><title>Aeva Study Guide — ${name}</title>
+    const win = window.open('', '_blank', 'width=750,height=900')
+    win.document.write(`<!DOCTYPE html><html><head><title>Aeva Study Guide — ${guide.topic}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, 'Inter', sans-serif; max-width: 680px; margin: 48px auto; padding: 0 24px; color: #1a1a2e; line-height: 1.65; }
-  h1 { font-size: 26px; font-weight: 800; color: #2e27a0; margin-bottom: 4px; }
-  .meta { font-size: 12px; color: #888; margin-bottom: 36px; }
-  h2 { font-size: 16px; font-weight: 700; color: #3730a3; margin: 28px 0 10px; text-transform: uppercase; letter-spacing: 0.06em; }
-  h3 { font-size: 14px; font-weight: 600; color: #4338ca; margin: 18px 0 8px; }
-  p { margin: 8px 0; font-size: 14px; }
-  blockquote { border-left: 3px solid #6366F1; padding: 10px 16px; background: rgba(99,102,241,0.08); border-radius: 0 8px 8px 0; font-style: italic; color: #4338ca; margin: 12px 0; font-size: 14px; }
-  ul, ol { padding-left: 20px; margin: 8px 0; }
-  li { font-size: 14px; margin: 5px 0; }
-  strong { color: #1e1a3a; }
-  code { background: #f0f0f8; padding: 1px 5px; border-radius: 4px; font-family: monospace; font-size: 13px; }
-  table { border-collapse: collapse; width: 100%; margin: 12px 0; }
-  th { background: #eef0ff; color: #3730a3; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 12px; border: 1px solid #c7d2fe; text-align: left; }
-  td { padding: 8px 12px; border: 1px solid #e0e7ff; font-size: 13.5px; }
-  hr { border: none; border-top: 1px solid #e0e7ff; margin: 24px 0; }
+  body { font-family: -apple-system,'Inter',sans-serif; max-width: 660px; margin: 48px auto; padding: 0 28px; color: #1a1a2e; line-height: 1.7; }
+  h1 { font-size: 24px; font-weight: 800; color: #2e27a0; margin-bottom: 4px; letter-spacing: -0.03em; }
+  .meta { font-size: 12px; color: #999; margin-bottom: 32px; }
+  .section { margin: 24px 0; }
+  .section-label { font-size: 10px; font-weight: 800; color: #6366F1; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 10px; }
+  .insight { background: #f0f0ff; border-left: 3px solid #6366F1; padding: 12px 16px; border-radius: 0 10px 10px 0; font-size: 15px; color: #3730a3; font-style: italic; }
+  .concept { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid #eee; }
+  .term { font-weight: 700; color: #1e1a3a; min-width: 140px; font-size: 13.5px; }
+  .def { font-size: 13.5px; color: #444; }
+  .formula { background: #f8f7ff; border: 1px solid #e0e7ff; border-radius: 8px; padding: 12px 16px; margin: 8px 0; }
+  .fname { font-size: 11px; color: #6366F1; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+  .fval { font-family: monospace; font-size: 15px; color: #1e1a3a; font-weight: 600; }
+  .fnote { font-size: 12px; color: #888; margin-top: 4px; }
+  .step { display: flex; gap: 10px; padding: 6px 0; font-size: 13.5px; color: #333; }
+  .num { font-weight: 800; color: #6366F1; min-width: 18px; }
+  .tip { background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 12px 16px; font-size: 13.5px; color: #92400e; margin-top: 8px; }
+  hr { border: none; border-top: 1px solid #eee; margin: 28px 0; }
   @media print { body { margin: 20px auto; } }
 </style></head><body>
-<h1>Study Guide</h1>
-<div class="meta">Session with Aeva &middot; ${name} &middot; ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+<h1>${guide.topic || 'Study Guide'}</h1>
+<div class="meta">Aeva Study Guide · ${name} · ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
 <hr>
-<p>${mdToHtml(summary)}</p>
+${guide.coreInsight ? `<div class="section"><div class="section-label">Core Insight</div><div class="insight">${guide.coreInsight}</div></div>` : ''}
+${guide.concepts?.length ? `<div class="section"><div class="section-label">Key Concepts</div>${guide.concepts.map(c => `<div class="concept"><div class="term">${c.term}</div><div class="def">${c.definition}</div></div>`).join('')}</div>` : ''}
+${guide.formulas?.length ? `<div class="section"><div class="section-label">Formulas</div>${guide.formulas.map(f => `<div class="formula"><div class="fname">${f.name}</div><div class="fval">${f.formula}</div>${f.note ? `<div class="fnote">${f.note}</div>` : ''}</div>`).join('')}</div>` : ''}
+${guide.nextSteps?.length ? `<div class="section"><div class="section-label">Next Steps</div>${guide.nextSteps.map((s, i) => `<div class="step"><div class="num">${i + 1}.</div><div>${s}</div></div>`).join('')}</div>` : ''}
+${guide.examTip ? `<div class="section"><div class="section-label">Exam Tip</div><div class="tip">💡 ${guide.examTip}</div></div>` : ''}
 </body></html>`)
     win.document.close()
-    setTimeout(() => win.print(), 400)
+    setTimeout(() => win.print(), 350)
   }
+
+  const ff = "'Inter', system-ui, sans-serif"
+  const purple = '#818CF8'
 
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ position: 'fixed', inset: 0, zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 24, background: 'rgba(4,6,20,0.80)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, background: 'rgba(4,6,20,0.82)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
       <motion.div
-        initial={{ scale: 0.90, y: 24 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.90, y: 20 }}
+        initial={{ scale: 0.91, y: 22 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.91, y: 20 }}
         transition={{ type: 'spring', stiffness: 340, damping: 28 }}
-        style={{ width: '100%', maxWidth: 580, maxHeight: '82vh', borderRadius: 28, overflow: 'hidden',
-          background: 'linear-gradient(160deg, #0a0c1e 0%, #0f1228 100%)',
-          border: '1px solid rgba(255,255,255,0.10)', display: 'flex', flexDirection: 'column' }}
+        style={{ width: '100%', maxWidth: 560, maxHeight: '90vh', borderRadius: 28, overflow: 'hidden', background: 'rgba(8,10,26,0.98)', border: '1px solid rgba(255,255,255,0.10)', display: 'flex', flexDirection: 'column', fontFamily: ff }}
       >
         {/* Header */}
-        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.02em' }}>Study Guide</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)', marginTop: 2 }}>
-              {loading ? 'Generating summary…' : `Session with Aeva · ${name}`}
+        <div style={{ padding: '20px 22px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <div style={{ fontSize: 17, fontWeight: 800, color: 'rgba(255,255,255,0.94)', letterSpacing: '-0.02em' }}>
+                  {loading ? 'Study Guide' : (guide?.topic || 'Study Guide')}
+                </div>
+                {!loading && guide?.topic && (
+                  <div style={{ padding: '2px 9px', borderRadius: 99, background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.30)', fontSize: 10.5, fontWeight: 700, color: purple, flexShrink: 0 }}>
+                    {guide.topic}
+                  </div>
+                )}
+              </div>
+              <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.35)' }}>
+                {loading ? 'Generating…' : `${exchangeCount} exchange${exchangeCount !== 1 ? 's' : ''} · ${guide?.concepts?.length || 0} concepts · ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+              </div>
             </div>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.30)', cursor: 'pointer', fontSize: 20, padding: '2px 6px', flexShrink: 0, lineHeight: 1 }}>✕</button>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {!loading && summary && (
-              <motion.button
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+
+          {/* Action buttons */}
+          {!loading && guide && (
+            <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+              style={{ display: 'flex', gap: 7, marginTop: 14, flexWrap: 'wrap' }}>
+              {guide.concepts?.length > 0 && (
+                <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                  onClick={handleAddFlashcards}
+                  style={{ padding: '7px 13px', borderRadius: 10, background: cardsAdded ? 'rgba(16,185,129,0.15)' : 'rgba(16,185,129,0.10)', border: `1px solid ${cardsAdded ? 'rgba(16,185,129,0.45)' : 'rgba(16,185,129,0.28)'}`, color: cardsAdded ? '#34D399' : '#6EE7B7', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: ff, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  {cardsAdded ? '✓ Added to flashcards' : `⚡ Add ${guide.concepts.length} flashcards`}
+                </motion.button>
+              )}
+              <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                onClick={handleSave}
+                style={{ padding: '7px 13px', borderRadius: 10, background: saved ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.06)', border: `1px solid ${saved ? 'rgba(99,102,241,0.40)' : 'rgba(255,255,255,0.12)'}`, color: saved ? '#A5B4FC' : 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: ff, display: 'flex', alignItems: 'center', gap: 5 }}>
+                {saved ? '✓ Saved' : '📚 Save to Library'}
+              </motion.button>
+              <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                 onClick={handleExport}
-                style={{ padding: '7px 14px', borderRadius: 99, cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                  background: 'rgba(139,143,255,0.15)', border: '1px solid rgba(139,143,255,0.30)',
-                  color: '#A5B4FC', fontFamily: "'Inter', system-ui, sans-serif" }}
-              >⬇ Export PDF</motion.button>
-            )}
-            <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.30)', cursor: 'pointer', fontSize: 18, padding: '0 4px' }}>✕</button>
-          </div>
+                style={{ padding: '7px 13px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.11)', color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: ff }}>
+                ⬇ Export PDF
+              </motion.button>
+            </motion.div>
+          )}
         </div>
 
         {/* Content */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 22px 28px' }}>
           {loading && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, gap: 16 }}>
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}
-                style={{ width: 28, height: 28, borderRadius: '50%', border: '2.5px solid rgba(139,143,255,0.15)', borderTopColor: '#A5B4FC' }}
-              />
-              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>Summarising your session…</span>
-            </div>
-          )}
-          {!loading && summary && (
-            <MarkdownRenderer text={summary} streaming={false} cursorColor="transparent" />
-          )}
-          {!loading && !summary && (
-            <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.30)', fontSize: 14, padding: '40px 0' }}>
-              No content to summarise yet. Chat with Aeva first.
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 220, gap: 14 }}>
+              <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.1, repeat: Infinity, ease: 'linear' }}
+                style={{ width: 26, height: 26, borderRadius: '50%', border: '2.5px solid rgba(139,143,255,0.12)', borderTopColor: '#A5B4FC' }} />
+              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>Building your study guide…</span>
             </div>
           )}
 
-          {/* Visual Insights from Aeva Lens */}
-          {visualInsights.length > 0 && (
-            <div style={{ marginTop: 20, borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
-                <span style={{ fontSize: 13 }}>🔭</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(103,232,249,0.75)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                  Visual Insights
-                </span>
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', fontWeight: 500 }}>
-                  from Aeva Lens
-                </span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {visualInsights.map((v, i) => (
-                  <div key={i} style={{
-                    padding: '12px 14px', borderRadius: 12,
-                    background: 'rgba(0,200,255,0.06)', border: '1px solid rgba(0,200,255,0.18)',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                      <div style={{ padding: '2px 8px', borderRadius: 99, background: 'rgba(0,200,255,0.12)', border: '1px solid rgba(0,200,255,0.25)', fontSize: 10.5, fontWeight: 700, color: '#67E8F9' }}>
-                        {v.topic}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: 12.5, color: 'rgba(207,250,254,0.80)', lineHeight: 1.55, marginBottom: 4 }}>
-                      <strong style={{ color: 'rgba(255,255,255,0.70)', fontWeight: 600 }}>Insight: </strong>{v.coreInsight}
-                    </div>
-                    <div style={{ fontSize: 12, color: 'rgba(252,165,165,0.72)', lineHeight: 1.5 }}>
-                      <strong style={{ fontWeight: 600 }}>Struggle: </strong>{v.strugglePoint}
-                    </div>
-                    {v.steps?.length > 0 && (
-                      <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                        {v.steps.map((s, j) => (
-                          <div key={j} style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.45)', display: 'flex', gap: 6 }}>
-                            <span style={{ color: 'rgba(0,200,255,0.50)', fontWeight: 700 }}>{j + 1}.</span>
-                            {s}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+          {!loading && !guide && (
+            <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.28)', fontSize: 14, padding: '48px 0' }}>
+              No session content yet. Chat with Aeva first.
             </div>
+          )}
+
+          {!loading && guide && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+              {/* Core Insight */}
+              {guide.coreInsight && (
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: purple, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>Core Insight</div>
+                  <div style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(99,102,241,0.09)', border: '1px solid rgba(99,102,241,0.25)', borderLeft: '3px solid rgba(99,102,241,0.70)' }}>
+                    <p style={{ fontSize: 14.5, color: 'rgba(255,255,255,0.88)', lineHeight: 1.65, margin: 0, fontStyle: 'italic' }}>{guide.coreInsight}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Key Concepts */}
+              {guide.concepts?.length > 0 && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: purple, letterSpacing: '0.12em', textTransform: 'uppercase' }}>Key Concepts</div>
+                    <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.28)' }}>Tap to expand</div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {guide.concepts.map((c, i) => (
+                      <motion.div key={i} layout
+                        onClick={() => setExpandedConcept(expandedConcept === i ? null : i)}
+                        style={{ borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', overflow: 'hidden', cursor: 'pointer' }}>
+                        <div style={{ padding: '11px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                            <div style={{ width: 24, height: 24, borderRadius: 7, background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: purple, flexShrink: 0 }}>{i + 1}</div>
+                            <span style={{ fontSize: 13.5, fontWeight: 700, color: 'rgba(255,255,255,0.90)' }}>{c.term}</span>
+                          </div>
+                          <motion.span animate={{ rotate: expandedConcept === i ? 90 : 0 }} style={{ color: 'rgba(255,255,255,0.28)', fontSize: 12, flexShrink: 0 }}>›</motion.span>
+                        </div>
+                        <AnimatePresence>
+                          {expandedConcept === i && (
+                            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
+                              style={{ overflow: 'hidden' }}>
+                              <div style={{ padding: '0 14px 13px 47px', fontSize: 13, color: 'rgba(255,255,255,0.65)', lineHeight: 1.6 }}>{c.definition}</div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Formulas */}
+              {guide.formulas?.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: '#60A5FA', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>Formulas & Rules</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {guide.formulas.map((f, i) => (
+                      <div key={i} style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.22)' }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#93C5FD', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>{f.name}</div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.92)', fontFamily: '"JetBrains Mono","Fira Code",monospace', marginBottom: f.note ? 6 : 0 }}>{f.formula}</div>
+                        {f.note && <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 }}>{f.note}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Next Steps */}
+              {guide.nextSteps?.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: '#34D399', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>Next Steps</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                    {guide.nextSteps.map((step, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 11 }}>
+                        <div style={{ width: 24, height: 24, borderRadius: 7, background: 'rgba(16,185,129,0.16)', border: '1px solid rgba(16,185,129,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#34D399', flexShrink: 0, marginTop: 1 }}>{i + 1}</div>
+                        <span style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.80)', lineHeight: 1.6, paddingTop: 3 }}>{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Exam Tip */}
+              {guide.examTip && (
+                <div style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', display: 'flex', gap: 11, alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: 16, flexShrink: 0 }}>💡</span>
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: '#FCD34D', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 5 }}>Exam Tip</div>
+                    <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.80)', lineHeight: 1.60, margin: 0 }}>{guide.examTip}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Visual Insights from Lens */}
+              {visualInsights.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: '#67E8F9', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 8 }}>🔭 Lens Insights</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {visualInsights.map((v, i) => (
+                      <div key={i} style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(0,200,255,0.06)', border: '1px solid rgba(0,200,255,0.18)' }}>
+                        <div style={{ fontSize: 10.5, fontWeight: 700, color: '#67E8F9', marginBottom: 5 }}>{v.topic}</div>
+                        <div style={{ fontSize: 13, color: 'rgba(207,250,254,0.80)', lineHeight: 1.55, marginBottom: v.strugglePoint ? 4 : 0 }}>{v.coreInsight}</div>
+                        {v.strugglePoint && <div style={{ fontSize: 12, color: 'rgba(252,165,165,0.70)', lineHeight: 1.5 }}>⚠ {v.strugglePoint}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
           )}
         </div>
       </motion.div>
