@@ -656,7 +656,7 @@ const NODE_R       = 38   // node circle radius (76px diameter)
 const TOP_PAD      = 32
 
 function PathView() {
-  const { getActive, completeNode, closeRoadmapHub, startNodeSession, endNodeSession } = useRoadmapStore()
+  const { getActive, completeNode, closeRoadmapHub, startNodeSession, endNodeSession, markLogSeen } = useRoadmapStore()
   const { openLab, addOrder, setLabTab, setPendingAutoStart } = useLabStore()
   const { addXP } = useXPStore()
   const { setPendingChatPrompt } = useAevaControlStore()
@@ -897,6 +897,39 @@ function PathView() {
           <div style={{ fontSize: 18, opacity: 0.6 }}>→</div>
         </motion.button>
       </div>
+
+      {/* ── Aeva change log banner ───────────────────────────────────────── */}
+      {(() => {
+        const unseen = (roadmap.aevaLog || []).filter(e => !e.seen)
+        if (!unseen.length) return null
+        const ICONS = { flag: '🚩', skip: '⏭', inject: '➕', reprioritise: '🔀', crunch: '⚡' }
+        return (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+            style={{ flexShrink: 0, margin: '10px 20px 0', borderRadius: 14, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.28)', overflow: 'hidden' }}>
+            <div style={{ padding: '10px 14px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13 }}>✦</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: '#FCD34D' }}>Aeva updated your roadmap</span>
+              </div>
+              <motion.button whileTap={{ scale: 0.9 }} onClick={() => markLogSeen(roadmap.id)}
+                style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '2px 6px' }}>
+                Dismiss
+              </motion.button>
+            </div>
+            <div style={{ padding: '0 14px 12px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {unseen.map((e, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  <span style={{ fontSize: 11, flexShrink: 0, marginTop: 1 }}>{ICONS[e.type] || '✦'}</span>
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', lineHeight: 1.4 }}>
+                    <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>{e.topic}</span>
+                    {e.description ? ` — ${e.description}` : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )
+      })()}
 
       {/* ── Path ─────────────────────────────────────────────────────────── */}
       <div ref={containerRef} style={{ flex: 1, position: 'relative', minHeight: containerH, margin: '24px 0 40px' }}>

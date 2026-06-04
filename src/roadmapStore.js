@@ -100,6 +100,28 @@ export const useRoadmapStore = create((set, get) => {
       return s.roadmaps.find(r => r.id === s.activeRoadmapId) || s.roadmaps[0] || null
     },
 
+    // ── Aeva Change Log ──────────────────────────────────────────────────────
+    logAevaAction: (roadmapId, entry) => {
+      set(s => {
+        const roadmaps = s.roadmaps.map(r => {
+          if (r.id !== roadmapId) return r
+          const log = r.aevaLog || []
+          return { ...r, aevaLog: [...log, { ...entry, timestamp: Date.now(), seen: false }].slice(-20) }
+        })
+        const u = { ...s, roadmaps }; save(u); return u
+      })
+    },
+
+    markLogSeen: (roadmapId) => {
+      set(s => {
+        const roadmaps = s.roadmaps.map(r => {
+          if (r.id !== roadmapId) return r
+          return { ...r, aevaLog: (r.aevaLog || []).map(e => ({ ...e, seen: true })) }
+        })
+        const u = { ...s, roadmaps }; save(u); return u
+      })
+    },
+
     // ── Aeva Control Actions ─────────────────────────────────────────────────
 
     // Insert a new node right after a given node (or at front of locked queue if afterNodeId is null)

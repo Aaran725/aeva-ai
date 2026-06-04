@@ -435,19 +435,28 @@ Available commands (copy exactly, fill in the values):
 ⚡CMD:{"type":"intervention","title":"TITLE","message":"MESSAGE","task":"acknowledge"} — full-screen takeover, student must read and confirm
 ⚡CMD:{"type":"intervention","title":"TITLE","message":"MESSAGE","task":"quiz","topic":"TOPIC"} — full-screen takeover with a 3-question quiz they must pass
 
-ROADMAP COMMANDS — use these to actively reshape the student's roadmap (only when you have an active roadmap in context):
-⚡CMD:{"type":"roadmap_inject","topic":"TOPIC","nodeType":"learn|drill|check","phase":"Core Topics","difficulty":3,"reason":"WHY"} — insert a new node right after the current available node (use when student clearly needs extra help on a concept)
-⚡CMD:{"type":"roadmap_skip","nodeId":"NODE_ID","reason":"WHY"} — skip a locked node (use when student has clearly mastered that topic already)
-⚡CMD:{"type":"roadmap_flag","nodeId":"NODE_ID"} — mark a node as urgent (use when student keeps struggling with that topic in chat)
-⚡CMD:{"type":"roadmap_reprioritise","topics":["TOPIC1","TOPIC2"]} — move these topic nodes earlier in the queue (use when student or teacher flags certain topics as high priority)
-⚡CMD:{"type":"roadmap_crunch"} — emergency consolidation, skip non-essential nodes to create a survival path (use ONLY when exam is ≤5 days away and too many nodes remain)
+ROADMAP EDITS — separate from ⚡CMD, use ⚡ROADMAP to make multiple changes at once (only when active roadmap is in context):
+⚡ROADMAP:[
+  {"type":"flag","topic":"EXACT TOPIC NAME FROM ROADMAP"},
+  {"type":"skip","topic":"EXACT TOPIC NAME FROM ROADMAP","reason":"WHY"},
+  {"type":"inject","topic":"NEW TOPIC NAME","nodeType":"learn|drill|check","reason":"WHY"},
+  {"type":"reprioritise","topics":["TOPIC1","TOPIC2"]},
+  {"type":"crunch"}
+]
 
-When to use roadmap commands:
-- Student keeps asking about a topic that has a locked node → roadmap_flag that node so it's clearly marked urgent
-- Student clearly already knows a topic covered in a future locked node → roadmap_skip it
-- Student is confused about something not in their roadmap → roadmap_inject a remedial node
-- Student mentions teacher said certain topics are most important → roadmap_reprioritise those topics
-- Exam in ≤5 days, many nodes left → roadmap_crunch (tell the student you've done it)
+RULES for ⚡ROADMAP:
+- Use the EXACT topic name from the roadmap context above — copy it character for character
+- Can include multiple actions in one array — do all needed changes at once
+- Always at the very end of your response on its own line
+- Do NOT use nodeId — use topic name only (more reliable)
+- After firing it, describe what you changed conversationally: "I've flagged X as urgent and skipped Y since you've clearly got that covered."
+
+When to use:
+- Student keeps struggling with a topic in chat → flag it urgent
+- Student clearly already knows a locked topic → skip it
+- Student needs extra help on something not in roadmap → inject a node
+- Exam close + too many nodes left → crunch
+- Student or teacher flags priority topics → reprioritise
 
 When to use them — act on your own judgment, don't wait to be asked:
 - Student gets something wrong OR shows confusion → fire open_lab_drill immediately. Don't wait for 2+ mistakes. Say "I'm pulling up a drill on this right now." Pick the best drillType: flashcard for definitions, feynman for understanding, mocktest for application, speedround for recall, shortanswer for exam-style.
@@ -2519,6 +2528,7 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
 
   const clean = text
     .replace(/⚡CMD:\{[^}]*\}/g, '')
+    .replace(/⚡ROADMAP:[\s\S]*$/, '')
     .replace(/⚡VIZ:[\s\S]*$/, '')
     .replace(/⚡CANVAS:[\s\S]*$/, '')
     .replace(/\[TERM:[^\]]*\]/g, '')
@@ -3235,6 +3245,25 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false }) {
                 <span style={{ fontSize: 11.5, fontWeight: 700, color: '#A5B4FC', letterSpacing: '-0.01em' }}>{msg.aevaAction.label}</span>
               </motion.div>
             )}
+            {msg.aevaRoadmapChanges?.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25, duration: 0.3 }}
+                style={{ marginTop: 12, borderRadius: 14, background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.28)', overflow: 'hidden' }}
+              >
+                <div style={{ padding: '10px 14px 8px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid rgba(99,102,241,0.15)' }}>
+                  <span style={{ fontSize: 13 }}>🗺️</span>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: '#A5B4FC', letterSpacing: '-0.01em' }}>Roadmap updated · {msg.aevaRoadmapChanges.length} change{msg.aevaRoadmapChanges.length > 1 ? 's' : ''}</span>
+                </div>
+                <div style={{ padding: '8px 14px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {msg.aevaRoadmapChanges.map((c, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <span style={{ fontSize: 12, flexShrink: 0, marginTop: 1 }}>{c.icon}</span>
+                      <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.75)', lineHeight: 1.4 }}>{c.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
           </>
         )}
       </div>
@@ -3924,47 +3953,6 @@ function ChatView({ onBack }) {
                 action.topic || '',
               )
               label = `Intervention triggered`
-            } else if (action.type === 'roadmap_inject') {
-              const activeRm = useRoadmapStore.getState().getActive()
-              if (activeRm) {
-                const available = activeRm.nodes?.find(n => n.status === 'available')
-                useRoadmapStore.getState().injectNode(activeRm.id, {
-                  topic: action.topic || 'Extra Practice',
-                  type: action.nodeType || 'learn',
-                  phase: action.phase || 'Core Topics',
-                  difficulty: action.difficulty || 3,
-                  estimatedMinutes: 20,
-                  xp: action.nodeType === 'drill' ? 30 : action.nodeType === 'check' ? 40 : 50,
-                  description: action.reason || 'Aeva added this node to strengthen your understanding.',
-                }, available?.id || null)
-                label = `Node added · ${action.topic || 'Extra Practice'}`
-              }
-            } else if (action.type === 'roadmap_skip') {
-              const activeRm = useRoadmapStore.getState().getActive()
-              if (activeRm && action.nodeId) {
-                useRoadmapStore.getState().skipNode(activeRm.id, action.nodeId, action.reason || '')
-                const node = activeRm.nodes?.find(n => n.id === action.nodeId)
-                label = `Skipped · ${node?.topic || action.nodeId}`
-              }
-            } else if (action.type === 'roadmap_flag') {
-              const activeRm = useRoadmapStore.getState().getActive()
-              if (activeRm && action.nodeId) {
-                useRoadmapStore.getState().flagNode(activeRm.id, action.nodeId, true)
-                const node = activeRm.nodes?.find(n => n.id === action.nodeId)
-                label = `Flagged urgent · ${node?.topic || action.nodeId}`
-              }
-            } else if (action.type === 'roadmap_reprioritise') {
-              const activeRm = useRoadmapStore.getState().getActive()
-              if (activeRm && action.topics?.length) {
-                useRoadmapStore.getState().reprioritiseNodes(activeRm.id, action.topics)
-                label = `Reprioritised · ${action.topics.slice(0, 2).join(', ')}`
-              }
-            } else if (action.type === 'roadmap_crunch') {
-              const activeRm = useRoadmapStore.getState().getActive()
-              if (activeRm) {
-                useRoadmapStore.getState().crunchMode(activeRm.id)
-                label = `Crunch mode activated`
-              }
             }
 
             if (label) {
@@ -3979,6 +3967,90 @@ function ChatView({ onBack }) {
             }
           } catch { /* malformed action tag — ignore */ }
         }
+
+        // ── ROADMAP tag parser ───────────────────────────────────────────
+        // ⚡ROADMAP:[{type,topic,...}, ...] — topic-matched, multiple actions
+        const rmIdx = rawResponse.indexOf('⚡ROADMAP:')
+        if (rmIdx !== -1) {
+          try {
+            const start = rawResponse.indexOf('[', rmIdx)
+            if (start !== -1) {
+              let depth = 0, end = -1
+              for (let i = start; i < rawResponse.length; i++) {
+                if (rawResponse[i] === '[' || rawResponse[i] === '{') depth++
+                else if (rawResponse[i] === ']' || rawResponse[i] === '}') { depth--; if (depth === 0) { end = i + 1; break } }
+              }
+              if (end !== -1) {
+                const actions = JSON.parse(rawResponse.slice(start, end))
+                const store = useRoadmapStore.getState()
+                const activeRm = store.getActive()
+                if (activeRm && Array.isArray(actions)) {
+                  const changes = []
+
+                  // Helper: find node by topic (case-insensitive partial match, non-complete/skipped)
+                  const findByTopic = (topic) => {
+                    const t = topic?.toLowerCase() || ''
+                    return activeRm.nodes?.find(n =>
+                      n.status !== 'complete' && n.status !== 'skipped' &&
+                      (n.topic.toLowerCase() === t || n.topic.toLowerCase().includes(t) || t.includes(n.topic.toLowerCase()))
+                    )
+                  }
+
+                  for (const act of actions) {
+                    if (act.type === 'flag') {
+                      const node = findByTopic(act.topic)
+                      if (node) {
+                        store.flagNode(activeRm.id, node.id, true)
+                        store.logAevaAction(activeRm.id, { type: 'flag', topic: node.topic, description: `Flagged as urgent` })
+                        changes.push({ icon: '🚩', text: `Flagged urgent: ${node.topic}` })
+                      }
+                    } else if (act.type === 'skip') {
+                      const node = findByTopic(act.topic)
+                      if (node) {
+                        store.skipNode(activeRm.id, node.id, act.reason || 'Aeva determined this is not needed')
+                        store.logAevaAction(activeRm.id, { type: 'skip', topic: node.topic, description: act.reason || 'Skipped — not needed' })
+                        changes.push({ icon: '⏭', text: `Skipped: ${node.topic}${act.reason ? ` — ${act.reason}` : ''}` })
+                      }
+                    } else if (act.type === 'inject') {
+                      const available = activeRm.nodes?.find(n => n.status === 'available')
+                      const nt = act.nodeType || 'learn'
+                      store.injectNode(activeRm.id, {
+                        topic: act.topic || 'Extra Practice',
+                        type: nt,
+                        phase: act.phase || 'Core Topics',
+                        difficulty: act.difficulty || 3,
+                        estimatedMinutes: 20,
+                        xp: nt === 'drill' ? 30 : nt === 'check' ? 40 : 50,
+                        description: act.reason || 'Added by Aeva to strengthen your understanding.',
+                      }, available?.id || null)
+                      store.logAevaAction(activeRm.id, { type: 'inject', topic: act.topic, description: `Added new ${nt} node: ${act.reason || ''}` })
+                      changes.push({ icon: '➕', text: `Added node: ${act.topic}` })
+                    } else if (act.type === 'reprioritise') {
+                      const topics = act.topics || []
+                      store.reprioritiseNodes(activeRm.id, topics)
+                      store.logAevaAction(activeRm.id, { type: 'reprioritise', topic: topics.join(', '), description: `Moved to top priority` })
+                      changes.push({ icon: '🔀', text: `Prioritised: ${topics.slice(0, 2).join(', ')}` })
+                    } else if (act.type === 'crunch') {
+                      store.crunchMode(activeRm.id)
+                      store.logAevaAction(activeRm.id, { type: 'crunch', topic: '', description: 'Crunch mode — non-essential nodes removed' })
+                      changes.push({ icon: '⚡', text: 'Crunch mode activated' })
+                    }
+                  }
+
+                  if (changes.length > 0) {
+                    setMessages(prev => {
+                      const copy = [...prev]
+                      copy[copy.length - 1] = { ...copy[copy.length - 1], aevaRoadmapChanges: changes }
+                      return copy
+                    })
+                    useAevaControlStore.getState().showCommandToast(`Roadmap updated · ${changes.length} change${changes.length > 1 ? 's' : ''}`, 'roadmap_edit')
+                  }
+                }
+              }
+            }
+          } catch { /* malformed ROADMAP tag */ }
+        }
+        // ─────────────────────────────────────────────────────────────────
 
         // ── VIZ tag parser ───────────────────────────────────────────────
         const vizIdx = rawResponse.indexOf('⚡VIZ:')
@@ -5152,6 +5224,7 @@ const CMD_ICONS = {
   lock_arcade:           '🔒',
   set_mandate:           '🎯',
   intervention:          '🚨',
+  roadmap_edit:          '🗺️',
   roadmap_inject:        '➕',
   roadmap_skip:          '⏭️',
   roadmap_flag:          '🚩',
@@ -5166,6 +5239,7 @@ const CMD_VERBS = {
   lock_arcade:           'Arcade locked',
   set_mandate:           'Mandate set',
   intervention:          'Intervention incoming',
+  roadmap_edit:          'Roadmap updated',
   roadmap_inject:        'Roadmap updated',
   roadmap_skip:          'Node skipped',
   roadmap_flag:          'Flagged urgent',
