@@ -274,14 +274,25 @@ IDENTITY & VOICE:
 - Short sentences. Maximum information density per word.
 - Sophisticated but plain vocabulary. Accessible to a sharp 16-year-old, satisfying to a PhD.
 
-RESPONSE FORMAT — follow this 3-part structure for every teaching response:
+RESPONSE FORMAT — follow this structure for every teaching response:
 
 **[Concept Name]**
-> One sentence capturing the essential "why" — the mechanism, not just the definition. Make it memorable.
+> **Definition:** One sentence defining the concept precisely.
+> **Key Insight:** The "why" — the mechanism, not just the definition.
 
-[A clean visual: numbered list for processes, Markdown table for comparisons, formula for math — choose what actually helps]
+[A clean visual: step-by-step, table for comparisons, or display equation — choose what helps most]
 
-*[One specific real-world example, or a Socratic question that makes them apply what they just learned.]*
+*[One Socratic question or real-world application to close.]*
+
+STEP-BY-STEP FORMAT (for walkthroughs and problem solving):
+Use EXACTLY this format for each step — no bold markers, no "**Step N:**":
+1: Step title
+[brief explanation, then any equation on its own $$ block]
+
+2: Next step title
+[explanation + $$ equation $$]
+
+The "N: Title" format renders as a visual numbered badge chip. Never write **Step 1: Title** or ## Step 1.
 
 MARKDOWN RULES (non-negotiable):
 - Tables: always use proper GitHub Markdown format with a header row and \`| --- |\` separator row. Never ASCII art.
@@ -2486,11 +2497,11 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
         const html = katex.renderToString(mathContent, { throwOnError: false, displayMode: true })
         elements.push(
           <div key={`dmath-${startI}`} style={{
-            overflowX: 'auto', margin: '14px 0', padding: '22px 24px',
-            textAlign: 'center', borderRadius: 14, fontSize: 18,
-            background: isLight ? 'rgba(99,102,241,0.06)' : 'rgba(99,102,241,0.09)',
-            border: isLight ? '1px solid rgba(99,102,241,0.22)' : '1px solid rgba(99,102,241,0.28)',
-            boxShadow: isLight ? 'none' : '0 2px 20px rgba(99,102,241,0.08), inset 0 1px 0 rgba(165,170,255,0.06)',
+            overflowX: 'auto', margin: '16px 0', padding: '26px 28px',
+            textAlign: 'center', borderRadius: 16, fontSize: 19,
+            background: isLight ? 'rgba(99,102,241,0.07)' : 'rgba(14,16,48,0.80)',
+            border: isLight ? '1px solid rgba(99,102,241,0.22)' : '1px solid rgba(99,102,241,0.30)',
+            boxShadow: isLight ? 'none' : '0 4px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(165,170,255,0.07)',
           }}
             dangerouslySetInnerHTML={{ __html: html }}
           />
@@ -2645,16 +2656,16 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
       continue
     }
 
-    // Step heading: "1: Title" or "Step 1: Title" — numbered badge chip
-    const stepMatch = trimmed.match(/^(?:Step\s+)?(\d+):\s+(.+)/)
-    if (stepMatch && trimmed.length < 90) {
+    // Step heading: "1: Title", "Step 1: Title", or "**Step 1: Title**" — numbered badge chip
+    const stepMatch = trimmed.match(/^(?:\*\*)?(?:Step\s+)?(\d+):\s+(.+?)(?:\*\*)?$/)
+    if (stepMatch && trimmed.replace(/\*\*/g, '').length < 100) {
       flushList()
       elements.push(
-        <div key={`step-${i}`} style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 16, marginBottom: 3 }}>
-          <div style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 7, background: isLight ? 'rgba(99,102,241,0.18)' : 'rgba(99,102,241,0.22)', border: isLight ? '1px solid rgba(99,102,241,0.30)' : '1px solid rgba(99,102,241,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: isLight ? '#5B5BD6' : '#A5B4FC' }}>
+        <div key={`step-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 22, marginBottom: 6 }}>
+          <div style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 8, background: isLight ? 'rgba(99,102,241,0.20)' : 'rgba(99,102,241,0.28)', border: isLight ? '1px solid rgba(99,102,241,0.35)' : '1px solid rgba(99,102,241,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: isLight ? '#5B5BD6' : '#A5B4FC' }}>
             {stepMatch[1]}
           </div>
-          <span style={{ fontWeight: 700, fontSize: 14.5, color: isLight ? 'rgba(0,0,0,0.92)' : 'rgba(255,255,255,0.96)', lineHeight: 1.4 }}>
+          <span style={{ fontWeight: 700, fontSize: 15, color: isLight ? 'rgba(0,0,0,0.92)' : 'rgba(255,255,255,0.96)', lineHeight: 1.3, letterSpacing: '-0.01em' }}>
             {parseInline(stepMatch[2], isLight)}
           </span>
         </div>
