@@ -656,7 +656,9 @@ const NODE_R       = 38   // node circle radius (76px diameter)
 const TOP_PAD      = 32
 
 function PathView() {
-  const { getActive, completeNode, closeRoadmapHub, startNodeSession, endNodeSession, markLogSeen } = useRoadmapStore()
+  const { getActive, completeNode, closeRoadmapHub, startNodeSession, endNodeSession, markLogSeen, flagNode } = useRoadmapStore()
+  // Subscribe to roadmaps array so component re-renders when Aeva mutates nodes
+  useRoadmapStore(state => state.roadmaps)
   const { openLab, addOrder, setLabTab, setPendingAutoStart } = useLabStore()
   const { addXP } = useXPStore()
   const { setPendingChatPrompt } = useAevaControlStore()
@@ -872,7 +874,7 @@ function PathView() {
           animate={askAevaFlash ? { boxShadow: ['0 0 0 0 rgba(99,102,241,0)', '0 0 0 8px rgba(99,102,241,0.25)', '0 0 0 0 rgba(99,102,241,0)'] } : {}}
           onClick={() => {
             const done     = nodes.filter(n => n.status === 'complete').length
-            const total    = nodes.filter(n => n.status !== 'skipped').length
+            const total    = nodes.length
             const lp       = roadmap.learningProfile || {}
             const weakStr  = lp.weak?.length ? ` My weak areas are: ${lp.weak.slice(0,3).join(', ')}.` : ''
             const urgStr   = nodes.filter(n => n.urgent).map(n => n.topic).join(', ')
@@ -1080,8 +1082,16 @@ function PathView() {
                           </div>
                         )
                       })()}
-                      {/* Topic + type */}
-                      <div style={{ fontSize: 14.5, fontWeight: 800, color: '#fff', marginBottom: 2, letterSpacing: '-0.02em' }}>{node.topic}</div>
+                      {/* Topic + type + urgent clear */}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6, marginBottom: 2 }}>
+                        <div style={{ fontSize: 14.5, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', flex: 1 }}>{node.topic}</div>
+                        {isUrgent && (
+                          <button onClick={() => flagNode(roadmap.id, node.id, false)}
+                            style={{ flexShrink: 0, padding: '2px 7px', borderRadius: 6, border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.08)', color: '#FCD34D', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: 2 }}>
+                            🚩 Un-flag
+                          </button>
+                        )}
+                      </div>
                       <div style={{ fontSize: 10.5, color: cfg.light, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>{cfg.label}</div>
                       {/* Difficulty dots + time + XP */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>

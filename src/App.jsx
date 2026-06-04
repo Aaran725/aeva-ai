@@ -3277,6 +3277,7 @@ function ChatView({ onBack }) {
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState([])
   const [isThinking, setIsThinking] = useState(false)
+  const [isExtractingRoadmap, setIsExtractingRoadmap] = useState(false)
   const [sessionState, setSessionState] = useState('DIAGNOSTIC')
   const [criticism, setCriticism] = useState(null)
   const [masteryMap, setMasteryMap] = useState({})
@@ -3872,17 +3873,25 @@ function ChatView({ onBack }) {
         const activeRmForExtraction = useRoadmapStore.getState().getActive()
         const roadmapChangeKeywords = /\b(flagged?|urgent|skipp?e?d?|remov(ed)?|delet(ed)?|added?|inject(ed)?|prioriti(s|z)(ed)?|crunch|moved?|cut|trimm?e?d?|reduc(ed)?|restructur(ed)?|adjust(ed)?|updat(ed)? (your )?roadmap)\b/i
         if (!isMission && activeRmForExtraction && roadmapChangeKeywords.test(rawResponse)) {
+          setIsExtractingRoadmap(true)
           try {
             const nodeList = activeRmForExtraction.nodes
               .filter(n => n.status !== 'complete')
               .map(n => `"${n.topic}"`)
               .join(', ')
 
+            // Extract only change-related sentences to avoid missing late-mentioned changes
+            const changeSentences = rawResponse
+              .split(/(?<=[.!?])\s+/)
+              .filter(s => /flagged?|urgent|remov(ed)?|delet(ed)?|skipp?|added?|inject(ed)?|crunch|moved?|prioriti(s|z)(ed)?|restructur(ed)?/i.test(s))
+              .join(' ')
+            const extractText = (changeSentences || rawResponse).replace(/"/g, "'").slice(0, 3000)
+
             const extractionPrompt = `Extract roadmap changes from this AI tutor response. Output ONLY JSON.
 
 Available nodes (non-complete): ${nodeList}
 
-AI response: "${rawResponse.replace(/"/g, "'").slice(0, 1000)}"
+AI response: "${extractText}"
 
 Map what the AI said to these action types:
 - "flag" = marked urgent / flagged / prioritised a node that exists above
@@ -3987,6 +3996,7 @@ If no clear changes: {"changes":[]}`
               }
             }
           } catch { /* extraction failed silently */ }
+          finally { setIsExtractingRoadmap(false) }
         }
         // ─────────────────────────────────────────────────────────────────
 
@@ -4637,6 +4647,21 @@ If no clear changes: {"changes":[]}`
                 <div ref={bottomRef} />
               </div>
             </div>
+
+            {/* Roadmap extraction indicator */}
+            <AnimatePresence>
+              {isExtractingRoadmap && (
+                <motion.div
+                  initial={{ opacity: 0, y: 6, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: 4, height: 0 }}
+                  style={{ flexShrink: 0, padding: '0 20px 8px', overflow: 'hidden' }}>
+                  <div style={{ maxWidth: 640, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', borderRadius: 12, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.22)' }}>
+                    <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.1, repeat: Infinity }}
+                      style={{ width: 6, height: 6, borderRadius: '50%', background: '#818CF8', flexShrink: 0 }} />
+                    <span style={{ fontSize: 12.5, color: 'rgba(165,180,252,0.80)', fontWeight: 600, fontFamily: "'Inter', system-ui, sans-serif" }}>Applying roadmap changes…</span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Prediction banner */}
             <AnimatePresence>
