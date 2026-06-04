@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, createContext, useContext } from 'react'
+import { GROQ_KEYS, GROQ_URL, nextGroqKey } from './groqClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
@@ -46,21 +47,7 @@ import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
 import { useMemoryStore } from './memoryStore'
 import './index.css'
 
-/* ─── Groq API ─── */
-const GROQ_KEYS = [
-  import.meta.env.VITE_GROQ_API_KEY,
-  import.meta.env.VITE_GROQ_API_KEY_2,
-  import.meta.env.VITE_GROQ_API_KEY_3,
-].filter(Boolean)
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
-
-// Round-robin key index (module-level so it persists across calls)
-let _groqKeyIdx = 0
-function nextGroqKey() {
-  const key = GROQ_KEYS[_groqKeyIdx % GROQ_KEYS.length]
-  _groqKeyIdx++
-  return key
-}
+/* ─── Groq API (keys + URL imported at top of file) ─── */
 
 /* ─── Chat customisation ─── */
 const CHIP_DEFAULTS = [
@@ -210,7 +197,7 @@ async function runCritic(history, userMessage) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: 'llama-3.1-8b-instant',
         messages: [
           {
             role: 'system',
@@ -610,7 +597,7 @@ async function summariseSessionBackground(messages, userName, topics, addMemory)
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: 'llama-3.1-8b-instant',
         messages: [{
           role: 'user',
           content: `Summarise this tutoring session in exactly 2 sentences. Be specific: name the topic, what the student understood, and any difficulty. No filler.\n\nSession:\n${lines}`,

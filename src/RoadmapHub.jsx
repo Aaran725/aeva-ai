@@ -5,9 +5,7 @@ import { useRoadmapStore } from './roadmapStore'
 import { useLabStore } from './labStore'
 import { useXPStore } from './xpStore'
 import { useAevaControlStore } from './aevaControlStore'
-
-const _GROQ_KEYS=[import.meta.env.VITE_GROQ_API_KEY,import.meta.env.VITE_GROQ_API_KEY_2,import.meta.env.VITE_GROQ_API_KEY_3].filter(Boolean);let _ki=0;const gKey=()=>_GROQ_KEYS[_ki++%_GROQ_KEYS.length]
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
+import { nextGroqKey as gKey, GROQ_URL } from './groqClient'
 
 async function generateRoadmapNodes(title, examDate, assessmentInfo, options = {}) {
   const daysLeft = Math.max(1, Math.ceil((new Date(examDate) - Date.now()) / 86400000))
