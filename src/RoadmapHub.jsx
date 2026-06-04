@@ -876,8 +876,9 @@ function PathView() {
             const lp       = roadmap.learningProfile || {}
             const weakStr  = lp.weak?.length ? ` My weak areas are: ${lp.weak.slice(0,3).join(', ')}.` : ''
             const urgStr   = nodes.filter(n => n.urgent).map(n => n.topic).join(', ')
+            const nodeNames = nodes.filter(n => n.status !== 'complete').map(n => `"${n.topic}"`).join(', ')
             setPendingChatPrompt(
-              `Aeva, review my roadmap for "${roadmap.title}". I've done ${done}/${total} nodes. Exam is in ${daysLeft} days.${weakStr}${urgStr ? ` Urgent topics: ${urgStr}.` : ''} Analyse my progress, tell me if I'm on track, and make any adjustments to my roadmap you think are needed — skip nodes I don't need, flag urgent ones, add any missing topics.`
+              `Aeva, review my roadmap for "${roadmap.title}" and make the actual changes now. I've done ${done}/${total} nodes. Exam is in ${daysLeft} days.${weakStr}${urgStr ? ` Already flagged urgent: ${urgStr}.` : ''} Remaining nodes: ${nodeNames}. Go through each node and: remove any I clearly don't need, flag the most critical ones as urgent, add anything missing, activate crunch mode if the timeline is tight. For each change say exactly "I've flagged [topic] as urgent", "I've removed [topic] from your roadmap", or "I've activated crunch mode" so the changes apply automatically.`
             )
             setAskAevaFlash(true)
             setTimeout(() => { setAskAevaFlash(false); closeRoadmapHub() }, 600)

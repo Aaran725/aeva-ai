@@ -391,13 +391,13 @@ When to fire (act without being asked):
 - Not engaged seriously → intervention task:"acknowledge"
 Never announce commands beforehand. Describe in past/present tense: "I've opened your Lab", "Opening Arcade."
 
-ROADMAP EDITS — describe changes in plain English, system detects and applies automatically:
-- Struggling with topic → "I've flagged [topic] as urgent"
-- Already knows it → "I've removed [topic] — you've got that covered"
-- Needs extra node → "I've added a [learn/drill] on [topic]"
-- Exam close, too many nodes → "I've activated crunch mode"
-- Priority topics → "I've moved [topic] to the top"
-Name exact topics — student sees a confirmation card.
+ROADMAP EDITS — when adjusting the roadmap, describe changes clearly in your response using these exact phrases (system detects and applies them automatically):
+- Flag urgent: "I've flagged [EXACT TOPIC NAME] as urgent"
+- Remove node: "I've removed [EXACT TOPIC NAME] from your roadmap"
+- Add node: "I've added a [learn/drill/check] node on [NEW TOPIC] to your roadmap"
+- Move up: "I've moved [TOPIC] to the top of your queue"
+- Crunch: "I've activated crunch mode — trimmed your roadmap down to essentials"
+Use the EXACT topic name as it appears in the roadmap. You can make multiple changes in one response. Student sees a confirmation card of what changed.
 
 ━━━ AEVA CANVAS ━━━
 Use ⚡CANVAS when student is actively learning a concept and visuals genuinely help. Skip for: greetings, casual chat, simple factual questions, follow-ups right after canvas was shown.
@@ -3868,34 +3868,39 @@ function ChatView({ onBack }) {
 
         // ── ROADMAP extraction ───────────────────────────────────────────
         // After main response: if Aeva mentioned roadmap changes, fire a
-        // structured extraction call to get the exact changes reliably.
-        // This is more reliable than asking Aeva to emit a JSON tag herself.
+        // fast structured extraction call to apply them reliably.
         const activeRmForExtraction = useRoadmapStore.getState().getActive()
-        const roadmapChangeKeywords = /\b(flagged|flag|urgent|skip(ped)?|remov(ed)?|delet(ed)?|add(ed)?|inject(ed)?|prioriti(s|z)(ed)?|crunch|cut(ting)?|trim(med)?|reduc(ed)?)\b/i
+        const roadmapChangeKeywords = /\b(flagged?|urgent|skipp?e?d?|remov(ed)?|delet(ed)?|added?|inject(ed)?|prioriti(s|z)(ed)?|crunch|moved?|cut|trimm?e?d?|reduc(ed)?|restructur(ed)?|adjust(ed)?|updat(ed)? (your )?roadmap)\b/i
         if (!isMission && activeRmForExtraction && roadmapChangeKeywords.test(rawResponse)) {
           try {
             const nodeList = activeRmForExtraction.nodes
               .filter(n => n.status !== 'complete')
-              .map(n => `"${n.topic}" (${n.type}, ${n.status})`)
+              .map(n => `"${n.topic}"`)
               .join(', ')
 
-            const extractionPrompt = `You are a JSON extraction tool. Read the AI response below and extract any roadmap changes the AI said it made or will make.
+            const extractionPrompt = `Extract roadmap changes from this AI tutor response. Output ONLY JSON.
 
-Active roadmap nodes: ${nodeList}
+Available nodes (non-complete): ${nodeList}
 
-AI response: "${rawResponse.replace(/"/g, "'").slice(0, 800)}"
+AI response: "${rawResponse.replace(/"/g, "'").slice(0, 1000)}"
 
-Output ONLY valid JSON, no other text:
-{"changes":[{"type":"flag|skip|inject|reprioritise|crunch","topic":"EXACT topic name from node list above","reason":"brief reason","nodeType":"learn|drill|check","topics":["topic1"]}]}
+Map what the AI said to these action types:
+- "flag" = marked urgent / flagged / prioritised a node that exists above
+- "skip" = removed / skipped / deleted / won't need a node that exists above
+- "inject" = added a NEW node not in the list above
+- "reprioritise" = moved topics to the top / reordered priority
+- "crunch" = crunch mode / trimmed / cut down the roadmap overall
 
-Rules:
-- "type" must be one of: flag, skip, inject, reprioritise, crunch
-- For flag/skip: "topic" must match a node from the list above
-- For inject: "topic" is the new topic name, include "nodeType"
-- For reprioritise: use "topics" array
-- For crunch: no topic needed
-- If no changes were made, output {"changes":[]}
-- Only include changes that are clearly stated`
+Output format:
+{"changes":[
+  {"type":"flag","topic":"exact node name from list"},
+  {"type":"skip","topic":"exact node name from list","reason":"why"},
+  {"type":"inject","topic":"new topic name","nodeType":"learn|drill|check","reason":"why"},
+  {"type":"reprioritise","topics":["topic1","topic2"]},
+  {"type":"crunch"}
+]}
+
+If no clear changes: {"changes":[]}`
 
             const extractRes = await fetch(GROQ_URL, {
               method: 'POST',
