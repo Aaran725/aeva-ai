@@ -276,7 +276,7 @@ ${lp.misconceptions?.length ? `Known misconceptions: ${lp.misconceptions.slice(0
 }
 
 /* ─── Step B: Build dynamic Aeva prompt ─── */
-function buildAevaPrompt(sessionState, criticism, userName, profile, memoryBlock = '', extras = {}, langDirective = '') {
+function buildAevaPrompt(sessionState, criticism, userName, profile, memoryBlock = '', extras = {}, langDirective = '', subject = null) {
   const state = STATE_CONFIG[sessionState] || STATE_CONFIG.DIAGNOSTIC
   const mode = MODE_CONFIG[criticism?.mode] || MODE_CONFIG.coach
   const { trend, conceptScaffold, difficultyDirective } = extras
@@ -285,7 +285,9 @@ function buildAevaPrompt(sessionState, criticism, userName, profile, memoryBlock
   const scaffoldBlock = conceptScaffold ? `\n\n${conceptScaffold}` : ''
   const diffBlock = difficultyDirective ? `\n\n${difficultyDirective}` : ''
 
-  return `${memoryBlock}${trendBlock}${scaffoldBlock}${diffBlock}
+  const subjectBlock = subject && SUBJECT_STYLES[subject] ? SUBJECT_STYLES[subject] : ''
+
+  return `${memoryBlock}${trendBlock}${scaffoldBlock}${diffBlock}${subjectBlock}
 
 You are Aeva — a world-class personal mentor for ${userName}. Think: the most precise professor you never had, minus the ego.
 
@@ -344,8 +346,22 @@ SMART TAGS — always include these inline (the UI parses them silently):
 
 THE 80/20 RULE:
 - 20% theory. 80% real-world application.
-- Never write a 500-word essay. Give a 30-word insight + one beautiful visual + one sharp question.
 - Simple question → simple answer. Depth only when warranted.
+
+RESPONSE LENGTH — HARD LIMITS (count your words, cut ruthlessly):
+- Greeting / casual chat: ≤ 40 words
+- Simple factual question: ≤ 80 words
+- Concept explanation: ≤ 180 words + formula or table if needed
+- Worked example: ≤ 220 words
+- NEVER exceed 250 words of prose. If you need more space, split into two turns.
+If your draft is too long, cut the weakest sentence. Then cut another.
+
+ACTIVE RECALL — NON-NEGOTIABLE:
+Every response that explains a concept MUST end with exactly ONE check question.
+The question must be specific to what you just explained — not generic filler.
+It must require ${userName} to demonstrate understanding, not just recall a word.
+If ${userName} has NOT answered your previous question and sends a new topic instead — pause. Redirect: "Before we move on — [restate the question]." Do not teach new content until they engage with it.
+Exception: greetings, admin questions, or if they say "skip" or "move on".
 
 CONTRADICTION WATCH: Scan the full conversation history above. If ${userName}'s current message contradicts something they said in an earlier message, call it out directly before answering — "Hold on — earlier you said [X], but now you're saying [Y]. Which is it?" Make them resolve the contradiction before you continue.
 
@@ -457,6 +473,31 @@ function buildConceptScaffold(sessionConcepts) {
   if (none.length)     s += `✗ Struggling: ${none.join(', ')}\n`
   s += 'When introducing a new concept, explicitly connect it to what is already understood.'
   return s
+}
+
+/* ─── Fix 4: Subject detection + style injection ─── */
+function detectSubject(topic, messages) {
+  const text = ((topic || '') + ' ' + (messages || []).slice(-6).map(m => m.text || '').join(' ')).toLowerCase()
+  if (/\b(force|velocity|momentum|acceleration|energy|wave|optic|electric|magnetic|quantum|thermodynamic|newton|circuit|resistor|gravitational|pressure|density)\b/.test(text)) return 'physics'
+  if (/\b(reaction|molecule|element|compound|acid|base|organic|bond|ion|titration|mole|oxidation|reduction|polymer|catalyst|enthalpy|electrochemistry)\b/.test(text)) return 'chemistry'
+  if (/\b(cell|dna|gene|protein|evolution|ecology|organ|muscle|photosynthesis|mitosis|meiosis|homeostasis|neuron|hormone|allele|chromosome|respiration)\b/.test(text)) return 'biology'
+  if (/\b(war|empire|revolution|century|coloniali|political|treaty|monarchy|dynasty|parliament|industriali|fascism|communism|nationalism|cold war)\b/.test(text)) return 'history'
+  if (/\b(supply|demand|market|gdp|inflation|fiscal|monetary|elasticity|macroeconomic|microeconomic|equilibrium|consumer|producer|tariff)\b/.test(text)) return 'economics'
+  if (/\b(algebra|calculus|geometry|trigonometry|matrix|vector|differential|integral|statistic|probability|theorem|derivative|quadratic|polynomial|logarithm)\b/.test(text)) return 'maths'
+  if (/\b(algorithm|function|variable|loop|class|object|database|sorting|recursion|complexity|binary|python|javascript|programming|pseudocode|array)\b/.test(text)) return 'cs'
+  if (/\b(poem|novel|character|theme|metaphor|symbolism|narrative|imagery|tone|diction|rhetoric|prose|playwright|literary|stanza|soliloquy)\b/.test(text)) return 'english'
+  return null
+}
+
+const SUBJECT_STYLES = {
+  physics:   `\nPHYSICS MODE: State the physical principle before the equation. Include units at every step. Show dimensional analysis on non-trivial calculations. End with a scenario question that requires applying the concept numerically.`,
+  chemistry: `\nCHEMISTRY MODE: Balance all equations explicitly. State reaction conditions (temp, pressure, catalyst). Use → for reactions. Show electron movement in mechanisms. End with a "predict the product" or "explain why this reaction occurs" question.`,
+  biology:   `\nBIOLOGY MODE: Use precise biological vocabulary. Describe processes as ordered sequences (A → B → C). Name real organisms or systems as examples. End with "what would happen if [one variable changed]?" to test application.`,
+  history:   `\nHISTORY MODE: Anchor every point to specific dates, names, and places. Explain causation (X led to Y because...). Structure as cause → event → consequence → significance. End with "Why did X happen rather than Y?" to push causal reasoning.`,
+  economics: `\nECONOMICS MODE: Attach a real-world example to every concept. Describe diagrams verbally (the supply curve shifts right because...). Use precise economic vocabulary. End with an application question tied to a real market scenario.`,
+  maths:     `\nMATHS MODE: Show every step — never skip algebra. $$...$$ on its own line for every equation. After explaining a method, give ONE practice problem at the same difficulty. When marking, go through their working step by step.`,
+  cs:        `\nCOMPUTER SCIENCE MODE: Use pseudocode or real code. Trace through examples with concrete values. Mention time/space complexity where relevant. End with "what does this output?" or "find the bug" or "what's the time complexity?" question.`,
+  english:   `\nENGLISH MODE: Quote the text with specific references. Analyse language choices (diction, syntax, imagery, tone). Structure as: quotation → technique → effect → significance. End with "What does this reveal about [theme / character / writer's intent]?"`,
 }
 
 function buildDifficultyDirective(neural) {
@@ -626,7 +667,7 @@ async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _at
     messages,
     stream: true,
     temperature:       opts.temperature       ?? 0.75,
-    max_tokens:        opts.maxTokens         ?? 1000,
+    max_tokens:        opts.maxTokens         ?? 650,
     frequency_penalty: opts.frequencyPenalty  ?? 0,
     presence_penalty:  opts.presencePenalty   ?? 0,
   }
@@ -3701,8 +3742,10 @@ function ChatView({ onBack }) {
     if (/^\s*why\b/i.test(userText) || /\bwhy\b.{0,20}(does|is|do|would|should)/i.test(userText)) bumpLearningStyle('conceptual')
 
     const userMsg = { role: 'user', text: userText }
-    const history = [...messages, userMsg]
-    setMessages([...history, { role: 'model', text: '', streaming: true, lockIn: false }])
+    const allMessages = [...messages, userMsg]
+    // Fix 3: cap history at 20 messages — older context is captured by session memory
+    const history = allMessages.slice(-20)
+    setMessages([...allMessages, { role: 'model', text: '', streaming: true, lockIn: false }])
     setIsThinking(true)
 
     const controller = new AbortController()
@@ -3806,7 +3849,9 @@ function ChatView({ onBack }) {
         const recallBlock = buildRecallBlock(name)
         const fullMemory  = recallBlock + buildMemoryBlock(name)
         const roadmapCtx  = buildRoadmapContext(useRoadmapStore.getState().getActive())
-        systemPrompt = feedbackPrefix + orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, fullMemory + roadmapCtx, extras, T.aevaLanguageDirective)
+        // Fix 4: detect subject from critic topic + recent messages
+        const detectedSubject = detectSubject(criticResult?.topic, messages)
+        systemPrompt = feedbackPrefix + orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, fullMemory + roadmapCtx, extras, T.aevaLanguageDirective, detectedSubject)
 
         if (socraticActive) {
           systemPrompt += '\n\nSOCRATIC MODE: You must NEVER state facts, answers, or explanations directly. Respond ONLY with 1-3 targeted questions that guide the student to discover the answer themselves. If they arrive at the correct answer, confirm warmly and deepen with another question. If wrong, ask a question that exposes the specific gap without revealing the answer. Never say "the answer is", never explain anything outright. Make them think every time.'
