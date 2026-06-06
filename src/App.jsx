@@ -421,7 +421,10 @@ ROADMAP EDITS — when adjusting the roadmap, describe changes clearly in your r
 Use the EXACT topic name as it appears in the roadmap. You can make multiple changes in one response. Student sees a confirmation card of what changed.
 
 ━━━ AEVA CANVAS ━━━
-Use ⚡CANVAS when student is actively learning a concept and visuals genuinely help. Skip for: greetings, casual chat, simple factual questions, follow-ups right after canvas was shown.
+Use ⚡CANVAS SPARINGLY — only when a visual is the only way to explain something clearly. Most concepts do NOT need canvas.
+Skip canvas for: greetings, casual questions, anything explainable in text, follow-up questions, practice problems, feedback on student answers, and any time canvas appeared in the last 4 responses.
+Only fire canvas when: the student explicitly asks for a diagram, OR the concept is spatial/visual and cannot be understood without seeing it (e.g. a graph shape, a process flow, a timeline).
+Default: text first. Canvas only as a last resort.
 
 ⚡CANVAS:{"topic":"Topic Name","blocks":[...]} — ONE line, end of response.
 
@@ -648,8 +651,8 @@ function OrderToast({ order, onJump, onDismiss }) {
 // Fires every 6 exchanges — fire-and-forget, never blocks the main response.
 async function summariseSessionBackground(messages, userName, topics, addMemory) {
   try {
-    const lines = messages.slice(-12).map(m =>
-      `${m.role === 'model' ? 'Aeva' : userName}: ${m.text?.slice(0, 280)}`
+    const lines = messages.slice(-16).map(m =>
+      `${m.role === 'model' ? 'Aeva' : userName}: ${m.text?.slice(0, 300)}`
     ).join('\n')
 
     const res = await fetch(GROQ_URL, {
@@ -659,16 +662,37 @@ async function summariseSessionBackground(messages, userName, topics, addMemory)
         model: 'llama-3.1-8b-instant',
         messages: [{
           role: 'user',
-          content: `Summarise this tutoring session in exactly 2 sentences. Be specific: name the topic, what the student understood, and any difficulty. No filler.\n\nSession:\n${lines}`,
+          content: `Analyse this tutoring session. Return ONLY valid JSON, no markdown.
+
+Session:
+${lines}
+
+Return:
+{
+  "summary": "one specific sentence: topic studied and overall progress",
+  "mastered": ["concepts where student showed solid or mastery understanding — max 4"],
+  "struggled": ["concepts where student showed none or partial understanding — max 4"],
+  "keyMistake": "the single most important misconception or error pattern, or null if none"
+}`,
         }],
-        temperature: 0.2,
-        max_tokens: 90,
+        temperature: 0.15,
+        max_tokens: 200,
+        response_format: { type: 'json_object' },
       }),
     })
     if (!res.ok) return
     const json = await res.json()
-    const summary = json.choices?.[0]?.message?.content?.trim()
-    if (summary) addMemory({ summary, topics, exchanges: messages.length })
+    const result = JSON.parse(json.choices?.[0]?.message?.content || '{}')
+    if (result.summary) {
+      addMemory({
+        summary:    result.summary,
+        topics,
+        exchanges:  messages.length,
+        mastered:   result.mastered  || [],
+        struggled:  result.struggled || [],
+        keyMistake: result.keyMistake || null,
+      })
+    }
   } catch { /* silent — never surface to user */ }
 }
 
@@ -3538,6 +3562,8 @@ function ChatView({ onBack }) {
   const masteryMapRef = useRef({})         // kept in sync for session-end save
   const lastTopicRef = useRef(null)        // previous critic topic for change detection
   const phaseStreakRef = useRef(0)         // consecutive solid/mastery answers in current phase
+  const sessionSubjectRef = useRef(null)  // Fix 3: persisted subject for this session
+  const lastCanvasExchangeRef = useRef(-99) // Fix 6: canvas cooldown tracker
 
   const hasInput = input.trim().length > 0
   const isActive = isThinking || hasInput
@@ -3695,17 +3721,17 @@ function ChatView({ onBack }) {
     let nextIdx = currentIdx
 
     if (currentIdx === 0) {
-      // DIAGNOSTIC → SCAFFOLDING: after 2 exchanges (we've seen enough to start building)
-      if (count >= 2) nextIdx = 1
+      // DIAGNOSTIC → SCAFFOLDING: min 4 exchanges — need to actually learn something about them
+      if (count >= 4) nextIdx = 1
     } else if (currentIdx === 1) {
-      // SCAFFOLDING → STRESS_TEST: 2 consecutive solid/mastery answers, min 4 exchanges
-      if (phaseStreakRef.current >= 2 && count >= 4) nextIdx = 2
-      // Hard cap: advance after 10 exchanges regardless
-      else if (count >= 10) nextIdx = 2
+      // SCAFFOLDING → STRESS_TEST: 3 consecutive solid/mastery answers, min 6 exchanges
+      if (phaseStreakRef.current >= 3 && count >= 6) nextIdx = 2
+      // Hard cap: advance after 14 exchanges regardless
+      else if (count >= 14) nextIdx = 2
     } else if (currentIdx === 2) {
-      // STRESS_TEST → CONSOLIDATION: 2 consecutive solid/mastery at stress level, min 7 exchanges
-      if (phaseStreakRef.current >= 2 && count >= 7) nextIdx = 3
-      else if (count >= 14) nextIdx = 3
+      // STRESS_TEST → CONSOLIDATION: 3 consecutive solid/mastery at stress level, min 10 exchanges
+      if (phaseStreakRef.current >= 3 && count >= 10) nextIdx = 3
+      else if (count >= 20) nextIdx = 3
     }
     // CONSOLIDATION: stay here — no further advance
 
@@ -3901,15 +3927,20 @@ function ChatView({ onBack }) {
           difficultyDirective: buildDifficultyDirective({ frustrationScore, avgResponseLength, totalExchanges, depth }),
         }
 
-        // Orb personality prefix — injected FIRST so it anchors the whole response
+        // Orb personality — style modifier only, does NOT override teaching rules
         const activeOrbDef = ORBS.find(o => o.id === useXPStore.getState().activeOrb)
         const orbPrefix = activeOrbDef?.personality
-          ? `⚠ OVERRIDE — THIS RULE SUPERSEDES ALL OTHER INSTRUCTIONS BELOW:\n${activeOrbDef.personality}\nApply this to every single response. It is non-negotiable.\n\n`
+          ? `STYLE MODIFIER (voice and tone only — all teaching rules, brevity limits, and active recall rules still apply fully):\n${activeOrbDef.personality}\n\n`
           : ''
 
-        // Feedback tag injection — detect if user answered a question and force the correct tag
+        // Feedback tag injection — only when student genuinely attempted to answer a check question
         const lastModelMsg = [...messages].reverse().find(m => m.role === 'model')
-        const userAnsweredQuestion = lastModelMsg && /\?/.test(lastModelMsg.text)
+        const lastMsgHadQuestion = lastModelMsg && /\?/.test(lastModelMsg.text)
+        // Must be substantive (>20 chars) and not a conversational redirect/question of their own
+        const isSubstantiveAnswer = userText.length > 20
+          && !/^(ok|yes|no|sure|fine|got it|okay|can we|let'?s|skip|move on|next|continue|thanks?|bye|what about|and |also |how |why |what |when |where |can you|could you|i don'?t|idk|dunno)\b/i.test(userText.trim())
+          && !/\?$/.test(userText.trim()) // they're asking a question, not answering one
+        const userAnsweredQuestion = lastMsgHadQuestion && isSubstantiveAnswer
         let feedbackPrefix = ''
         if (userAnsweredQuestion && criticResult && !socraticActive) {
           const understanding = criticResult.understanding
@@ -3926,8 +3957,10 @@ function ChatView({ onBack }) {
         const recallBlock = buildRecallBlock(name)
         const fullMemory  = recallBlock + buildMemoryBlock(name)
         const roadmapCtx  = buildRoadmapContext(useRoadmapStore.getState().getActive())
-        // Fix 4: detect subject from critic topic + recent messages
-        const detectedSubject = detectSubject(criticResult?.topic, messages)
+        // Fix 3: persist subject across the whole session — only update when newly detected
+        const newlyDetected = detectSubject(criticResult?.topic, messages)
+        if (newlyDetected) sessionSubjectRef.current = newlyDetected
+        const detectedSubject = sessionSubjectRef.current
         systemPrompt = feedbackPrefix + orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, fullMemory + roadmapCtx, extras, T.aevaLanguageDirective, detectedSubject)
 
         if (socraticActive) {
@@ -4285,7 +4318,9 @@ If no clear changes: {"changes":[]}`
           return false
         })()
         const canvasIdx = rawResponse.indexOf('⚡CANVAS:')
-        if (canvasIdx !== -1 && !isCanvasSuppressed) {
+        const canvasCooledDown = (exchangeCountRef.current - lastCanvasExchangeRef.current) >= 4
+        if (canvasIdx !== -1 && !isCanvasSuppressed && canvasCooledDown) {
+          lastCanvasExchangeRef.current = exchangeCountRef.current
           try {
             const start = rawResponse.indexOf('{', canvasIdx)
             if (start !== -1) {

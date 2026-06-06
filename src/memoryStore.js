@@ -23,9 +23,9 @@ export const useMemoryStore = create((set, get) => ({
 
   /**
    * Add a session memory entry.
-   * entry: { summary: string, topics: string[], exchanges: number }
+   * entry: { summary, topics[], exchanges, mastered[], struggled[], keyMistake }
    */
-  addMemory: ({ summary, topics = [], exchanges = 0 }) => {
+  addMemory: ({ summary, topics = [], exchanges = 0, mastered = [], struggled = [], keyMistake = null }) => {
     if (!summary?.trim()) return
     const entry = {
       id: `mem_${Date.now()}`,
@@ -33,6 +33,9 @@ export const useMemoryStore = create((set, get) => ({
       summary: summary.trim(),
       topics,
       exchanges,
+      mastered,
+      struggled,
+      keyMistake,
     }
     set(state => {
       const memories = [entry, ...state.memories].slice(0, MAX)
@@ -53,14 +56,18 @@ export const useMemoryStore = create((set, get) => ({
       const date = new Date(m.date).toLocaleDateString('en-GB', {
         weekday: 'short', day: 'numeric', month: 'short',
       })
-      return `  • ${date} (${m.exchanges} exchanges): ${m.summary}`
+      let line = `  • ${date} (${m.exchanges} exchanges): ${m.summary}`
+      if (m.mastered?.length)  line += `\n    ✓ Mastered: ${m.mastered.join(', ')}`
+      if (m.struggled?.length) line += `\n    ✗ Struggled: ${m.struggled.join(', ')}`
+      if (m.keyMistake)        line += `\n    ⚠ Key mistake: ${m.keyMistake}`
+      return line
     }).join('\n')
 
     return `
 ┌── CROSS-SESSION MEMORY — what ${userName} has worked on before ─────────────┐
 ${lines}
 └─────────────────────────────────────────────────────────────────────────────┘
-IMPORTANT: Use this memory actively. If ${userName} mentions something they've studied before, acknowledge the continuity. If they're revisiting a struggle zone, note it and dig deeper this time. If they've made progress since last session, say so. Never announce "I remember" — just act like a tutor who was there.
+IMPORTANT: Use this memory actively. If ${userName} is revisiting a struggle zone, go deeper and try a different approach this time. If they've mastered something before, build on it — don't re-explain it from scratch. Never say "I remember" — just act like a tutor who was there.
 
 `
   },
