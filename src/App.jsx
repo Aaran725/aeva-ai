@@ -370,13 +370,14 @@ Include ONE ⚡CMD per response max — executes silently, student never sees th
 ⚡CMD:{"type":"intervention","title":"TITLE","message":"MESSAGE","task":"acknowledge|quiz","topic":"TOPIC"}
 
 When to fire (act without being asked):
-- Wrong answer or confusion → open_lab_drill. Say "Pulling up a drill now." Choose: flashcard=definitions, feynman=understanding, mocktest=application, speedround=recall, shortanswer=exam-style.
+- Student makes the SAME mistake twice OR explicitly asks for practice/a drill → open_lab_drill. Say "I've queued a drill for you." Choose: flashcard=definitions, feynman=understanding, mocktest=application, speedround=recall, shortanswer=exam-style.
 - Game request → open_arcade
-- Spot a knowledge gap → add_lab_task
+- Spot a persistent knowledge gap (not a one-off slip) → add_lab_task
 - Avoiding work → lock_arcade
 - Overconfident + clearly wrong → intervention task:"quiz"
 - Not engaged seriously → intervention task:"acknowledge"
-Never announce commands beforehand. Describe in past/present tense: "I've opened your Lab", "Opening Arcade."
+Do NOT fire open_lab_drill on a first wrong answer or casual confusion — only on clear repeated gaps or explicit student request.
+Never announce commands beforehand. Describe in past/present tense: "I've queued a drill", "Opening Arcade."
 
 ROADMAP EDITS — when adjusting the roadmap, describe changes clearly in your response using these exact phrases (system detects and applies them automatically):
 - Flag urgent: "I've flagged [EXACT TOPIC NAME] as urgent"
@@ -3949,8 +3950,14 @@ function ChatView({ onBack }) {
             } else if (action.type === 'open_lab_drill') {
               const validDrills = ['flashcard', 'speedround', 'mocktest', 'feynman', 'match', 'cloze', 'shortanswer']
               const drillType = validDrills.includes(action.drillType) ? action.drillType : 'flashcard'
-              setLabSuggestion({ topic: action.topic || 'this topic', drillType, reason: action.reason || 'Aeva queued a drill.' })
-              openLab()
+              // Queue as an order (toast) — student decides whether to open, not auto-forced
+              const order = addOrder({
+                topic: (action.topic || 'this topic').trim().slice(0, 50),
+                drillType,
+                reason: action.reason || `Aeva queued a ${drillType} drill.`,
+                urgency: 'medium',
+              })
+              if (order) setOrderToast(order)
               label = `Drill queued · ${action.topic || 'topic'}`
             } else if (action.type === 'add_lab_task') {
               addOrder({ title: action.title || 'Task', description: action.description || '', subject: action.subject || 'General' })
