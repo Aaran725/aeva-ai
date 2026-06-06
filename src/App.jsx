@@ -294,10 +294,14 @@ You are Aeva — a world-class personal mentor for ${userName}. Think: the most 
 IDENTITY & VOICE:
 - Calm, direct, intellectually generous. Never excited, never corporate.
 - Use "we" and "let's" to signal partnership: "Let's see what this actually means."
-- No AI-isms. Never say: "Certainly!", "Great question!", "Absolutely!", "Delighted to help!", "Of course!"
 - If ${userName} is wrong, correct with a surgical question — not a lecture.
 - Short sentences. Maximum information density per word.
 - Sophisticated but plain vocabulary. Accessible to a sharp 16-year-old, satisfying to a PhD.
+
+BANNED PHRASES — these destroy credibility. Never use them:
+"Great question!", "Excellent!", "Perfect!", "Wonderful!", "Awesome work!", "You're doing great!", "Well done!", "Fantastic!", "Absolutely right!", "That's correct, great job!", "Of course!", "Certainly!", "Delighted to help!", "Sure!", "No problem!"
+When ${userName} is correct: name exactly what they got right and why it matters. Nothing else. No filler praise.
+When they're wrong: don't soften it. Say what the error is. Then fix it together.
 
 RESPONSE FORMAT — structured always. No plain paragraph dumps.
 
@@ -356,12 +360,27 @@ RESPONSE LENGTH — HARD LIMITS (count your words, cut ruthlessly):
 - NEVER exceed 250 words of prose. If you need more space, split into two turns.
 If your draft is too long, cut the weakest sentence. Then cut another.
 
+WORKED EXAMPLE PROTOCOL (maths, science, CS — any procedural skill):
+When teaching a method or technique, follow this exact 3-step pattern:
+1. Explain the concept in ≤3 sentences
+2. Show a fully worked example with every step labelled (N: format)
+3. End with: "Your turn: [a similar problem, same difficulty, different numbers/context]"
+If ${userName} attempts the practice problem → evaluate their working step by step, not just the answer.
+If they skip it and ask something else → redirect: "Try [the problem] first — then we'll move on."
+
 ACTIVE RECALL — NON-NEGOTIABLE:
 Every response that explains a concept MUST end with exactly ONE check question.
 The question must be specific to what you just explained — not generic filler.
 It must require ${userName} to demonstrate understanding, not just recall a word.
 If ${userName} has NOT answered your previous question and sends a new topic instead — pause. Redirect: "Before we move on — [restate the question]." Do not teach new content until they engage with it.
-Exception: greetings, admin questions, or if they say "skip" or "move on".
+Exception: greetings, admin questions, or if they explicitly say "skip" or "move on".
+
+RESPONSE CALIBRATION — match length to question complexity:
+- One-word or yes/no question: 1-2 sentences max
+- Definition request: ≤ 50 words
+- "How does X work?": ≤ 120 words + formula/diagram if needed
+- Worked example request: full steps, ≤ 220 words
+- Never pad. If you've said it clearly in 40 words, stop at 40 words.
 
 CONTRADICTION WATCH: Scan the full conversation history above. If ${userName}'s current message contradicts something they said in an earlier message, call it out directly before answering — "Hold on — earlier you said [X], but now you're saying [Y]. Which is it?" Make them resolve the contradiction before you continue.
 
@@ -652,6 +671,53 @@ async function summariseSessionBackground(messages, userName, topics, addMemory)
     if (summary) addMemory({ summary, topics, exchanges: messages.length })
   } catch { /* silent — never surface to user */ }
 }
+
+/* ─── Fix 7: Session end summary generation ─── */
+async function generateSessionSummary(messages, userName, concepts) {
+  try {
+    const lines = messages.slice(-30).map(m =>
+      `${m.role === 'model' ? 'Aeva' : userName}: ${m.text?.slice(0, 300)}`
+    ).join('\n')
+
+    const conceptList = Object.entries(concepts)
+      .map(([topic, understanding]) => `${topic}: ${understanding}`)
+      .join(', ') || 'none tracked'
+
+    const res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [{
+          role: 'user',
+          content: `Analyse this tutoring session and return ONLY valid JSON.
+
+Session:
+${lines}
+
+Concept tracking: ${conceptList}
+
+Return:
+{
+  "topics": ["list of 2-5 main topics covered this session"],
+  "mastered": ["concepts where student showed solid or mastery understanding"],
+  "needsWork": ["concepts where student struggled or showed partial/none understanding"],
+  "keyInsight": "the single most important thing they learned today, in one sentence",
+  "nextStep": "the most logical next topic or action for their next session, in one sentence"
+}`,
+        }],
+        temperature: 0.15,
+        max_tokens: 300,
+        response_format: { type: 'json_object' },
+      }),
+    })
+    if (!res.ok) return null
+    const json = await res.json()
+    return JSON.parse(json.choices?.[0]?.message?.content || 'null')
+  } catch { return null }
+}
+
+const SESSION_END_PATTERNS = /^(bye|goodbye|thanks?|thank you|done|finished|that'?s? all|gotta go|see you|gtg|cya|i'?m? done|end session|stop|exit|quit|ok thanks|ok thank you|cheers)\b/i
 
 /* ─── Stream Aeva response ─── */
 async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _attempt = 0) {
@@ -3449,6 +3515,8 @@ function ChatView({ onBack }) {
   const lensInputRef = useRef(null)
   const [orderToast, setOrderToast] = useState(null)
   const [drillOpen, setDrillOpen] = useState(false)
+  const [sessionSummary, setSessionSummary] = useState(null)
+  const [summaryLoading, setSummaryLoading] = useState(false)
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [socraticActive, setSocraticActive] = useState(false)
   const socraticExchangeRef = useRef(0)
@@ -3719,6 +3787,15 @@ function ChatView({ onBack }) {
     const userText = overrideText || input.trim()
     if (!userText || isThinking) return
     if (!overrideText) setInput('')
+
+    // Fix 7: Detect session end — generate summary card
+    if (!isMission && SESSION_END_PATTERNS.test(userText.trim()) && messages.length >= 4) {
+      setSummaryLoading(true)
+      generateSessionSummary(messages, name, sessionConceptsRef.current).then(summary => {
+        setSummaryLoading(false)
+        if (summary) setSessionSummary(summary)
+      })
+    }
     sendTimeRef.current = Date.now()
 
     // Clear countdown on send
@@ -4814,6 +4891,66 @@ If no clear changes: {"changes":[]}`
                     ? <ThemedChatBubble key={i} msg={msg} mission={activeMission} />
                     : <ChatBubble key={i} msg={msg} deepDiveCards={deepDiveMap[i] || []} onDismissCard={(cardId) => setDeepDiveMap(prev => ({ ...prev, [i]: (prev[i] || []).filter(c => c.id !== cardId) }))} isLight={isLight} />
                 )}
+
+                {/* Session summary loading */}
+                {summaryLoading && (
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 12, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.20)', fontFamily: "'Inter', system-ui, sans-serif" }}>
+                      <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1, repeat: Infinity }}
+                        style={{ width: 6, height: 6, borderRadius: '50%', background: '#818CF8' }} />
+                      <span style={{ fontSize: 12, color: 'rgba(165,180,252,0.80)', fontWeight: 600 }}>Generating session summary…</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Session summary card */}
+                <AnimatePresence>
+                  {sessionSummary && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                      style={{ margin: '8px 0 16px', padding: '18px 20px', borderRadius: 16, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.22)', fontFamily: "'Inter', system-ui, sans-serif", position: 'relative' }}
+                    >
+                      <button onClick={() => setSessionSummary(null)} style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', color: 'rgba(255,255,255,0.30)', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>×</button>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#818CF8', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 12 }}>📋 Session Summary</div>
+
+                      {sessionSummary.keyInsight && (
+                        <div style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.82)', lineHeight: 1.55, marginBottom: 14, fontStyle: 'italic', borderLeft: '2px solid rgba(99,102,241,0.50)', paddingLeft: 12 }}>
+                          "{sessionSummary.keyInsight}"
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+                        {sessionSummary.mastered?.length > 0 && (
+                          <div style={{ flex: '1 1 140px' }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: '#4ADE80', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>✓ Mastered</div>
+                            {sessionSummary.mastered.map((t, i) => (
+                              <div key={i} style={{ fontSize: 12, color: 'rgba(255,255,255,0.68)', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#4ADE80', flexShrink: 0 }} />{t}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {sessionSummary.needsWork?.length > 0 && (
+                          <div style={{ flex: '1 1 140px' }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: '#F59E0B', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>↺ Needs Work</div>
+                            {sessionSummary.needsWork.map((t, i) => (
+                              <div key={i} style={{ fontSize: 12, color: 'rgba(255,255,255,0.68)', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#F59E0B', flexShrink: 0 }} />{t}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {sessionSummary.nextStep && (
+                        <div style={{ fontSize: 12, color: 'rgba(165,180,252,0.80)', borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 10, marginTop: 4 }}>
+                          <span style={{ fontWeight: 700, color: '#818CF8' }}>Next: </span>{sessionSummary.nextStep}
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 <div ref={bottomRef} />
               </div>
             </div>
