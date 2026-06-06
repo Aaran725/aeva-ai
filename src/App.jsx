@@ -362,7 +362,6 @@ YOUR RESPONSE MUST REFLECT THIS SIGNAL. Do not ignore it. If mode is REDIRECT, u
 Include ONE ⚡CMD per response max — executes silently, student never sees the tag.
 
 ⚡CMD:{"type":"open_lab"}
-⚡CMD:{"type":"open_lab_drill","topic":"TOPIC","drillType":"flashcard|speedround|mocktest|feynman|match|cloze|shortanswer","reason":"WHY"}
 ⚡CMD:{"type":"add_lab_task","title":"TITLE","description":"DESC"}
 ⚡CMD:{"type":"open_arcade"}
 ⚡CMD:{"type":"lock_arcade","reason":"REASON"}
@@ -370,14 +369,13 @@ Include ONE ⚡CMD per response max — executes silently, student never sees th
 ⚡CMD:{"type":"intervention","title":"TITLE","message":"MESSAGE","task":"acknowledge|quiz","topic":"TOPIC"}
 
 When to fire (act without being asked):
-- Student makes the SAME mistake twice OR explicitly asks for practice/a drill → open_lab_drill. Say "I've queued a drill for you." Choose: flashcard=definitions, feynman=understanding, mocktest=application, speedround=recall, shortanswer=exam-style.
+- Student explicitly asks to open the lab → open_lab
 - Game request → open_arcade
-- Spot a persistent knowledge gap (not a one-off slip) → add_lab_task
 - Avoiding work → lock_arcade
 - Overconfident + clearly wrong → intervention task:"quiz"
 - Not engaged seriously → intervention task:"acknowledge"
-Do NOT fire open_lab_drill on a first wrong answer or casual confusion — only on clear repeated gaps or explicit student request.
-Never announce commands beforehand. Describe in past/present tense: "I've queued a drill", "Opening Arcade."
+Do NOT proactively assign drills — the system handles drill suggestions automatically in the background.
+Never announce commands beforehand. Describe in past/present tense: "I've opened your Lab", "Opening Arcade."
 
 ROADMAP EDITS — when adjusting the roadmap, describe changes clearly in your response using these exact phrases (system detects and applies them automatically):
 - Flag urgent: "I've flagged [EXACT TOPIC NAME] as urgent"
@@ -3749,8 +3747,8 @@ function ChatView({ onBack }) {
           )
         }
 
-        // Aeva's Orders analysis every 4 exchanges — fire-and-forget
-        if (ec % 4 === 0 && messages.length >= 4) {
+        // Aeva's Orders analysis every 8 exchanges — fire-and-forget
+        if (ec % 8 === 0 && messages.length >= 8) {
           analyzeForOrders(messages, struggleZones, addOrder, setOrderToast)
         }
         // XP every 5 Socratic exchanges (resets when mode is toggled)
