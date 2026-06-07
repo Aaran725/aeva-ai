@@ -384,20 +384,27 @@ function LabDemo() {
         ))}
       </div>
       {/* Flashcard */}
-      <motion.div animate={{ rotateY: flipped ? 180 : 0 }} transition={{ duration: 0.6 }} style={{ perspective: 800 }}>
-        <div style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', minHeight: 72, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-          {!flipped ? (
+      <AnimatePresence mode="wait">
+        {!flipped ? (
+          <motion.div key="front"
+            initial={{ opacity: 0, scaleX: 0.85 }} animate={{ opacity: 1, scaleX: 1 }} exit={{ opacity: 0, scaleX: 0.85 }}
+            transition={{ duration: 0.25 }}
+            style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', minHeight: 72, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.80)', fontWeight: 600 }}>
               What does the discriminant b²−4ac tell you?
             </div>
-          ) : (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
-              style={{ fontSize: 12.5, color: 'rgba(167,139,250,0.90)', lineHeight: 1.55 }}>
+          </motion.div>
+        ) : (
+          <motion.div key="back"
+            initial={{ opacity: 0, scaleX: 0.85 }} animate={{ opacity: 1, scaleX: 1 }} exit={{ opacity: 0, scaleX: 0.85 }}
+            transition={{ duration: 0.25 }}
+            style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(139,92,246,0.10)', border: '1px solid rgba(139,92,246,0.30)', minHeight: 72, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+            <div style={{ fontSize: 12.5, color: 'rgba(167,139,250,0.90)', lineHeight: 1.55 }}>
               It tells you how many real roots exist: &gt;0 means two roots, =0 means one, &lt;0 means none.
-            </motion.div>
-          )}
-        </div>
-      </motion.div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {flipped && !answered && (
         <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => setAnswered('got')} style={{ flex: 1, padding: '8px', borderRadius: 10, background: 'rgba(74,222,128,0.14)', border: '1px solid rgba(74,222,128,0.35)', color: '#4ADE80', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>✓ Got it</button>
