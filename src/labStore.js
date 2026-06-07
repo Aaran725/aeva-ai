@@ -1,11 +1,14 @@
 import { create } from 'zustand'
+import { scheduleSave } from './syncService'
 
 const HISTORY_KEY = 'aeva_drill_history_v1'
 function loadHistory() {
   try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]') } catch { return [] }
 }
 function saveHistory(h) {
-  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(-50))) } catch {} // keep last 50
+  const trimmed = h.slice(-50)
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(trimmed)) } catch {}
+  scheduleSave('drill_history', trimmed)
 }
 
 const ORDERS_KEY = 'aeva_lab_orders_v1'
@@ -13,7 +16,9 @@ function loadOrders() {
   try { return JSON.parse(localStorage.getItem(ORDERS_KEY) || '[]') } catch { return [] }
 }
 function saveOrders(orders) {
-  try { localStorage.setItem(ORDERS_KEY, JSON.stringify(orders.slice(0, 30))) } catch {}
+  const trimmed = orders.slice(0, 30)
+  try { localStorage.setItem(ORDERS_KEY, JSON.stringify(trimmed)) } catch {}
+  scheduleSave('lab_orders', trimmed)
 }
 
 export const DRILLS = {

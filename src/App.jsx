@@ -8,6 +8,7 @@ import { useAppSettings, SECTION_BG_PRESETS, CARD_STYLES, FONT_STYLES } from './
 import { useLanguageStore } from './languageStore'
 import { useT } from './translations'
 import { supabase } from './supabase'
+import { loadAndHydrateUser, setCurrentUser } from './syncService'
 import { useArcadeStore } from './arcadeStore'
 import { useLabStore } from './labStore'
 import { useAevaControlStore } from './aevaControlStore'
@@ -6034,11 +6035,35 @@ export default function App() {
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       setAuthUser(session?.user ?? null)
-      if (!session) { setView('dashboard'); setShowLogin(false) }
+      if (!session) { setCurrentUser(null); setView('dashboard'); setShowLogin(false) }
       if (session?.user) checkStreak()
     })
     return () => subscription.unsubscribe()
   }, [])
+
+  // Load cloud data when user signs in and hydrate all stores
+  useEffect(() => {
+    if (!authUser?.id) return
+    loadAndHydrateUser(authUser.id).then(() => {
+      try {
+        const cards = JSON.parse(localStorage.getItem('aeva_sr_v1') || '[]')
+        useSRStore.setState({ cards })
+      } catch {}
+      try {
+        const rm = JSON.parse(localStorage.getItem('aeva_roadmaps_v1') || 'null')
+        if (rm) useRoadmapStore.setState(s => ({ ...s, roadmaps: rm.roadmaps || [], activeRoadmapId: rm.activeRoadmapId || null }))
+      } catch {}
+      try {
+        const hist  = JSON.parse(localStorage.getItem('aeva_drill_history_v1') || '[]')
+        const ords  = JSON.parse(localStorage.getItem('aeva_lab_orders_v1')    || '[]')
+        useLabStore.setState(s => ({ ...s, drillHistory: hist, orders: ords }))
+      } catch {}
+      try {
+        const xp = JSON.parse(localStorage.getItem('aeva_xp_v1') || 'null')
+        if (xp) useXPStore.setState(s => ({ ...s, ...xp }))
+      } catch {}
+    })
+  }, [authUser?.id])
 
   // Admin panel — completely separate from user auth
   if (adminMode) {

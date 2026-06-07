@@ -1,8 +1,13 @@
 import { create } from 'zustand'
+import { scheduleSave } from './syncService'
 
 const KEY = 'aeva_roadmaps_v1'
 const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) } catch { return null } }
-const save = (s) => { try { localStorage.setItem(KEY, JSON.stringify({ roadmaps: s.roadmaps, activeRoadmapId: s.activeRoadmapId })) } catch {} }
+const save = (s) => {
+  try { localStorage.setItem(KEY, JSON.stringify({ roadmaps: s.roadmaps, activeRoadmapId: s.activeRoadmapId })) } catch {}
+  scheduleSave('roadmaps', s.roadmaps)
+  scheduleSave('active_roadmap_id', s.activeRoadmapId)
+}
 const uid  = () => Math.random().toString(36).slice(2, 10)
 
 const DEFAULT = { roadmaps: [], activeRoadmapId: null, roadmapOpen: false, activeNodeSession: null }

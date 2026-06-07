@@ -1,8 +1,12 @@
 import { create } from 'zustand'
+import { scheduleSave } from './syncService'
 
 const KEY = 'aeva_xp_v1'
 function load() { try { return JSON.parse(localStorage.getItem(KEY) || 'null') } catch { return null } }
-function save(s) { try { localStorage.setItem(KEY, JSON.stringify(s)) } catch {} }
+function save(s) {
+  try { localStorage.setItem(KEY, JSON.stringify(s)) } catch {}
+  scheduleSave('xp_state', s)
+}
 
 /* ── Orb definitions ──────────────────────────────── */
 export const ORBS = [
@@ -103,6 +107,7 @@ export const XP_EVENTS = {
   SOCRATIC_5:     { amount: 55,  label: 'Socratic Session' },
   STREAK_7:       { amount: 120, label: '7-Day Streak!' },
   STREAK_30:      { amount: 300, label: '30-Day Streak!' },
+  AEVA_BONUS:     { amount: 50,  label: 'Aeva Bonus' },
 }
 
 export function xpForLevel(level) {
@@ -154,6 +159,33 @@ export const useXPStore = create((set, get) => {
           pendingToast: {
             amount: event.amount,
             label: event.label,
+            newOrb: newUnlocks[0] || null,
+            id: Date.now(),
+          },
+        }
+        save(updated)
+        return updated
+      })
+    },
+
+    // Aeva can award custom XP amounts with a custom label
+    addDirectXP: (amount, label = 'Aeva Bonus') => {
+      const safeAmount = Math.min(200, Math.max(10, Math.round(amount || 50)))
+      set(state => {
+        const newXP = state.xp + safeAmount
+        const newLevel = levelFromXP(newXP)
+        const prevLevel = levelFromXP(state.xp)
+        const newUnlocks = ORBS.filter(
+          o => o.requiredLevel <= newLevel && o.requiredLevel > prevLevel && !state.unlockedOrbs.includes(o.id)
+        )
+        const newUnlockedIds = newUnlocks.map(o => o.id)
+        const updated = {
+          ...state,
+          xp: newXP,
+          unlockedOrbs: [...state.unlockedOrbs, ...newUnlockedIds],
+          pendingToast: {
+            amount: safeAmount,
+            label,
             newOrb: newUnlocks[0] || null,
             id: Date.now(),
           },

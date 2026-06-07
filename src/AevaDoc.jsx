@@ -14,11 +14,28 @@ import {
   X, Upload, FileText, Send, Loader,
   Star, AlertCircle, RotateCcw, ChevronDown,
 } from 'lucide-react'
+import { nextGroqKey as gKey, GROQ_URL } from './groqClient'
+import * as pdfjsLib from 'pdfjs-dist'
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).href
 
-const GROQ_KEY  = import.meta.env.VITE_GROQ_API_KEY
-const GROQ_URL  = 'https://api.groq.com/openai/v1/chat/completions'
-const VISION    = 'meta-llama/llama-4-scout-17b-16e-instruct'
-const TEXT      = 'llama-3.3-70b-versatile'
+const VISION = 'meta-llama/llama-4-scout-17b-16e-instruct'
+const TEXT   = 'llama-3.3-70b-versatile'
+
+// ─── PDF text extraction ──────────────────────────────────────────────────────
+async function extractPDFText(file) {
+  const arrayBuffer = await file.arrayBuffer()
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+  const totalPages = pdf.numPages
+  const pageLimit = Math.min(totalPages, 20)
+  const pages = []
+  for (let i = 1; i <= pageLimit; i++) {
+    const page = await pdf.getPage(i)
+    const content = await page.getTextContent()
+    const pageText = content.items.map(item => item.str).join(' ').replace(/\s{3,}/g, '  ')
+    if (pageText.trim()) pages.push(`[Page ${i}]\n${pageText}`)
+  }
+  return { text: pages.join('\n\n'), totalPages }
+}
 
 // ─── Prompts ──────────────────────────────────────────────────────────────────
 
@@ -77,8 +94,8 @@ Formatting rules:
 async function* streamGroqDoc(apiMessages, model) {
   const res = await fetch(GROQ_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
-    body: JSON.stringify({ model, messages: apiMessages, max_tokens: 700, temperature: 0.62, stream: true }),
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${gKey()}` },
+    body: JSON.stringify({ model, messages: apiMessages, max_tokens: 1200, temperature: 0.62, stream: true }),
   })
   if (!res.ok) throw new Error(`Groq error: ${res.status}`)
   const reader = res.body.getReader()
@@ -101,40 +118,44 @@ async function* streamGroqDoc(apiMessages, model) {
   }
 }
 
-// ─── Suggestion chips per doc type ───────────────────────────────────────────
+// ─── Contextual chips (persistent, refresh per turn) ─────────────────────────
 
-function getChips(scanCtx) {
-  if (!scanCtx) return [
-    "What do I need to do in this document?",
-    "Walk me through this step by step",
-    "What are the key concepts I need to know?",
-    "Quiz me on this content",
-  ]
+function getContextualChips(scanCtx, messages) {
+  if (!scanCtx) return []
+
+  const lastAeva = [...messages].reverse().find(m => m.role === 'assistant')
+  const lastText = (lastAeva?.content || '').toLowerCase()
+
+  const chips = []
+
+  // Context-aware first chip
+  if (/step \d|next step/i.test(lastText)) {
+    chips.push("What's the next step?")
+  } else if (/\?/.test(lastText)) {
+    chips.push("Can you give me an example?")
+  } else if (/try|attempt|have a go/i.test(lastText)) {
+    chips.push("Check my answer")
+  } else {
+    chips.push("Explain that differently")
+  }
+
+  // Doc-type second chip
   const type = scanCtx.type || ''
-  if (type === 'problem_set' || type === 'worksheet' || type === 'exam') return [
-    "Walk me through the first question",
-    "What method should I use here?",
-    "Check my understanding before I start",
-    "Which questions look hardest?",
-  ]
-  if (type === 'essay') return [
-    "What's the key argument in this essay prompt?",
-    "How should I structure my response?",
-    "What evidence would strengthen this?",
-    "Help me plan my introduction",
-  ]
-  if (type === 'notes' || type === 'textbook' || type === 'revision') return [
-    "Summarise the key points",
-    "What's most important to remember?",
-    "Quiz me on this",
-    "Explain the hardest concept here",
-  ]
-  return [
-    "What do I need to do in this document?",
-    "Walk me through this step by step",
-    "What are the key concepts I need to know?",
-    "Quiz me on this content",
-  ]
+  if (type === 'problem_set' || type === 'worksheet' || type === 'exam') {
+    chips.push("What method should I use?")
+  } else if (type === 'essay') {
+    chips.push("How should I structure my response?")
+  } else if (type === 'notes' || type === 'revision') {
+    chips.push("What's most important to remember?")
+  } else {
+    chips.push("Summarise the key points")
+  }
+
+  // Always-useful chips
+  chips.push("Quiz me on this")
+  chips.push("What do I need to know next?")
+
+  return chips.slice(0, 4)
 }
 
 // ─── KaTeX helpers ────────────────────────────────────────────────────────────
@@ -187,72 +208,210 @@ function renderInline(text) {
   })
 }
 
+// ─── Code block ───────────────────────────────────────────────────────────────
+
+function DocCodeBlock({ code, lang }) {
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    })
+  }
+  return (
+    <div style={{ margin: '12px 0', borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(0,0,0,0.38)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 14px', background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.32)', fontFamily: 'monospace' }}>{lang || 'code'}</span>
+        <button onClick={copy} style={{ fontSize: 11, fontWeight: 700, color: copied ? '#4ADE80' : 'rgba(255,255,255,0.38)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', borderRadius: 5, fontFamily: 'inherit' }}>
+          {copied ? 'Copied ✓' : 'Copy'}
+        </button>
+      </div>
+      <pre style={{ margin: 0, padding: '13px 16px', overflowX: 'auto', fontSize: 13, lineHeight: 1.65, color: '#E2E8F0', fontFamily: "'Fira Code', 'JetBrains Mono', monospace" }}>
+        <code>{code}</code>
+      </pre>
+    </div>
+  )
+}
+
+// ─── Table ────────────────────────────────────────────────────────────────────
+
+function DocTable({ rows }) {
+  const parsed = rows.map(r => {
+    const cells = r.split('|')
+    return cells.slice(r.startsWith('|') ? 1 : 0, r.endsWith('|') ? cells.length - 1 : cells.length).map(c => c.trim())
+  })
+  const dataRows = parsed.filter(r => !r.every(c => /^[-: ]+$/.test(c)))
+  const [header, ...body] = dataRows
+  if (!header) return null
+  return (
+    <div style={{ margin: '12px 0', overflowX: 'auto', borderRadius: 10, border: '1px solid rgba(255,255,255,0.09)' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <thead>
+          <tr>
+            {header.map((h, i) => (
+              <th key={i} style={{ padding: '9px 13px', textAlign: 'left', fontWeight: 700, color: 'rgba(255,255,255,0.90)', background: 'rgba(99,102,241,0.12)', borderBottom: '1.5px solid rgba(99,102,241,0.25)', fontSize: 12.5, whiteSpace: 'nowrap' }}>
+                {renderInline(h)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {body.map((row, ri) => (
+            <tr key={ri} style={{ background: ri % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
+              {row.map((cell, ci) => (
+                <td key={ci} style={{ padding: '8px 13px', color: 'rgba(255,255,255,0.72)', borderBottom: '1px solid rgba(255,255,255,0.05)', lineHeight: 1.5 }}>
+                  {renderInline(cell)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 // ─── Markdown + KaTeX renderer ────────────────────────────────────────────────
 
 function DocMarkdown({ text }) {
-  // First, split on block-level math: \[...\] or $$...$$
-  const blockRe = /\\\[([\s\S]*?)\\\]|\$\$([\s\S]*?)\$\$/g
-  const topSegs = []
-  let last = 0, m
-  while ((m = blockRe.exec(text)) !== null) {
-    if (m.index > last) topSegs.push({ type: 'md', content: text.slice(last, m.index) })
-    topSegs.push({ type: 'block-math', content: (m[1] ?? m[2]).trim() })
-    last = m.index + m[0].length
+  const elements = []
+  let key = 0
+
+  // Split on block math first so we don't mangle \[...\] or $$...$$
+  const mathChunks = []
+  const blockMathRe = /\\\[([\s\S]*?)\\\]|\$\$([\s\S]*?)\$\$/g
+  let lastMath = 0, mm
+  while ((mm = blockMathRe.exec(text)) !== null) {
+    if (mm.index > lastMath) mathChunks.push({ type: 'md', content: text.slice(lastMath, mm.index) })
+    mathChunks.push({ type: 'block-math', content: (mm[1] ?? mm[2]).trim() })
+    lastMath = mm.index + mm[0].length
   }
-  if (last < text.length) topSegs.push({ type: 'md', content: text.slice(last) })
+  if (lastMath < text.length) mathChunks.push({ type: 'md', content: text.slice(lastMath) })
+
+  for (const chunk of mathChunks) {
+    if (chunk.type === 'block-math') {
+      elements.push(
+        <div key={key++}
+          style={{ margin: '14px 0', padding: '14px 18px', borderRadius: 12, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.20)', textAlign: 'center', overflowX: 'auto' }}
+          dangerouslySetInnerHTML={{ __html: renderMathSafe(chunk.content, true) }}
+        />
+      )
+      continue
+    }
+
+    // Process the markdown text segment line by line
+    const lines = chunk.content.split('\n')
+    let i = 0
+    while (i < lines.length) {
+      const line = lines[i]
+
+      // ── Code fence ──────────────────────────────────────────
+      if (line.startsWith('```')) {
+        const lang = line.slice(3).trim()
+        const codeLines = []
+        i++
+        while (i < lines.length && !lines[i].startsWith('```')) {
+          codeLines.push(lines[i])
+          i++
+        }
+        i++ // skip closing ```
+        elements.push(<DocCodeBlock key={key++} code={codeLines.join('\n')} lang={lang} />)
+        continue
+      }
+
+      // ── Table ───────────────────────────────────────────────
+      if (line.includes('|') && lines[i + 1]?.match(/^\|?[\s\-|:]+\|?$/)) {
+        const tableLines = []
+        while (i < lines.length && lines[i].includes('|')) {
+          tableLines.push(lines[i])
+          i++
+        }
+        elements.push(<DocTable key={key++} rows={tableLines} />)
+        continue
+      }
+
+      // ── Blockquote ──────────────────────────────────────────
+      if (line.startsWith('> ')) {
+        const bqLines = []
+        while (i < lines.length && lines[i].startsWith('> ')) {
+          bqLines.push(lines[i].slice(2))
+          i++
+        }
+        elements.push(
+          <div key={key++} style={{ borderLeft: '3px solid rgba(99,102,241,0.45)', paddingLeft: 14, margin: '10px 0', color: 'rgba(255,255,255,0.58)', fontStyle: 'italic', lineHeight: 1.65 }}>
+            {bqLines.map((l, li) => <div key={li}>{renderInline(l)}</div>)}
+          </div>
+        )
+        continue
+      }
+
+      // ── Step badge "1: Title" or "Step 1: Title" ────────────
+      const stepMatch = line.match(/^(?:Step\s+)?(\d+):\s+(.+)/)
+      if (stepMatch && line.length < 90) {
+        elements.push(
+          <div key={key++} style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 20, marginBottom: 6 }}>
+            <div style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg, rgba(99,102,241,0.40), rgba(139,92,246,0.28))', border: '1px solid rgba(99,102,241,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#A5B4FC', boxShadow: '0 2px 8px rgba(99,102,241,0.22)', letterSpacing: '-0.02em' }}>
+              {stepMatch[1]}
+            </div>
+            <span style={{ fontWeight: 700, fontSize: 14.5, color: 'rgba(255,255,255,0.96)', letterSpacing: '-0.01em' }}>{renderInline(stepMatch[2])}</span>
+          </div>
+        )
+        i++
+        continue
+      }
+
+      // ── Headings ────────────────────────────────────────────
+      if (line.startsWith('### ')) {
+        elements.push(<div key={key++} style={{ fontWeight: 700, fontSize: 14.5, marginTop: 18, marginBottom: 4, color: '#C4B5FD', letterSpacing: '-0.01em' }}>{renderInline(line.slice(4))}</div>)
+        i++; continue
+      }
+      if (line.startsWith('## ')) {
+        elements.push(<div key={key++} style={{ fontWeight: 800, fontSize: 16.5, marginTop: 22, marginBottom: 6, color: 'rgba(255,255,255,0.96)', letterSpacing: '-0.025em', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 5 }}>{renderInline(line.slice(3))}</div>)
+        i++; continue
+      }
+      if (line.startsWith('# ')) {
+        elements.push(<div key={key++} style={{ fontWeight: 900, fontSize: 19, marginTop: 24, marginBottom: 7, color: '#fff', letterSpacing: '-0.03em' }}>{renderInline(line.slice(2))}</div>)
+        i++; continue
+      }
+
+      // ── Bullet list ─────────────────────────────────────────
+      if (line.startsWith('- ') || line.startsWith('• ')) {
+        elements.push(
+          <div key={key++} style={{ display: 'flex', gap: 9, marginTop: 5, alignItems: 'flex-start' }}>
+            <span style={{ color: '#818CF8', flexShrink: 0, marginTop: 6, fontSize: 7 }}>◆</span>
+            <span style={{ lineHeight: 1.68 }}>{renderInline(line.slice(2))}</span>
+          </div>
+        )
+        i++; continue
+      }
+
+      // ── Numbered list ───────────────────────────────────────
+      const numMatch = line.match(/^(\d+)\. (.*)/)
+      if (numMatch) {
+        elements.push(
+          <div key={key++} style={{ display: 'flex', gap: 9, marginTop: 5, alignItems: 'flex-start' }}>
+            <span style={{ color: '#818CF8', flexShrink: 0, minWidth: 20, fontSize: 12.5, fontWeight: 700, marginTop: 1 }}>{numMatch[1]}.</span>
+            <span style={{ lineHeight: 1.68 }}>{renderInline(numMatch[2])}</span>
+          </div>
+        )
+        i++; continue
+      }
+
+      // ── Empty line ──────────────────────────────────────────
+      if (!line.trim()) {
+        elements.push(<div key={key++} style={{ height: 9 }} />)
+        i++; continue
+      }
+
+      // ── Paragraph ───────────────────────────────────────────
+      elements.push(<div key={key++} style={{ marginTop: 3, lineHeight: 1.72 }}>{renderInline(line)}</div>)
+      i++
+    }
+  }
 
   return (
-    <div style={{ fontSize: 14, lineHeight: 1.72, color: 'rgba(255,255,255,0.88)', fontFamily: "'Inter', system-ui, sans-serif" }}>
-      {topSegs.map((seg, si) => {
-        if (seg.type === 'block-math') {
-          return (
-            <div key={si}
-              style={{ margin: '14px 0', padding: '14px 18px', borderRadius: 14, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.20)', textAlign: 'center', overflowX: 'auto' }}
-              dangerouslySetInnerHTML={{ __html: renderMathSafe(seg.content, true) }}
-            />
-          )
-        }
-        // Render markdown lines
-        const lines = seg.content.split('\n')
-        return lines.map((line, li) => {
-          const key = `${si}-${li}`
-
-          // Numbered step heading: "1: Title" or "Step 1: Title"
-          const stepMatch = line.match(/^(?:Step\s+)?(\d+):\s+(.+)/)
-          if (stepMatch && line.length < 80) {
-            return (
-              <div key={key} style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 18, marginBottom: 4 }}>
-                <div style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 7, background: 'rgba(99,102,241,0.20)', border: '1px solid rgba(99,102,241,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#A5B4FC' }}>{stepMatch[1]}</div>
-                <span style={{ fontWeight: 700, fontSize: 14.5, color: 'rgba(255,255,255,0.96)' }}>{renderInline(stepMatch[2])}</span>
-              </div>
-            )
-          }
-
-          if (line.startsWith('### ')) return <div key={key} style={{ fontWeight: 800, fontSize: 14, marginTop: 16, marginBottom: 3, color: '#C4B5FD', letterSpacing: '-0.01em' }}>{renderInline(line.slice(4))}</div>
-          if (line.startsWith('## '))  return <div key={key} style={{ fontWeight: 800, fontSize: 15, marginTop: 18, marginBottom: 4, color: 'rgba(255,255,255,0.96)', letterSpacing: '-0.02em' }}>{renderInline(line.slice(3))}</div>
-          if (line.startsWith('# '))   return <div key={key} style={{ fontWeight: 900, fontSize: 16, marginTop: 18, marginBottom: 6, color: '#fff', letterSpacing: '-0.02em' }}>{renderInline(line.slice(2))}</div>
-
-          if (line.startsWith('- ') || line.startsWith('• ')) {
-            return (
-              <div key={key} style={{ display: 'flex', gap: 9, marginTop: 4 }}>
-                <span style={{ color: '#818CF8', flexShrink: 0, marginTop: 3, fontSize: 10 }}>●</span>
-                <span>{renderInline(line.slice(2))}</span>
-              </div>
-            )
-          }
-          if (/^\d+\. /.test(line)) {
-            const lm = line.match(/^(\d+)\. (.*)/)
-            return (
-              <div key={key} style={{ display: 'flex', gap: 9, marginTop: 4 }}>
-                <span style={{ color: '#818CF8', flexShrink: 0, minWidth: 18, fontSize: 13, fontWeight: 700 }}>{lm[1]}.</span>
-                <span>{renderInline(lm[2])}</span>
-              </div>
-            )
-          }
-          if (!line.trim()) return <div key={key} style={{ height: 8 }} />
-          return <div key={key} style={{ marginTop: 2 }}>{renderInline(line)}</div>
-        })
-      })}
+    <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.88)', fontFamily: "'Inter', system-ui, sans-serif" }}>
+      {elements}
     </div>
   )
 }
@@ -342,7 +501,7 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
   const [input, setInput]         = useState('')
   const [thinking, setThinking]   = useState(false)
   const [dragOver, setDragOver]   = useState(false)
-  const [chipsUsed, setChipsUsed] = useState(false)
+  const [mobileTab, setMobileTab] = useState('doc')
   const [docCollapsed, setDocCollapsed] = useState(false)
 
   const fileInputRef = useRef(null)
@@ -358,14 +517,13 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
   }, [messages])
 
   // ── Handle file ──────────────────────────────────────────────────────────────
-  const handleFile = (f) => {
+  const handleFile = async (f) => {
     if (!f) return
     const url = URL.createObjectURL(f)
     setFile(f)
     setFileUrl(url)
     setScanCtx(null)
     setMessages([])
-    setChipsUsed(false)
     base64Ref.current = null
     mimeRef.current = null
 
@@ -373,12 +531,34 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
     setIsPdf(pdf)
 
     if (pdf) {
-      // PDF: display in iframe, Aeva works from description
-      setScanCtx({ type: 'pdf', subject: 'Document', level: 'Unknown', summary: `PDF: ${f.name}` })
-      setMessages([{
-        role: 'assistant',
-        content: `I can see **${f.name}** on the left. I can't read PDFs directly, but I can see it displayed there — tell me which section or question you need help with, or type out what it says and I'll explain.`,
-      }])
+      setScanning(true)
+      try {
+        const { text: extracted, totalPages } = await extractPDFText(f)
+        const ctx = {
+          type: 'pdf',
+          subject: f.name.replace(/\.pdf$/i, ''),
+          level: 'Unknown',
+          summary: `PDF document: ${f.name}`,
+          allText: extracted,
+          questions: [],
+          keyTerms: [],
+          hasDiagrams: false,
+        }
+        setScanCtx(ctx)
+        const preview = extracted.slice(0, 120).trim()
+        setMessages([{
+          role: 'assistant',
+          content: `I've read **${f.name}** — ${totalPages} page${totalPages !== 1 ? 's' : ''} extracted. I can see the full text. What would you like to work through?${preview ? `\n\n*Preview: "${preview}…"*` : ''}`,
+        }])
+      } catch {
+        setScanCtx({ type: 'pdf', subject: 'Document', level: 'Unknown', summary: `PDF: ${f.name}` })
+        setMessages([{
+          role: 'assistant',
+          content: `I've got **${f.name}** on the left. PDF text extraction failed — tell me which section or question you need help with and I'll assist.`,
+        }])
+      }
+      setScanning(false)
+      setMobileTab('chat')
     } else {
       // Image: scan via vision model
       scanImage(f)
@@ -398,7 +578,7 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
       try {
         const res = await fetch(GROQ_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${gKey()}` },
           body: JSON.stringify({
             model: VISION,
             messages: [{
@@ -448,6 +628,7 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
         }])
       }
       setScanning(false)
+      setMobileTab('chat')
     }
     reader.readAsDataURL(f)
   }
@@ -457,7 +638,6 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
     const text = (msg || input).trim()
     if (!text || thinking || scanning) return
     setInput('')
-    setChipsUsed(true)
 
     const userMsg = { role: 'user', content: text }
     const updated = [...messages, userMsg]
@@ -468,9 +648,10 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
     const systemContent = buildSystemPrompt(scanCtx, name)
     const apiMessages = [{ role: 'system', content: systemContent }]
 
-    // For image docs: include image in first user message for context on first call
-    // On follow-ups use only text (scan context in system prompt is sufficient)
-    const isFirstQuestion = updated.filter(m => m.role === 'user').length === 1
+    // First user question: include image for visual context.
+    // Follow-ups: text-only — the system prompt carries full doc text via allText.
+    const userTurnCount = updated.filter(m => m.role === 'user').length
+    const isFirstQuestion = userTurnCount === 1
     if (!isPdf && base64Ref.current && isFirstQuestion) {
       apiMessages.push({
         role: 'user',
@@ -480,9 +661,9 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
         ],
       })
     } else {
-      // All subsequent messages: text only (scan context in system prompt has the full text)
+      // Reconstruct full conversation history (text only)
       for (const m of updated) {
-        apiMessages.push({ role: m.role, content: typeof m.content === 'string' ? m.content : text })
+        if (m.content) apiMessages.push({ role: m.role, content: m.content })
       }
     }
 
@@ -513,8 +694,8 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
     setTimeout(() => inputRef.current?.focus(), 80)
   }
 
-  const chips = getChips(scanCtx)
-  const showChips = !chipsUsed && messages.length === 1 && !thinking
+  const chips = getContextualChips(scanCtx, messages)
+  const showChips = scanCtx && !thinking && messages.length > 0
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
@@ -584,27 +765,69 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
         </div>
       </div>
 
+      {/* ── Question navigator strip ─────────────────────────────────────── */}
+      <AnimatePresence>
+        {scanCtx?.questions?.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+            style={{ flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(5,6,18,0.80)', overflow: 'hidden' }}>
+            <div style={{ padding: '7px 20px', display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.10em', textTransform: 'uppercase', flexShrink: 0 }}>Questions</span>
+              <div style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.08)', flexShrink: 0 }} />
+              {scanCtx.questions.map((q, i) => (
+                <motion.button
+                  key={i}
+                  whileHover={{ scale: 1.06, background: 'rgba(99,102,241,0.22)' }}
+                  whileTap={{ scale: 0.94 }}
+                  onClick={() => send(`Help me with question ${i + 1}: ${q}`)}
+                  style={{ flexShrink: 0, padding: '4px 12px', borderRadius: 99, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.28)', color: '#A5B4FC', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                  Q{i + 1}
+                </motion.button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Mobile tab bar ───────────────────────────────────────────────── */}
+      {isMobile && file && (
+        <div style={{ flexShrink: 0, display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(8,9,24,0.95)' }}>
+          {[{ id: 'doc', label: '📄 Document' }, { id: 'chat', label: '💬 Chat' }].map(tab => (
+            <button key={tab.id} onClick={() => setMobileTab(tab.id)}
+              style={{
+                flex: 1, padding: '11px 0', border: 'none',
+                background: mobileTab === tab.id ? 'rgba(99,102,241,0.10)' : 'transparent',
+                borderBottom: mobileTab === tab.id ? '2px solid #6366F1' : '2px solid transparent',
+                color: mobileTab === tab.id ? '#A5B4FC' : 'rgba(255,255,255,0.35)',
+                fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                transition: 'all 0.15s',
+              }}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* ── Body ────────────────────────────────────────────────────────────── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: isMobile ? 'column' : 'row', overflow: 'hidden', minHeight: 0 }}>
 
-        {/* ── Doc panel (left on desktop, top on mobile) ────────────────────── */}
+        {/* ── Doc panel (left on desktop, full on mobile doc tab) ───────────── */}
         <AnimatePresence initial={false}>
-          {!docCollapsed && (
+          {!docCollapsed && (!isMobile || mobileTab === 'doc') && (
             <motion.div
               key="doc-panel"
-              initial={isMobile ? { height: 0, opacity: 0 } : { width: 0, opacity: 0 }}
+              initial={isMobile ? { opacity: 0 } : { width: 0, opacity: 0 }}
               animate={isMobile
-                ? { height: file ? '42%' : '38%', opacity: 1 }
+                ? { opacity: 1 }
                 : { width: file ? '55%' : '50%', opacity: 1 }
               }
-              exit={isMobile ? { height: 0, opacity: 0 } : { width: 0, opacity: 0 }}
+              exit={isMobile ? { opacity: 0 } : { width: 0, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 280, damping: 30 }}
               style={{
                 flexShrink: 0, overflow: 'hidden',
                 borderRight: isMobile ? 'none' : '1px solid rgba(255,255,255,0.07)',
-                borderBottom: isMobile ? '1px solid rgba(255,255,255,0.07)' : 'none',
                 display: 'flex', flexDirection: 'column',
-                ...(isMobile ? { width: '100%' } : {}),
+                ...(isMobile ? { flex: 1, width: '100%' } : {}),
               }}
             >
               {/* Hidden file input */}
@@ -626,11 +849,7 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
                   <UploadZone onFile={handleFile} dragOver={dragOver} setDragOver={setDragOver} fileInputRef={fileInputRef} compact={isMobile} />
                 ) : isPdf ? (
                   /* PDF viewer */
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.20)' }}>
-                      <AlertCircle size={13} color="#F59E0B" />
-                      <span style={{ fontSize: 11.5, color: '#FCD34D', fontWeight: 600 }}>Aeva can't read PDFs directly — describe what you need help with in the chat</span>
-                    </div>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0 }}>
                     <embed
                       src={fileUrl}
                       type="application/pdf"
@@ -663,7 +882,7 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
           )}
         </AnimatePresence>
 
-        {/* Collapse toggle (desktop only) */}
+        {/* Collapse toggle — desktop only */}
         {file && !isMobile && (
           <motion.button
             whileHover={{ background: 'rgba(255,255,255,0.08)' }}
@@ -680,7 +899,7 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
         )}
 
         {/* ── Right: Chat panel ────────────────────────────────────────────── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
+        <div style={{ flex: 1, display: isMobile && file && mobileTab === 'doc' ? 'none' : 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
 
           {/* Messages */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '22px 22px 8px', display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>

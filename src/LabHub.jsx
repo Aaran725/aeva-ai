@@ -134,6 +134,74 @@ Return ONLY this JSON:
   return JSON.parse(json.choices[0].message.content)
 }
 
+/* ── Per-card AI explanation ── */
+async function generateCardExplanation(topic, question, correctAnswer) {
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
+    body: JSON.stringify({
+      model: 'llama-3.1-8b-instant',
+      messages: [
+        { role: 'system', content: 'Concise tutor. Explain in 2-3 sentences. Direct, specific, no fluff.' },
+        { role: 'user', content: `Topic: "${topic}"\nQuestion: "${question}"\nCorrect answer: "${correctAnswer}"\n\nWhy is this the correct answer? What concept underpins it? 2-3 sentences max.` },
+      ],
+      temperature: 0.3,
+      max_tokens: 120,
+    }),
+  })
+  const json = await res.json()
+  return json.choices?.[0]?.message?.content || null
+}
+
+function WrongItemCard({ item, topic }) {
+  const [expanded, setExpanded] = useState(false)
+  const [explanation, setExplanation] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  const handleExplain = async () => {
+    setExpanded(true)
+    if (explanation || loading) return
+    setLoading(true)
+    try {
+      const text = await generateCardExplanation(topic, item.q, item.correct)
+      setExplanation(text)
+    } catch {}
+    setLoading(false)
+  }
+
+  return (
+    <div style={{ borderRadius: 11, border: '1px solid rgba(239,68,68,0.18)', background: 'rgba(239,68,68,0.05)', overflow: 'hidden', marginBottom: 7 }}>
+      <div style={{ padding: '10px 13px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.65)', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.q}</div>
+          <div style={{ fontSize: 11.5, color: '#4ADE80', marginTop: 3, fontWeight: 600 }}>✓ {item.correct}</div>
+        </div>
+        <button
+          onClick={expanded ? () => setExpanded(false) : handleExplain}
+          style={{ flexShrink: 0, padding: '4px 10px', borderRadius: 8, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.24)', color: 'rgba(167,139,250,0.80)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+          {expanded ? 'Hide' : 'Explain'}
+        </button>
+      </div>
+      <AnimatePresence>
+        {expanded && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} style={{ overflow: 'hidden' }}>
+            <div style={{ padding: '0 13px 12px', borderTop: '1px solid rgba(239,68,68,0.12)' }}>
+              {loading ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, paddingTop: 10 }}>
+                  <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid rgba(99,102,241,0.2)', borderTopColor: '#818CF8', flexShrink: 0 }} />
+                  <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.35)' }}>Explaining…</span>
+                </div>
+              ) : (
+                <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.68)', lineHeight: 1.60, margin: '10px 0 0' }}>{explanation}</p>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 /* ═══ DRILL COMPLETE SCREEN ══════════════════════════ */
 function DrillComplete({ score, wrongItems = [], onExit, onRetry, onGoHarder, topic, drillType }) {
   const { difficulty, setDifficulty, closeLab, exitDrill } = useLabStore()
@@ -200,6 +268,16 @@ function DrillComplete({ score, wrongItems = [], onExit, onRetry, onGoHarder, to
         </div>
       )}
 
+      {/* Wrong items — expandable per-card explain */}
+      {wrongItems.length > 0 && (
+        <div style={{ width: '100%' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(239,68,68,0.55)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 8 }}>
+            Missed · {wrongItems.length}
+          </div>
+          {wrongItems.map((item, i) => <WrongItemCard key={i} item={item} topic={topic} />)}
+        </div>
+      )}
+
       {/* Adaptive difficulty */}
       {canGoHarder && currentDiffIdx < 3 && onGoHarder && (
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
@@ -246,7 +324,7 @@ function DrillComplete({ score, wrongItems = [], onExit, onRetry, onGoHarder, to
 }
 
 /* ═══ FLASHCARD SPRINT ═══════════════════════════════ */
-function FlashcardDrill({ data, topic, onExit }) {
+function FlashcardDrill({ data, topic, onExit, onGoHarder }) {
   const { setDrillScore, recordDrillResult, currentTopic } = useLabStore()
   const { recordCard } = useSRStore()
   const [idx, setIdx] = useState(0)
@@ -303,7 +381,7 @@ function FlashcardDrill({ data, topic, onExit }) {
         drillType="flashcard"
         onExit={onExit}
         onRetry={() => { setIdx(0); setFlipped(false); setResults([]); setWrongItems([]); setDone(false) }}
-        onGoHarder={onExit}
+        onGoHarder={onGoHarder}
       />
     )
   }
@@ -569,7 +647,7 @@ function ReviewDrill({ data, onExit, onNewDrill }) {
 }
 
 /* ═══ SPEED ROUND ════════════════════════════════════ */
-function SpeedRoundDrill({ data, topic, onExit }) {
+function SpeedRoundDrill({ data, topic, onExit, onGoHarder }) {
   const { setDrillScore, recordDrillResult, currentTopic } = useLabStore()
   const cards = data.cards || []
   const [idx, setIdx] = useState(0)
@@ -624,7 +702,7 @@ function SpeedRoundDrill({ data, topic, onExit }) {
         onRetry={() => { setIdx(0); setFlipped(false); setResults([]); setDone(false); setTimeLeft(15) }}
         topic={topic}
         drillType="speedround"
-        onGoHarder={onExit}
+        onGoHarder={onGoHarder}
       />
     )
   }
@@ -973,6 +1051,7 @@ function FeynmanDrill({ data, topic, onExit }) {
   const [explanation, setExplanation] = useState('')
   const [grading, setGrading] = useState(false)
   const [result, setResult] = useState(null)
+  const [focusedMissing, setFocusedMissing] = useState(null)
   const textareaRef = useRef(null)
   const wordCount = explanation.trim().split(/\s+/).filter(Boolean).length
 
@@ -1026,8 +1105,17 @@ function FeynmanDrill({ data, topic, onExit }) {
             </div>
           </div>
         )}
-        <div style={{ display: 'flex', gap: 10, paddingTop: 8 }}>
-          <button onClick={() => { setResult(null); setExplanation('') }} style={{ flex: 1, padding: '12px', borderRadius: 13, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.65)', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+        {result.missing?.length > 0 && (
+          <motion.button
+            initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
+            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+            onClick={() => { setFocusedMissing(result.missing); setResult(null); setExplanation('') }}
+            style={{ width: '100%', padding: '13px 16px', borderRadius: 13, border: '1px solid rgba(239,68,68,0.38)', background: 'rgba(239,68,68,0.12)', color: '#FCA5A5', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontFamily: 'inherit' }}>
+            <RotateCcw size={13} /> Retry on missed points ({result.missing.length})
+          </motion.button>
+        )}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={() => { setResult(null); setExplanation(''); setFocusedMissing(null) }} style={{ flex: 1, padding: '12px', borderRadius: 13, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.65)', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             <RotateCcw size={13} /> Try again
           </button>
           <button onClick={onExit} style={{ flex: 1, padding: '12px', borderRadius: 13, background: 'linear-gradient(135deg, rgba(139,92,246,0.28), rgba(59,130,246,0.20))', border: '1px solid rgba(139,92,246,0.40)', color: 'rgba(255,255,255,0.92)', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
@@ -1040,21 +1128,30 @@ function FeynmanDrill({ data, topic, onExit }) {
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ padding: '16px 18px', borderRadius: 16, background: 'rgba(139,92,246,0.10)', border: '1px solid rgba(139,92,246,0.22)' }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(139,92,246,0.80)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 8 }}>Feynman Challenge</div>
-        <p style={{ fontSize: 15.5, fontWeight: 600, color: 'rgba(255,255,255,0.94)', lineHeight: 1.55, margin: 0 }}>{data.prompt}</p>
-      </div>
+      {focusedMissing ? (
+        <div style={{ padding: '13px 16px', borderRadius: 14, background: 'rgba(239,68,68,0.09)', border: '1px solid rgba(239,68,68,0.30)' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(248,113,113,0.80)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 4 }}>Retry — focus on your gaps</div>
+          <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.60)' }}>Cover only the points you missed below. Clear and simple.</div>
+        </div>
+      ) : (
+        <div style={{ padding: '16px 18px', borderRadius: 16, background: 'rgba(139,92,246,0.10)', border: '1px solid rgba(139,92,246,0.22)' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(139,92,246,0.80)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 8 }}>Feynman Challenge</div>
+          <p style={{ fontSize: 15.5, fontWeight: 600, color: 'rgba(255,255,255,0.94)', lineHeight: 1.55, margin: 0 }}>{data.prompt}</p>
+        </div>
+      )}
       <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
         Write as if teaching someone with zero background. Simple language, real examples, no jargon. Aeva will find the gaps.
       </div>
 
-      {/* Key-point reference chips */}
-      {data.keyPoints?.length > 0 && (
+      {/* Key-point reference chips — show only missed when in focus mode */}
+      {(focusedMissing ?? data.keyPoints)?.length > 0 && (
         <div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(139,92,246,0.55)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 7 }}>Cover these points →</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: focusedMissing ? 'rgba(239,68,68,0.60)' : 'rgba(139,92,246,0.55)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 7 }}>
+            {focusedMissing ? 'Points to cover this time →' : 'Cover these points →'}
+          </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {data.keyPoints.map((pt, i) => (
-              <div key={i} style={{ padding: '5px 12px', borderRadius: 99, fontSize: 12, fontWeight: 500, background: 'rgba(139,92,246,0.10)', border: '1px solid rgba(139,92,246,0.22)', color: 'rgba(167,139,250,0.70)' }}>
+            {(focusedMissing ?? data.keyPoints).map((pt, i) => (
+              <div key={i} style={{ padding: '5px 12px', borderRadius: 99, fontSize: 12, fontWeight: 500, background: focusedMissing ? 'rgba(239,68,68,0.10)' : 'rgba(139,92,246,0.10)', border: `1px solid ${focusedMissing ? 'rgba(239,68,68,0.28)' : 'rgba(139,92,246,0.22)'}`, color: focusedMissing ? '#FCA5A5' : 'rgba(167,139,250,0.70)' }}>
                 {pt}
               </div>
             ))}
@@ -1103,7 +1200,7 @@ function FeynmanDrill({ data, topic, onExit }) {
 }
 
 /* ═══ CLOZE (FILL THE GAPS) ══════════════════════════ */
-function ClozeDrill({ data, topic, onExit }) {
+function ClozeDrill({ data, topic, onExit, onGoHarder }) {
   const { setDrillScore, recordDrillResult, currentTopic } = useLabStore()
   const passage = data.passage || ''
   const answers = data.blanks || []
@@ -1136,7 +1233,7 @@ function ClozeDrill({ data, topic, onExit }) {
         topic={topic} drillType="cloze"
         onExit={onExit}
         onRetry={() => { setInputs(Array(answers.length).fill('')); setSubmitted(false); setResults([]) }}
-        onGoHarder={onExit}
+        onGoHarder={onGoHarder}
       />
     )
   }
@@ -1227,7 +1324,7 @@ async function gradeShortAnswer(topic, question, modelAnswer, keyPoints, userAns
   return JSON.parse(json.choices[0].message.content)
 }
 
-function ShortAnswerDrill({ data, topic, onExit }) {
+function ShortAnswerDrill({ data, topic, onExit, onGoHarder }) {
   const { setDrillScore, recordDrillResult, currentTopic } = useLabStore()
   const questions = data.questions || []
   const [idx, setIdx] = useState(0)
@@ -1278,7 +1375,7 @@ function ShortAnswerDrill({ data, topic, onExit }) {
         topic={topic} drillType="shortanswer"
         onExit={onExit}
         onRetry={() => { setIdx(0); setAnswers(Array(questions.length).fill('')); setGrades([]); setCurrentGrade(null); setDone(false) }}
-        onGoHarder={onExit}
+        onGoHarder={onGoHarder}
       />
     )
   }
@@ -1365,7 +1462,7 @@ function ShortAnswerDrill({ data, topic, onExit }) {
 }
 
 /* ═══ MATCH GRID ═════════════════════════════════════ */
-function MatchGridDrill({ data, topic, onExit }) {
+function MatchGridDrill({ data, topic, onExit, onGoHarder }) {
   const { setDrillScore, recordDrillResult, currentTopic } = useLabStore()
   const pairs = data.pairs || []
   const [terms] = useState(pairs.map(p => p.term))
@@ -1404,7 +1501,7 @@ function MatchGridDrill({ data, topic, onExit }) {
       drillType="match"
       onExit={onExit}
       onRetry={() => { setMatched([]); setSelectedTerm(null); setSelectedDef(null); setDone(false) }}
-      onGoHarder={onExit}
+      onGoHarder={onGoHarder}
     />
   )
 
@@ -1562,7 +1659,7 @@ function DrillTab() {
   const {
     difficulty, setDifficulty, questionCount, setQuestionCount, focusMode, setFocusMode,
     labSuggestion, clearSuggestion, startDrill, exitDrill, setDrillData, getPersonalBest,
-    pendingAutoStart, clearPendingAutoStart,
+    pendingAutoStart, clearPendingAutoStart, drillHistory,
   } = useLabStore()
   const { struggleZones, dominantTopics } = useNeuralStore()
   const { getDueCards, getDueCount, getUpcomingCount, getTotalCards } = useSRStore()
@@ -1574,6 +1671,21 @@ function DrillTab() {
   const dueCount      = getDueCount()
   const upcomingCount = getUpcomingCount(7)
   const totalSRCards  = getTotalCards()
+
+  // Recent topics from drill history (last 5 unique)
+  const recentTopics = [...new Set(drillHistory.slice().reverse().map(h => h.topic))].slice(0, 5)
+
+  // Weakest topic: lowest average score across all sessions, avg < 75%
+  const topicAvgMap = {}
+  drillHistory.forEach(h => {
+    if (!topicAvgMap[h.topic]) topicAvgMap[h.topic] = { total: 0, count: 0 }
+    topicAvgMap[h.topic].total += h.pct
+    topicAvgMap[h.topic].count++
+  })
+  const weakestTopic = Object.entries(topicAvgMap)
+    .map(([topic, { total, count }]) => ({ topic, avg: Math.round(total / count), count }))
+    .filter(e => e.avg < 75)
+    .sort((a, b) => a.avg - b.avg)[0] || null
 
   useEffect(() => {
     if (labSuggestion?.topic) setTopicInput(labSuggestion.topic)
@@ -1624,6 +1736,45 @@ function DrillTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
+      {/* Today's Priority card — SR due + weakest topic combined */}
+      {(dueCount > 0 || weakestTopic) && (
+        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+          style={{ padding: '16px 18px', borderRadius: 16, background: 'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(59,130,246,0.07))', border: '1px solid rgba(139,92,246,0.26)' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(167,139,250,0.80)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 12 }}>
+            🎯 Today's Priority
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {dueCount > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: 'rgba(255,255,255,0.90)' }}>
+                    <RefreshCw size={12} style={{ display: 'inline', marginRight: 6, verticalAlign: 'middle' }} />
+                    Spaced Review
+                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(74,222,128,0.65)', marginTop: 2 }}>
+                    {dueCount} card{dueCount !== 1 ? 's' : ''} due{upcomingCount > 0 ? ` · ${upcomingCount} more this week` : ''}
+                  </div>
+                </div>
+                <button onClick={handleReview} style={{ padding: '7px 14px', borderRadius: 10, background: 'rgba(34,197,94,0.18)', border: '1px solid rgba(34,197,94,0.38)', color: '#86EFAC', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+                  Review →
+                </button>
+              </div>
+            )}
+            {weakestTopic && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, ...(dueCount > 0 ? { paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.07)' } : {}) }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: 'rgba(255,255,255,0.90)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{weakestTopic.topic}</div>
+                  <div style={{ fontSize: 11, color: 'rgba(248,113,113,0.70)', marginTop: 2 }}>Avg {weakestTopic.avg}% — needs work</div>
+                </div>
+                <button onClick={() => handleStart('flashcard', weakestTopic.topic)} style={{ padding: '7px 14px', borderRadius: 10, background: 'rgba(248,113,113,0.14)', border: '1px solid rgba(248,113,113,0.32)', color: '#FCA5A5', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+                  Drill →
+                </button>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+
       {/* Lab suggestion banner */}
       <AnimatePresence>
         {labSuggestion && (
@@ -1636,24 +1787,7 @@ function DrillTab() {
         )}
       </AnimatePresence>
 
-      {/* SR review banner */}
-      {dueCount > 0 && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: '#4ADE80', marginBottom: 2 }}>
-              <RefreshCw size={11} style={{ display: 'inline', marginRight: 5 }} />
-              {dueCount} card{dueCount !== 1 ? 's' : ''} due
-            </div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)' }}>
-              {upcomingCount > 0 ? `${upcomingCount} more due this week` : 'Spaced repetition ready'}
-            </div>
-          </div>
-          <button onClick={handleReview} style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(34,197,94,0.22)', border: '1px solid rgba(34,197,94,0.45)', color: '#86EFAC', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            Review now
-          </button>
-        </motion.div>
-      )}
+      {/* SR memory bank info (when no cards currently due) */}
       {dueCount === 0 && totalSRCards > 0 && (
         <div style={{ padding: '9px 13px', borderRadius: 11, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.38)' }}>🧠 {totalSRCards} cards in memory bank</span>
@@ -1680,6 +1814,19 @@ function DrillTab() {
           onKeyDown={e => e.key === 'Enter' && handleStart('flashcard')}
         />
         {error && <div style={{ fontSize: 12, color: '#F87171', marginTop: 5 }}>{error}</div>}
+        {/* Recent topics */}
+        {recentTopics.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+            {recentTopics.map((t, i) => (
+              <motion.button key={i}
+                whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                onClick={() => setTopicInput(t)}
+                style={{ padding: '3px 10px', borderRadius: 99, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif", background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.20)', color: 'rgba(147,197,253,0.65)' }}>
+                ↩ {t}
+              </motion.button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Inline settings: difficulty + count */}
@@ -1773,11 +1920,13 @@ function OrdersTab({ onLaunchOrder }) {
             const urgColor = URGENCY_COLOR[order.urgency] || '#FBBF24'
             const emoji    = DRILL_EMOJI[order.drillType] || '📋'
             const drillDef = DRILLS[order.drillType]
+            const isHigh   = order.urgency === 'high'
             return (
               <motion.div
                 key={order.id}
-                initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-                style={{ padding: '16px 18px', borderRadius: 18, background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.22)', position: 'relative' }}
+                initial={{ opacity: 0, x: -10 }} animate={isHigh ? { opacity: 1, x: 0, boxShadow: ['0 0 0px rgba(239,68,68,0)', '0 0 16px rgba(239,68,68,0.22)', '0 0 0px rgba(239,68,68,0)'] } : { opacity: 1, x: 0 }}
+                transition={isHigh ? { opacity: { duration: 0.3 }, x: { duration: 0.3 }, boxShadow: { duration: 2.4, repeat: Infinity, ease: 'easeInOut' } } : {}}
+                style={{ padding: '16px 18px', borderRadius: 18, background: isHigh ? 'rgba(239,68,68,0.08)' : 'rgba(59,130,246,0.07)', border: isHigh ? '1.5px solid rgba(239,68,68,0.32)' : '1px solid rgba(59,130,246,0.22)', position: 'relative' }}
               >
                 {/* Urgency badge */}
                 <div style={{ position: 'absolute', top: 14, right: 14, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -1787,12 +1936,12 @@ function OrdersTab({ onLaunchOrder }) {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 10, paddingRight: 64 }}>
-                  <div style={{ width: 38, height: 38, borderRadius: 12, background: 'rgba(59,130,246,0.18)', border: '1px solid rgba(59,130,246,0.32)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 12, background: isHigh ? 'rgba(239,68,68,0.16)' : 'rgba(59,130,246,0.18)', border: `1px solid ${isHigh ? 'rgba(239,68,68,0.32)' : 'rgba(59,130,246,0.32)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
                     {emoji}
                   </div>
                   <div>
                     <div style={{ fontSize: 14.5, fontWeight: 700, color: 'rgba(255,255,255,0.92)', marginBottom: 2 }}>{order.topic}</div>
-                    <div style={{ fontSize: 11.5, color: 'rgba(59,130,246,0.70)', fontWeight: 600 }}>{drillDef?.title || order.drillType}</div>
+                    <div style={{ fontSize: 11.5, color: isHigh ? 'rgba(239,68,68,0.65)' : 'rgba(59,130,246,0.70)', fontWeight: 600 }}>{drillDef?.title || order.drillType}</div>
                   </div>
                 </div>
 
@@ -1803,7 +1952,7 @@ function OrdersTab({ onLaunchOrder }) {
                 <div style={{ display: 'flex', gap: 8 }}>
                   <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                     onClick={() => onLaunchOrder(order)}
-                    style={{ flex: 1, padding: '10px 16px', borderRadius: 11, background: 'rgba(59,130,246,0.22)', border: '1px solid rgba(59,130,246,0.48)', color: '#93C5FD', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontFamily: "'Inter', system-ui, sans-serif" }}>
+                    style={{ flex: 1, padding: '10px 16px', borderRadius: 11, background: isHigh ? 'rgba(239,68,68,0.18)' : 'rgba(59,130,246,0.22)', border: `1px solid ${isHigh ? 'rgba(239,68,68,0.42)' : 'rgba(59,130,246,0.48)'}`, color: isHigh ? '#FCA5A5' : '#93C5FD', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontFamily: "'Inter', system-ui, sans-serif" }}>
                     Do it now <ArrowRight size={12} />
                   </motion.button>
                   <button onClick={() => dismissOrder(order.id)}
@@ -1914,6 +2063,20 @@ function StatsTab() {
   })
   const topicBests = Object.entries(topicBestMap).sort((a, b) => b[1] - a[1]).slice(0, 8)
 
+  // Weakest topics (avg score < 70%)
+  const topicAvgAccum = {}
+  drillHistory.forEach(e => {
+    const t = e.topic.toLowerCase()
+    if (!topicAvgAccum[t]) topicAvgAccum[t] = { total: 0, count: 0 }
+    topicAvgAccum[t].total += e.pct
+    topicAvgAccum[t].count++
+  })
+  const weakTopics = Object.entries(topicAvgAccum)
+    .map(([topic, { total, count }]) => ({ topic, avg: Math.round(total / count), count }))
+    .filter(e => e.avg < 70)
+    .sort((a, b) => a.avg - b.avg)
+    .slice(0, 6)
+
   // Recent sessions
   const recent = [...drillHistory].reverse().slice(0, 8)
 
@@ -1970,6 +2133,30 @@ function StatsTab() {
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Weakest topics */}
+      {weakTopics.length > 0 && (
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(239,68,68,0.55)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>Needs Work</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {weakTopics.map(({ topic, avg, count }) => (
+              <div key={topic} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.70)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topic}</span>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: '#F87171', flexShrink: 0, marginLeft: 8 }}>{avg}%</span>
+                  </div>
+                  <div style={{ height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.07)' }}>
+                    <motion.div initial={{ width: 0 }} animate={{ width: `${avg}%` }} transition={{ duration: 0.6, ease: 'easeOut' }}
+                      style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #EF4444, #F87171)' }} />
+                  </div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)', marginTop: 2 }}>{count} session{count !== 1 ? 's' : ''}</div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -2035,6 +2222,19 @@ export default function LabHub() {
     try {
       const { difficulty, questionCount, focusMode } = useLabStore.getState()
       const data = await generateDrillContent(order.drillType, order.topic, difficulty, questionCount, focusMode)
+      setDrillData(data)
+    } catch {
+      exitDrill()
+    }
+  }
+
+  // Go Harder — re-runs the current drill with the difficulty already bumped by DrillComplete
+  const handleRestartDrill = async () => {
+    const { activeDrill: drillId, currentTopic: topic, difficulty, questionCount, focusMode } = useLabStore.getState()
+    if (!drillId || !topic) return
+    startDrill(drillId, topic)
+    try {
+      const data = await generateDrillContent(drillId, topic, difficulty, questionCount, focusMode)
       setDrillData(data)
     } catch {
       exitDrill()
@@ -2170,13 +2370,13 @@ export default function LabHub() {
                     : drillLoading
                       ? <LabLoading topic={currentTopic} />
                       : drillData
-                        ? activeDrill === 'flashcard'    ? <FlashcardDrill    data={drillData} topic={currentTopic} onExit={exitDrill} />
-                          : activeDrill === 'speedround'  ? <SpeedRoundDrill   data={drillData} topic={currentTopic} onExit={exitDrill} />
+                        ? activeDrill === 'flashcard'    ? <FlashcardDrill    data={drillData} topic={currentTopic} onExit={exitDrill} onGoHarder={handleRestartDrill} />
+                          : activeDrill === 'speedround'  ? <SpeedRoundDrill   data={drillData} topic={currentTopic} onExit={exitDrill} onGoHarder={handleRestartDrill} />
                           : activeDrill === 'mocktest'    ? <MockTestDrill     data={drillData} topic={currentTopic} onExit={exitDrill} />
                           : activeDrill === 'feynman'     ? <FeynmanDrill      data={drillData} topic={currentTopic} onExit={exitDrill} />
-                          : activeDrill === 'cloze'       ? <ClozeDrill        data={drillData} topic={currentTopic} onExit={exitDrill} />
-                          : activeDrill === 'shortanswer' ? <ShortAnswerDrill  data={drillData} topic={currentTopic} onExit={exitDrill} />
-                                                         : <MatchGridDrill     data={drillData} topic={currentTopic} onExit={exitDrill} />
+                          : activeDrill === 'cloze'       ? <ClozeDrill        data={drillData} topic={currentTopic} onExit={exitDrill} onGoHarder={handleRestartDrill} />
+                          : activeDrill === 'shortanswer' ? <ShortAnswerDrill  data={drillData} topic={currentTopic} onExit={exitDrill} onGoHarder={handleRestartDrill} />
+                                                         : <MatchGridDrill     data={drillData} topic={currentTopic} onExit={exitDrill} onGoHarder={handleRestartDrill} />
                         : <LabLoading topic={currentTopic} />
                   }
                 </>

@@ -3,6 +3,7 @@
  * Cards from Flashcard drills are saved here and resurface on schedule.
  */
 import { create } from 'zustand'
+import { scheduleSave } from './syncService'
 
 const SR_KEY = 'aeva_sr_v1'
 const DAY = 24 * 60 * 60 * 1000
@@ -12,6 +13,7 @@ function loadCards() {
 }
 function saveCards(cards) {
   try { localStorage.setItem(SR_KEY, JSON.stringify(cards)) } catch {}
+  scheduleSave('sr_cards', cards)
 }
 
 // Stable deterministic ID so the same card is always the same row
