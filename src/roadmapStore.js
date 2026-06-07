@@ -23,6 +23,15 @@ function recalc(nodes) {
   return out
 }
 
+// Readiness: solid nodes = 100%, shaky nodes = 60%
+function calcReadiness(nodes) {
+  const total = nodes.length
+  if (!total) return 0
+  const solid = nodes.filter(n => n.status === 'complete' && n.confidence !== 'shaky').length
+  const shaky = nodes.filter(n => n.status === 'complete' && n.confidence === 'shaky').length
+  return Math.round((solid * 1.0 + shaky * 0.6) / total * 100)
+}
+
 export const useRoadmapStore = create((set, get) => {
   const stored = load()
   return {
@@ -45,13 +54,21 @@ export const useRoadmapStore = create((set, get) => {
     },
 
     completeNode: (roadmapId, nodeId) => {
+      get().completeNodeWithConfidence(roadmapId, nodeId, 'solid')
+    },
+
+    completeNodeWithConfidence: (roadmapId, nodeId, confidence = 'solid') => {
       set(s => {
         const roadmaps = s.roadmaps.map(r => {
           if (r.id !== roadmapId) return r
-          let nodes = r.nodes.map(n => n.id === nodeId ? { ...n, status: 'complete' } : n)
+          let nodes = r.nodes.map(n => n.id === nodeId ? { ...n, status: 'complete', confidence } : n)
           nodes = recalc(nodes)
-          const readiness = Math.round(nodes.filter(n => n.status === 'complete').length / nodes.length * 100)
-          return { ...r, nodes, readiness }
+          const readiness = calcReadiness(nodes)
+          // If shaky, auto-add to weak areas
+          const weakUpdate = confidence === 'shaky'
+            ? { learningProfile: { ...(r.learningProfile || {}), weak: [...new Set([...(r.learningProfile?.weak || []), r.nodes.find(n => n.id === nodeId)?.topic || ''].filter(Boolean))] } }
+            : {}
+          return { ...r, nodes, readiness, ...weakUpdate }
         })
         const u = { ...s, roadmaps }; save(u); return u
       })
@@ -158,8 +175,7 @@ export const useRoadmapStore = create((set, get) => {
           if (r.id !== roadmapId) return r
           let nodes = r.nodes.filter(n => n.id !== nodeId)
           nodes = recalc(nodes)
-          const readiness = Math.round(nodes.filter(n => n.status === 'complete').length / Math.max(nodes.length, 1) * 100)
-          return { ...r, nodes, readiness }
+          return { ...r, nodes, readiness: calcReadiness(nodes) }
         })
         const u = { ...s, roadmaps }; save(u); return u
       })
@@ -230,8 +246,8 @@ export const useRoadmapStore = create((set, get) => {
             }
             return true
           })
-          const readiness = Math.round(nodes.filter(n => n.status === 'complete').length / Math.max(nodes.length, 1) * 100)
-          return { ...r, nodes: recalc(nodes), crunchMode: true, readiness }
+          const recalced = recalc(nodes)
+          return { ...r, nodes: recalced, crunchMode: true, readiness: calcReadiness(recalced) }
         })
         const u = { ...s, roadmaps }; save(u); return u
       })

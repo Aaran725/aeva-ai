@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText, BookOpen, Zap, Target, ClipboardList, Check, Lock, Clock, Trophy, Trash2, Brain, Dumbbell, GraduationCap, FlaskConical, Share2, Copy } from 'lucide-react'
+import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText, BookOpen, Zap, Target, ClipboardList, Check, Lock, Clock, Trophy, Trash2, Brain, Dumbbell, GraduationCap, FlaskConical, Share2, Copy, AlertTriangle, RotateCcw } from 'lucide-react'
 import { useRoadmapStore } from './roadmapStore'
 import { useLabStore } from './labStore'
 import { supabase } from './supabase'
@@ -37,7 +37,8 @@ Return ONLY valid JSON:
       "difficulty": 1,
       "estimatedMinutes": 20,
       "xp": 50,
-      "description": "One sentence: exactly what the student will learn or practise in this step"
+      "description": "One sentence: exactly what the student will learn or practise in this step",
+      "subtopics": ["Specific subtopic 1", "Specific subtopic 2", "Specific subtopic 3"]
     }
   ]
 }
@@ -71,6 +72,7 @@ TYPE VALUES: exactly one of: learn, drill, check, mock
 DIFFICULTY: Foundation=1-2, Core Topics=2-3, Practice=3-4, Exam Prep=4-5
 XP: learn=50, drill=30, check=40, mock=100
 TOPIC NAMES: 3-6 words, specific not vague (e.g. "Quadratic Formula & Discriminant" not "Algebra")
+SUBTOPICS: For every "learn" node include 3-5 specific exam-relevant subtopics that will be covered (e.g. for "Photosynthesis": ["Light-dependent reactions & photolysis", "Photosystem I & II electron transport", "Calvin cycle & carbon fixation", "Factors limiting rate"]). For drill/check/mock nodes, subtopics may be omitted or left as [].
 ORDER: strict prerequisites — foundational concepts always before applications`
 
   const res = await fetch(GROQ_URL, {
@@ -759,7 +761,7 @@ const NODE_R       = 38   // node circle radius (76px diameter)
 const TOP_PAD      = 32
 
 function PathView() {
-  const { getActive, completeNode, closeRoadmapHub, startNodeSession, endNodeSession, markLogSeen, flagNode } = useRoadmapStore()
+  const { getActive, completeNode, completeNodeWithConfidence, closeRoadmapHub, startNodeSession, endNodeSession, markLogSeen, flagNode } = useRoadmapStore()
   // Subscribe to roadmaps array so component re-renders when Aeva mutates nodes
   useRoadmapStore(state => state.roadmaps)
   const { openLab, addOrder, setLabTab, setPendingAutoStart } = useLabStore()
@@ -839,13 +841,21 @@ function PathView() {
     }
   }
 
-  const markDone = (node) => {
-    completeNode(roadmap.id, node.id)
+  const markDoneWithConfidence = (node, confidence) => {
+    completeNodeWithConfidence(roadmap.id, node.id, confidence)
     addXP('DRILL_COMPLETE')
     endNodeSession()
     setStartedIds(prev => { const n = new Set(prev); n.delete(node.id); return n })
     setSelected(null)
   }
+
+  // Behind-pace detection
+  const totalDays = Math.max(1, Math.ceil((new Date(roadmap.examDate) - new Date(roadmap.createdAt || Date.now())) / 86400000))
+  const daysElapsed = Math.max(0, totalDays - daysLeft)
+  const completedCount = nodes.filter(n => n.status === 'complete').length
+  const expectedDone = Math.floor((daysElapsed / totalDays) * nodes.length)
+  const behindBy = Math.max(0, expectedDone - completedCount)
+  const isBehind = behindBy >= 2 && daysElapsed > 1
 
   const mission      = roadmap.dailyMission
   const missionTasks = mission?.tasks || []
@@ -951,9 +961,10 @@ function PathView() {
         const remMins   = nodes.filter(n => n.status !== 'complete').reduce((s, n) => s + (n.estimatedMinutes || 20), 0)
         const earnedXP  = doneNodes.reduce((s, n) => s + (n.xp || 50), 0)
         const remH = Math.floor(remMins / 60), remM = remMins % 60
+        const shakyCount = nodes.filter(n => n.status === 'complete' && n.confidence === 'shaky').length
         const stats = [
           { label: 'STEPS',     value: `${doneNodes.length}/${nodes.length}` },
-          { label: 'XP',        value: earnedXP.toString() },
+          { label: 'SHAKY',     value: shakyCount.toString(), amber: shakyCount > 0 },
           { label: 'TIME LEFT', value: remH > 0 ? `${remH}h ${remM}m` : `${remM}m` },
           { label: 'READY',     value: `${roadmap.readiness}%`, green: roadmap.readiness >= 60 },
         ]
@@ -961,7 +972,7 @@ function PathView() {
           <div style={{ display: 'flex', flexShrink: 0, padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', marginTop: 14 }}>
             {stats.map((s, i) => (
               <div key={s.label} style={{ flex: 1, textAlign: 'center', borderRight: i < stats.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', padding: '2px 0' }}>
-                <div style={{ fontSize: 15, fontWeight: 900, color: s.green ? '#4ADE80' : '#fff', letterSpacing: '-0.03em' }}>{s.value}</div>
+                <div style={{ fontSize: 15, fontWeight: 900, color: s.green ? '#4ADE80' : s.amber ? '#FCD34D' : '#fff', letterSpacing: '-0.03em' }}>{s.value}</div>
                 <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)', fontWeight: 700, letterSpacing: '0.10em', marginTop: 2 }}>{s.label}</div>
               </div>
             ))}
@@ -1003,6 +1014,40 @@ function PathView() {
           <div style={{ fontSize: 18, opacity: 0.6 }}>→</div>
         </motion.button>
       </div>
+
+      {/* ── Behind-pace banner ──────────────────────────────────────────── */}
+      {isBehind && (
+        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+          style={{ flexShrink: 0, margin: '10px 20px 0', borderRadius: 14, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', padding: '12px 14px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ width: 30, height: 30, borderRadius: 9, background: 'rgba(239,68,68,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+            <AlertTriangle size={14} color="#F87171" />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#F87171', marginBottom: 3 }}>
+              Behind by {behindBy} node{behindBy !== 1 ? 's' : ''}
+            </div>
+            <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.42)', lineHeight: 1.55, marginBottom: 10 }}>
+              At your current pace, you won't finish before exam day. Ask Aeva to replan or activate Crunch Mode to cut non-essentials.
+            </div>
+            <div style={{ display: 'flex', gap: 7 }}>
+              <motion.button whileTap={{ scale: 0.96 }}
+                onClick={() => {
+                  const nodeNames = nodes.filter(n => n.status !== 'complete').map(n => `"${n.topic}"`).join(', ')
+                  setPendingChatPrompt(`Aeva, I'm ${behindBy} node${behindBy !== 1 ? 's' : ''} behind on my roadmap for "${roadmap.title}". I have ${daysLeft} days left. Remaining nodes: ${nodeNames}. Replan immediately — remove what I don't need, flag the critical ones as urgent, and tell me exactly what to prioritise.`)
+                  closeRoadmapHub()
+                }}
+                style={{ padding: '7px 12px', borderRadius: 9, background: 'rgba(239,68,68,0.14)', border: '1px solid rgba(239,68,68,0.30)', color: '#F87171', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <Sparkles size={11} /> Ask Aeva to replan
+              </motion.button>
+              <motion.button whileTap={{ scale: 0.96 }}
+                onClick={() => useRoadmapStore.getState().crunchMode(roadmap.id)}
+                style={{ padding: '7px 12px', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.50)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <RotateCcw size={11} /> Crunch mode
+              </motion.button>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* ── Aeva change log banner ───────────────────────────────────────── */}
       {(() => {
@@ -1046,9 +1091,10 @@ function PathView() {
             const x2 = getX(i + 1), y2 = getY(i + 1)
             const cy = (y1 + y2) / 2
             const d  = `M ${x1} ${y1} C ${x1} ${cy} ${x2} ${cy} ${x2} ${y2}`
-            const done = node.status === 'complete'
-            const pc   = PHASE_CFG[node.phase] || null
-            const lineColor = done ? 'rgba(74,222,128,0.65)' : pc ? `${pc.color}55` : 'rgba(99,102,241,0.35)'
+            const done  = node.status === 'complete'
+            const shaky = done && node.confidence === 'shaky'
+            const pc    = PHASE_CFG[node.phase] || null
+            const lineColor = shaky ? 'rgba(245,158,11,0.65)' : done ? 'rgba(74,222,128,0.65)' : pc ? `${pc.color}55` : 'rgba(99,102,241,0.35)'
             return (
               <g key={i}>
                 <path d={d} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={5} strokeLinecap="round" />
@@ -1084,16 +1130,19 @@ function PathView() {
           const cfg = NODE_CFG[node.type] || NODE_CFG.learn
           const { Icon } = cfg
           const isComplete  = node.status === 'complete'
+          const isShaky     = isComplete && node.confidence === 'shaky'
           const isAvailable = node.status === 'available'
           const isSelected  = selected?.id === node.id
           const isUrgent    = !!node.urgent
           const isInjected  = !!node.injectedByAeva
 
           // 3D gradient + bottom shadow colours
-          const nodeBg     = isComplete ? 'linear-gradient(180deg,#86EFAC 0%,#22C55E 55%,#15803D 100%)'
+          const nodeBg     = isShaky    ? 'linear-gradient(180deg,#FCD34D 0%,#F59E0B 55%,#B45309 100%)'
+            : isComplete   ? 'linear-gradient(180deg,#86EFAC 0%,#22C55E 55%,#15803D 100%)'
             : isAvailable  ? `linear-gradient(180deg,${cfg.light} 0%,${cfg.color} 55%,${cfg.shadow} 100%)`
             :                'linear-gradient(180deg,#4B5563 0%,#374151 55%,#1F2937 100%)'
-          const nodeShadow = isComplete ? '0 7px 0 #166534, 0 14px 28px rgba(34,197,94,0.30)'
+          const nodeShadow = isShaky    ? '0 7px 0 #92400E, 0 14px 28px rgba(245,158,11,0.30)'
+            : isComplete   ? '0 7px 0 #166534, 0 14px 28px rgba(34,197,94,0.30)'
             : isAvailable  ? `0 7px 0 ${cfg.shadow}, 0 14px 28px ${cfg.color}44`
             :                '0 5px 0 #111827'
 
@@ -1125,11 +1174,13 @@ function PathView() {
                   opacity: (!isComplete && !isAvailable) ? 0.55 : 1,
                   transition: 'opacity 0.2s',
                 }}>
-                {isComplete
-                  ? <Check size={22} color="#fff" strokeWidth={3} />
-                  : isAvailable
-                    ? <Icon size={20} color="#fff" strokeWidth={2.2} />
-                    : <Lock size={16} color="rgba(255,255,255,0.55)" strokeWidth={2} />
+                {isShaky
+                  ? <span style={{ fontSize: 18, lineHeight: 1 }}>◐</span>
+                  : isComplete
+                    ? <Check size={22} color="#fff" strokeWidth={3} />
+                    : isAvailable
+                      ? <Icon size={20} color="#fff" strokeWidth={2.2} />
+                      : <Lock size={16} color="rgba(255,255,255,0.55)" strokeWidth={2} />
                 }
               </motion.button>
 
@@ -1149,7 +1200,7 @@ function PathView() {
                 left: '50%', transform: 'translateX(-50%)',
                 whiteSpace: 'nowrap', textAlign: 'center',
                 fontSize: 11.5, fontWeight: isAvailable ? 700 : 500,
-                color: isComplete ? '#4ADE80' : isUrgent ? '#FCD34D' : isAvailable ? '#fff' : 'rgba(255,255,255,0.28)',
+                color: isShaky ? '#FCD34D' : isComplete ? '#4ADE80' : isUrgent ? '#FCD34D' : isAvailable ? '#fff' : 'rgba(255,255,255,0.28)',
                 letterSpacing: isAvailable ? '-0.01em' : 0,
               }}>
                 {node.topic}
@@ -1210,29 +1261,41 @@ function PathView() {
                         )}
                         <div style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 800, color: cfg.color }}>+{node.xp || 50} XP</div>
                       </div>
-                      <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.42)', marginBottom: 14, lineHeight: 1.55 }}>{node.description || 'Click below to begin this step.'}</div>
+                      <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.42)', marginBottom: node.subtopics?.length ? 8 : 14, lineHeight: 1.55 }}>{node.description || 'Click below to begin this step.'}</div>
+
+                      {/* Subtopics list */}
+                      {node.subtopics?.length > 0 && (
+                        <div style={{ marginBottom: 14, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.30)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>Covers</div>
+                          {node.subtopics.map((s, si) => (
+                            <div key={si} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: si < node.subtopics.length - 1 ? 4 : 0 }}>
+                              <span style={{ color: cfg.color, fontSize: 10, marginTop: 3, flexShrink: 0 }}>▸</span>
+                              <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.58)', lineHeight: 1.45 }}>{s}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
 
                       {isStarted ? (
-                        /* Already launched — show Mark Done */
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                          <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                            onClick={() => markDone(node)}
-                            style={{
-                              width: '100%', padding: '10px 0', borderRadius: 10, border: 'none',
-                              background: 'linear-gradient(135deg,#16a34a,#22C55E)',
-                              color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                              fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                            }}>
-                            <Check size={14} strokeWidth={3} /> Mark as Done · +{node.xp || 50} XP
+                        /* Three-way confidence selector */
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <div style={{ fontSize: 10.5, fontWeight: 700, color: 'rgba(255,255,255,0.30)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>How did it go?</div>
+                          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                            onClick={() => markDoneWithConfidence(node, 'solid')}
+                            style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#16a34a,#22C55E)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 7 }}>
+                            <Check size={13} strokeWidth={3} /> Got it — fully understood
+                            <span style={{ marginLeft: 'auto', opacity: 0.8, fontSize: 11 }}>+{node.xp || 50} XP</span>
                           </motion.button>
                           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                            onClick={() => launchNode(node)}
-                            style={{
-                              width: '100%', padding: '8px 0', borderRadius: 10, border: `1px solid ${cfg.color}40`,
-                              background: 'transparent', color: cfg.light, fontSize: 12, fontWeight: 600,
-                              cursor: 'pointer', fontFamily: 'inherit',
-                            }}>
-                            Go again
+                            onClick={() => markDoneWithConfidence(node, 'shaky')}
+                            style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.08)', color: '#FCD34D', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 7 }}>
+                            <span style={{ fontSize: 14 }}>◐</span> Shaky — needs more practice
+                            <span style={{ marginLeft: 'auto', opacity: 0.7, fontSize: 11 }}>+{Math.round((node.xp || 50) * 0.6)} XP</span>
+                          </motion.button>
+                          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                            onClick={() => { setSelected(null); setStartedIds(prev => { const n = new Set(prev); n.delete(node.id); return n }) }}
+                            style={{ width: '100%', padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.09)', background: 'transparent', color: 'rgba(255,255,255,0.38)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <RotateCcw size={11} /> Not done yet — go again
                           </motion.button>
                         </div>
                       ) : node.type === 'mock' && roadmap.readiness < 60 ? (
