@@ -182,27 +182,50 @@ function splitInlineMath(text) {
   return segs
 }
 
-// Render a run of plain text with bold/code markup
+// Render a run of plain text with bold / italic / inline-code markup
 function renderPlain(text) {
   const parts = []
-  const re = /\*\*(.+?)\*\*|`(.+?)`/g
+  // Order matters: **bold** before *italic* so ** isn't consumed as two *
+  const re = /\*\*(.+?)\*\*|\*([^*\n]+?)\*|`([^`\n]+?)`/g
   let last = 0, m, k = 0
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) parts.push(<span key={k++}>{text.slice(last, m.index)}</span>)
-    if (m[1] !== undefined) parts.push(<strong key={k++} style={{ fontWeight: 700, color: 'rgba(255,255,255,0.98)' }}>{m[1]}</strong>)
-    else if (m[2] !== undefined) parts.push(<code key={k++} style={{ fontFamily: 'monospace', fontSize: '0.88em', background: 'rgba(255,255,255,0.11)', borderRadius: 4, padding: '1px 5px', color: '#A5B4FC' }}>{m[2]}</code>)
+    if (m[1] !== undefined)
+      parts.push(<strong key={k++} style={{ fontWeight: 700, color: '#fff' }}>{m[1]}</strong>)
+    else if (m[2] !== undefined)
+      parts.push(<em key={k++} style={{ fontStyle: 'italic', color: 'rgba(255,255,255,0.78)' }}>{m[2]}</em>)
+    else if (m[3] !== undefined)
+      parts.push(
+        <code key={k++} style={{
+          fontFamily: "'Fira Code', 'JetBrains Mono', Consolas, monospace",
+          fontSize: '0.855em', background: 'rgba(99,102,241,0.20)',
+          borderRadius: 5, padding: '2px 7px', color: '#93C5FD',
+          border: '1px solid rgba(99,102,241,0.28)', letterSpacing: 0,
+        }}>{m[3]}</code>
+      )
     last = m.index + m[0].length
   }
   if (last < text.length) parts.push(<span key={k++}>{text.slice(last)}</span>)
   return parts.length ? parts : text
 }
 
-// Render an inline line with math + bold/code
+// Render an inline line with math + bold/italic/code
 function renderInline(text) {
   const segs = splitInlineMath(text)
   return segs.map((seg, i) => {
     if (seg.type === 'inline-math') {
-      return <span key={i} dangerouslySetInnerHTML={{ __html: renderMathSafe(seg.content, false) }} />
+      return (
+        <span key={i}
+          style={{
+            display: 'inline-block', verticalAlign: 'middle',
+            background: 'rgba(139,92,246,0.13)',
+            border: '1px solid rgba(139,92,246,0.28)',
+            borderRadius: 5, padding: '0 5px', margin: '0 2px',
+            color: '#C4B5FD', lineHeight: 1.4,
+          }}
+          dangerouslySetInnerHTML={{ __html: renderMathSafe(seg.content, false) }}
+        />
+      )
     }
     return <span key={i}>{renderPlain(seg.content)}</span>
   })
@@ -292,7 +315,13 @@ function DocMarkdown({ text }) {
     if (chunk.type === 'block-math') {
       elements.push(
         <div key={key++}
-          style={{ margin: '14px 0', padding: '14px 18px', borderRadius: 12, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.20)', textAlign: 'center', overflowX: 'auto' }}
+          style={{
+            margin: '18px 0', padding: '18px 22px', borderRadius: 14,
+            background: 'rgba(99,102,241,0.09)',
+            border: '1px solid rgba(139,92,246,0.30)',
+            borderLeft: '3px solid rgba(139,92,246,0.65)',
+            textAlign: 'center', overflowX: 'auto', fontSize: 16,
+          }}
           dangerouslySetInnerHTML={{ __html: renderMathSafe(chunk.content, true) }}
         />
       )
@@ -362,55 +391,75 @@ function DocMarkdown({ text }) {
 
       // ── Headings ────────────────────────────────────────────
       if (line.startsWith('### ')) {
-        elements.push(<div key={key++} style={{ fontWeight: 700, fontSize: 14.5, marginTop: 18, marginBottom: 4, color: '#C4B5FD', letterSpacing: '-0.01em' }}>{renderInline(line.slice(4))}</div>)
+        elements.push(
+          <div key={key++} style={{ fontWeight: 700, fontSize: 15, marginTop: 20, marginBottom: 5, color: '#C4B5FD', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 3, height: 15, borderRadius: 99, background: 'rgba(139,92,246,0.60)', flexShrink: 0, display: 'inline-block' }} />
+            {renderInline(line.slice(4))}
+          </div>
+        )
         i++; continue
       }
       if (line.startsWith('## ')) {
-        elements.push(<div key={key++} style={{ fontWeight: 800, fontSize: 16.5, marginTop: 22, marginBottom: 6, color: 'rgba(255,255,255,0.96)', letterSpacing: '-0.025em', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 5 }}>{renderInline(line.slice(3))}</div>)
+        elements.push(
+          <div key={key++} style={{ fontWeight: 800, fontSize: 18, marginTop: 26, marginBottom: 8, color: '#fff', letterSpacing: '-0.03em', borderBottom: '1.5px solid rgba(139,92,246,0.25)', paddingBottom: 7 }}>
+            {renderInline(line.slice(3))}
+          </div>
+        )
         i++; continue
       }
       if (line.startsWith('# ')) {
-        elements.push(<div key={key++} style={{ fontWeight: 900, fontSize: 19, marginTop: 24, marginBottom: 7, color: '#fff', letterSpacing: '-0.03em' }}>{renderInline(line.slice(2))}</div>)
+        elements.push(
+          <div key={key++} style={{ fontWeight: 900, fontSize: 22, marginTop: 28, marginBottom: 10, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1.15 }}>
+            {renderInline(line.slice(2))}
+          </div>
+        )
         i++; continue
       }
 
       // ── Bullet list ─────────────────────────────────────────
-      if (line.startsWith('- ') || line.startsWith('• ')) {
+      if (line.startsWith('- ') || line.startsWith('• ') || line.startsWith('* ')) {
+        const content = line.slice(2)
         elements.push(
-          <div key={key++} style={{ display: 'flex', gap: 9, marginTop: 5, alignItems: 'flex-start' }}>
-            <span style={{ color: '#818CF8', flexShrink: 0, marginTop: 6, fontSize: 7 }}>◆</span>
-            <span style={{ lineHeight: 1.68 }}>{renderInline(line.slice(2))}</span>
+          <div key={key++} style={{ display: 'flex', gap: 10, marginTop: 6, alignItems: 'flex-start' }}>
+            <span style={{ color: '#818CF8', flexShrink: 0, marginTop: 7, fontSize: 6, lineHeight: 1 }}>◆</span>
+            <span style={{ lineHeight: 1.72, flex: 1 }}>{renderInline(content)}</span>
           </div>
         )
         i++; continue
       }
 
       // ── Numbered list ───────────────────────────────────────
-      const numMatch = line.match(/^(\d+)\. (.*)/)
+      const numMatch = line.match(/^(\d+)[.)]\s+(.*)/)
       if (numMatch) {
         elements.push(
-          <div key={key++} style={{ display: 'flex', gap: 9, marginTop: 5, alignItems: 'flex-start' }}>
-            <span style={{ color: '#818CF8', flexShrink: 0, minWidth: 20, fontSize: 12.5, fontWeight: 700, marginTop: 1 }}>{numMatch[1]}.</span>
-            <span style={{ lineHeight: 1.68 }}>{renderInline(numMatch[2])}</span>
+          <div key={key++} style={{ display: 'flex', gap: 10, marginTop: 6, alignItems: 'flex-start' }}>
+            <span style={{ color: '#818CF8', flexShrink: 0, minWidth: 22, fontSize: 13, fontWeight: 700, marginTop: 1, textAlign: 'right' }}>{numMatch[1]}.</span>
+            <span style={{ lineHeight: 1.72, flex: 1 }}>{renderInline(numMatch[2])}</span>
           </div>
         )
         i++; continue
       }
 
+      // ── Horizontal rule ─────────────────────────────────────
+      if (/^---+$/.test(line.trim())) {
+        elements.push(<div key={key++} style={{ height: 1, background: 'rgba(255,255,255,0.09)', margin: '14px 0' }} />)
+        i++; continue
+      }
+
       // ── Empty line ──────────────────────────────────────────
       if (!line.trim()) {
-        elements.push(<div key={key++} style={{ height: 9 }} />)
+        elements.push(<div key={key++} style={{ height: 8 }} />)
         i++; continue
       }
 
       // ── Paragraph ───────────────────────────────────────────
-      elements.push(<div key={key++} style={{ marginTop: 3, lineHeight: 1.72 }}>{renderInline(line)}</div>)
+      elements.push(<div key={key++} style={{ marginTop: 5, lineHeight: 1.78 }}>{renderInline(line)}</div>)
       i++
     }
   }
 
   return (
-    <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.88)', fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div style={{ fontSize: 14.5, color: 'rgba(255,255,255,0.88)', fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: '-0.005em' }}>
       {elements}
     </div>
   )
