@@ -18,9 +18,49 @@
     <meta property="og:title" content="Aeva — AI Tutor" />
     <meta property="og:description" content="Your personal AI tutor. Study smarter, remember more." />
     <meta property="og:type" content="website" />
+    <meta property="og:image" content="/icons/icon-512.png" />
+
+    <!-- Prevent flash of white before React boots -->
+    <style>
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; background: #08091a; min-height: 100vh; }
+      #root { min-height: 100vh; }
+      /* Boot splash — removed by JS once React mounts */
+      #boot-splash {
+        position: fixed; inset: 0; background: #08091a;
+        display: flex; align-items: center; justify-content: center;
+        z-index: 9999; transition: opacity 0.35s ease;
+      }
+      #boot-splash.fade { opacity: 0; pointer-events: none; }
+      .boot-orb {
+        width: 64px; height: 64px; border-radius: 50%;
+        background: radial-gradient(circle at 35% 35%, rgba(139,143,255,0.9) 0%, rgba(45,48,142,0.85) 45%, rgba(8,9,26,0.9) 100%);
+        box-shadow: 0 0 40px rgba(139,143,255,0.35), 0 0 80px rgba(45,48,142,0.25);
+        animation: orbPulse 1.6s ease-in-out infinite;
+      }
+      @keyframes orbPulse {
+        0%, 100% { transform: scale(1); opacity: 0.7; }
+        50%       { transform: scale(1.08); opacity: 1; }
+      }
+    </style>
   </head>
   <body>
+    <!-- Boot splash: visible before React hydrates, especially important in PWA mode -->
+    <div id="boot-splash">
+      <div class="boot-orb"></div>
+    </div>
+
     <div id="root"></div>
+
+    <script>
+      // Remove splash once React takes over (fires after first paint)
+      window.__removeSplash = function() {
+        var el = document.getElementById('boot-splash')
+        if (!el) return
+        el.classList.add('fade')
+        setTimeout(function() { el && el.remove() }, 400)
+      }
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

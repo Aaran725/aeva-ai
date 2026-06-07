@@ -19,10 +19,17 @@ class ErrorBoundary extends Component {
   }
 }
 
-createRoot(document.getElementById('root')).render(
+const root = createRoot(document.getElementById('root'))
+root.render(
   <StrictMode>
     <ErrorBoundary>
       <App />
     </ErrorBoundary>
   </StrictMode>,
 )
+
+// Remove the boot splash once React has mounted
+if (typeof window.__removeSplash === 'function') {
+  // Small rAF delay so the first React paint lands before splash disappears
+  requestAnimationFrame(() => requestAnimationFrame(window.__removeSplash))
+}
