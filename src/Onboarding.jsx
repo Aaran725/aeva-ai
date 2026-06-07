@@ -322,78 +322,222 @@ function StepStyle({ name, selected, onSelect, onNext }) {
   )
 }
 
-// ─── Step 3: How it works ────────────────────────────────────────────────────
-const HOW_LOOPS = [
-  {
-    icon: '💬',
-    title: 'Chat',
-    color: '#6366F1',
-    desc: 'Have a real conversation. Aeva asks questions back, catches gaps, and never just dumps information.',
-  },
-  {
-    icon: '⚡',
-    title: 'Lab',
-    color: '#F97316',
-    desc: '7 drill modes — flashcards, Feynman test, speed round, and more. AI-graded. Gets harder as you improve.',
-  },
-  {
-    icon: '🗺️',
-    title: 'Roadmap',
-    color: '#8B5CF6',
-    desc: 'A structured path from today to exam-ready. Aeva updates it based on what you actually understand.',
-  },
+// ─── Step 3: Demo walkthrough ─────────────────────────────────────────────────
+
+function ChatDemo() {
+  const messages = [
+    { role: 'aeva', text: "What part of quadratic equations trips you up most — factoring, or the formula itself?" },
+    { role: 'user', text: "The formula. I always forget it under pressure." },
+    { role: 'aeva', text: "That's the most common gap. Let's fix it right now — not by memorising, but by deriving it once so it actually sticks." },
+  ]
+  const [shown, setShown] = useState(0)
+  useEffect(() => {
+    if (shown >= messages.length) return
+    const t = setTimeout(() => setShown(s => s + 1), shown === 0 ? 400 : 1600)
+    return () => clearTimeout(t)
+  }, [shown])
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 0' }}>
+      {messages.slice(0, shown).map((m, i) => (
+        <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+          style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+          <div style={{
+            maxWidth: '82%', padding: '9px 13px', borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+            background: m.role === 'user' ? 'rgba(99,102,241,0.28)' : 'rgba(255,255,255,0.08)',
+            border: m.role === 'user' ? '1px solid rgba(99,102,241,0.35)' : '1px solid rgba(255,255,255,0.10)',
+            fontSize: 12, color: 'rgba(255,255,255,0.85)', lineHeight: 1.55,
+          }}>
+            {m.role === 'aeva' && <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(167,139,250,0.80)', display: 'block', marginBottom: 3 }}>Aeva</span>}
+            {m.text}
+          </div>
+        </motion.div>
+      ))}
+      {shown < messages.length && (
+        <div style={{ display: 'flex', gap: 4, padding: '6px 2px' }}>
+          {[0,1,2].map(i => (
+            <motion.div key={i} animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+              style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgba(167,139,250,0.60)' }} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LabDemo() {
+  const [flipped, setFlipped] = useState(false)
+  const [answered, setAnswered] = useState(null)
+  useEffect(() => {
+    const t = setTimeout(() => setFlipped(true), 1200)
+    return () => clearTimeout(t)
+  }, [])
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* Mini drill type pills */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {[['⚡','Flashcard','#3B82F6'],['🧪','Feynman','#8B5CF6'],['⏱','Speed Round','#F97316'],['🎯','Mock Test','#06B6D4']].map(([icon, label, col]) => (
+          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 99, background: `rgba(${col === '#3B82F6' ? '59,130,246' : col === '#8B5CF6' ? '139,92,246' : col === '#F97316' ? '249,115,22' : '6,182,212'},0.15)`, border: `1px solid rgba(${col === '#3B82F6' ? '59,130,246' : col === '#8B5CF6' ? '139,92,246' : col === '#F97316' ? '249,115,22' : '6,182,212'},0.30)`, fontSize: 10.5, color: col }}>
+            <span>{icon}</span><span style={{ fontWeight: 600 }}>{label}</span>
+          </div>
+        ))}
+      </div>
+      {/* Flashcard */}
+      <motion.div animate={{ rotateY: flipped ? 180 : 0 }} transition={{ duration: 0.6 }} style={{ perspective: 800 }}>
+        <div style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', minHeight: 72, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+          {!flipped ? (
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.80)', fontWeight: 600 }}>
+              What does the discriminant b²−4ac tell you?
+            </div>
+          ) : (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
+              style={{ fontSize: 12.5, color: 'rgba(167,139,250,0.90)', lineHeight: 1.55 }}>
+              It tells you how many real roots exist: &gt;0 means two roots, =0 means one, &lt;0 means none.
+            </motion.div>
+          )}
+        </div>
+      </motion.div>
+      {flipped && !answered && (
+        <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setAnswered('got')} style={{ flex: 1, padding: '8px', borderRadius: 10, background: 'rgba(74,222,128,0.14)', border: '1px solid rgba(74,222,128,0.35)', color: '#4ADE80', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>✓ Got it</button>
+          <button onClick={() => setAnswered('missed')} style={{ flex: 1, padding: '8px', borderRadius: 10, background: 'rgba(248,113,113,0.14)', border: '1px solid rgba(248,113,113,0.35)', color: '#F87171', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>✗ Missed</button>
+        </motion.div>
+      )}
+      {answered && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          style={{ fontSize: 12, color: answered === 'got' ? '#4ADE80' : '#F87171', textAlign: 'center', fontWeight: 600 }}>
+          {answered === 'got' ? '🔥 Aeva schedules it for review in 3 days' : '📌 Aeva flags it — you\'ll see it again tomorrow'}
+        </motion.div>
+      )}
+    </div>
+  )
+}
+
+function RoadmapDemo() {
+  const nodes = [
+    { label: 'Foundations of Algebra', done: true },
+    { label: 'Quadratic Formula', done: true },
+    { label: 'Discriminant & Roots', active: true },
+    { label: 'Completing the Square', locked: true },
+    { label: 'Mock Exam', locked: true },
+  ]
+  const [lit, setLit] = useState(2)
+  useEffect(() => {
+    const t = setTimeout(() => setLit(3), 1800)
+    return () => clearTimeout(t)
+  }, [])
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {nodes.map((n, i) => (
+        <motion.div key={i}
+          initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 11,
+            background: n.done ? 'rgba(74,222,128,0.07)' : n.active ? 'rgba(139,92,246,0.14)' : 'rgba(255,255,255,0.03)',
+            border: `1px solid ${n.done ? 'rgba(74,222,128,0.25)' : n.active ? 'rgba(139,92,246,0.40)' : 'rgba(255,255,255,0.07)'}`,
+          }}>
+          <div style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11,
+            background: n.done ? 'rgba(74,222,128,0.22)' : n.active ? 'rgba(139,92,246,0.30)' : 'rgba(255,255,255,0.06)',
+            color: n.done ? '#4ADE80' : n.active ? '#A78BFA' : 'rgba(255,255,255,0.25)',
+          }}>
+            {n.done ? '✓' : n.active ? '→' : '○'}
+          </div>
+          <span style={{ fontSize: 12, fontWeight: n.active ? 700 : 500,
+            color: n.done ? 'rgba(255,255,255,0.45)' : n.active ? 'rgba(255,255,255,0.90)' : 'rgba(255,255,255,0.28)',
+          }}>
+            {n.label}
+          </span>
+          {n.active && (
+            <motion.span animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.5, repeat: Infinity }}
+              style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, color: '#A78BFA', background: 'rgba(139,92,246,0.18)', padding: '2px 7px', borderRadius: 99 }}>
+              NOW
+            </motion.span>
+          )}
+        </motion.div>
+      ))}
+    </div>
+  )
+}
+
+const DEMOS = [
+  { id: 'chat',    icon: '💬', label: 'Chat',    color: '#6366F1', rgb: '99,102,241',  tag: 'Understand',  desc: 'Aeva asks questions back and catches gaps in real time.', Component: ChatDemo },
+  { id: 'lab',     icon: '⚡', label: 'Lab',     color: '#F97316', rgb: '249,115,22',  tag: '7 drill modes', desc: 'Flashcards, Feynman test, speed round — AI graded, adaptive.', Component: LabDemo },
+  { id: 'roadmap', icon: '🗺️', label: 'Roadmap', color: '#8B5CF6', rgb: '139,92,246',  tag: 'Track progress', desc: 'A learning path from zero to exam-ready. Aeva updates it as you go.', Component: RoadmapDemo },
 ]
 
 function StepHowItWorks({ onNext }) {
+  const [active, setActive] = useState(0)
+
+  // Auto-cycle every 5s
+  useEffect(() => {
+    const t = setInterval(() => setActive(a => (a + 1) % DEMOS.length), 5000)
+    return () => clearInterval(t)
+  }, [])
+
+  const demo = DEMOS[active]
+
   return (
     <motion.div
       key="how"
       initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
       transition={{ duration: 0.35 }}
-      style={{ display: 'flex', flexDirection: 'column', gap: 20 }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 18 }}
     >
       <div style={{ textAlign: 'center' }}>
-        <p style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.30)', margin: '0 0 14px' }}>
-          Three loops
+        <p style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.30)', margin: '0 0 10px' }}>
+          See how it works
         </p>
-        <h2 style={{ fontSize: 24, fontWeight: 900, color: 'rgba(255,255,255,0.94)', letterSpacing: '-0.04em', margin: '0 0 4px', lineHeight: 1.15 }}>
-          Here's how Aeva works
+        <h2 style={{ fontSize: 23, fontWeight: 900, color: 'rgba(255,255,255,0.94)', letterSpacing: '-0.04em', margin: 0, lineHeight: 1.2 }}>
+          Three tools, one system
         </h2>
-        <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.36)', margin: 0 }}>
-          Use all three together — that's where it clicks.
-        </p>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {HOW_LOOPS.map((loop, i) => (
-          <motion.div
-            key={loop.title}
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 + 0.1, duration: 0.35 }}
-            style={{
-              display: 'flex', alignItems: 'flex-start', gap: 14,
-              padding: '15px 16px', borderRadius: 16,
-              background: `rgba(${loop.color === '#6366F1' ? '99,102,241' : loop.color === '#F97316' ? '249,115,22' : '139,92,246'},0.08)`,
-              border: `1px solid rgba(${loop.color === '#6366F1' ? '99,102,241' : loop.color === '#F97316' ? '249,115,22' : '139,92,246'},0.20)`,
-            }}
-          >
-            <div style={{
-              width: 40, height: 40, borderRadius: 12, flexShrink: 0,
-              background: `rgba(${loop.color === '#6366F1' ? '99,102,241' : loop.color === '#F97316' ? '249,115,22' : '139,92,246'},0.18)`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
+      {/* Tab switcher */}
+      <div style={{ display: 'flex', gap: 6, background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 4 }}>
+        {DEMOS.map((d, i) => (
+          <button key={d.id} onClick={() => setActive(i)}
+            style={{ flex: 1, padding: '8px 4px', borderRadius: 9, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, transition: 'all 0.2s',
+              background: active === i ? `rgba(${d.rgb},0.22)` : 'transparent',
+              color: active === i ? `rgb(${d.rgb})` : 'rgba(255,255,255,0.38)',
+              boxShadow: active === i ? `0 0 0 1px rgba(${d.rgb},0.35)` : 'none',
             }}>
-              {loop.icon}
-            </div>
-            <div>
-              <div style={{ fontSize: 14.5, fontWeight: 800, color: 'rgba(255,255,255,0.90)', marginBottom: 4, letterSpacing: '-0.02em' }}>
-                {loop.title}
-              </div>
-              <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.45)', lineHeight: 1.55 }}>
-                {loop.desc}
-              </div>
-            </div>
+            {d.icon} {d.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Demo area */}
+      <div style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid rgba(${demo.rgb},0.25)`, borderRadius: 18, padding: '16px 16px 14px', minHeight: 180 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div>
+            <span style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.10em', color: `rgba(${demo.rgb},0.80)`, background: `rgba(${demo.rgb},0.14)`, padding: '2px 8px', borderRadius: 99 }}>
+              {demo.tag}
+            </span>
+          </div>
+        </div>
+        <AnimatePresence mode="wait">
+          <motion.div key={active} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }}>
+            <demo.Component />
           </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* Description */}
+      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', textAlign: 'center', lineHeight: 1.6, minHeight: 40 }}>
+        <AnimatePresence mode="wait">
+          <motion.p key={active} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ margin: 0 }}>
+            {demo.desc}
+          </motion.p>
+        </AnimatePresence>
+      </div>
+
+      {/* Progress dots */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 6 }}>
+        {DEMOS.map((_, i) => (
+          <motion.div key={i} onClick={() => setActive(i)}
+            animate={{ width: active === i ? 20 : 6, background: active === i ? `rgb(${demo.rgb})` : 'rgba(255,255,255,0.18)' }}
+            style={{ height: 6, borderRadius: 3, cursor: 'pointer' }} transition={{ duration: 0.3 }} />
         ))}
       </div>
 
@@ -401,15 +545,9 @@ function StepHowItWorks({ onNext }) {
         whileHover={{ scale: 1.02, boxShadow: '0 8px 28px rgba(99,102,241,0.38)' }}
         whileTap={{ scale: 0.97 }}
         onClick={onNext}
-        style={{
-          padding: '14px', borderRadius: 13,
-          background: 'linear-gradient(135deg, #3D40A8, #5558D4)',
-          border: '1px solid rgba(139,143,255,0.40)',
-          color: 'white', fontSize: 15, fontWeight: 700, cursor: 'pointer',
-          fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-        }}
+        style={{ padding: '14px', borderRadius: 13, background: 'linear-gradient(135deg, #3D40A8, #5558D4)', border: '1px solid rgba(139,143,255,0.40)', color: 'white', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
       >
-        Got it <ArrowRight size={16} />
+        Let's go <ArrowRight size={16} />
       </motion.button>
     </motion.div>
   )
