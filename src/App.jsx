@@ -43,6 +43,7 @@ import Mirror from './Mirror'
 import OrbSelector from './OrbSelector'
 import Parents from './ShowEm'
 import AevaDoc from './AevaDoc'
+import WorksheetModal from './WorksheetModal'
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
 import { useMemoryStore } from './memoryStore'
 import './index.css'
@@ -104,7 +105,7 @@ const STATE_CONFIG = {
   DIAGNOSTIC: {
     label: 'Diagnosing',
     color: '#8B8FFF',
-    instruction: 'Find out what the student already knows. Ask one probing question — no teaching yet. Be genuinely curious, not interrogative.',
+    instruction: 'Find out what the student already knows. Ask one probing question — no teaching yet. Be genuinely curious, not interrogative. EXCEPTION: if they open with a specific question or "explain X to me", answer it directly — do not make them prove themselves first.',
   },
   SCAFFOLDING: {
     label: 'Building',
@@ -131,58 +132,6 @@ const MODE_CONFIG = {
 }
 
 /* ─── Student profile (persists across sessions) ─── */
-function loadProfile(userId) {
-  try {
-    return JSON.parse(localStorage.getItem(`aeva_profile_${userId}`) || 'null') || {
-      totalExchanges: 0,
-      topicsExplored: [],
-      strengths: [],
-      weaknesses: [],
-      patterns: [],
-      style: null,
-    }
-  } catch { return { totalExchanges: 0, topicsExplored: [], strengths: [], weaknesses: [], patterns: [], style: null } }
-}
-
-function saveProfile(userId, profile) {
-  try { localStorage.setItem(`aeva_profile_${userId}`, JSON.stringify(profile)) } catch {}
-}
-
-function evolveProfile(profile, criticism, userMessage) {
-  const updated = { ...profile, totalExchanges: profile.totalExchanges + 1 }
-
-  // Track topics
-  if (criticism.topic && criticism.topic !== 'general') {
-    const t = criticism.topic.toLowerCase()
-    if (!updated.topicsExplored.includes(t)) updated.topicsExplored = [...updated.topicsExplored.slice(-9), t]
-  }
-
-  // Track strengths/weaknesses from mastery signals
-  if (criticism.understanding === 'mastery' || criticism.understanding === 'solid') {
-    if (criticism.topic && !updated.strengths.includes(criticism.topic)) {
-      updated.strengths = [...updated.strengths.slice(-4), criticism.topic]
-    }
-  }
-  if (criticism.understanding === 'none' || (criticism.lazy_thinking && criticism.understanding === 'partial')) {
-    if (criticism.topic && !updated.weaknesses.includes(criticism.topic)) {
-      updated.weaknesses = [...updated.weaknesses.slice(-4), criticism.topic]
-    }
-  }
-
-  // Detect response style (brief vs elaborate)
-  if (updated.totalExchanges === 5) {
-    const avgLen = userMessage.length
-    updated.style = avgLen < 40 ? 'concise' : avgLen > 150 ? 'elaborate' : 'balanced'
-  }
-
-  // Track patterns
-  if (criticism.lazy_thinking && !updated.patterns.includes('surface answers')) {
-    updated.patterns = [...updated.patterns.slice(-3), 'tends to give surface answers first']
-  }
-
-  return updated
-}
-
 /* ─── Step A: The Critic ─── */
 const CRITIC_FALLBACK = { understanding: 'partial', lazy_thinking: false, mode: 'coach', topic: 'general', confidence: 'uncertain', note: '' }
 
@@ -279,15 +228,16 @@ ${lp.misconceptions?.length ? `Known misconceptions: ${lp.misconceptions.slice(0
 function buildAevaPrompt(sessionState, criticism, userName, profile, memoryBlock = '', extras = {}, langDirective = '', subject = null) {
   const state = STATE_CONFIG[sessionState] || STATE_CONFIG.DIAGNOSTIC
   const mode = MODE_CONFIG[criticism?.mode] || MODE_CONFIG.coach
-  const { trend, conceptScaffold, difficultyDirective } = extras
+  const { trend, conceptScaffold, difficultyDirective, topicProgress } = extras
 
-  const trendBlock = trend ? `\n\n${trend}` : ''
-  const scaffoldBlock = conceptScaffold ? `\n\n${conceptScaffold}` : ''
-  const diffBlock = difficultyDirective ? `\n\n${difficultyDirective}` : ''
+  const trendBlock        = trend           ? `\n\n${trend}`           : ''
+  const scaffoldBlock     = conceptScaffold ? `\n\n${conceptScaffold}` : ''
+  const diffBlock         = difficultyDirective ? `\n\n${difficultyDirective}` : ''
+  const topicProgressBlock = topicProgress  ? `\n\n${topicProgress}`  : ''
 
   const subjectBlock = subject && SUBJECT_STYLES[subject] ? SUBJECT_STYLES[subject] : ''
 
-  return `${memoryBlock}${trendBlock}${scaffoldBlock}${diffBlock}${subjectBlock}
+  return `${memoryBlock}${trendBlock}${scaffoldBlock}${diffBlock}${topicProgressBlock}${subjectBlock}
 
 You are Aeva — a world-class personal mentor for ${userName}. Think: the most precise professor you never had, minus the ego.
 
@@ -339,50 +289,34 @@ FEEDBACK TAGS — use these when ${userName} attempts an answer or exercise:
 - ALWAYS use a feedback tag when the student has attempted an answer. Never leave them guessing.
 
 DIFFICULTY ADAPTATION:
-- When ${userName} switches to a NEW topic, immediately recalibrate — start at a simpler level and build up. Do not assume they know anything about the new topic just because they mastered the previous one.
-- When they answer 3 questions correctly in a row, explicitly say "You've got this. Let me push you harder." and raise the difficulty immediately.
-- When they struggle 2+ times on the same concept, stop advancing and say "Let me explain this differently." Rebuild from scratch with a different analogy.
-- Match your complexity to their demonstrated understanding — not their assumed level.
+- When ${userName} switches to a NEW topic, immediately recalibrate — start simpler, build up. Don't assume transfer from the previous topic.
+- When they get 2 answers correct in a row on the same concept, advance. Say "You've got that — let's go harder." and raise the difficulty immediately.
+- When they struggle 2+ times on the same concept, stop and say "Let me come at this differently." Rebuild with a new analogy or angle.
+- Match complexity to demonstrated understanding, not assumed level.
 
 SMART TAGS — always include these inline (the UI parses them silently):
 - When introducing a new technical term: \`[TERM: word | one-sentence definition]\`
 - Only 1–3 terms per response max. Don't tag common words.
 
-THE 80/20 RULE:
-- 20% theory. 80% real-world application.
-- Simple question → simple answer. Depth only when warranted.
-
-RESPONSE LENGTH — HARD LIMITS (count your words, cut ruthlessly):
-- Greeting / casual chat: ≤ 40 words
-- Simple factual question: ≤ 80 words
+RESPONSE LENGTH — match to question type, cut ruthlessly:
+- Greeting / casual: ≤ 40 words
+- Simple fact or definition: ≤ 80 words
 - Concept explanation: ≤ 180 words + formula or table if needed
 - Worked example: ≤ 220 words
-- NEVER exceed 250 words of prose. If you need more space, split into two turns.
-If your draft is too long, cut the weakest sentence. Then cut another.
+- Never exceed 250 words of prose. Split into two turns if needed. If you've said it in 40 words, stop at 40.
 
 WORKED EXAMPLE PROTOCOL (maths, science, CS — any procedural skill):
-When teaching a method or technique, follow this exact 3-step pattern:
+When teaching a method, follow this pattern:
 1. Explain the concept in ≤3 sentences
 2. Show a fully worked example with every step labelled (N: format)
-3. End with: "Your turn: [a similar problem, same difficulty, different numbers/context]"
-If ${userName} attempts the practice problem → evaluate their working step by step, not just the answer.
-If they skip it and ask something else → redirect: "Try [the problem] first — then we'll move on."
+3. End with: "Your turn: [similar problem, same difficulty, different numbers]"
+If ${userName} attempts the practice problem → evaluate step by step, not just the answer.
+If they skip it once, you may note it briefly. If they skip it again or clearly want to move on, let it go — follow their lead.
 
-ACTIVE RECALL — NON-NEGOTIABLE:
-Every response that explains a concept MUST end with exactly ONE check question.
-The question must be specific to what you just explained — not generic filler.
-It must require ${userName} to demonstrate understanding, not just recall a word.
-If ${userName} has NOT answered your previous question and sends a new topic instead — pause. Redirect: "Before we move on — [restate the question]." Do not teach new content until they engage with it.
-Exception: greetings, admin questions, or if they explicitly say "skip" or "move on".
-
-RESPONSE CALIBRATION — match length to question complexity:
-- One-word or yes/no question: 1-2 sentences max
-- Definition request: ≤ 50 words
-- "How does X work?": ≤ 120 words + formula/diagram if needed
-- Worked example request: full steps, ≤ 220 words
-- Never pad. If you've said it clearly in 40 words, stop at 40 words.
-
-CONTRADICTION WATCH: Scan the full conversation history above. If ${userName}'s current message contradicts something they said in an earlier message, call it out directly before answering — "Hold on — earlier you said [X], but now you're saying [Y]. Which is it?" Make them resolve the contradiction before you continue.
+ACTIVE RECALL:
+Every response that explains a concept should end with ONE check question — specific, not generic filler.
+If ${userName} skips your question once, redirect ONCE: "Quick answer before we move — [restate]." If they skip again or want to move on, let it go. Never redirect more than once per question. Never hold progress hostage.
+Exception: greetings, casual chat, "skip" or "move on" — answer directly.
 
 SESSION PHASE: ${sessionState} — ${state.instruction}
 
@@ -393,8 +327,9 @@ Note: ${criticism?.note || ''}
 
 YOUR RESPONSE MUST REFLECT THIS SIGNAL. Do not ignore it. If mode is REDIRECT, use an analogy. If CHALLENGE, surface the gap. If HYPE, raise the bar immediately. If COACH, ask one precise Socratic question.${langDirective}
 
-━━━ PLATFORM COMMANDS — YOU OWN THE APP ━━━
-Include ONE ⚡CMD per response max — executes silently, student never sees the tag.
+━━━ PLATFORM COMMANDS — USE SPARINGLY ━━━
+MOST RESPONSES SHOULD HAVE NO CMD. Only fire a ⚡CMD when an explicit trigger condition below is met.
+At most ONE ⚡CMD per response. Executes silently — student never sees the tag.
 
 ⚡CMD:{"type":"open_lab"}
 ⚡CMD:{"type":"add_lab_task","title":"TITLE","description":"DESC"}
@@ -402,15 +337,26 @@ Include ONE ⚡CMD per response max — executes silently, student never sees th
 ⚡CMD:{"type":"lock_arcade","reason":"REASON"}
 ⚡CMD:{"type":"set_mandate","topic":"TOPIC","goal":"GOAL"}
 ⚡CMD:{"type":"intervention","title":"TITLE","message":"MESSAGE","task":"acknowledge|quiz","topic":"TOPIC"}
+⚡CMD:{"type":"award_xp","amount":50,"reason":"one specific reason e.g. first-principles reasoning on Newton's third law"}
+⚡CMD:{"type":"pin_note","title":"SHORT TITLE","content":"KEY FORMULA OR CONCEPT — stays pinned on screen"}
+⚡CMD:{"type":"set_timer","seconds":120,"label":"Challenge label e.g. Solve the circuit"}
+⚡CMD:{"type":"lock_topic","topic":"EXACT TOPIC","reason":"short reason e.g. you keep skipping the hard step","exchanges":5}
 
-When to fire (act without being asked):
-- Student explicitly asks to open the lab → open_lab
-- Game request → open_arcade
-- Avoiding work → lock_arcade
-- Overconfident + clearly wrong → intervention task:"quiz"
-- Not engaged seriously → intervention task:"acknowledge"
-Do NOT proactively assign drills — the system handles drill suggestions automatically in the background.
-Never announce commands beforehand. Describe in past/present tense: "I've opened your Lab", "Opening Arcade."
+TRIGGER CONDITIONS — only fire when one of these is true:
+- Student types "open lab" or "go to lab" → open_lab
+- Student explicitly requests a game or arcade → open_arcade
+- Student is clearly avoiding work → lock_arcade
+- Student is overconfident AND demonstrably wrong → intervention task:"quiz"
+- Student is disengaged for 3+ exchanges → intervention task:"acknowledge"
+- Student gives a genuinely exceptional answer (first-principles, surprising insight, creative connection) → award_xp (amount 40-100)
+- You introduced THE single most critical formula/definition of this ENTIRE topic that they MUST have visible — not for every concept, not for examples, not for reminders. Once per session maximum → pin_note
+- You are explicitly setting a TIMED challenge (you told the student how long they have). Not for regular practice problems → set_timer (30-300 seconds)
+- Student keeps avoiding or skipping a concept they're struggling with → lock_topic (3-8 exchanges)
+DO NOT fire CMDs routinely. pin_note and set_timer in particular should be RARE — most sessions have zero of them.
+Only use LaTeX math ($...$, \[...\]) for actual mathematical or scientific expressions. Never use math delimiters for non-math content.
+Never announce commands. Describe in past tense: "I've pinned that formula", "Timer's running", "I've awarded you 60 XP for that."
+
+WORKSHEET: If ${userName} asks to create a worksheet, say exactly: "Generating your worksheet now — it'll appear in a moment." Then continue the conversation normally. Do NOT try to write the worksheet yourself in chat.
 
 ROADMAP EDITS — when adjusting the roadmap, describe changes clearly in your response using these exact phrases (system detects and applies them automatically):
 - Flag urgent: "I've flagged [EXACT TOPIC NAME] as urgent"
@@ -495,6 +441,24 @@ function buildConceptScaffold(sessionConcepts) {
   if (none.length)     s += `✗ Struggling: ${none.join(', ')}\n`
   s += 'When introducing a new concept, explicitly connect it to what is already understood.'
   return s
+}
+
+/* ─── Topic progression signal ─── */
+// Fires when Aeva has been on the same sub-topic too long or the student has clearly mastered it
+function buildTopicProgressSignal(streak, userName) {
+  if (!streak.topic || streak.topic === 'general') return null
+
+  // 2+ consecutive strong answers on same topic → advance NOW
+  if (streak.strongCount >= 2) {
+    return `⚡ ADVANCE SIGNAL — "${streak.topic}" (${streak.count} exchanges, ${streak.strongCount} strong answers in a row): ${userName} has demonstrated solid understanding of this sub-topic. DO NOT ask another question at the same level on "${streak.topic}". Advance immediately: say "Good — let's push this further." then either (a) introduce a harder application or edge case, or (b) connect to the next concept. Move the difficulty up one level.`
+  }
+
+  // 5+ exchanges on same topic regardless of performance → too long, switch angle
+  if (streak.count >= 5) {
+    return `⚠ TOPIC OVERLOAD — You have been on "${streak.topic}" for ${streak.count} consecutive exchanges. This is too long on one sub-topic. Move on now — go deeper (edge cases, applications, "what breaks this rule?") or pivot to a connected concept. Do NOT ask another question at the same difficulty and angle on "${streak.topic}".`
+  }
+
+  return null
 }
 
 /* ─── Fix 4: Subject detection + style injection ─── */
@@ -723,10 +687,11 @@ Concept tracking: ${conceptList}
 
 Return:
 {
-  "topics": ["list of 2-5 main topics covered this session"],
+  "topics": ["2-5 main topics covered"],
   "mastered": ["concepts where student showed solid or mastery understanding"],
-  "needsWork": ["concepts where student struggled or showed partial/none understanding"],
+  "struggled": ["concepts where student showed partial or no understanding"],
   "keyInsight": "the single most important thing they learned today, in one sentence",
+  "keyMistake": "the most significant misconception or error pattern from this session, in one sentence, or null if none",
   "nextStep": "the most logical next topic or action for their next session, in one sentence"
 }`,
         }],
@@ -742,6 +707,94 @@ Return:
 }
 
 const SESSION_END_PATTERNS = /^(bye|goodbye|thanks?|thank you|done|finished|that'?s? all|gotta go|see you|gtg|cya|i'?m? done|end session|stop|exit|quit|ok thanks|ok thank you|cheers)\b/i
+
+/* ─── Worksheet generation ─── */
+async function generateWorksheet(messages, userName, sessionConcepts) {
+  const recent = messages.slice(-24).map(m =>
+    `${m.role === 'model' ? 'Aeva' : userName}: ${(m.text || '').slice(0, 320)}`
+  ).join('\n')
+
+  const topics = Object.entries(sessionConcepts)
+    .map(([t, u]) => `${t}: ${u}`)
+    .join(', ') || 'general topics'
+
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{
+        role: 'user',
+        content: `You are generating a printable student practice worksheet based on a tutoring session.
+
+Tutoring conversation:
+${recent}
+
+Topics covered and understanding levels: ${topics}
+
+Create a worksheet that DIRECTLY tests what was covered. Match difficulty to what the student demonstrated.
+
+Return ONLY valid JSON:
+{
+  "title": "Short worksheet title e.g. 'Quadratic Equations Practice'",
+  "subject": "Subject area e.g. 'Mathematics'",
+  "topic": "Main topic e.g. 'Quadratic Formula'",
+  "isMath": true,
+  "keyFormulas": [
+    { "name": "Formula name", "formula": "The formula in plain text", "note": "When to use it" }
+  ],
+  "sections": [
+    {
+      "title": "Section label e.g. 'A: Calculations'",
+      "instructions": "Brief instruction sentence for this section",
+      "questions": [
+        { "number": 1, "type": "calculation", "question": "Solve: 3x + 7 = 22", "workingLines": 5, "lines": 1 }
+      ]
+    }
+  ]
+}
+
+Question types — use the right "type" per question:
+- "calculation"  → a specific numeric or algebraic problem the student solves (e.g. "Solve: 2x² - 5x + 3 = 0", "Evaluate: 3/4 + 5/6", "Simplify: (2x³)(4x²)"). MUST have actual numbers/expressions. workingLines = 4-7 (space to show steps). lines = 1 (just the answer line).
+- "fill_blank"   → a statement with a gap: "The gradient of y = 3x + 5 is ___". lines = 1.
+- "true_false"   → a claim that is true or false. lines = 1.
+- "short_answer" → write 2-3 sentences explaining a concept. lines = 3.
+- "explain"      → longer written explanation or proof. lines = 5.
+
+Subject detection rules — set "isMath": true if the subject is mathematics, physics, chemistry, statistics, accounting, or any other quantitative field where numeric calculation is central. Otherwise false.
+
+If isMath is true:
+- Section A must be pure calculation problems — real equations or expressions to evaluate with specific numbers. NO word problems here.
+- Section B can be mixed: some calculations, some fill-in-blank, some true/false about common mistakes.
+- Section C (optional): 1-2 applied word problems (these are fine here).
+- Section D (optional): challenge — harder version of something from A.
+- At least 60% of all questions must be type "calculation" with actual numerics.
+- NEVER write a calculation question as "solve a linear equation" — always give the actual equation: "Solve: 5x - 12 = 3".
+
+If isMath is false:
+- Use short_answer, explain, fill_blank, and true_false. No calculation type.
+
+General rules for all worksheets:
+- keyFormulas: only include if real formulas/equations were covered. Empty array if not.
+- 2-4 sections. 3-5 questions per section. Numbered sequentially across all sections.
+- Questions must test EXACTLY what was discussed — not generic textbook problems.
+- Use plain text for formulas — no LaTeX, no dollar signs.`,
+      }],
+      temperature: 0.3,
+      max_tokens: 2200,
+      response_format: { type: 'json_object' },
+    }),
+  })
+  if (!res.ok) throw new Error('Worksheet generation failed')
+  const data = await res.json()
+  const parsed = JSON.parse(data.choices[0].message.content)
+  // Renumber questions sequentially across sections
+  let qNum = 1
+  for (const section of parsed.sections || []) {
+    for (const q of section.questions || []) { q.number = qNum++ }
+  }
+  return parsed
+}
 
 /* ─── Stream Aeva response ─── */
 async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _attempt = 0) {
@@ -2577,22 +2630,27 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
     if (listItems.length === 0) return
     if (listType === 'ol') {
       elements.push(
-        <div key={`list-${elements.length}`} style={{ margin: '6px 0 6px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <div key={`list-${elements.length}`} style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 7 }}>
           {listItems.map((item, idx) => (
-            <div key={idx} style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
-              <span style={{ color: purple, flexShrink: 0, minWidth: 18, fontSize: 13, fontWeight: 700, lineHeight: 1.7 }}>{idx + 1}.</span>
-              <span style={{ fontSize: 14, color: txtBody, lineHeight: 1.70 }}>{parseInline(item, isLight)}</span>
+            <div key={idx} style={{ display: 'flex', gap: 11, alignItems: 'flex-start' }}>
+              <span style={{
+                color: purple, flexShrink: 0, minWidth: 22, fontSize: 12.5,
+                fontWeight: 800, lineHeight: 1.75,
+                background: isLight ? 'rgba(99,102,241,0.08)' : 'rgba(99,102,241,0.15)',
+                borderRadius: 5, padding: '0 5px', textAlign: 'center',
+              }}>{idx + 1}</span>
+              <span style={{ fontSize: 14.5, color: txtBody, lineHeight: 1.72 }}>{parseInline(item, isLight)}</span>
             </div>
           ))}
         </div>
       )
     } else {
       elements.push(
-        <div key={`list-${elements.length}`} style={{ margin: '6px 0 6px 0', display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <div key={`list-${elements.length}`} style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 7 }}>
           {listItems.map((item, idx) => (
-            <div key={idx} style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
-              <span style={{ color: purple, flexShrink: 0, marginTop: 7, fontSize: 9 }}>●</span>
-              <span style={{ fontSize: 14, color: txtBody, lineHeight: 1.70 }}>{parseInline(item, isLight)}</span>
+            <div key={idx} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <span style={{ color: purple, flexShrink: 0, marginTop: 8, fontSize: 7, opacity: 0.9 }}>◆</span>
+              <span style={{ fontSize: 14.5, color: txtBody, lineHeight: 1.72 }}>{parseInline(item, isLight)}</span>
             </div>
           ))}
         </div>
@@ -2608,7 +2666,7 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
 
     if (trimmed === '') {
       flushList()
-      elements.push(<div key={`gap-${i}`} style={{ height: 6 }} />)
+      elements.push(<div key={`gap-${i}`} style={{ height: 10 }} />)
       i++; continue
     }
 
@@ -2671,11 +2729,18 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
         INCORRECT: { bg: 'rgba(248,113,113,0.10)', border: 'rgba(248,113,113,0.25)', color: '#F87171', icon: '✗', label: 'Not quite' },
       }[type]
       elements.push(
-        <div key={`fb-${i}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '8px 0', padding: '10px 14px', background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 12 }}>
-          <span style={{ fontSize: 15, fontWeight: 800, color: cfg.color, flexShrink: 0, lineHeight: 1.5 }}>{cfg.icon}</span>
+        <div key={`fb-${i}`} style={{
+            display: 'flex', alignItems: 'flex-start', gap: 12,
+            margin: '10px 0', padding: '13px 16px',
+            background: cfg.bg,
+            border: `1px solid ${cfg.border}`,
+            borderLeft: `4px solid ${cfg.color}`,
+            borderRadius: 14,
+          }}>
+          <span style={{ fontSize: 20, fontWeight: 900, color: cfg.color, flexShrink: 0, lineHeight: 1.3, marginTop: 1 }}>{cfg.icon}</span>
           <div>
-            <span style={{ fontSize: 11.5, fontWeight: 800, color: cfg.color, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{cfg.label}</span>
-            {msg && <div style={{ marginTop: 3, fontSize: 13.5, color: isLight ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.82)', lineHeight: 1.6 }}>{parseInline(msg, isLight)}</div>}
+            <div style={{ fontSize: 11, fontWeight: 900, color: cfg.color, letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: msg ? 5 : 0 }}>{cfg.label}</div>
+            {msg && <div style={{ fontSize: 14, color: isLight ? 'rgba(0,0,0,0.80)' : 'rgba(255,255,255,0.88)', lineHeight: 1.65, fontWeight: 500 }}>{parseInline(msg, isLight)}</div>}
           </div>
         </div>
       )
@@ -2702,22 +2767,24 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
       i++; continue
     }
 
-    // H2 ## — white-ish, medium weight
+    // H2 ## — section divider with subtle rule
     if (/^##\s/.test(trimmed)) {
       flushList()
       elements.push(
-        <div key={`h2-${i}`} style={{ fontWeight: 800, fontSize: 15, marginTop: 18, marginBottom: 4, color: isLight ? 'rgba(0,0,0,0.92)' : 'rgba(255,255,255,0.96)', letterSpacing: '-0.02em', lineHeight: 1.3 }}>
-          {parseInline(trimmed.replace(/^##\s/, ''), isLight)}
+        <div key={`h2-${i}`} style={{ marginTop: 22, marginBottom: 8 }}>
+          <div style={{ fontWeight: 800, fontSize: 15.5, color: isLight ? 'rgba(0,0,0,0.93)' : 'rgba(255,255,255,0.97)', letterSpacing: '-0.025em', lineHeight: 1.3, paddingBottom: 7, borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.10)'}` }}>
+            {parseInline(trimmed.replace(/^##\s/, ''), isLight)}
+          </div>
         </div>
       )
       i++; continue
     }
 
-    // H1 # — large and bright
+    // H1 # — large accent heading
     if (/^#\s/.test(trimmed)) {
       flushList()
       elements.push(
-        <div key={`h1-${i}`} style={{ fontWeight: 900, fontSize: 16.5, marginTop: 18, marginBottom: 6, color: isLight ? '#000' : '#fff', letterSpacing: '-0.03em', lineHeight: 1.25 }}>
+        <div key={`h1-${i}`} style={{ fontWeight: 900, fontSize: 17, marginTop: 20, marginBottom: 8, color: isLight ? '#000' : '#fff', letterSpacing: '-0.03em', lineHeight: 1.25 }}>
           {parseInline(trimmed.replace(/^#\s/, ''), isLight)}
         </div>
       )
@@ -2750,26 +2817,26 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
             margin: '10px 0', padding: '12px 16px',
             background: cfg.bg,
             border: `1px solid ${cfg.border}`,
-            borderLeft: `3px solid ${cfg.border}`,
-            borderRadius: '0 12px 12px 0',
+            borderLeft: `4px solid ${cfg.color}`,
+            borderRadius: 14,
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: body ? 5 : 0 }}>
-              <span style={{ fontSize: 11, color: cfg.color }}>{cfg.icon}</span>
-              <span style={{ fontSize: 11, fontWeight: 800, color: cfg.color, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{label}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: body ? 6 : 0 }}>
+              <span style={{ fontSize: 12, color: cfg.color, fontWeight: 700 }}>{cfg.icon}</span>
+              <span style={{ fontSize: 10.5, fontWeight: 900, color: cfg.color, letterSpacing: '0.10em', textTransform: 'uppercase' }}>{label}</span>
             </div>
-            {body && <div style={{ fontSize: 14, lineHeight: 1.70, color: isLight ? 'rgba(0,0,0,0.80)' : 'rgba(255,255,255,0.86)' }}>{parseInline(body, isLight)}</div>}
+            {body && <div style={{ fontSize: 14, lineHeight: 1.72, color: isLight ? 'rgba(0,0,0,0.82)' : 'rgba(255,255,255,0.88)', fontWeight: 400 }}>{parseInline(body, isLight)}</div>}
           </div>
         )
       } else {
         // Plain blockquote — slim left-border insight strip
         elements.push(
           <div key={`bq-${i}`} style={{
-            margin: '8px 0', padding: '10px 14px',
-            borderLeft: `3px solid ${isLight ? 'rgba(99,102,241,0.50)' : 'rgba(129,140,248,0.50)'}`,
+            margin: '8px 0', padding: '10px 16px',
+            borderLeft: `4px solid ${isLight ? 'rgba(99,102,241,0.45)' : 'rgba(129,140,248,0.45)'}`,
             background: isLight ? 'rgba(99,102,241,0.05)' : 'rgba(99,102,241,0.07)',
-            borderRadius: '0 10px 10px 0',
-            fontSize: 14, lineHeight: 1.68, fontStyle: 'italic',
-            color: isLight ? 'rgba(0,0,0,0.80)' : 'rgba(220,220,255,0.90)',
+            borderRadius: 12,
+            fontSize: 14, lineHeight: 1.70, fontStyle: 'italic',
+            color: isLight ? 'rgba(0,0,0,0.78)' : 'rgba(220,220,255,0.88)',
           }}>
             {parseInline(content, isLight)}
           </div>
@@ -2786,20 +2853,41 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
       i++
       while (i < lines.length && !/^```/.test(lines[i].trim())) { codeLines.push(lines[i]); i++ }
       i++
-      elements.push(
-        <div key={`code-${elements.length}`} style={{
-          margin: '10px 0', borderRadius: 10, overflow: 'hidden',
-          background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(0,0,0,0.35)',
-          border: isLight ? '1px solid rgba(0,0,0,0.10)' : '1px solid rgba(255,255,255,0.10)',
-        }}>
-          {lang && (
-            <div style={{ padding: '5px 12px', background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)', fontSize: 10.5, color: isLight ? 'rgba(0,0,0,0.38)' : 'rgba(255,255,255,0.35)', fontFamily: 'monospace', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{lang}</div>
-          )}
-          <pre style={{ margin: 0, padding: '12px 14px', fontFamily: '"JetBrains Mono", "Fira Code", monospace', fontSize: 13, color: isLight ? '#1D4ED8' : '#93C5FD', lineHeight: 1.65, overflowX: 'auto', whiteSpace: 'pre' }}>
-            {codeLines.join('\n')}
-          </pre>
-        </div>
-      )
+      {(() => {
+        const codeStr = codeLines.join('\n')
+        let copied = false
+        const codeKey = `code-${elements.length}`
+        elements.push(
+          <div key={codeKey} style={{
+            margin: '12px 0', borderRadius: 14, overflow: 'hidden',
+            background: isLight ? 'rgba(0,0,0,0.055)' : 'rgba(0,0,0,0.42)',
+            border: isLight ? '1px solid rgba(0,0,0,0.10)' : '1px solid rgba(255,255,255,0.09)',
+          }}>
+            <div style={{
+              padding: '7px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)',
+              borderBottom: isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.07)',
+            }}>
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: isLight ? 'rgba(0,0,0,0.40)' : 'rgba(255,255,255,0.35)', fontFamily: 'monospace', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                {lang || 'code'}
+              </span>
+              <button
+                onClick={() => { navigator.clipboard?.writeText(codeStr) }}
+                style={{
+                  fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em',
+                  color: isLight ? 'rgba(0,0,0,0.38)' : 'rgba(255,255,255,0.35)',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontFamily: "'Inter', system-ui, sans-serif",
+                  padding: '2px 6px', borderRadius: 6,
+                }}
+              >Copy</button>
+            </div>
+            <pre style={{ margin: 0, padding: '14px 16px', fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace', fontSize: 13, color: isLight ? '#1D4ED8' : '#93C5FD', lineHeight: 1.70, overflowX: 'auto', whiteSpace: 'pre' }}>
+              {codeStr}
+            </pre>
+          </div>
+        )
+      })()}
       continue
     }
 
@@ -2808,11 +2896,19 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
     if (stepMatch && trimmed.replace(/\*\*/g, '').length < 100) {
       flushList()
       elements.push(
-        <div key={`step-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 22, marginBottom: 6 }}>
-          <div style={{ flexShrink: 0, width: 26, height: 26, borderRadius: 8, background: isLight ? 'rgba(99,102,241,0.20)' : 'rgba(99,102,241,0.28)', border: isLight ? '1px solid rgba(99,102,241,0.35)' : '1px solid rgba(99,102,241,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: isLight ? '#5B5BD6' : '#A5B4FC' }}>
+        <div key={`step-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 13, marginTop: 24, marginBottom: 8 }}>
+          <div style={{
+            flexShrink: 0, width: 30, height: 30, borderRadius: 10,
+            background: isLight ? 'linear-gradient(135deg,rgba(99,102,241,0.25),rgba(79,70,229,0.18))' : 'linear-gradient(135deg,rgba(99,102,241,0.40),rgba(79,70,229,0.28))',
+            border: isLight ? '1px solid rgba(99,102,241,0.40)' : '1px solid rgba(139,143,255,0.50)',
+            boxShadow: isLight ? 'none' : '0 2px 8px rgba(99,102,241,0.25)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 13, fontWeight: 900, color: isLight ? '#4338CA' : '#C4B5FD',
+            letterSpacing: '-0.02em',
+          }}>
             {stepMatch[1]}
           </div>
-          <span style={{ fontWeight: 700, fontSize: 15, color: isLight ? 'rgba(0,0,0,0.92)' : 'rgba(255,255,255,0.96)', lineHeight: 1.3, letterSpacing: '-0.01em' }}>
+          <span style={{ fontWeight: 700, fontSize: 15, color: isLight ? 'rgba(0,0,0,0.92)' : 'rgba(255,255,255,0.97)', lineHeight: 1.3, letterSpacing: '-0.015em' }}>
             {parseInline(stepMatch[2], isLight)}
           </span>
         </div>
@@ -2841,8 +2937,18 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
     if (standaloneBoldMatch) {
       flushList()
       elements.push(
-        <div key={`sh-${i}`} style={{ fontWeight: 800, fontSize: 15, marginTop: 18, marginBottom: 4, color: isLight ? 'rgba(0,0,0,0.92)' : 'rgba(255,255,255,0.96)', letterSpacing: '-0.02em', lineHeight: 1.3 }}>
-          {standaloneBoldMatch[1]}
+        <div key={`sh-${i}`} style={{ marginTop: 22, marginBottom: 6 }}>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            paddingBottom: 6,
+            borderBottom: `2px solid ${isLight ? 'rgba(99,102,241,0.22)' : 'rgba(139,143,255,0.22)'}`,
+            width: '100%',
+          }}>
+            <div style={{ width: 4, height: 16, borderRadius: 2, background: isLight ? '#6366F1' : '#818CF8', flexShrink: 0 }} />
+            <span style={{ fontWeight: 800, fontSize: 15.5, color: isLight ? 'rgba(0,0,0,0.93)' : 'rgba(255,255,255,0.97)', letterSpacing: '-0.025em', lineHeight: 1.3 }}>
+              {standaloneBoldMatch[1]}
+            </span>
+          </div>
         </div>
       )
       i++; continue
@@ -2855,14 +2961,17 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
       flushList()
       elements.push(
         <div key={`qi-${i}`} style={{
-          marginTop: 10, padding: '9px 13px',
-          borderLeft: isLight ? '2px solid rgba(234,179,8,0.55)' : '2px solid rgba(251,191,36,0.40)',
-          background: isLight ? 'rgba(234,179,8,0.05)' : 'rgba(251,191,36,0.05)',
-          borderRadius: '0 8px 8px 0',
-          fontSize: 14, color: isLight ? 'rgba(0,0,0,0.70)' : 'rgba(255,255,255,0.72)',
-          fontStyle: 'italic', lineHeight: 1.65,
+          marginTop: 14, padding: '11px 15px',
+          background: isLight ? 'rgba(234,179,8,0.06)' : 'rgba(251,191,36,0.07)',
+          border: isLight ? '1px solid rgba(234,179,8,0.28)' : '1px solid rgba(251,191,36,0.22)',
+          borderLeft: isLight ? '4px solid rgba(234,179,8,0.60)' : '4px solid rgba(251,191,36,0.55)',
+          borderRadius: 12,
+          display: 'flex', alignItems: 'flex-start', gap: 9,
         }}>
-          {parseInline(trimmed.slice(1, -1), isLight)}
+          <span style={{ fontSize: 13, color: isLight ? 'rgba(180,130,0,0.80)' : 'rgba(251,191,36,0.70)', flexShrink: 0, marginTop: 1 }}>?</span>
+          <span style={{ fontSize: 14.5, color: isLight ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.80)', fontStyle: 'italic', lineHeight: 1.65, fontWeight: 450 }}>
+            {parseInline(trimmed.slice(1, -1), isLight)}
+          </span>
         </div>
       )
       i++; continue
@@ -2901,7 +3010,7 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
     // Default paragraph
     flushList()
     elements.push(
-      <div key={`p-${i}`} style={{ marginTop: 2, fontSize: 14, color: txtP, lineHeight: 1.72 }}>
+      <div key={`p-${i}`} style={{ marginTop: 4, fontSize: 14.5, color: txtP, lineHeight: 1.75 }}>
         {parseInline(trimmed, isLight)}
       </div>
     )
@@ -2911,7 +3020,7 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
   flushList()
 
   return (
-    <div style={{ minWidth: 0, fontSize: 14, lineHeight: 1.72, color: txtBody, fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div style={{ minWidth: 0, fontSize: 14.5, lineHeight: 1.75, color: txtBody, fontFamily: "'Inter', system-ui, sans-serif" }}>
       {elements}
       {streaming && (
         <motion.span
@@ -3541,6 +3650,9 @@ function ChatView({ onBack }) {
   const [drillOpen, setDrillOpen] = useState(false)
   const [sessionSummary, setSessionSummary] = useState(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
+  const [worksheet, setWorksheet] = useState(null)
+  const [worksheetLoading, setWorksheetLoading] = useState(false)
+  const [worksheetOpen, setWorksheetOpen] = useState(false)
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [socraticActive, setSocraticActive] = useState(false)
   const socraticExchangeRef = useRef(0)
@@ -3564,6 +3676,13 @@ function ChatView({ onBack }) {
   const phaseStreakRef = useRef(0)         // consecutive solid/mastery answers in current phase
   const sessionSubjectRef = useRef(null)  // Fix 3: persisted subject for this session
   const lastCanvasExchangeRef = useRef(-99) // Fix 6: canvas cooldown tracker
+  const topicStreakRef = useRef({ topic: null, count: 0, strongCount: 0 }) // per-topic progression tracker
+
+  // ── Aeva Power CMDs state ──────────────────────────────────────────────────
+  const [pinnedNote, setPinnedNote] = useState(null)   // { title, content } | null
+  const [challengeTimer, setChallengeTimer] = useState(null)  // { label, total, remaining } | null
+  const [topicLock, setTopicLock] = useState(null)    // { topic, reason, until } | null — until = exchange count
+  const challengeTimerRef = useRef(null)
 
   const hasInput = input.trim().length > 0
   const isActive = isThinking || hasInput
@@ -3672,6 +3791,29 @@ function ChatView({ onBack }) {
     setTimeout(() => sendWithText(text), 120)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingChatPrompt])
+
+  // ── Challenge timer countdown ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!challengeTimer) {
+      if (challengeTimerRef.current) { clearInterval(challengeTimerRef.current); challengeTimerRef.current = null }
+      return
+    }
+    if (challengeTimerRef.current) clearInterval(challengeTimerRef.current)
+    challengeTimerRef.current = setInterval(() => {
+      setChallengeTimer(prev => {
+        if (!prev) return null
+        if (prev.remaining <= 1) {
+          clearInterval(challengeTimerRef.current)
+          challengeTimerRef.current = null
+          // Timer ran out — inject a message
+          setMessages(m => [...m, { role: 'model', text: `⏱ Time's up. Let's see where you got to.`, streaming: false }])
+          return null
+        }
+        return { ...prev, remaining: prev.remaining - 1 }
+      })
+    }, 1000)
+    return () => { if (challengeTimerRef.current) clearInterval(challengeTimerRef.current) }
+  }, [challengeTimer?.label]) // re-run only when a new timer is set, not on every tick
 
   const toggleSocratic = () => {
     setSocraticActive(prev => {
@@ -3814,8 +3956,8 @@ function ChatView({ onBack }) {
     if (!userText || isThinking) return
     if (!overrideText) setInput('')
 
-    // Fix 7: Detect session end — generate summary card
-    if (!isMission && SESSION_END_PATTERNS.test(userText.trim()) && messages.length >= 4) {
+    // Fix 7: Detect session end — generate summary card (min 12 messages = ~6 real exchanges)
+    if (!isMission && SESSION_END_PATTERNS.test(userText.trim()) && messages.length >= 12) {
       setSummaryLoading(true)
       generateSessionSummary(messages, name, sessionConceptsRef.current).then(summary => {
         setSummaryLoading(false)
@@ -3823,6 +3965,14 @@ function ChatView({ onBack }) {
       })
     }
     sendTimeRef.current = Date.now()
+
+    // ── Worksheet trigger ────────────────────────────────────────────────────
+    if (!isMission && /\b(create|make|generate|give me|build|prepare|write)\s+(a\s+|me\s+a\s+)?worksheet\b|^worksheet\b|\bworksheet\s*please\b/i.test(userText.trim())) {
+      setWorksheetLoading(true)
+      generateWorksheet(messages, name, sessionConceptsRef.current)
+        .then(ws => { setWorksheetLoading(false); if (ws) { setWorksheet(ws); setWorksheetOpen(true) } })
+        .catch(() => setWorksheetLoading(false))
+    }
 
     // Clear countdown on send
     if (countdownRef.current) {
@@ -3876,16 +4026,19 @@ function ChatView({ onBack }) {
         systemPrompt = activeMission.systemPrompt + memoryStr + buildMemoryBlock(name)
       } else {
         // Standard tutor mode
-        criticResult = await runCritic(messages, userText)
+        // Gate: skip critic for casual/short messages — saves ~40% of API calls
+        const isCasualMessage = userText.length < 18
+          || /^(ok|okay|yes|no|sure|fine|got it|thanks?|thank you|bye|goodbye|hi|hey|hello|cool|nice|great|lol|haha|lmao|yep|nope|wow|what|really|hm+|ah+|oh+|alright|sounds good|makes sense|i see|got it|interesting|go on|continue|and\??|also\??|next\??)\b[.!?]?\s*$/i.test(userText.trim())
+        criticResult = isCasualMessage ? CRITIC_FALLBACK : await runCritic(messages, userText)
         setCriticism(criticResult)
         updateMastery(criticResult)
         exchangeCountRef.current += 1
         advanceSessionState(exchangeCountRef.current, criticResult)
 
-        // Background summarisation: first save at exchange 2 (captures short sessions),
+        // Background summarisation: first save at exchange 6 (enough context to be useful),
         // then every 6 thereafter. Non-blocking, silent.
         const ec = exchangeCountRef.current
-        if ((ec === 2 || (ec > 2 && ec % 6 === 0)) && messages.length >= 3) {
+        if ((ec === 6 || (ec > 6 && ec % 6 === 0)) && messages.length >= 10) {
           summariseSessionBackground(
             messages, name,
             Object.keys(sessionConceptsRef.current).slice(0, 6),
@@ -3920,11 +4073,25 @@ function ChatView({ onBack }) {
         }
         lastTopicRef.current = newTopic
 
+        // ── Per-topic streak tracking ──────────────────────────────────────
+        const isStrong = criticResult?.understanding === 'solid' || criticResult?.understanding === 'mastery'
+        const streak = topicStreakRef.current
+        if (newTopic && newTopic === streak.topic) {
+          topicStreakRef.current = {
+            topic: newTopic,
+            count: streak.count + 1,
+            strongCount: isStrong ? streak.strongCount + 1 : 0, // reset streak on weak answer
+          }
+        } else if (newTopic) {
+          topicStreakRef.current = { topic: newTopic, count: 1, strongCount: isStrong ? 1 : 0 }
+        }
+
         // Build live adaptation extras
         const extras = {
           trend: computeTrend(recentCriticRef.current),
           conceptScaffold: buildConceptScaffold(sessionConceptsRef.current),
           difficultyDirective: buildDifficultyDirective({ frustrationScore, avgResponseLength, totalExchanges, depth }),
+          topicProgress: buildTopicProgressSignal(topicStreakRef.current, name),
         }
 
         // Orb personality — style modifier only, does NOT override teaching rules
@@ -3945,13 +4112,13 @@ function ChatView({ onBack }) {
         if (userAnsweredQuestion && criticResult && !socraticActive) {
           const understanding = criticResult.understanding
           const tagMap = {
-            mastery: `[CORRECT: {one specific sentence praising exactly what ${name} got right}]`,
-            solid:   `[CORRECT: {one specific sentence praising exactly what ${name} got right}]`,
-            partial: `[PARTIAL: {one sentence — what was right, then what was missing or wrong}]`,
-            none:    `[INCORRECT: {one sentence — the specific misconception or gap, not just "that's wrong"}]`,
+            mastery: `[CORRECT: write one specific sentence naming exactly what ${name} got right and why it's correct]`,
+            solid:   `[CORRECT: write one specific sentence naming exactly what ${name} got right and why it's correct]`,
+            partial: `[PARTIAL: write one sentence — state what was right first, then what was missing or wrong]`,
+            none:    `[INCORRECT: write one sentence — name the specific misconception or gap, not just "that's wrong"]`,
           }
           const tag = tagMap[understanding] || tagMap.partial
-          feedbackPrefix = `🚨 FEEDBACK REQUIRED: ${name} just answered your question. The critic assessment is: ${understanding.toUpperCase()}.\nYou MUST begin your response with exactly this tag (fill in the curly braces): ${tag}\nDo NOT skip this. Do NOT start with anything else. The tag renders as a visual banner — it is the most important part of your response.\n\n`
+          feedbackPrefix = `🚨 FEEDBACK REQUIRED: ${name} just answered your question. The critic assessment is: ${understanding.toUpperCase()}.\nYou MUST begin your response with exactly this feedback tag: ${tag}\nReplace the instruction inside the brackets with the actual feedback text. Do NOT keep the instruction text. Do NOT skip this tag. Do NOT start with anything else.\n\n`
         }
 
         const recallBlock = buildRecallBlock(name)
@@ -3965,6 +4132,13 @@ function ChatView({ onBack }) {
 
         if (socraticActive) {
           systemPrompt += '\n\nSOCRATIC MODE: You must NEVER state facts, answers, or explanations directly. Respond ONLY with 1-3 targeted questions that guide the student to discover the answer themselves. If they arrive at the correct answer, confirm warmly and deepen with another question. If wrong, ask a question that exposes the specific gap without revealing the answer. Never say "the answer is", never explain anything outright. Make them think every time.'
+        }
+
+        // ── Topic Lock — Aeva enforces focus on one topic ──────────────────
+        if (topicLock && exchangeCountRef.current < topicLock.until) {
+          systemPrompt += `\n\n🔒 TOPIC LOCK ACTIVE: ${name} is locked to "${topicLock.topic}" until they demonstrate solid understanding. If their message is off-topic, do NOT answer the new topic. Instead say: "We're staying on ${topicLock.topic} until you've got it — ${topicLock.reason} Answer my last question first." Only unlock when they show solid or mastery understanding of "${topicLock.topic}".`
+        } else if (topicLock && exchangeCountRef.current >= topicLock.until) {
+          setTopicLock(null)  // auto-expire lock after N exchanges
         }
       }
 
@@ -4098,8 +4272,16 @@ function ChatView({ onBack }) {
             let label = ''
 
             if (action.type === 'open_lab') {
-              openLab()
-              label = 'Opened Lab'
+              // Show a suggestion toast — never auto-navigate. Student decides.
+              const order = addOrder({
+                topic: 'Lab',
+                drillType: 'flashcard',
+                reason: 'Aeva suggests opening the Lab for this topic.',
+                urgency: 'low',
+                isLabSuggestion: true,
+              })
+              if (order) setOrderToast(order)
+              label = 'Lab suggested'
             } else if (action.type === 'open_lab_drill') {
               const validDrills = ['flashcard', 'speedround', 'mocktest', 'feynman', 'match', 'cloze', 'shortanswer']
               const drillType = validDrills.includes(action.drillType) ? action.drillType : 'flashcard'
@@ -4132,6 +4314,34 @@ function ChatView({ onBack }) {
                 action.topic || '',
               )
               label = `Intervention triggered`
+
+            // ── NEW POWER CMDs ────────────────────────────────────────────
+            } else if (action.type === 'award_xp') {
+              const amt = Math.min(200, Math.max(10, Math.round(action.amount || 50)))
+              const reason = (action.reason || 'Aeva Bonus').slice(0, 48)
+              useXPStore.getState().addDirectXP(amt, reason)
+              label = `+${amt} XP — ${reason}`
+
+            } else if (action.type === 'pin_note') {
+              const title   = (action.title   || 'Key Concept').slice(0, 60)
+              const content = (action.content || '').slice(0, 400)
+              if (content) {
+                setPinnedNote({ title, content, id: Date.now() })
+                label = `Pinned: ${title}`
+              }
+
+            } else if (action.type === 'set_timer') {
+              const secs  = Math.min(600, Math.max(15, Math.round(action.seconds || 120)))
+              const lbl   = (action.label || 'Challenge').slice(0, 40)
+              setChallengeTimer({ label: lbl, total: secs, remaining: secs })
+              label = `Timer: ${lbl} · ${secs}s`
+
+            } else if (action.type === 'lock_topic') {
+              const topic  = (action.topic  || criticResult?.topic || 'current topic').slice(0, 60)
+              const reason = (action.reason || "you're still building this").slice(0, 120)
+              const lockFor = Math.min(10, Math.max(3, Math.round(action.exchanges || 5)))
+              setTopicLock({ topic, reason, until: exchangeCountRef.current + lockFor })
+              label = `Topic locked: ${topic}`
             }
 
             if (label) {
@@ -4151,7 +4361,8 @@ function ChatView({ onBack }) {
         // After main response: if Aeva mentioned roadmap changes, fire a
         // fast structured extraction call to apply them reliably.
         const activeRmForExtraction = useRoadmapStore.getState().getActive()
-        const roadmapChangeKeywords = /\b(flagged?|urgent|skipp?e?d?|remov(ed)?|delet(ed)?|added?|inject(ed)?|prioriti(s|z)(ed)?|crunch|moved?|cut|trimm?e?d?|reduc(ed)?|restructur(ed)?|adjust(ed)?|updat(ed)? (your )?roadmap)\b/i
+        // Only trigger when Aeva used the exact prescribed roadmap-edit phrases
+        const roadmapChangeKeywords = /I've\s+(added?\s+a\s+(learn|drill|check)\s+node|removed?\s+.{1,60}\s+from\s+your\s+roadmap|flagged?\s+.{1,60}\s+as\s+urgent|moved?\s+.{1,60}\s+to\s+the\s+top|activated\s+crunch\s+mode)/i
         if (!isMission && activeRmForExtraction && roadmapChangeKeywords.test(rawResponse)) {
           setIsExtractingRoadmap(true)
           try {
@@ -4240,6 +4451,11 @@ If no clear changes: {"changes":[]}`
                       changes.push({ icon: '⏭', text: `Removed: ${node.topic}${act.reason ? ` — ${act.reason}` : ''}` })
                     }
                   } else if (act.type === 'inject') {
+                    // Guard: topic must share keywords with the roadmap subject
+                    const rmWords = (activeRm.title || '').toLowerCase().split(/\W+/).filter(w => w.length > 3)
+                    const injectLower = (act.topic || '').toLowerCase()
+                    const isRelevant = rmWords.length === 0 || rmWords.some(w => injectLower.includes(w) || w.includes(injectLower.slice(0, 5)))
+                    if (!isRelevant) break
                     const nt = act.nodeType || 'learn'
                     const available = activeRm.nodes?.find(n => n.status === 'available')
                     store.injectNode(activeRm.id, {
@@ -4921,10 +5137,137 @@ If no clear changes: {"changes":[]}`
               style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', justifyContent: isEmpty ? 'flex-end' : 'flex-start' }}
             >
               <div style={{ width: '100%', maxWidth: isMission ? 720 : 640, margin: '0 auto' }}>
+
+                {/* ── Pinned Note Card ──────────────────────────────────── */}
+                {pinnedNote && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+                    style={{
+                      marginBottom: 14, borderRadius: 14,
+                      background: 'linear-gradient(135deg, rgba(251,191,36,0.08), rgba(245,158,11,0.05))',
+                      border: '1px solid rgba(251,191,36,0.28)',
+                      padding: '12px 16px',
+                      position: 'relative',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
+                      <span style={{ fontSize: 12 }}>📌</span>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: '#FCD34D', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{pinnedNote.title}</span>
+                      <motion.button whileTap={{ scale: 0.9 }} onClick={() => setPinnedNote(null)}
+                        style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.28)', fontSize: 14, lineHeight: 1, padding: 2 }}>×</motion.button>
+                    </div>
+                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.70)', lineHeight: 1.6, whiteSpace: 'pre-wrap', fontFamily: "'Inter', system-ui, sans-serif" }}>
+                      {pinnedNote.content}
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* ── Challenge Timer ───────────────────────────────────── */}
+                {challengeTimer && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }}
+                    style={{
+                      marginBottom: 14, borderRadius: 14,
+                      background: challengeTimer.remaining < 30
+                        ? 'linear-gradient(135deg, rgba(239,68,68,0.12), rgba(220,38,38,0.06))'
+                        : 'linear-gradient(135deg, rgba(99,102,241,0.10), rgba(79,70,229,0.05))',
+                      border: `1px solid ${challengeTimer.remaining < 30 ? 'rgba(239,68,68,0.35)' : 'rgba(99,102,241,0.30)'}`,
+                      padding: '10px 16px',
+                      display: 'flex', alignItems: 'center', gap: 12,
+                    }}
+                  >
+                    <motion.div
+                      animate={challengeTimer.remaining < 30 ? { opacity: [0.6, 1, 0.6] } : {}}
+                      transition={{ duration: 0.8, repeat: Infinity }}
+                      style={{ fontSize: 16 }}>⏱</motion.div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: challengeTimer.remaining < 30 ? '#F87171' : '#A5B4FC', marginBottom: 2 }}>{challengeTimer.label}</div>
+                      <div style={{ height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                        <motion.div
+                          animate={{ width: `${(challengeTimer.remaining / challengeTimer.total) * 100}%` }}
+                          transition={{ duration: 0.9, ease: 'linear' }}
+                          style={{ height: '100%', borderRadius: 99, background: challengeTimer.remaining < 30 ? '#EF4444' : '#6366F1' }}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 22, fontWeight: 900, color: challengeTimer.remaining < 30 ? '#F87171' : '#fff', letterSpacing: '-0.04em', minWidth: 44, textAlign: 'right' }}>
+                      {Math.floor(challengeTimer.remaining / 60)}:{String(challengeTimer.remaining % 60).padStart(2, '0')}
+                    </div>
+                    <motion.button whileTap={{ scale: 0.9 }} onClick={() => setChallengeTimer(null)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.25)', fontSize: 14, padding: 2 }}>×</motion.button>
+                  </motion.div>
+                )}
+
+                {/* ── Topic Lock Banner ─────────────────────────────────── */}
+                {topicLock && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+                    style={{
+                      marginBottom: 14, borderRadius: 14,
+                      background: 'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(109,40,217,0.05))',
+                      border: '1px solid rgba(139,92,246,0.28)',
+                      padding: '9px 14px',
+                      display: 'flex', alignItems: 'center', gap: 10,
+                    }}
+                  >
+                    <span style={{ fontSize: 13 }}>🔒</span>
+                    <div style={{ flex: 1, fontSize: 12, color: 'rgba(196,181,253,0.85)', fontWeight: 600 }}>
+                      Locked to: <span style={{ color: '#C4B5FD', fontWeight: 800 }}>{topicLock.topic}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.35)', fontWeight: 400 }}> — {topicLock.reason}</span>
+                    </div>
+                    <motion.button whileTap={{ scale: 0.9 }} onClick={() => setTopicLock(null)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.25)', fontSize: 14, padding: 2 }}>×</motion.button>
+                  </motion.div>
+                )}
+
                 {messages.map((msg, i) =>
                   isMission
                     ? <ThemedChatBubble key={i} msg={msg} mission={activeMission} />
                     : <ChatBubble key={i} msg={msg} deepDiveCards={deepDiveMap[i] || []} onDismissCard={(cardId) => setDeepDiveMap(prev => ({ ...prev, [i]: (prev[i] || []).filter(c => c.id !== cardId) }))} isLight={isLight} />
+                )}
+
+                {/* Worksheet generating indicator */}
+                {worksheetLoading && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                    style={{ display: 'flex', justifyContent: 'center', padding: '12px 0' }}>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '11px 18px',
+                      borderRadius: 14, background: 'rgba(79,70,229,0.10)',
+                      border: '1px solid rgba(99,102,241,0.28)',
+                      fontFamily: "'Inter', system-ui, sans-serif",
+                    }}>
+                      <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}
+                        style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(99,102,241,0.25)', borderTopColor: '#818CF8' }} />
+                      <span style={{ fontSize: 13, color: 'rgba(165,180,252,0.90)', fontWeight: 600 }}>Building your worksheet…</span>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Worksheet ready button */}
+                {worksheet && !worksheetLoading && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                    style={{ display: 'flex', justifyContent: 'center', padding: '8px 0' }}>
+                    <motion.button
+                      whileHover={{ scale: 1.04, boxShadow: '0 8px 32px rgba(99,102,241,0.35)' }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => setWorksheetOpen(true)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 9, padding: '11px 20px',
+                        borderRadius: 14, cursor: 'pointer',
+                        background: 'linear-gradient(135deg,rgba(79,70,229,0.22),rgba(124,58,237,0.16))',
+                        border: '1px solid rgba(99,102,241,0.45)',
+                        fontFamily: 'inherit',
+                        boxShadow: '0 4px 20px rgba(99,102,241,0.20)',
+                      }}>
+                      <span style={{ fontSize: 16 }}>📄</span>
+                      <div style={{ textAlign: 'left' }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#A5B4FC' }}>{worksheet.title}</div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.40)' }}>Tap to open · Print or save as PDF</div>
+                      </div>
+                    </motion.button>
+                  </motion.div>
                 )}
 
                 {/* Session summary loading */}
@@ -4965,10 +5308,10 @@ If no clear changes: {"changes":[]}`
                             ))}
                           </div>
                         )}
-                        {sessionSummary.needsWork?.length > 0 && (
+                        {(sessionSummary.struggled ?? sessionSummary.needsWork)?.length > 0 && (
                           <div style={{ flex: '1 1 140px' }}>
-                            <div style={{ fontSize: 10, fontWeight: 700, color: '#F59E0B', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>↺ Needs Work</div>
-                            {sessionSummary.needsWork.map((t, i) => (
+                            <div style={{ fontSize: 10, fontWeight: 700, color: '#F59E0B', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>↺ Struggled</div>
+                            {(sessionSummary.struggled ?? sessionSummary.needsWork).map((t, i) => (
                               <div key={i} style={{ fontSize: 12, color: 'rgba(255,255,255,0.68)', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#F59E0B', flexShrink: 0 }} />{t}
                               </div>
@@ -4977,8 +5320,14 @@ If no clear changes: {"changes":[]}`
                         )}
                       </div>
 
+                      {sessionSummary.keyMistake && (
+                        <div style={{ fontSize: 12, color: 'rgba(248,113,113,0.85)', borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 10, marginTop: 4, marginBottom: 8, display: 'flex', gap: 6 }}>
+                          <span style={{ fontWeight: 700, color: '#F87171', flexShrink: 0 }}>⚠ Key mistake: </span>{sessionSummary.keyMistake}
+                        </div>
+                      )}
+
                       {sessionSummary.nextStep && (
-                        <div style={{ fontSize: 12, color: 'rgba(165,180,252,0.80)', borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 10, marginTop: 4 }}>
+                        <div style={{ fontSize: 12, color: 'rgba(165,180,252,0.80)', borderTop: sessionSummary.keyMistake ? 'none' : '1px solid rgba(255,255,255,0.07)', paddingTop: sessionSummary.keyMistake ? 0 : 10, marginTop: 4 }}>
                           <span style={{ fontWeight: 700, color: '#818CF8' }}>Next: </span>{sessionSummary.nextStep}
                         </div>
                       )}
@@ -5264,6 +5613,17 @@ If no clear changes: {"changes":[]}`
         {feynmanOpen && <FeynmanMode onClose={() => setFeynmanOpen(false)} />}
       </AnimatePresence>
 
+      {/* Worksheet Modal */}
+      <AnimatePresence>
+        {worksheetOpen && worksheet && (
+          <WorksheetModal
+            worksheet={worksheet}
+            studentName={name}
+            onClose={() => setWorksheetOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Appearance settings */}
       <AnimatePresence>
         {chatAppSettingsOpen && <AppSettingsPanel onClose={() => setChatAppSettingsOpen(false)} />}
@@ -5535,9 +5895,13 @@ const CMD_ICONS = {
   roadmap_flag:          '🚩',
   roadmap_reprioritise:  '🔀',
   roadmap_crunch:        '⚡',
+  award_xp:              '⭐',
+  pin_note:              '📌',
+  set_timer:             '⏱',
+  lock_topic:            '🔒',
 }
 const CMD_VERBS = {
-  open_lab:              'Taking you to Lab',
+  open_lab:              'Lab suggested',
   open_lab_drill:        'Drill loaded',
   add_lab_task:          'Task queued',
   open_arcade:           'Opening Arcade',
@@ -5550,6 +5914,10 @@ const CMD_VERBS = {
   roadmap_flag:          'Flagged urgent',
   roadmap_reprioritise:  'Roadmap reprioritised',
   roadmap_crunch:        'Crunch mode on',
+  award_xp:              'XP awarded',
+  pin_note:              'Note pinned',
+  set_timer:             'Timer started',
+  lock_topic:            'Topic locked',
 }
 
 function AevaCommandToast() {
