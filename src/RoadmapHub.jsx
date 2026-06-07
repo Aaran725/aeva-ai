@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText, BookOpen, Zap, Target, ClipboardList, Check, Lock, Clock, Trophy, Trash2, Brain, Dumbbell, GraduationCap, FlaskConical } from 'lucide-react'
+import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText, BookOpen, Zap, Target, ClipboardList, Check, Lock, Clock, Trophy, Trash2, Brain, Dumbbell, GraduationCap, FlaskConical, Share2, Copy } from 'lucide-react'
 import { useRoadmapStore } from './roadmapStore'
 import { useLabStore } from './labStore'
+import { supabase } from './supabase'
 import { useXPStore } from './xpStore'
 import { useAevaControlStore } from './aevaControlStore'
 import { nextGroqKey as gKey, GROQ_URL } from './groqClient'
@@ -93,6 +94,97 @@ ORDER: strict prerequisites — foundational concepts always before applications
   return { overview: parsed.overview || '', nodes }
 }
 
+/* ── Share modal ────────────────────────────────────────────────── */
+function ShareModal({ roadmap, onClose }) {
+  const [state, setState] = useState('idle') // idle | loading | done | error
+  const [shareUrl, setShareUrl] = useState('')
+  const [copied, setCopied] = useState(false)
+
+  const generate = async () => {
+    setState('loading')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { setState('error'); return }
+      const code = Math.random().toString(36).slice(2, 10)
+      const { error } = await supabase.from('shared_roadmaps').upsert({
+        share_code: code,
+        roadmap,
+        owner_id: session.user.id,
+        title: roadmap.title,
+      }, { onConflict: 'share_code' })
+      if (error) throw error
+      const url = `${window.location.origin}/r/${code}`
+      setShareUrl(url)
+      setState('done')
+    } catch {
+      setState('error')
+    }
+  }
+
+  useEffect(() => { generate() }, [])
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      setCopied(true); setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(4,5,18,0.80)', backdropFilter: 'blur(18px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={onClose}
+    >
+      <motion.div initial={{ scale: 0.92, y: 20 }} animate={{ scale: 1, y: 0 }}
+        onClick={e => e.stopPropagation()}
+        style={{ background: 'rgba(12,13,32,0.98)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 24, padding: 26, maxWidth: 380, width: '100%', fontFamily: "'Inter', system-ui, sans-serif" }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(99,102,241,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Share2 size={15} color="#A5B4FC" />
+            </div>
+            <span style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>Share Roadmap</span>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}><X size={17} /></button>
+        </div>
+
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', marginBottom: 18, lineHeight: 1.6 }}>
+          Anyone with this link can view <strong style={{ color: 'rgba(255,255,255,0.80)' }}>{roadmap.title}</strong> and clone it to their own account.
+        </div>
+
+        {state === 'loading' && (
+          <div style={{ textAlign: 'center', padding: '20px 0', color: 'rgba(255,255,255,0.40)', fontSize: 13 }}>
+            <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.2, repeat: Infinity }}>Generating link…</motion.div>
+          </div>
+        )}
+
+        {state === 'done' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 11, padding: '10px 14px', fontSize: 12.5, color: 'rgba(255,255,255,0.60)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {shareUrl}
+              </div>
+              <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={handleCopy}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px', borderRadius: 11, background: copied ? 'rgba(16,185,129,0.18)' : 'rgba(99,102,241,0.18)', border: `1px solid ${copied ? 'rgba(16,185,129,0.40)' : 'rgba(99,102,241,0.40)'}`, color: copied ? '#4ADE80' : '#A5B4FC', fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' }}>
+                <Copy size={13} /> {copied ? 'Copied!' : 'Copy'}
+              </motion.button>
+            </div>
+            <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.30)', textAlign: 'center' }}>
+              🔗 Public link — anyone can view and clone this roadmap
+            </div>
+          </div>
+        )}
+
+        {state === 'error' && (
+          <div style={{ textAlign: 'center', color: '#FF8C6B', fontSize: 13, padding: '12px 0' }}>
+            Failed to generate link. Make sure you're signed in.
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  )
+}
+
 export default function RoadmapHub() {
   const { roadmapOpen, closeRoadmapHub, roadmaps, getActive } = useRoadmapStore()
   const [view, setView] = useState(() => {
@@ -100,6 +192,7 @@ export default function RoadmapHub() {
     return active?.nodes?.length ? 'path' : 'home'
   })
   const [pendingForm, setPending] = useState(null)  // holds form data during generation
+  const [showShare, setShowShare] = useState(false)
 
   const active = getActive()
 
@@ -151,12 +244,24 @@ export default function RoadmapHub() {
               <Plus size={13} /> New
             </motion.button>
           )}
+          {view === 'path' && active && (
+            <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+              onClick={() => setShowShare(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 99, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.14)', color: 'rgba(255,255,255,0.65)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+              <Share2 size={13} /> Share
+            </motion.button>
+          )}
           <motion.button whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }} onClick={closeRoadmapHub}
             style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <X size={15} />
           </motion.button>
         </div>
       </div>
+
+      {/* Share modal */}
+      <AnimatePresence>
+        {showShare && active && <ShareModal roadmap={active} onClose={() => setShowShare(false)} />}
+      </AnimatePresence>
 
       {/* Body */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>

@@ -45,6 +45,7 @@ import OrbSelector from './OrbSelector'
 import Parents from './ShowEm'
 import AevaDoc from './AevaDoc'
 import WorksheetModal from './WorksheetModal'
+import SharedRoadmapView from './SharedRoadmapView'
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
 import { useMemoryStore } from './memoryStore'
 import './index.css'
@@ -6004,6 +6005,10 @@ function useInactivityIntervention() {
 }
 
 export default function App() {
+  // ── Shared roadmap route: /r/:code ──────────────────────────────────────────
+  const _pathMatch = window.location.pathname.match(/^\/r\/([a-z0-9]+)$/i)
+  if (_pathMatch) return <SharedRoadmapView shareCode={_pathMatch[1]} />
+
   useInactivityIntervention()
   const [view, setView] = useState('dashboard')
   const [authUser, setAuthUser] = useState(undefined)

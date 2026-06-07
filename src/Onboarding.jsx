@@ -322,7 +322,100 @@ function StepStyle({ name, selected, onSelect, onNext }) {
   )
 }
 
-// ─── Step 3: Subject ──────────────────────────────────────────────────────────
+// ─── Step 3: How it works ────────────────────────────────────────────────────
+const HOW_LOOPS = [
+  {
+    icon: '💬',
+    title: 'Chat',
+    color: '#6366F1',
+    desc: 'Have a real conversation. Aeva asks questions back, catches gaps, and never just dumps information.',
+  },
+  {
+    icon: '⚡',
+    title: 'Lab',
+    color: '#F97316',
+    desc: '7 drill modes — flashcards, Feynman test, speed round, and more. AI-graded. Gets harder as you improve.',
+  },
+  {
+    icon: '🗺️',
+    title: 'Roadmap',
+    color: '#8B5CF6',
+    desc: 'A structured path from today to exam-ready. Aeva updates it based on what you actually understand.',
+  },
+]
+
+function StepHowItWorks({ onNext }) {
+  return (
+    <motion.div
+      key="how"
+      initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
+      transition={{ duration: 0.35 }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 20 }}
+    >
+      <div style={{ textAlign: 'center' }}>
+        <p style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.30)', margin: '0 0 14px' }}>
+          Three loops
+        </p>
+        <h2 style={{ fontSize: 24, fontWeight: 900, color: 'rgba(255,255,255,0.94)', letterSpacing: '-0.04em', margin: '0 0 4px', lineHeight: 1.15 }}>
+          Here's how Aeva works
+        </h2>
+        <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.36)', margin: 0 }}>
+          Use all three together — that's where it clicks.
+        </p>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {HOW_LOOPS.map((loop, i) => (
+          <motion.div
+            key={loop.title}
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.1 + 0.1, duration: 0.35 }}
+            style={{
+              display: 'flex', alignItems: 'flex-start', gap: 14,
+              padding: '15px 16px', borderRadius: 16,
+              background: `rgba(${loop.color === '#6366F1' ? '99,102,241' : loop.color === '#F97316' ? '249,115,22' : '139,92,246'},0.08)`,
+              border: `1px solid rgba(${loop.color === '#6366F1' ? '99,102,241' : loop.color === '#F97316' ? '249,115,22' : '139,92,246'},0.20)`,
+            }}
+          >
+            <div style={{
+              width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+              background: `rgba(${loop.color === '#6366F1' ? '99,102,241' : loop.color === '#F97316' ? '249,115,22' : '139,92,246'},0.18)`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
+            }}>
+              {loop.icon}
+            </div>
+            <div>
+              <div style={{ fontSize: 14.5, fontWeight: 800, color: 'rgba(255,255,255,0.90)', marginBottom: 4, letterSpacing: '-0.02em' }}>
+                {loop.title}
+              </div>
+              <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.45)', lineHeight: 1.55 }}>
+                {loop.desc}
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      <motion.button
+        whileHover={{ scale: 1.02, boxShadow: '0 8px 28px rgba(99,102,241,0.38)' }}
+        whileTap={{ scale: 0.97 }}
+        onClick={onNext}
+        style={{
+          padding: '14px', borderRadius: 13,
+          background: 'linear-gradient(135deg, #3D40A8, #5558D4)',
+          border: '1px solid rgba(139,143,255,0.40)',
+          color: 'white', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+          fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        }}
+      >
+        Got it <ArrowRight size={16} />
+      </motion.button>
+    </motion.div>
+  )
+}
+
+// ─── Step 4: Subject ──────────────────────────────────────────────────────────
 const SUBJECTS = ['Mathematics', 'Sciences', 'History', 'Languages', 'Computer Science', 'Business', 'Law', 'Other']
 
 function StepSubject({ name, selected, onSelect, onNext }) {
@@ -521,7 +614,7 @@ export default function Onboarding({ name: authName, onComplete }) {
 
   // Step 0 is cinematic — no dots
   const showDots = step > 0
-  const dotStep = step - 1  // dots for steps 1-4 only
+  const dotStep = step - 1  // dots for steps 1-5 only
 
   const handleComplete = () => {
     // Apply the chosen orb
@@ -558,7 +651,7 @@ export default function Onboarding({ name: authName, onComplete }) {
           padding: step === 0 ? '0' : '28px 24px',
           display: 'flex', flexDirection: 'column', gap: 22,
         }}>
-          {showDots && <StepDots total={4} current={dotStep} />}
+          {showDots && <StepDots total={5} current={dotStep} />}
 
           <AnimatePresence mode="wait">
             {step === 0 && <StepArrival key="s0" onNext={() => setStep(1)} />}
@@ -580,17 +673,20 @@ export default function Onboarding({ name: authName, onComplete }) {
               />
             )}
             {step === 3 && (
+              <StepHowItWorks key="s3" onNext={() => setStep(4)} />
+            )}
+            {step === 4 && (
               <StepSubject
-                key="s3"
+                key="s4"
                 name={displayName}
                 selected={subject}
                 onSelect={setSubject}
-                onNext={() => setStep(4)}
+                onNext={() => setStep(5)}
               />
             )}
-            {step === 4 && (
+            {step === 5 && (
               <StepAevaOpener
-                key="s4"
+                key="s5"
                 name={displayName}
                 styleId={styleId}
                 subject={subject}

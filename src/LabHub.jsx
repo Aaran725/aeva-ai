@@ -1815,7 +1815,7 @@ function DrillTab() {
         />
         {error && <div style={{ fontSize: 12, color: '#F87171', marginTop: 5 }}>{error}</div>}
         {/* Recent topics */}
-        {recentTopics.length > 0 && (
+        {recentTopics.length > 0 ? (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
             {recentTopics.map((t, i) => (
               <motion.button key={i}
@@ -1825,6 +1825,10 @@ function DrillTab() {
                 ↩ {t}
               </motion.button>
             ))}
+          </div>
+        ) : (
+          <div style={{ marginTop: 10, padding: '11px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', fontSize: 12.5, color: 'rgba(255,255,255,0.38)', lineHeight: 1.6 }}>
+            💬 <strong style={{ color: 'rgba(255,255,255,0.55)', fontWeight: 600 }}>Tip:</strong> Chat with Aeva about a topic first — she'll suggest what to drill and even assign it as an Order. Or just type any topic above to start now.
           </div>
         )}
       </div>
@@ -2084,9 +2088,23 @@ function StatsTab() {
 
   if (totalDrills === 0) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, paddingTop: 48, textAlign: 'center' }}>
-        <div style={{ fontSize: 36, opacity: 0.45 }}>📊</div>
-        <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.38)', lineHeight: 1.65 }}>Complete a drill to see your stats.</div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, paddingTop: 56, paddingBottom: 24, textAlign: 'center', padding: '56px 24px 24px' }}>
+        <div style={{ fontSize: 40 }}>📊</div>
+        <div style={{ fontSize: 17, fontWeight: 800, color: 'rgba(255,255,255,0.75)', letterSpacing: '-0.03em' }}>No stats yet</div>
+        <div style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.40)', lineHeight: 1.7, maxWidth: 260 }}>
+          Complete your first drill in the Drill tab to start tracking accuracy, streaks, and weak spots.
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', maxWidth: 300, marginTop: 8 }}>
+          {[['⚡', 'Flashcard Sprint', 'Fastest way to start'], ['🧪', 'Feynman Test', 'Explain it to find gaps'], ['🎯', 'Mock Test', 'Full timed practice']].map(([icon, title, sub]) => (
+            <div key={title} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', textAlign: 'left' }}>
+              <span style={{ fontSize: 18 }}>{icon}</span>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.70)' }}>{title}</div>
+                <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.35)' }}>{sub}</div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
