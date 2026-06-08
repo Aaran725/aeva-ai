@@ -369,31 +369,33 @@ Note: ${criticism?.note || ''}
 
 YOUR RESPONSE MUST REFLECT THIS SIGNAL. Do not ignore it. If mode is REDIRECT, use an analogy. If CHALLENGE, surface the gap. If HYPE, raise the bar immediately. If COACH, ask one precise Socratic question.${langDirective}
 
-━━━ VISUAL COMPONENTS — use only when a visual genuinely helps ━━━
-Embed ONE of these tags on its own line where the visual should appear. Never use more than one per response. Never use for simple questions or casual chat. Skip if text is clearer.
+━━━ VISUAL COMPONENTS — [VIZ:...] tags ━━━
+These are LIGHTWEIGHT inline visuals. Embed ONE tag on its own line (no backticks, no code block, no other text on that line).
+Use INSTEAD of ⚡CANVAS when a simple static visual is all that's needed. Do NOT wrap in backticks.
+
+TRIGGER RULES — MUST use a [VIZ:...] tag when:
+- User says "compare X and Y" or "difference between X and Y" → [VIZ:comparison|...]
+- User asks about a process, cycle, or sequence of steps → [VIZ:process|...]
+- User asks about historical order, causes in order, timeline → [VIZ:timeline|...]
+- User asks to "show data", "chart", "graph", statistics → [VIZ:bar|...] or [VIZ:line|...]
+- User asks for a formula or "what's the equation" → [VIZ:formula|...]
+- User asks what two things share / have in common → [VIZ:venn|...]
 
 [VIZ:comparison|Left Title|Right Title|Label:LeftVal:RightVal|Label:LeftVal:RightVal|...]
-→ When: comparing two related concepts (Mitosis vs Meiosis, AC vs DC, Speed vs Velocity)
 
 [VIZ:process|Step 1 title|Step 2 title|Step 3 title|...]
-→ When: sequential steps or a cycle (Krebs cycle, algorithm steps, digestive system)
 
 [VIZ:timeline|Date:Event description|Date:Event|...]
-→ When: historical sequence, causes in order, scientific discoveries with dates
 
 [VIZ:bar|Chart Title|Label:Number|Label:Number|...]
-→ When: comparing quantities, statistics, distributions (population sizes, exam scores)
 
 [VIZ:line|Chart Title|X axis label|Y axis label|x1:y1|x2:y2|x3:y3|...]
-→ When: change over time, trends, growth or decay curves
 
 [VIZ:formula|Formula Name|LaTeX formula|When to use / description]
-→ When: introducing a KEY formula that deserves visual emphasis beyond a normal $$ block
 
 [VIZ:venn|Left Name|Right Name|Left-only items (comma sep)|Both items (comma sep)|Right-only items (comma sep)]
-→ When: showing what two concepts share vs what makes them different
 
-EXAMPLES:
+EXAMPLES (copy the format exactly — no backticks, nothing else on the line):
 [VIZ:comparison|Mitosis|Meiosis|Purpose:Growth & repair:Sexual reproduction|Divisions:1:2|Cells produced:2 identical:4 unique|DNA:Diploid:Haploid]
 [VIZ:process|Glucose enters|Glycolysis|Pyruvate formed|Krebs cycle|ATP produced]
 [VIZ:bar|UK GCSE Grade Distribution|Grade 9:8|Grade 8:15|Grade 7:22|Grade 6:25|Grade 5:18|Grade 4:12]
@@ -486,9 +488,9 @@ table — sortable comparison
 diagram — flowchart (node positions as % of 100×100 grid)
 {"type":"diagram","title":"Process","nodes":[{"id":"a","label":"Start","x":50,"y":15},{"id":"b","label":"Middle","x":50,"y":50},{"id":"c","label":"End","x":50,"y":85}],"edges":[{"from":"a","to":"b","label":"leads to"},{"from":"b","to":"c","label":"produces"}]}
 
-⚡VIZ (RARELY USE — only for a single static graph where no interaction is needed):
-⚡VIZ:{"type":"function","expr":"x**2","xMin":-4,"xMax":4,"title":"Parabola"}
-Never use both ⚡VIZ and ⚡CANVAS in the same response.`
+⚡FUNCGRAPH (RARELY USE — only for a single function plot where no interaction is needed):
+⚡FUNCGRAPH:{"type":"function","expr":"x**2","xMin":-4,"xMax":4,"title":"Parabola"}
+Never use both ⚡FUNCGRAPH and ⚡CANVAS in the same response.`
 }
 
 /* ─── Trend / scaffold / difficulty helpers ─── */
@@ -2695,7 +2697,7 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
   const clean = text
     .replace(/⚡CMD:\{[^}]*\}/g, '')
     .replace(/⚡ROADMAP:[\s\S]*$/, '')
-    .replace(/⚡VIZ:[\s\S]*$/, '')
+    .replace(/⚡FUNCGRAPH:[\s\S]*$/, '')
     .replace(/⚡CANVAS:[\s\S]*$/, '')
     .replace(/\[TERM:[^\]]*\]/g, '')
     .replace(/\[SUMMARY:[^\]]*\]/g, '')

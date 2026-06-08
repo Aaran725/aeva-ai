@@ -30,7 +30,9 @@ function splitFirst(str, sep = ':') {
 }
 
 export function parseVizTag(line) {
-  const match = line.trim().match(/^\[VIZ:([a-z_]+)\|(.+)\]$/is)
+  // Strip backtick wrapping in case model wraps the tag
+  const stripped = line.trim().replace(/^`+|`+$/g, '').trim()
+  const match = stripped.match(/^\[VIZ:([a-z_]+)\|(.+?)\]\.?$/is)
   if (!match) return null
   return { type: match[1].toLowerCase(), raw: match[2] }
 }
