@@ -3,7 +3,7 @@ import { GROQ_KEYS, GROQ_URL, nextGroqKey } from './groqClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import { ArrowUp, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, ChevronRight, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Users, FileText, LayoutGrid } from 'lucide-react'
+import { ArrowUp, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, ChevronRight, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Users, FileText, LayoutGrid, Palette } from 'lucide-react'
 import { useAppSettings, SECTION_BG_PRESETS, CARD_STYLES, FONT_STYLES } from './appSettings'
 import { useLanguageStore } from './languageStore'
 import { useT } from './translations'
@@ -5352,19 +5352,22 @@ If no clear changes: {"changes":[]}`
             {isWidget && (
               <div style={{ position: 'relative' }}>
                 <motion.button
-                  whileHover={{ scale: 1.10 }} whileTap={{ scale: 0.92 }}
+                  whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }}
                   onClick={() => setShowThemePicker(v => !v)}
                   title={`Theme: ${activeTheme.label}`}
                   style={{
-                    width: 30, height: 30, borderRadius: '50%', cursor: 'pointer', padding: 0,
-                    background: `radial-gradient(circle at 38% 38%, ${activeTheme.swatch}55, ${activeTheme.swatch}22)`,
-                    border: `1.5px solid ${activeTheme.swatch}80`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: showThemePicker ? `0 0 12px ${activeTheme.swatch}60` : 'none',
-                    transition: 'box-shadow 0.2s',
+                    height: 30, borderRadius: 99, cursor: 'pointer', padding: '0 10px',
+                    background: showThemePicker
+                      ? `linear-gradient(135deg, ${activeTheme.swatch}50, ${activeTheme.swatch}28)`
+                      : 'rgba(255,255,255,0.09)',
+                    border: `1.5px solid ${activeTheme.swatch}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    boxShadow: `0 0 12px ${activeTheme.swatch}55`,
+                    transition: 'background 0.2s, box-shadow 0.2s',
                   }}
                 >
-                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: activeTheme.swatch, boxShadow: `0 0 7px ${activeTheme.swatch}` }} />
+                  <Palette size={11} color={activeTheme.swatch} />
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: activeTheme.swatch, boxShadow: `0 0 6px ${activeTheme.swatch}` }} />
                 </motion.button>
                 {showThemePicker && (
                   <motion.div
