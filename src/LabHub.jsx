@@ -60,6 +60,20 @@ Difficulty: ${diffInstr}
 Focus: ${focusInstr}
 Each question should require 2-4 sentences to answer properly. Include a model answer and the 3 key points a good answer must cover.
 Return ONLY valid JSON: {"questions":[{"q":"question text","modelAnswer":"ideal 3-4 sentence answer","keyPoints":["point 1","point 2","point 3"]}]}`,
+
+    examPractice: `Generate ${Math.min(count, 5)} past-paper-style exam questions about "${topic}".
+Difficulty: ${diffInstr}
+Style: GCSE/A-Level exam board format (AQA/Edexcel/OCR style). Mix 1-mark, 2-mark, and 4-6 mark questions.
+Each question must have a mark allocation and a detailed mark scheme.
+Return ONLY valid JSON:
+{"questions":[{
+  "q": "Full question text exactly as it would appear on an exam paper",
+  "marks": 4,
+  "command": "Explain/Describe/Calculate/Evaluate/Discuss",
+  "markScheme": ["marking point 1 (1 mark)","marking point 2 (1 mark)","marking point 3 (1 mark)","marking point 4 (1 mark)"],
+  "modelAnswer": "Full model answer covering all mark scheme points"
+}]}
+Rules: markScheme array length MUST equal marks. Each point is worth 1 mark. Include key terms examiners look for in brackets e.g. (accept: mitosis/cell division).`,
   }
 
   const res = await fetch(GROQ_URL, {
@@ -79,6 +93,36 @@ Return ONLY valid JSON: {"questions":[{"q":"question text","modelAnswer":"ideal 
   if (!res.ok) throw new Error('Generation failed')
   const json = await res.json()
   return JSON.parse(json.choices[0].message.content)
+}
+
+// AI marks a student's exam answer against a mark scheme
+async function markExamAnswer(question, marks, markScheme, studentAnswer) {
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
+    body: JSON.stringify({
+      model: 'llama-3.1-8b-instant',
+      messages: [
+        { role: 'system', content: 'You are a strict but fair exam marker. Award marks only for points explicitly covered in the mark scheme. Return ONLY valid JSON.' },
+        { role: 'user', content: `Question: ${question}
+Available marks: ${marks}
+Mark scheme (each point = 1 mark): ${markScheme.map((p, i) => `${i + 1}. ${p}`).join('\n')}
+Student answer: ${studentAnswer}
+
+Return ONLY valid JSON:
+{"awarded":${marks},"awardedPoints":["scheme point text"],"missedPoints":["scheme point text"],"feedback":"2 sentence examiner comment","examinerTip":"one specific thing to improve"}` },
+      ],
+      temperature: 0.1,
+      max_tokens: 400,
+      response_format: { type: 'json_object' },
+    }),
+  })
+  const json = await res.json()
+  try {
+    const result = JSON.parse(json.choices[0].message.content)
+    result.awarded = Math.min(marks, Math.max(0, Math.round(result.awarded)))
+    return result
+  } catch { return { awarded: 0, awardedPoints: [], missedPoints: markScheme, feedback: 'Could not mark this answer.', examinerTip: '' } }
 }
 
 async function generateDrillAnalysis(drillType, topic, wrongItems) {
@@ -1497,6 +1541,209 @@ function ShortAnswerDrill({ data, topic, onExit, onGoHarder }) {
   )
 }
 
+/* ═══ EXAM PRACTICE (Past Paper) ═════════════════════ */
+function ExamPracticeDrill({ data, topic, onExit }) {
+  const { recordDrillResult } = useLabStore()
+  const questions = data?.questions || []
+  const [idx, setIdx]           = useState(0)
+  const [answer, setAnswer]     = useState('')
+  const [marking, setMarking]   = useState(false)
+  const [result, setResult]     = useState(null)  // { awarded, awardedPoints, missedPoints, feedback, examinerTip }
+  const [results, setResults]   = useState([])    // per-question: { awarded, total }
+  const [done, setDone]         = useState(false)
+
+  const q = questions[idx]
+  const totalMarks    = questions.reduce((s, q) => s + (q.marks || 0), 0)
+  const earnedMarks   = results.reduce((s, r) => s + r.awarded, 0)
+  const progressPct   = Math.round((idx / questions.length) * 100)
+
+  const markAnswer = async () => {
+    if (!answer.trim() || marking) return
+    setMarking(true)
+    try {
+      const r = await markExamAnswer(q.q, q.marks, q.markScheme || [], answer)
+      setResult(r)
+    } catch {
+      setResult({ awarded: 0, awardedPoints: [], missedPoints: q.markScheme || [], feedback: 'Marking failed — check connection.', examinerTip: '' })
+    }
+    setMarking(false)
+  }
+
+  const nextQuestion = () => {
+    const newResults = [...results, { awarded: result.awarded, total: q.marks }]
+    setResults(newResults)
+    if (idx + 1 >= questions.length) {
+      const totalAwarded = newResults.reduce((s, r) => s + r.awarded, 0)
+      const pct = Math.round((totalAwarded / totalMarks) * 100)
+      recordDrillResult(topic, 'examPractice', totalAwarded, totalMarks, 'intermediate')
+      setDone(true)
+    } else {
+      setIdx(i => i + 1)
+      setAnswer('')
+      setResult(null)
+    }
+  }
+
+  const gradeFromPct = (pct) => {
+    if (pct >= 90) return { grade: 'A*', color: '#A78BFA' }
+    if (pct >= 78) return { grade: 'A',  color: '#818CF8' }
+    if (pct >= 62) return { grade: 'B',  color: '#34D399' }
+    if (pct >= 47) return { grade: 'C',  color: '#60A5FA' }
+    if (pct >= 33) return { grade: 'D',  color: '#FBBF24' }
+    return { grade: 'E',  color: '#FB923C' }
+  }
+
+  /* ── Done screen ── */
+  if (done) {
+    const finalPct = Math.round((earnedMarks + (results[results.length-1]?.awarded || 0)) / totalMarks * 100)
+    const finalEarned = results.reduce((s,r) => s + r.awarded, 0)
+    const g = gradeFromPct(finalPct)
+    return (
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+        style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 20, padding: '8px 0', overflowY: 'auto' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 8 }}>📝</div>
+          <div style={{ fontSize: 48, fontWeight: 900, color: g.color, letterSpacing: '-0.04em', lineHeight: 1 }}>{g.grade}</div>
+          <div style={{ fontSize: 15, color: 'rgba(255,255,255,0.55)', marginTop: 6 }}>
+            {finalEarned} / {totalMarks} marks  ·  {finalPct}%
+          </div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.30)', marginTop: 4 }}>
+            This is real evidence — not an estimate
+          </div>
+        </div>
+
+        {/* Per-question breakdown */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {results.map((r, i) => {
+            const pct = Math.round((r.awarded / r.total) * 100)
+            const col = pct >= 75 ? '#4ADE80' : pct >= 50 ? '#FBBF24' : '#F87171'
+            return (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 700, minWidth: 22 }}>Q{i+1}</span>
+                <div style={{ flex: 1, height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.08)' }}>
+                  <div style={{ width: `${pct}%`, height: '100%', borderRadius: 99, background: col, transition: 'width 0.6s ease' }} />
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 800, color: col, minWidth: 36, textAlign: 'right' }}>{r.awarded}/{r.total}</span>
+              </div>
+            )
+          })}
+        </div>
+
+        <button onClick={onExit} style={{ padding: '14px', borderRadius: 14, background: 'rgba(167,139,250,0.18)', border: '1px solid rgba(167,139,250,0.38)', color: '#C4B5FD', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+          Done
+        </button>
+      </motion.div>
+    )
+  }
+
+  /* ── Question screen ── */
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Progress */}
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.38)', letterSpacing: '0.06em' }}>
+            Q{idx + 1} of {questions.length}
+          </span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#A78BFA' }}>
+            {earnedMarks} / {results.reduce((s,r) => s+r.total, 0)} marks so far
+          </span>
+        </div>
+        <div style={{ height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.07)' }}>
+          <motion.div animate={{ width: `${progressPct}%` }} style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #A78BFA, #C4B5FD)' }} />
+        </div>
+      </div>
+
+      {/* Question card */}
+      <div style={{ padding: '20px', borderRadius: 18, background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.25)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, gap: 12 }}>
+          <span style={{ fontSize: 10, fontWeight: 800, color: 'rgba(167,139,250,0.70)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+            {q?.command || 'Question'}
+          </span>
+          <span style={{ fontSize: 11, fontWeight: 800, color: '#A78BFA', background: 'rgba(167,139,250,0.18)', border: '1px solid rgba(167,139,250,0.35)', padding: '3px 10px', borderRadius: 99, whiteSpace: 'nowrap' }}>
+            [{q?.marks} mark{q?.marks !== 1 ? 's' : ''}]
+          </span>
+        </div>
+        <p style={{ fontSize: 15.5, color: 'rgba(255,255,255,0.92)', lineHeight: 1.65, margin: 0, fontWeight: 500 }}>{q?.q}</p>
+      </div>
+
+      {/* Answer area or marking result */}
+      <AnimatePresence mode="wait">
+        {!result ? (
+          <motion.div key="answer" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <textarea
+              value={answer}
+              onChange={e => setAnswer(e.target.value)}
+              placeholder={`Write your answer here… (${q?.marks} mark${q?.marks !== 1 ? 's' : ''} available)`}
+              style={{
+                width: '100%', minHeight: 140, padding: '14px', borderRadius: 14,
+                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
+                color: 'rgba(255,255,255,0.90)', fontSize: 14, lineHeight: 1.65,
+                fontFamily: 'inherit', resize: 'vertical', outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={markAnswer}
+              disabled={!answer.trim() || marking}
+              style={{
+                padding: '14px', borderRadius: 14, fontSize: 14, fontWeight: 700,
+                cursor: answer.trim() && !marking ? 'pointer' : 'not-allowed',
+                background: answer.trim() && !marking ? 'rgba(167,139,250,0.22)' : 'rgba(255,255,255,0.05)',
+                border: answer.trim() && !marking ? '1px solid rgba(167,139,250,0.45)' : '1px solid rgba(255,255,255,0.08)',
+                color: answer.trim() && !marking ? '#C4B5FD' : 'rgba(255,255,255,0.25)',
+                fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}>
+              {marking ? <><span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⟳</span> Marking…</> : '✓ Submit for marking'}
+            </motion.button>
+          </motion.div>
+        ) : (
+          <motion.div key="result" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* Score */}
+            <div style={{
+              padding: '16px', borderRadius: 14, textAlign: 'center',
+              background: result.awarded >= q.marks * 0.75 ? 'rgba(74,222,128,0.10)' : result.awarded >= q.marks * 0.5 ? 'rgba(251,191,36,0.10)' : 'rgba(248,113,113,0.10)',
+              border: `1px solid ${result.awarded >= q.marks * 0.75 ? 'rgba(74,222,128,0.35)' : result.awarded >= q.marks * 0.5 ? 'rgba(251,191,36,0.30)' : 'rgba(248,113,113,0.30)'}`,
+            }}>
+              <div style={{ fontSize: 28, fontWeight: 900, color: result.awarded >= q.marks * 0.75 ? '#4ADE80' : result.awarded >= q.marks * 0.5 ? '#FBBF24' : '#F87171', letterSpacing: '-0.03em' }}>
+                {result.awarded} / {q.marks}
+              </div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>marks awarded</div>
+            </div>
+
+            {/* Awarded points */}
+            {result.awardedPoints?.length > 0 && (
+              <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(74,222,128,0.07)', border: '1px solid rgba(74,222,128,0.20)' }}>
+                <div style={{ fontSize: 10.5, fontWeight: 800, color: '#4ADE80', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 8 }}>✓ Awarded</div>
+                {result.awardedPoints.map((p, i) => <div key={i} style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.78)', lineHeight: 1.55, marginBottom: 4 }}>· {p}</div>)}
+              </div>
+            )}
+
+            {/* Missed points */}
+            {result.missedPoints?.length > 0 && (
+              <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(248,113,113,0.07)', border: '1px solid rgba(248,113,113,0.20)' }}>
+                <div style={{ fontSize: 10.5, fontWeight: 800, color: '#F87171', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 8 }}>✗ Missed</div>
+                {result.missedPoints.map((p, i) => <div key={i} style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.78)', lineHeight: 1.55, marginBottom: 4 }}>· {p}</div>)}
+              </div>
+            )}
+
+            {/* Examiner feedback */}
+            <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.22)' }}>
+              <div style={{ fontSize: 10.5, fontWeight: 800, color: '#A78BFA', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 6 }}>Examiner Comment</div>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 1.60 }}>{result.feedback}</div>
+              {result.examinerTip && <div style={{ marginTop: 8, fontSize: 12, color: 'rgba(167,139,250,0.80)', fontStyle: 'italic' }}>💡 {result.examinerTip}</div>}
+            </div>
+
+            <button onClick={nextQuestion} style={{ padding: '13px', borderRadius: 14, background: 'rgba(167,139,250,0.22)', border: '1px solid rgba(167,139,250,0.45)', color: '#C4B5FD', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              {idx + 1 < questions.length ? `Next Question →` : 'See Results'}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 /* ═══ MATCH GRID ═════════════════════════════════════ */
 function MatchGridDrill({ data, topic, onExit, onGoHarder }) {
   const { setDrillScore, recordDrillResult, currentTopic } = useLabStore()
@@ -2435,8 +2682,9 @@ export default function LabHub() {
                           : activeDrill === 'mocktest'    ? <MockTestDrill     data={drillData} topic={currentTopic} onExit={exitDrill} />
                           : activeDrill === 'feynman'     ? <FeynmanDrill      data={drillData} topic={currentTopic} onExit={exitDrill} />
                           : activeDrill === 'cloze'       ? <ClozeDrill        data={drillData} topic={currentTopic} onExit={exitDrill} onGoHarder={handleRestartDrill} />
-                          : activeDrill === 'shortanswer' ? <ShortAnswerDrill  data={drillData} topic={currentTopic} onExit={exitDrill} onGoHarder={handleRestartDrill} />
-                                                         : <MatchGridDrill     data={drillData} topic={currentTopic} onExit={exitDrill} onGoHarder={handleRestartDrill} />
+                          : activeDrill === 'shortanswer'   ? <ShortAnswerDrill   data={drillData} topic={currentTopic} onExit={exitDrill} onGoHarder={handleRestartDrill} />
+                          : activeDrill === 'examPractice'  ? <ExamPracticeDrill  data={drillData} topic={currentTopic} onExit={exitDrill} />
+                                                           : <MatchGridDrill      data={drillData} topic={currentTopic} onExit={exitDrill} onGoHarder={handleRestartDrill} />
                         : <LabLoading topic={currentTopic} />
                   }
                 </>

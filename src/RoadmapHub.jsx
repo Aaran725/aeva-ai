@@ -789,6 +789,80 @@ const NODE_SPACING = 172  // px between nodes vertically (extra room for labels 
 const NODE_R       = 38   // node circle radius (76px diameter)
 const TOP_PAD      = 32
 
+function ActualResultCard({ roadmap }) {
+  const { setActualGrade } = useRoadmapStore()
+  const [selected, setSelected] = useState(null)
+  const [saved, setSaved]       = useState(false)
+
+  if (roadmap.actualGrade) {
+    const predicted = calcGrade(roadmap.readiness || 0).grade
+    const actual    = roadmap.actualGrade
+    const hit       = actual === predicted
+    const better    = ['A*','A','B','C','D','E'].indexOf(actual) <= ['A*','A','B','C','D','E'].indexOf(predicted)
+    const col       = hit ? '#4ADE80' : better ? '#818CF8' : '#FBBF24'
+    return (
+      <div style={{ margin: '0 20px 16px', padding: '16px 18px', borderRadius: 16, background: `${col}12`, border: `1px solid ${col}35` }}>
+        <div style={{ fontSize: 10.5, fontWeight: 800, color: col, letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 8 }}>
+          {hit ? '🎯 Prediction nailed it' : better ? '🚀 Better than predicted' : '📊 Result recorded'}
+        </div>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginBottom: 2 }}>Predicted</div>
+            <div style={{ fontSize: 26, fontWeight: 900, color: 'rgba(255,255,255,0.55)' }}>{predicted}</div>
+          </div>
+          <div style={{ fontSize: 18, color: 'rgba(255,255,255,0.25)' }}>→</div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginBottom: 2 }}>Actual</div>
+            <div style={{ fontSize: 26, fontWeight: 900, color: col }}>{actual}</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (saved) return (
+    <div style={{ margin: '0 20px 16px', padding: '14px 18px', borderRadius: 16, background: 'rgba(74,222,128,0.10)', border: '1px solid rgba(74,222,128,0.28)', fontSize: 13, color: '#4ADE80', fontWeight: 700 }}>
+      ✓ Result saved — thanks for the data
+    </div>
+  )
+
+  return (
+    <div style={{ margin: '0 20px 16px', padding: '16px 18px', borderRadius: 16, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.28)' }}>
+      <div style={{ fontSize: 11, fontWeight: 800, color: '#FBBF24', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 10 }}>
+        🎓 Exam passed — how did you do?
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        {['A*','A','B','C','D','E','U'].map(g => {
+          const cols = { 'A*':'#A78BFA','A':'#818CF8','B':'#34D399','C':'#60A5FA','D':'#FBBF24','E':'#FB923C','U':'#F87171' }
+          const col  = cols[g]
+          return (
+            <motion.button key={g} whileTap={{ scale: 0.90 }} onClick={() => setSelected(g)}
+              style={{
+                flex: 1, padding: '10px 4px', borderRadius: 10, fontSize: 14, fontWeight: 800,
+                cursor: 'pointer', fontFamily: 'inherit',
+                background: selected === g ? `${col}22` : 'rgba(255,255,255,0.05)',
+                border: selected === g ? `1.5px solid ${col}70` : '1.5px solid rgba(255,255,255,0.08)',
+                color: selected === g ? col : 'rgba(255,255,255,0.38)',
+              }}>{g}</motion.button>
+          )
+        })}
+      </div>
+      <button
+        disabled={!selected}
+        onClick={() => { setActualGrade(roadmap.id, selected); setSaved(true) }}
+        style={{
+          width: '100%', padding: '11px', borderRadius: 12, fontSize: 13, fontWeight: 700,
+          cursor: selected ? 'pointer' : 'not-allowed', fontFamily: 'inherit',
+          background: selected ? 'rgba(251,191,36,0.20)' : 'rgba(255,255,255,0.04)',
+          border: selected ? '1px solid rgba(251,191,36,0.45)' : '1px solid rgba(255,255,255,0.07)',
+          color: selected ? '#FCD34D' : 'rgba(255,255,255,0.20)',
+        }}>
+        Save my result
+      </button>
+    </div>
+  )
+}
+
 function PathView() {
   const { getActive, completeNode, completeNodeWithConfidence, closeRoadmapHub, startNodeSession, endNodeSession, markLogSeen, flagNode } = useRoadmapStore()
   // Subscribe to roadmaps array so component re-renders when Aeva mutates nodes
@@ -1020,6 +1094,13 @@ function PathView() {
           )}
         </div>
       </div>
+
+      {/* ── Actual result card — shown when exam date has passed ── */}
+      {daysLeft === 0 && (
+        <div style={{ flexShrink: 0, padding: '0 20px 4px' }}>
+          <ActualResultCard roadmap={roadmap} />
+        </div>
+      )}
 
       {/* ── Stats strip ──────────────────────────────────────────────────── */}
       {(() => {

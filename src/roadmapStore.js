@@ -95,6 +95,20 @@ export const useRoadmapStore = create((set, get) => {
       set(s => { const u = { ...s, roadmaps: s.roadmaps.map(r => r.id === id ? { ...r, ...patch } : r) }; save(u); return u })
     },
 
+    // Record the student's actual exam result + compare to predicted grade
+    setActualGrade: (roadmapId, actualGrade) => {
+      set(s => {
+        const roadmaps = s.roadmaps.map(r => {
+          if (r.id !== roadmapId) return r
+          const predicted = calcGrade(r.readiness || 0).grade
+          const record = { date: new Date().toISOString(), predicted, actual: actualGrade }
+          const gradeAccuracy = [...(r.gradeAccuracy || []), record]
+          return { ...r, actualGrade, gradeAccuracy }
+        })
+        const u = { ...s, roadmaps }; save(u); return u
+      })
+    },
+
     completeNode: (roadmapId, nodeId) => {
       get().completeNodeWithConfidence(roadmapId, nodeId, 'solid')
     },

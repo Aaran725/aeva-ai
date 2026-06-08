@@ -64,6 +64,12 @@ export const DRILLS = {
     duration: '8 min', color: '#F59E0B',
     colorDim: 'rgba(245,158,11,0.14)', border: 'rgba(245,158,11,0.32)', glow: 'rgba(245,158,11,0.22)',
   },
+  examPractice: {
+    id: 'examPractice', emoji: '📝', title: 'Past Paper Practice',
+    tagline: 'Real exam questions. AI-marked against mark scheme.',
+    duration: '15–25 min', color: '#A78BFA',
+    colorDim: 'rgba(167,139,250,0.14)', border: 'rgba(167,139,250,0.32)', glow: 'rgba(167,139,250,0.22)',
+  },
 }
 
 export const DIFFICULTIES = {
