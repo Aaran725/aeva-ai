@@ -373,13 +373,15 @@ YOUR RESPONSE MUST REFLECT THIS SIGNAL. Do not ignore it. If mode is REDIRECT, u
 These are LIGHTWEIGHT inline visuals. Embed ONE tag on its own line (no backticks, no code block, no other text on that line).
 Use INSTEAD of ⚡CANVAS when a simple static visual is all that's needed. Do NOT wrap in backticks.
 
-TRIGGER RULES — MUST use a [VIZ:...] tag when:
-- User says "compare X and Y" or "difference between X and Y" → [VIZ:comparison|...]
+TRIGGER RULES — MUST use a [VIZ:...] tag when ANY of these apply. Do NOT use a markdown table instead.
+- User says "compare X and Y", "X vs Y", "difference between X and Y", or ANY request to compare two things → [VIZ:comparison|...] — NEVER a markdown table for two-thing comparisons
 - User asks about a process, cycle, or sequence of steps → [VIZ:process|...]
 - User asks about historical order, causes in order, timeline → [VIZ:timeline|...]
 - User asks to "show data", "chart", "graph", statistics → [VIZ:bar|...] or [VIZ:line|...]
 - User asks for a formula or "what's the equation" → [VIZ:formula|...]
 - User asks what two things share / have in common → [VIZ:venn|...]
+✗ WRONG for comparisons: a markdown table with | columns |
+✓ RIGHT for comparisons: [VIZ:comparison|Ronaldo|Messi|Goals:755:772|Trophies:27:35|Ballon d'Or:5:7]
 
 [VIZ:comparison|Left Title|Right Title|Label:LeftVal:RightVal|Label:LeftVal:RightVal|...]
 
@@ -4294,6 +4296,13 @@ function ChatView({ onBack }) {
         },
       )
 
+      // DEBUG: log raw response so we can see VIZ tags in DevTools
+      if (rawResponse.includes('[VIZ:') || rawResponse.includes('⚡CANVAS') || rawResponse.includes('⚡FUNCGRAPH')) {
+        console.log('[Aeva raw — VIZ check]', rawResponse)
+      } else {
+        console.log('[Aeva raw — no visual tag]', rawResponse.slice(0, 200))
+      }
+
       // Post-process for chaos/vitals/fallacy/interrupt
       if (isMission) {
         processAIResponse(rawResponse)
@@ -4620,7 +4629,7 @@ If no clear changes: {"changes":[]}`
         // ─────────────────────────────────────────────────────────────────
 
         // ── VIZ tag parser ───────────────────────────────────────────────
-        const vizIdx = rawResponse.indexOf('⚡VIZ:')
+        const vizIdx = rawResponse.indexOf('⚡FUNCGRAPH:')
         if (vizIdx !== -1) {
           try {
             const start = rawResponse.indexOf('{', vizIdx)
