@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion'
 import { X, FlaskConical, ChevronRight, RotateCcw, CheckCircle2, XCircle, ArrowRight, Settings, History, Zap, RefreshCw } from 'lucide-react'
 import { DRILLS, DIFFICULTIES, useLabStore } from './labStore'
 import { useNeuralStore } from './neuralStore'
@@ -407,62 +407,98 @@ function FlashcardDrill({ data, topic, onExit, onGoHarder }) {
         </div>
       </div>
 
-      {/* Card — large centered */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', perspective: 1200, minHeight: 300 }}>
-        <motion.div
-          onClick={() => setFlipped(f => !f)}
-          animate={{ rotateY: flipped ? 180 : 0 }}
-          transition={{ duration: 0.50, ease: [0.4, 0, 0.2, 1] }}
-          style={{ width: '100%', maxWidth: 560, minHeight: 280, position: 'relative', transformStyle: 'preserve-3d', cursor: 'pointer' }}
+      {/* Swipeable card */}
+      <AnimatePresence mode="wait">
+        <motion.div key={idx}
+          initial={{ opacity: 0, x: 40, scale: 0.96 }}
+          animate={{ opacity: 1, x: 0, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.92 }}
+          transition={{ duration: 0.22 }}
         >
-          {/* Front */}
-          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.28)', borderRadius: 24, padding: '40px 36px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 16 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(59,130,246,0.70)', textTransform: 'uppercase' }}>Question</span>
-            <p style={{ fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.94)', lineHeight: 1.5, margin: 0, fontFamily: "'Inter', system-ui, sans-serif" }}>
-              {card?.front}
-            </p>
-            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.26)', marginTop: 4 }}>tap to reveal</span>
-          </div>
-
-          {/* Back */}
-          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: 'rgba(6,182,212,0.10)', border: '1px solid rgba(6,182,212,0.30)', borderRadius: 24, padding: '40px 36px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 16 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(6,182,212,0.70)', textTransform: 'uppercase' }}>Answer</span>
-            <p style={{ fontSize: 18, color: 'rgba(255,255,255,0.90)', lineHeight: 1.65, margin: 0, fontFamily: "'Georgia', serif" }}>
-              {card?.back}
-            </p>
-          </div>
+          <SwipeCard card={card} onResult={handleResult} cardIndex={idx} total={cards.length} />
         </motion.div>
-      </div>
+      </AnimatePresence>
 
       {/* Keyboard hint */}
       <div style={{ textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,0.20)', letterSpacing: '0.04em' }}>
-        ⌨ Space · ← Missed · → Got it
+        ⌨ Space · ← Missed · → Got it &nbsp;·&nbsp; 👆 tap to flip, drag to rate
       </div>
+    </div>
+  )
+}
 
-      {/* Actions */}
-      <AnimatePresence>
-        {flipped && (
-          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            style={{ display: 'flex', gap: 12, maxWidth: 480, margin: '0 auto', width: '100%' }}>
-            <button onClick={() => handleResult('missed')} style={{ flex: 1, padding: '15px', borderRadius: 16, border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.12)', color: '#FCA5A5', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              <XCircle size={16} /> Missed it
-            </button>
-            <button onClick={() => handleResult('got')} style={{ flex: 1, padding: '15px', borderRadius: 16, border: '1px solid rgba(74,222,128,0.35)', background: 'rgba(74,222,128,0.12)', color: '#86EFAC', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              <CheckCircle2 size={16} /> Got it
-            </button>
+/* ═══ SWIPEABLE CARD (used by ReviewDrill) ══════════ */
+function SwipeCard({ card, onResult, cardIndex, total }) {
+  const [flipped, setFlipped] = useState(false)
+  const x = useMotionValue(0)
+  const rotate    = useTransform(x, [-160, 0, 160], [-18, 0, 18])
+  const gotOpacity    = useTransform(x, [20, 80],  [0, 1])
+  const missedOpacity = useTransform(x, [-80, -20], [1, 0])
+  const cardBg = useTransform(x, [-120, 0, 120],
+    ['rgba(239,68,68,0.18)', flipped ? 'rgba(6,182,212,0.10)' : 'rgba(59,130,246,0.10)', 'rgba(74,222,128,0.18)'])
+
+  const handleDragEnd = useCallback((_, info) => {
+    if (!flipped) return
+    if (info.offset.x > 80)       onResult('got')
+    else if (info.offset.x < -80) onResult('missed')
+    else x.set(0)
+  }, [flipped, onResult, x])
+
+  return (
+    <div style={{ position: 'relative', width: '100%', maxWidth: 520, margin: '0 auto', minHeight: 300, userSelect: 'none' }}>
+      {/* Swipe hint labels */}
+      <motion.div style={{ position: 'absolute', top: 20, left: 16, opacity: missedOpacity, zIndex: 2 }}>
+        <span style={{ fontSize: 13, fontWeight: 800, color: '#F87171', background: 'rgba(239,68,68,0.15)', border: '2px solid rgba(239,68,68,0.50)', padding: '4px 12px', borderRadius: 99, letterSpacing: '0.06em' }}>✗ MISSED</span>
+      </motion.div>
+      <motion.div style={{ position: 'absolute', top: 20, right: 16, opacity: gotOpacity, zIndex: 2 }}>
+        <span style={{ fontSize: 13, fontWeight: 800, color: '#4ADE80', background: 'rgba(74,222,128,0.15)', border: '2px solid rgba(74,222,128,0.50)', padding: '4px 12px', borderRadius: 99, letterSpacing: '0.06em' }}>✓ GOT IT</span>
+      </motion.div>
+
+      <motion.div
+        drag={flipped ? 'x' : false}
+        dragConstraints={{ left: 0, right: 0 }}
+        dragElastic={0.8}
+        onDragEnd={handleDragEnd}
+        style={{ x, rotate, cursor: flipped ? 'grab' : 'pointer' }}
+        whileDrag={{ cursor: 'grabbing', scale: 1.03 }}
+        onClick={() => !flipped && setFlipped(true)}
+        animate={{ rotateY: flipped ? 180 : 0 }}
+        transition={{ duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
+        sx={{ transformStyle: 'preserve-3d' }}
+        className="sr-card"
+      >
+        {/* We render both faces as absolute children */}
+        <div style={{ position: 'relative', perspective: 1200, minHeight: 280 }}>
+          <motion.div style={{ background: cardBg }}
+            className="sr-card-inner"
+            animate={{ rotateY: flipped ? 180 : 0 }}
+            transition={{ duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
+            sx={{ transformStyle: 'preserve-3d', width: '100%', minHeight: 280 }}
+          >
+            {/* Front */}
+            <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.28)', borderRadius: 24, padding: '40px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 14, minHeight: 280 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(59,130,246,0.70)', textTransform: 'uppercase' }}>Question</span>
+              <p style={{ fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.94)', lineHeight: 1.5, margin: 0 }}>{card?.front}</p>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.26)' }}>tap to reveal</span>
+            </div>
+            {/* Back */}
+            <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: 'rgba(6,182,212,0.10)', border: '1px solid rgba(6,182,212,0.30)', borderRadius: 24, padding: '40px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 14, minHeight: 280 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(6,182,212,0.70)', textTransform: 'uppercase' }}>Answer</span>
+              <p style={{ fontSize: 18, color: 'rgba(255,255,255,0.90)', lineHeight: 1.65, margin: 0, fontFamily: "'Georgia', serif" }}>{card?.back}</p>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', marginTop: 4 }}>swipe right = got it · swipe left = missed</span>
+            </div>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </div>
+      </motion.div>
     </div>
   )
 }
 
 /* ═══ SPACED REVIEW DRILL ════════════════════════════ */
 function ReviewDrill({ data, onExit, onNewDrill }) {
-  const { recordCard } = useSRStore()
+  const { recordCard, completeSession } = useSRStore()
   const cards = data?.cards || []
   const [idx, setIdx]           = useState(0)
-  const [flipped, setFlipped]   = useState(false)
   const [results, setResults]   = useState([])
   const [done, setDone]         = useState(false)
   const [schedule, setSchedule] = useState([]) // { front, result, days }
@@ -489,12 +525,12 @@ function ReviewDrill({ data, onExit, onNewDrill }) {
     const next = [...results, result]
     setResults(next)
     if (idx + 1 >= cards.length) {
+      completeSession()
       setDone(true)
     } else {
-      setFlipped(false)
-      setTimeout(() => setIdx(i => i + 1), 160)
+      setTimeout(() => setIdx(i => i + 1), 200)
     }
-  }, [results, idx, cards, recordCard]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [results, idx, cards, recordCard, completeSession]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -1662,7 +1698,7 @@ function DrillTab() {
     pendingAutoStart, clearPendingAutoStart, drillHistory,
   } = useLabStore()
   const { struggleZones, dominantTopics } = useNeuralStore()
-  const { getDueCards, getDueCount, getUpcomingCount, getTotalCards } = useSRStore()
+  const { getDueCards, getDueCount, getUpcomingCount, getTotalCards, getStreak } = useSRStore()
 
   const [topicInput, setTopicInput] = useState('')
   const [error, setError] = useState('')
@@ -1671,6 +1707,7 @@ function DrillTab() {
   const dueCount      = getDueCount()
   const upcomingCount = getUpcomingCount(7)
   const totalSRCards  = getTotalCards()
+  const streak        = getStreak()
 
   // Recent topics from drill history (last 5 unique)
   const recentTopics = [...new Set(drillHistory.slice().reverse().map(h => h.topic))].slice(0, 5)
@@ -1751,8 +1788,13 @@ function DrillTab() {
                     <RefreshCw size={12} style={{ display: 'inline', marginRight: 6, verticalAlign: 'middle' }} />
                     Spaced Review
                   </div>
-                  <div style={{ fontSize: 11, color: 'rgba(74,222,128,0.65)', marginTop: 2 }}>
+                  <div style={{ fontSize: 11, color: 'rgba(74,222,128,0.65)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 8 }}>
                     {dueCount} card{dueCount !== 1 ? 's' : ''} due{upcomingCount > 0 ? ` · ${upcomingCount} more this week` : ''}
+                    {streak > 0 && (
+                      <span style={{ background: 'rgba(251,146,60,0.18)', border: '1px solid rgba(251,146,60,0.35)', color: '#FB923C', borderRadius: 99, padding: '1px 8px', fontSize: 10.5, fontWeight: 800 }}>
+                        🔥 {streak} day{streak !== 1 ? 's' : ''}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <button onClick={handleReview} style={{ padding: '7px 14px', borderRadius: 10, background: 'rgba(34,197,94,0.18)', border: '1px solid rgba(34,197,94,0.38)', color: '#86EFAC', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>

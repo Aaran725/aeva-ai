@@ -5,7 +5,8 @@
 import { create } from 'zustand'
 import { scheduleSave } from './syncService'
 
-const SR_KEY = 'aeva_sr_v1'
+const SR_KEY    = 'aeva_sr_v1'
+const STREAK_KEY = 'aeva_sr_streak_v1'
 const DAY = 24 * 60 * 60 * 1000
 
 function loadCards() {
@@ -14,6 +15,24 @@ function loadCards() {
 function saveCards(cards) {
   try { localStorage.setItem(SR_KEY, JSON.stringify(cards)) } catch {}
   scheduleSave('sr_cards', cards)
+}
+
+function loadStreak() {
+  try { return JSON.parse(localStorage.getItem(STREAK_KEY) || '{"count":0,"lastDate":null}') } catch { return { count: 0, lastDate: null } }
+}
+function saveStreak(s) {
+  try { localStorage.setItem(STREAK_KEY, JSON.stringify(s)) } catch {}
+}
+
+// Call when a review session completes — maintains daily streak
+function updateStreak(current) {
+  const today = new Date().toDateString()
+  if (current.lastDate === today) return current           // already reviewed today
+  const yesterday = new Date(Date.now() - DAY).toDateString()
+  const count = current.lastDate === yesterday ? current.count + 1 : 1
+  const next = { count, lastDate: today }
+  saveStreak(next)
+  return next
 }
 
 // Stable deterministic ID so the same card is always the same row
@@ -26,6 +45,17 @@ export function makeCardId(topic, front) {
 
 export const useSRStore = create((set, get) => ({
   cards: loadCards(),
+  streak: loadStreak(),
+
+  /** Call when a full review session ends (at least 1 card reviewed) */
+  completeSession: () => {
+    set(state => {
+      const next = updateStreak(state.streak)
+      return { streak: next }
+    })
+  },
+
+  getStreak: () => get().streak.count,
 
   /**
    * Record a card result after a Flashcard or Review drill.
