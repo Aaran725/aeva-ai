@@ -1878,61 +1878,119 @@ function MatchGridDrill({ data, topic, onExit, onGoHarder }) {
 }
 
 /* ═══ LOADING SPINNER ════════════════════════════════ */
+const LOADING_MSGS = [
+  'Reading your topic…',
+  'Crafting questions…',
+  'Tuning difficulty…',
+  'Almost ready…',
+]
+
 function LabLoading({ topic }) {
+  const [msgIdx, setMsgIdx] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => setMsgIdx(i => (i + 1) % LOADING_MSGS.length), 1400)
+    return () => clearInterval(t)
+  }, [])
+
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-      <motion.div
-        animate={{ rotate: 360 }}
-        transition={{ duration: 1.4, repeat: Infinity, ease: 'linear' }}
-        style={{ width: 40, height: 40, borderRadius: '50%', border: '3px solid rgba(59,130,246,0.15)', borderTopColor: '#3B82F6' }}
-      />
-      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', textAlign: 'center' }}>
-        Generating drill for<br />
-        <span style={{ color: '#60A5FA', fontWeight: 600 }}>{topic}</span>…
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24, padding: '0 24px' }}>
+      {/* Animated rings */}
+      <div style={{ position: 'relative', width: 72, height: 72 }}>
+        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.8, repeat: Infinity, ease: 'linear' }}
+          style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '2px solid rgba(59,130,246,0.12)', borderTopColor: '#3B82F6' }} />
+        <motion.div animate={{ rotate: -360 }} transition={{ duration: 2.8, repeat: Infinity, ease: 'linear' }}
+          style={{ position: 'absolute', inset: 8, borderRadius: '50%', border: '2px solid rgba(6,182,212,0.10)', borderTopColor: '#06B6D4' }} />
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>
+          🧪
+        </div>
+      </div>
+      {/* Topic */}
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 17, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', marginBottom: 6 }}>{topic}</div>
+        <AnimatePresence mode="wait">
+          <motion.div key={msgIdx} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.3 }}
+            style={{ fontSize: 13, color: 'rgba(255,255,255,0.40)', fontWeight: 500 }}>
+            {LOADING_MSGS[msgIdx]}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+      {/* Dots */}
+      <div style={{ display: 'flex', gap: 5 }}>
+        {LOADING_MSGS.map((_, i) => (
+          <motion.div key={i} animate={{ background: i === msgIdx ? '#3B82F6' : 'rgba(255,255,255,0.12)' }}
+            style={{ width: 6, height: 6, borderRadius: '50%' }} />
+        ))}
       </div>
     </div>
   )
 }
 
 /* ═══ DRILL CARD (grid) ══════════════════════════════ */
+const DRILL_HOT = ['flashcard', 'examPractice', 'mocktest']
+
 function DrillCard({ drill, onStart, index, personalBest }) {
+  const isHot = DRILL_HOT.includes(drill.id)
+  const pbColor = personalBest >= 90 ? '#4ADE80' : personalBest >= 70 ? '#60A5FA' : personalBest >= 50 ? '#FBBF24' : '#F87171'
+
   return (
     <motion.button
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05, duration: 0.28 }}
-      whileHover={{ scale: 1.025, y: -3 }}
+      transition={{ delay: index * 0.04, duration: 0.24 }}
+      whileHover={{ scale: 1.03, y: -2, boxShadow: `0 12px 32px ${drill.glow}` }}
       whileTap={{ scale: 0.97 }}
       onClick={() => onStart(drill.id)}
       style={{
-        padding: '20px 22px', borderRadius: 20,
+        padding: '16px 16px 14px', borderRadius: 18,
         background: drill.colorDim, border: `1px solid ${drill.border}`,
         cursor: 'pointer', textAlign: 'left',
-        boxShadow: `0 4px 24px ${drill.glow}`,
-        backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-        position: 'relative', overflow: 'hidden', minHeight: 112,
+        boxShadow: `0 4px 20px ${drill.glow}`,
+        position: 'relative', overflow: 'hidden',
+        display: 'flex', flexDirection: 'column', gap: 12,
       }}
     >
-      <div aria-hidden style={{ position: 'absolute', top: -20, right: -20, width: 80, height: 80, borderRadius: '50%', background: `radial-gradient(circle, ${drill.color}30 0%, transparent 70%)`, filter: 'blur(16px)', pointerEvents: 'none' }} />
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, position: 'relative', zIndex: 1 }}>
-        <div style={{ width: 44, height: 44, borderRadius: 14, fontSize: 20, background: 'rgba(0,0,0,0.22)', border: `1px solid ${drill.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          {drill.emoji}
+      {/* Glow orb */}
+      <div aria-hidden style={{ position: 'absolute', top: -16, right: -16, width: 72, height: 72, borderRadius: '50%', background: `radial-gradient(circle, ${drill.color}35 0%, transparent 70%)`, filter: 'blur(14px)', pointerEvents: 'none' }} />
+
+      {/* Hot badge */}
+      {isHot && (
+        <div style={{ position: 'absolute', top: 10, right: 10, fontSize: 9, fontWeight: 800, color: drill.color, background: `${drill.color}18`, border: `1px solid ${drill.color}40`, borderRadius: 99, padding: '2px 7px', letterSpacing: '0.10em', textTransform: 'uppercase' }}>
+          ★ Top
         </div>
+      )}
+
+      {/* Top: emoji + title */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative', zIndex: 1 }}>
+        <div style={{ fontSize: 24, lineHeight: 1, flexShrink: 0 }}>{drill.emoji}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14.5, fontWeight: 700, color: 'rgba(255,255,255,0.94)', marginBottom: 4, letterSpacing: '-0.02em' }}>
+          <div style={{ fontSize: 13.5, fontWeight: 800, color: 'rgba(255,255,255,0.96)', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
             {drill.title}
           </div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45 }}>
-            {drill.tagline}
-          </div>
+          <div style={{ fontSize: 10.5, color: drill.color, fontWeight: 600, marginTop: 2, opacity: 0.85 }}>{drill.duration}</div>
         </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, position: 'relative', zIndex: 1 }}>
-        <span style={{ fontSize: 11, fontWeight: 600, color: drill.color, opacity: 0.85 }}>{drill.duration}</span>
-        {personalBest !== null && (
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.38)' }}>PB: {personalBest}%</span>
-        )}
+
+      {/* Tagline */}
+      <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.42)', lineHeight: 1.45, position: 'relative', zIndex: 1 }}>
+        {drill.tagline}
       </div>
+
+      {/* PB bar */}
+      {personalBest !== null ? (
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Best</span>
+            <span style={{ fontSize: 10.5, fontWeight: 800, color: pbColor }}>{personalBest}%</span>
+          </div>
+          <div style={{ height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+            <motion.div initial={{ width: 0 }} animate={{ width: `${personalBest}%` }} transition={{ duration: 0.7, delay: index * 0.04 + 0.2, ease: 'easeOut' }}
+              style={{ height: '100%', borderRadius: 99, background: pbColor }} />
+          </div>
+        </div>
+      ) : (
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)', position: 'relative', zIndex: 1 }}>No attempts yet</div>
+      )}
     </motion.button>
   )
 }
@@ -1947,8 +2005,9 @@ function DrillTab() {
   const { struggleZones, dominantTopics } = useNeuralStore()
   const { getDueCards, getDueCount, getUpcomingCount, getTotalCards, getStreak } = useSRStore()
 
-  const [topicInput, setTopicInput] = useState('')
-  const [error, setError] = useState('')
+  const [topicInput, setTopicInput]     = useState('')
+  const [error, setError]               = useState('')
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const inputRef = useRef(null)
 
   const dueCount      = getDueCount()
@@ -1957,9 +2016,9 @@ function DrillTab() {
   const streak        = getStreak()
 
   // Recent topics from drill history (last 5 unique)
-  const recentTopics = [...new Set(drillHistory.slice().reverse().map(h => h.topic))].slice(0, 5)
+  const recentTopics = [...new Set(drillHistory.slice().reverse().map(h => h.topic))].slice(0, 6)
 
-  // Weakest topic: lowest average score across all sessions, avg < 75%
+  // Weakest topic
   const topicAvgMap = {}
   drillHistory.forEach(h => {
     if (!topicAvgMap[h.topic]) topicAvgMap[h.topic] = { total: 0, count: 0 }
@@ -1970,6 +2029,11 @@ function DrillTab() {
     .map(([topic, { total, count }]) => ({ topic, avg: Math.round(total / count), count }))
     .filter(e => e.avg < 75)
     .sort((a, b) => a.avg - b.avg)[0] || null
+
+  // Session stats
+  const DAY = 86400000
+  const thisWeek = drillHistory.filter(h => Date.now() - h.date < 7 * DAY)
+  const avgScore  = drillHistory.length ? Math.round(drillHistory.reduce((s, h) => s + h.pct, 0) / drillHistory.length) : null
 
   useEffect(() => {
     if (labSuggestion?.topic) setTopicInput(labSuggestion.topic)
@@ -1991,7 +2055,6 @@ function DrillTab() {
     }
   }
 
-  // Auto-start drill when triggered from roadmap node
   useEffect(() => {
     if (!pendingAutoStart?.topic) return
     const { drillType, topic } = pendingAutoStart
@@ -2007,55 +2070,62 @@ function DrillTab() {
     setDrillData({ cards: due })
   }
 
-  // Suggestion chips: struggle zones first (highest urgency), then interests
   const chips = [
     ...[...struggleZones].reverse().slice(0, 4).map(z => ({ label: z, type: 'struggle' })),
     ...(dominantTopics || []).filter(t => !struggleZones.includes(t)).slice(0, 3).map(t => ({ label: t, type: 'interest' })),
   ].slice(0, 7)
 
-  const btnBase = { padding: '6px 13px', borderRadius: 99, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: '1px solid', transition: 'all 0.15s', fontFamily: "'Inter', system-ui, sans-serif" }
-  const active = (color) => ({ ...btnBase, background: `${color}22`, borderColor: color, color })
+  const btnBase = { padding: '5px 12px', borderRadius: 99, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', border: '1px solid', transition: 'all 0.15s', fontFamily: "'Inter', system-ui, sans-serif" }
+  const active  = (color) => ({ ...btnBase, background: `${color}22`, borderColor: color, color })
   const inactive = { ...btnBase, background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.42)' }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-      {/* Today's Priority card — SR due + weakest topic combined */}
+      {/* ── Stats strip ── */}
+      {drillHistory.length > 0 && (
+        <div style={{ display: 'flex', gap: 8 }}>
+          {[
+            streak > 0 && { emoji: '🔥', value: `${streak}d`, label: 'Streak', color: '#FB923C' },
+            { emoji: '📊', value: thisWeek.length, label: 'This week', color: '#60A5FA' },
+            avgScore !== null && { emoji: '🎯', value: `${avgScore}%`, label: 'Avg score', color: avgScore >= 70 ? '#4ADE80' : avgScore >= 50 ? '#FBBF24' : '#F87171' },
+            totalSRCards > 0 && { emoji: '🧠', value: totalSRCards, label: 'Memory', color: '#A78BFA' },
+          ].filter(Boolean).map((s, i) => (
+            <div key={i} style={{ flex: 1, padding: '10px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', textAlign: 'center' }}>
+              <div style={{ fontSize: 14, marginBottom: 2 }}>{s.emoji}</div>
+              <div style={{ fontSize: 14, fontWeight: 900, color: s.color, letterSpacing: '-0.02em', lineHeight: 1 }}>{s.value}</div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: 3 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Priority card ── */}
       {(dueCount > 0 || weakestTopic) && (
         <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-          style={{ padding: '16px 18px', borderRadius: 16, background: 'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(59,130,246,0.07))', border: '1px solid rgba(139,92,246,0.26)' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(167,139,250,0.80)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 12 }}>
-            🎯 Today's Priority
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          style={{ padding: '14px 16px', borderRadius: 16, background: 'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(59,130,246,0.07))', border: '1px solid rgba(139,92,246,0.26)' }}>
+          <div style={{ fontSize: 9.5, fontWeight: 800, color: 'rgba(167,139,250,0.80)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 10 }}>🎯 Do this first</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {dueCount > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                 <div>
-                  <div style={{ fontSize: 13.5, fontWeight: 700, color: 'rgba(255,255,255,0.90)' }}>
-                    <RefreshCw size={12} style={{ display: 'inline', marginRight: 6, verticalAlign: 'middle' }} />
-                    Spaced Review
-                  </div>
-                  <div style={{ fontSize: 11, color: 'rgba(74,222,128,0.65)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {dueCount} card{dueCount !== 1 ? 's' : ''} due{upcomingCount > 0 ? ` · ${upcomingCount} more this week` : ''}
-                    {streak > 0 && (
-                      <span style={{ background: 'rgba(251,146,60,0.18)', border: '1px solid rgba(251,146,60,0.35)', color: '#FB923C', borderRadius: 99, padding: '1px 8px', fontSize: 10.5, fontWeight: 800 }}>
-                        🔥 {streak} day{streak !== 1 ? 's' : ''}
-                      </span>
-                    )}
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.90)' }}>
+                    Spaced Review · {dueCount} due
+                    {upcomingCount > 0 && <span style={{ fontSize: 10.5, color: 'rgba(74,222,128,0.55)', marginLeft: 6 }}>{upcomingCount} more this week</span>}
                   </div>
                 </div>
-                <button onClick={handleReview} style={{ padding: '7px 14px', borderRadius: 10, background: 'rgba(34,197,94,0.18)', border: '1px solid rgba(34,197,94,0.38)', color: '#86EFAC', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+                <button onClick={handleReview} style={{ padding: '6px 14px', borderRadius: 10, background: 'rgba(34,197,94,0.18)', border: '1px solid rgba(34,197,94,0.38)', color: '#86EFAC', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
                   Review →
                 </button>
               </div>
             )}
             {weakestTopic && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, ...(dueCount > 0 ? { paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.07)' } : {}) }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, ...(dueCount > 0 ? { paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' } : {}) }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 700, color: 'rgba(255,255,255,0.90)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{weakestTopic.topic}</div>
-                  <div style={{ fontSize: 11, color: 'rgba(248,113,113,0.70)', marginTop: 2 }}>Avg {weakestTopic.avg}% — needs work</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.90)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{weakestTopic.topic}</div>
+                  <div style={{ fontSize: 10.5, color: 'rgba(248,113,113,0.70)', marginTop: 1 }}>Avg {weakestTopic.avg}% · needs work</div>
                 </div>
-                <button onClick={() => handleStart('flashcard', weakestTopic.topic)} style={{ padding: '7px 14px', borderRadius: 10, background: 'rgba(248,113,113,0.14)', border: '1px solid rgba(248,113,113,0.32)', color: '#FCA5A5', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+                <button onClick={() => handleStart('flashcard', weakestTopic.topic)} style={{ padding: '6px 14px', borderRadius: 10, background: 'rgba(248,113,113,0.14)', border: '1px solid rgba(248,113,113,0.32)', color: '#FCA5A5', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
                   Drill →
                 </button>
               </div>
@@ -2064,33 +2134,25 @@ function DrillTab() {
         </motion.div>
       )}
 
-      {/* Lab suggestion banner */}
+      {/* ── Aeva suggestion banner ── */}
       <AnimatePresence>
         {labSuggestion && (
           <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-            style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(251,191,36,0.10)', border: '1px solid rgba(251,191,36,0.30)' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#FCD34D', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>🎯 Aeva recommends</div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 1.55 }}>{labSuggestion.reason}</div>
-            <button onClick={clearSuggestion} style={{ marginTop: 7, fontSize: 11, color: 'rgba(255,255,255,0.30)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Dismiss</button>
+            style={{ padding: '11px 14px', borderRadius: 14, background: 'rgba(251,191,36,0.10)', border: '1px solid rgba(251,191,36,0.28)' }}>
+            <div style={{ fontSize: 9.5, fontWeight: 800, color: '#FCD34D', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>✦ Aeva recommends</div>
+            <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.72)', lineHeight: 1.55 }}>{labSuggestion.reason}</div>
+            <button onClick={clearSuggestion} style={{ marginTop: 6, fontSize: 10.5, color: 'rgba(255,255,255,0.28)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>Dismiss</button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* SR memory bank info (when no cards currently due) */}
-      {dueCount === 0 && totalSRCards > 0 && (
-        <div style={{ padding: '9px 13px', borderRadius: 11, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.38)' }}>🧠 {totalSRCards} cards in memory bank</span>
-          {upcomingCount > 0 && <span style={{ fontSize: 11, color: 'rgba(74,222,128,0.55)', fontWeight: 600 }}>{upcomingCount} due this week</span>}
-        </div>
-      )}
-
-      {/* Topic input — full width */}
+      {/* ── Topic input ── */}
       <div>
         <input
           ref={inputRef}
           value={topicInput}
           onChange={e => { setTopicInput(e.target.value); setError('') }}
-          placeholder="Topic to drill — e.g. Newton's laws, burn rate, logical fallacies…"
+          placeholder="Topic to drill — e.g. photosynthesis, quadratic formula…"
           style={{
             width: '100%', padding: '13px 16px', borderRadius: 14, boxSizing: 'border-box',
             background: 'rgba(255,255,255,0.06)',
@@ -2103,80 +2165,96 @@ function DrillTab() {
           onKeyDown={e => e.key === 'Enter' && handleStart('flashcard')}
         />
         {error && <div style={{ fontSize: 12, color: '#F87171', marginTop: 5 }}>{error}</div>}
-        {/* Recent topics */}
-        {recentTopics.length > 0 ? (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+
+        {/* Quick-start from recent — horizontal scroll */}
+        {recentTopics.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, marginTop: 8, overflowX: 'auto', paddingBottom: 2 }}>
             {recentTopics.map((t, i) => (
               <motion.button key={i}
-                whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                onClick={() => setTopicInput(t)}
-                style={{ padding: '3px 10px', borderRadius: 99, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif", background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.20)', color: 'rgba(147,197,253,0.65)' }}>
-                ↩ {t}
+                whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                onClick={() => handleStart('flashcard', t)}
+                style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif", background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.22)', color: 'rgba(147,197,253,0.80)', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 10 }}>⚡</span> {t}
               </motion.button>
             ))}
           </div>
-        ) : (
-          <div style={{ marginTop: 10, padding: '11px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', fontSize: 12.5, color: 'rgba(255,255,255,0.38)', lineHeight: 1.6 }}>
-            💬 <strong style={{ color: 'rgba(255,255,255,0.55)', fontWeight: 600 }}>Tip:</strong> Chat with Aeva about a topic first — she'll suggest what to drill and even assign it as an Order. Or just type any topic above to start now.
+        )}
+
+        {!recentTopics.length && chips.length === 0 && (
+          <div style={{ marginTop: 10, padding: '10px 13px', borderRadius: 11, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', fontSize: 12, color: 'rgba(255,255,255,0.35)', lineHeight: 1.6 }}>
+            💬 Chat with Aeva about a topic first — she'll suggest drills and assign Orders. Or type any topic above.
           </div>
         )}
       </div>
 
-      {/* Inline settings: difficulty + count */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.10em', textTransform: 'uppercase' }}>Difficulty:</span>
-        {Object.entries(DIFFICULTIES).map(([key, val]) => (
-          <button key={key} onClick={() => setDifficulty(key)} style={difficulty === key ? active(val.color) : inactive}>{val.label}</button>
-        ))}
-        <div style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.10)', margin: '0 2px' }} />
-        <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.10em', textTransform: 'uppercase' }}>Q:</span>
-        {[5, 8, 12, 20].map(n => (
-          <button key={n} onClick={() => setQuestionCount(n)} style={questionCount === n ? active('#60A5FA') : inactive}>{n}</button>
-        ))}
-      </div>
-
-      {/* Focus mode */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {[{ key: 'theory', label: 'Theory' }, { key: 'mixed', label: 'Mixed' }, { key: 'application', label: 'Application' }].map(({ key, label }) => (
-          <button key={key} onClick={() => setFocusMode(key)} style={focusMode === key ? active('#A78BFA') : inactive}>{label}</button>
-        ))}
-      </div>
-
-      {/* Suggestion chips */}
+      {/* ── Suggestions (struggle/interest chips) ── */}
       {chips.length > 0 && (
-        <div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 8 }}>Suggestions</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {chips.map((chip, i) => {
-              const isStruggle = chip.type === 'struggle'
-              return (
-                <motion.button
-                  key={i}
-                  whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-                  onClick={() => setTopicInput(chip.label)}
-                  style={{
-                    padding: '5px 12px', borderRadius: 99, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                    fontFamily: "'Inter', system-ui, sans-serif",
-                    background: isStruggle ? 'rgba(248,113,113,0.12)' : 'rgba(255,255,255,0.06)',
-                    border: isStruggle ? '1px solid rgba(248,113,113,0.30)' : '1px solid rgba(255,255,255,0.12)',
-                    color: isStruggle ? '#FCA5A5' : 'rgba(255,255,255,0.60)',
-                  }}
-                >
-                  {isStruggle ? '⚠ ' : ''}{chip.label}
-                </motion.button>
-              )
-            })}
-          </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {chips.map((chip, i) => {
+            const isStruggle = chip.type === 'struggle'
+            return (
+              <motion.button key={i} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                onClick={() => setTopicInput(chip.label)}
+                style={{ padding: '4px 11px', borderRadius: 99, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif", background: isStruggle ? 'rgba(248,113,113,0.10)' : 'rgba(255,255,255,0.05)', border: isStruggle ? '1px solid rgba(248,113,113,0.28)' : '1px solid rgba(255,255,255,0.10)', color: isStruggle ? '#FCA5A5' : 'rgba(255,255,255,0.55)' }}>
+                {isStruggle ? '⚠ ' : ''}{chip.label}
+              </motion.button>
+            )
+          })}
         </div>
       )}
 
-      {/* 7-drill grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
-        {Object.values(DRILLS).map((drill, i) => {
-          const best = topicInput.trim() ? getPersonalBest(topicInput.trim(), drill.id) : null
-          return <DrillCard key={drill.id} drill={drill} index={i} onStart={handleStart} personalBest={best} />
-        })}
+      {/* ── Collapsible settings ── */}
+      <div>
+        <button onClick={() => setSettingsOpen(o => !o)}
+          style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}>
+          <Settings size={12} />
+          <span style={{ flex: 1, textAlign: 'left' }}>
+            {DIFFICULTIES[difficulty]?.label} · {questionCount} questions · {focusMode.charAt(0).toUpperCase() + focusMode.slice(1)}
+          </span>
+          <span style={{ fontSize: 10, opacity: 0.6 }}>{settingsOpen ? '▲' : '▼'}</span>
+        </button>
+        <AnimatePresence>
+          {settingsOpen && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }} style={{ overflow: 'hidden' }}>
+              <div style={{ paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                  <span style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.10em', textTransform: 'uppercase', marginRight: 2 }}>Difficulty</span>
+                  {Object.entries(DIFFICULTIES).map(([key, val]) => (
+                    <button key={key} onClick={() => setDifficulty(key)} style={difficulty === key ? active(val.color) : inactive}>{val.label}</button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                  <span style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.10em', textTransform: 'uppercase', marginRight: 2 }}>Questions</span>
+                  {[5, 8, 12, 20].map(n => (
+                    <button key={n} onClick={() => setQuestionCount(n)} style={questionCount === n ? active('#60A5FA') : inactive}>{n}</button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                  <span style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.10em', textTransform: 'uppercase', marginRight: 2 }}>Focus</span>
+                  {[{ key: 'theory', label: 'Theory' }, { key: 'mixed', label: 'Mixed' }, { key: 'application', label: 'Application' }].map(({ key, label }) => (
+                    <button key={key} onClick={() => setFocusMode(key)} style={focusMode === key ? active('#A78BFA') : inactive}>{label}</button>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
+
+      {/* ── 2-column drill grid ── */}
+      <div>
+        <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 10 }}>
+          Choose a drill mode
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+          {Object.values(DRILLS).map((drill, i) => {
+            const best = topicInput.trim() ? getPersonalBest(topicInput.trim(), drill.id) : null
+            return <DrillCard key={drill.id} drill={drill} index={i} onStart={handleStart} personalBest={best} />
+          })}
+        </div>
+      </div>
+
     </div>
   )
 }
