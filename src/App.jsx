@@ -4296,13 +4296,6 @@ function ChatView({ onBack }) {
         },
       )
 
-      // DEBUG: log raw response so we can see VIZ tags in DevTools
-      if (rawResponse.includes('[VIZ:') || rawResponse.includes('⚡CANVAS') || rawResponse.includes('⚡FUNCGRAPH')) {
-        console.log('[Aeva raw — VIZ check]', rawResponse)
-      } else {
-        console.log('[Aeva raw — no visual tag]', rawResponse.slice(0, 200))
-      }
-
       // Post-process for chaos/vitals/fallacy/interrupt
       if (isMission) {
         processAIResponse(rawResponse)
