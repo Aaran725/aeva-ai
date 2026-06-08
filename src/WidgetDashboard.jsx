@@ -384,9 +384,7 @@ function HeroWidget({ name, level, xpPct, onOrbClick, activeOrbDef, orbPersonali
 function StreakWidget({ streak }) {
   return (
     <Widget idx={1} style={{
-      background: `
-        radial-gradient(ellipse at 55% 25%, #C84518 0%, #8A1408 55%, #540808 100%)
-      `,
+      background: 'radial-gradient(ellipse 140% 95% at 20% 0%, #E06828 0%, #C04018 22%, #881010 50%, #400808 74%, #0C0202 100%)',
     }}>
       <Label>Streak</Label>
       <Sub color="rgba(255,200,170,0.45)">Days in a row</Sub>
@@ -411,7 +409,7 @@ function StreakWidget({ streak }) {
 function LevelWidget({ level, xpPct }) {
   return (
     <Widget idx={2} style={{
-      background: 'radial-gradient(ellipse at 75% 20%, #1EC4AA 0%, #0C9280 42%, #066860 100%)',
+      background: 'radial-gradient(ellipse 140% 95% at 85% 0%, #22D4B8 0%, #10A890 22%, #067870 50%, #023838 74%, #010C0A 100%)',
     }}>
       {/* The distinctive golden crescent arcs */}
       <GoldenArc />
@@ -432,8 +430,7 @@ function LevelWidget({ level, xpPct }) {
 function ReadinessWidget({ pct, roadmapTitle }) {
   return (
     <Widget idx={3} style={{
-      /* key: starts at a light lavender center, not a dark purple */
-      background: 'radial-gradient(ellipse at 28% 28%, #C8A8D8 0%, #9B72BC 38%, #6E48A0 68%, #4A2C7C 100%)',
+      background: 'radial-gradient(ellipse 140% 95% at 15% 0%, #B080D8 0%, #8848B8 26%, #5A3090 52%, #261058 76%, #070414 100%)',
       gridColumn: 'span 2',
     }}>
       <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
@@ -463,14 +460,14 @@ function ReadinessWidget({ pct, roadmapTitle }) {
 function ModeWidget({ modeName, modeColor, modeSub }) {
   /* map mode color to Enhance-style card gradient */
   const bgMap = {
-    '#4ADE80': 'radial-gradient(ellipse at 50% 65%, #28C858 0%, #148A38 45%, #0A5828 100%)',
-    '#60A5FA': 'radial-gradient(ellipse at 50% 65%, #3888F8 0%, #1850C0 45%, #0C2870 100%)',
-    '#F87171': 'radial-gradient(ellipse at 50% 65%, #E83848 0%, #A01830 45%, #600818 100%)',
-    '#FBBF24': 'radial-gradient(ellipse at 50% 65%, #D89010 0%, #906000 45%, #583800 100%)',
-    '#A78BFA': 'radial-gradient(ellipse at 50% 65%, #9858F8 0%, #5820C0 45%, #2A1080 100%)',
-    '#F97316': 'radial-gradient(ellipse at 50% 65%, #E86010 0%, #A03808 45%, #601808 100%)',
+    '#4ADE80': 'radial-gradient(ellipse 130% 90% at 35% 5%, #32C858 0%, #188A38 26%, #0A5828 52%, #041C10 76%, #010A06 100%)',
+    '#60A5FA': 'radial-gradient(ellipse 130% 90% at 35% 5%, #3888F8 0%, #1858C8 26%, #0C2880 52%, #041040 76%, #010208 100%)',
+    '#F87171': 'radial-gradient(ellipse 130% 90% at 35% 5%, #E83848 0%, #A01828 26%, #600818 52%, #280408 76%, #080202 100%)',
+    '#FBBF24': 'radial-gradient(ellipse 130% 90% at 35% 5%, #D89010 0%, #906000 26%, #583800 52%, #281800 76%, #080402 100%)',
+    '#A78BFA': 'radial-gradient(ellipse 130% 90% at 35% 5%, #9858F8 0%, #5820C0 26%, #2A1080 52%, #100840 76%, #040108 100%)',
+    '#F97316': 'radial-gradient(ellipse 130% 90% at 35% 5%, #E86010 0%, #A03808 26%, #601808 52%, #280808 76%, #080202 100%)',
   }
-  const bg = bgMap[modeColor] || 'radial-gradient(ellipse at 50% 65%, #E01E6A 0%, #980E42 45%, #580828 100%)'
+  const bg = bgMap[modeColor] || 'radial-gradient(ellipse 130% 90% at 35% 5%, #F03080 0%, #C01060 26%, #880848 52%, #340220 76%, #0C0208 100%)'
 
   return (
     <Widget idx={4} style={{ background: bg }}>
@@ -494,7 +491,7 @@ function ModeWidget({ modeName, modeColor, modeSub }) {
 function DueWidget({ count, onLab }) {
   return (
     <Widget idx={5} onClick={onLab} style={{
-      background: 'radial-gradient(ellipse at 72% 22%, #A01830 0%, #600E20 48%, #380810 100%)',
+      background: 'radial-gradient(ellipse 140% 95% at 82% 0%, #C02030 0%, #801020 24%, #480810 52%, #200408 76%, #080202 100%)',
     }}>
       <Label>Cards Due</Label>
       <Sub color="rgba(255,175,175,0.42)">Spaced repetition</Sub>
@@ -555,7 +552,7 @@ function QuickLaunchWidget({ onChat, onLab, onArcade, onRoadmaps, onDocs, onBrai
 function KnowledgeWidget({ concepts, onPalace }) {
   return (
     <Widget idx={7} onClick={onPalace} style={{
-      background: 'radial-gradient(ellipse at 65% 45%, #1E3A9A 0%, #0E2068 45%, #070E38 100%)',
+      background: 'radial-gradient(ellipse 140% 95% at 78% 0%, #2040C0 0%, #1030A0 26%, #081870 52%, #030830 76%, #010208 100%)',
       gridColumn: 'span 2',
     }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
