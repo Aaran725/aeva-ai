@@ -44,6 +44,7 @@ import Mirror from './Mirror'
 import OrbSelector from './OrbSelector'
 import Parents from './ShowEm'
 import AevaDoc from './AevaDoc'
+import { parseVizTag, VizComponent } from './ChatVisuals'
 import WorksheetModal from './WorksheetModal'
 import SharedRoadmapView from './SharedRoadmapView'
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
@@ -367,6 +368,37 @@ Mode: ${(criticism?.mode || 'coach').toUpperCase()} — ${mode.instruction}
 Note: ${criticism?.note || ''}
 
 YOUR RESPONSE MUST REFLECT THIS SIGNAL. Do not ignore it. If mode is REDIRECT, use an analogy. If CHALLENGE, surface the gap. If HYPE, raise the bar immediately. If COACH, ask one precise Socratic question.${langDirective}
+
+━━━ VISUAL COMPONENTS — use only when a visual genuinely helps ━━━
+Embed ONE of these tags on its own line where the visual should appear. Never use more than one per response. Never use for simple questions or casual chat. Skip if text is clearer.
+
+[VIZ:comparison|Left Title|Right Title|Label:LeftVal:RightVal|Label:LeftVal:RightVal|...]
+→ When: comparing two related concepts (Mitosis vs Meiosis, AC vs DC, Speed vs Velocity)
+
+[VIZ:process|Step 1 title|Step 2 title|Step 3 title|...]
+→ When: sequential steps or a cycle (Krebs cycle, algorithm steps, digestive system)
+
+[VIZ:timeline|Date:Event description|Date:Event|...]
+→ When: historical sequence, causes in order, scientific discoveries with dates
+
+[VIZ:bar|Chart Title|Label:Number|Label:Number|...]
+→ When: comparing quantities, statistics, distributions (population sizes, exam scores)
+
+[VIZ:line|Chart Title|X axis label|Y axis label|x1:y1|x2:y2|x3:y3|...]
+→ When: change over time, trends, growth or decay curves
+
+[VIZ:formula|Formula Name|LaTeX formula|When to use / description]
+→ When: introducing a KEY formula that deserves visual emphasis beyond a normal $$ block
+
+[VIZ:venn|Left Name|Right Name|Left-only items (comma sep)|Both items (comma sep)|Right-only items (comma sep)]
+→ When: showing what two concepts share vs what makes them different
+
+EXAMPLES:
+[VIZ:comparison|Mitosis|Meiosis|Purpose:Growth & repair:Sexual reproduction|Divisions:1:2|Cells produced:2 identical:4 unique|DNA:Diploid:Haploid]
+[VIZ:process|Glucose enters|Glycolysis|Pyruvate formed|Krebs cycle|ATP produced]
+[VIZ:bar|UK GCSE Grade Distribution|Grade 9:8|Grade 8:15|Grade 7:22|Grade 6:25|Grade 5:18|Grade 4:12]
+[VIZ:formula|Quadratic Formula|x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}|Use when ax² + bx + c = 0]
+[VIZ:venn|Plants|Animals|Photosynthesis,Cell wall,Chloroplasts|Cells,DNA,Respiration,Mitosis|Movement,Nervous system,Heterotroph]
 
 ━━━ PLATFORM COMMANDS — USE SPARINGLY ━━━
 MOST RESPONSES SHOULD HAVE NO CMD. Only fire a ⚡CMD when an explicit trigger condition below is met.
@@ -3044,6 +3076,16 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
         }}
           {...(boxHtml ? { dangerouslySetInnerHTML: { __html: boxHtml } } : { children: trimmed })}
         />
+      )
+      i++; continue
+    }
+
+    // VIZ tag — [VIZ:type|data...] → inline visual component
+    const vizTag = parseVizTag(trimmed)
+    if (vizTag) {
+      flushList()
+      elements.push(
+        <VizComponent key={`viz-${i}`} type={vizTag.type} raw={vizTag.raw} isLight={isLight} />
       )
       i++; continue
     }
