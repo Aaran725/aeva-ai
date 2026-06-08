@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText, BookOpen, Zap, Target, ClipboardList, Check, Lock, Clock, Trophy, Trash2, Brain, Dumbbell, GraduationCap, FlaskConical, Share2, Copy, AlertTriangle, RotateCcw } from 'lucide-react'
-import { useRoadmapStore } from './roadmapStore'
+import { useRoadmapStore, calcGrade, gradeGapMessage, GRADE_THRESHOLDS } from './roadmapStore'
 import { useLabStore } from './labStore'
 import { supabase } from './supabase'
 import { useXPStore } from './xpStore'
@@ -427,12 +427,13 @@ function NodeCounter({ label, icon, color, bg, border, value, onChange, min = 1,
 }
 
 function CreateView({ onGenerate }) {
-  const [title, setTitle]       = useState('')
-  const [examDate, setExamDate] = useState('')
-  const [info, setInfo]         = useState('')
-  const [dragOver, setDragOver] = useState(false)
-  const [error, setError]       = useState('')
-  const fileRef                 = useRef(null)
+  const [title, setTitle]           = useState('')
+  const [examDate, setExamDate]     = useState('')
+  const [targetGrade, setTargetGrade] = useState('B')
+  const [info, setInfo]             = useState('')
+  const [dragOver, setDragOver]     = useState(false)
+  const [error, setError]           = useState('')
+  const fileRef                     = useRef(null)
 
   // Customisation
   const [learnCount,    setLearnCount]    = useState(8)
@@ -462,7 +463,7 @@ function CreateView({ onGenerate }) {
   const handleGenerate = () => {
     if (!title.trim() || !examDate) { setError('Add a title and exam date to continue.'); return }
     setError('')
-    onGenerate({ title: title.trim(), examDate, info, options: { learnCount, practiceCount, mockCount, pace } })
+    onGenerate({ title: title.trim(), examDate, targetGrade, info, options: { learnCount, practiceCount, mockCount, pace } })
   }
 
   const field = {
@@ -506,6 +507,34 @@ function CreateView({ onGenerate }) {
               style={{ ...field, paddingLeft: 40, colorScheme: 'dark' }}
             />
             <Calendar size={15} color="rgba(255,255,255,0.35)" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+          </div>
+        </div>
+
+        {/* Target Grade */}
+        <div>
+          <label style={{ fontSize: 11.5, fontWeight: 700, color: 'rgba(255,255,255,0.40)', letterSpacing: '0.10em', textTransform: 'uppercase', display: 'block', marginBottom: 10 }}>
+            Target Grade
+          </label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {['A*', 'A', 'B', 'C', 'D'].map(g => {
+              const gradeColors = { 'A*': '#A78BFA', 'A': '#818CF8', 'B': '#34D399', 'C': '#60A5FA', 'D': '#FBBF24' }
+              const col = gradeColors[g]
+              const selected = targetGrade === g
+              return (
+                <motion.button key={g} whileTap={{ scale: 0.92 }} onClick={() => setTargetGrade(g)}
+                  style={{
+                    flex: 1, padding: '12px 6px', borderRadius: 12, fontFamily: 'inherit',
+                    fontSize: 15, fontWeight: 800, cursor: 'pointer', letterSpacing: '-0.01em',
+                    background: selected ? `${col}22` : 'rgba(255,255,255,0.04)',
+                    border: selected ? `1.5px solid ${col}80` : '1.5px solid rgba(255,255,255,0.08)',
+                    color: selected ? col : 'rgba(255,255,255,0.35)',
+                    boxShadow: selected ? `0 0 14px ${col}30` : 'none',
+                    transition: 'all 0.15s',
+                  }}>
+                  {g}
+                </motion.button>
+              )
+            })}
           </div>
         </div>
 
@@ -654,7 +683,7 @@ function GeneratingView({ formData, onDone }) {
 
     const run = async () => {
       try {
-        const id = createRoadmap({ title: formData.title, examDate: formData.examDate, assessmentInfo: formData.info })
+        const id = createRoadmap({ title: formData.title, examDate: formData.examDate, targetGrade: formData.targetGrade || 'B', assessmentInfo: formData.info })
         const { overview, nodes } = await generateRoadmapNodes(formData.title, formData.examDate, formData.info, formData.options || {})
         if (cancelled) return
         updateRoadmap(id, { overview, nodes })
@@ -885,20 +914,57 @@ function PathView() {
             </div>
           </div>
 
-          {/* Progress bar */}
+          {/* Progress bar + Grade */}
           <div style={{ marginBottom: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600 }}>Readiness</span>
-              <span style={{ fontSize: 11, color: '#fff', fontWeight: 800 }}>{roadmap.readiness}%</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {/* Current grade pill */}
+                {(() => {
+                  const g = calcGrade(roadmap.readiness || 0)
+                  const tg = roadmap.targetGrade
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <span style={{
+                        fontSize: 12, fontWeight: 900, padding: '2px 9px', borderRadius: 99,
+                        background: `${g.color}22`, border: `1.5px solid ${g.color}60`,
+                        color: g.color, letterSpacing: '0.02em',
+                        boxShadow: `0 0 10px ${g.color}30`,
+                      }}>{g.grade}</span>
+                      {tg && tg !== g.grade && (
+                        <>
+                          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.30)' }}>→</span>
+                          <span style={{
+                            fontSize: 12, fontWeight: 900, padding: '2px 9px', borderRadius: 99,
+                            background: 'rgba(255,255,255,0.07)', border: '1.5px solid rgba(255,255,255,0.18)',
+                            color: 'rgba(255,255,255,0.55)', letterSpacing: '0.02em',
+                          }}>{tg}</span>
+                        </>
+                      )}
+                    </div>
+                  )
+                })()}
+                <span style={{ fontSize: 11, color: '#fff', fontWeight: 800 }}>{roadmap.readiness || 0}%</span>
+              </div>
             </div>
             <div style={{ height: 7, borderRadius: 99, background: 'rgba(255,255,255,0.15)', overflow: 'hidden' }}>
               <motion.div
                 initial={{ width: 0 }}
-                animate={{ width: `${roadmap.readiness}%` }}
+                animate={{ width: `${roadmap.readiness || 0}%` }}
                 transition={{ duration: 0.8, ease: 'easeOut' }}
                 style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #818CF8, #C4B5FD)' }}
               />
             </div>
+            {/* Grade gap message */}
+            {(() => {
+              const g = calcGrade(roadmap.readiness || 0)
+              const msg = roadmap.targetGrade ? gradeGapMessage(g.grade, roadmap.targetGrade, roadmap.readiness || 0, roadmap.learningProfile?.weak || []) : null
+              return msg ? (
+                <div style={{ marginTop: 8, fontSize: 11.5, color: 'rgba(255,255,255,0.50)', lineHeight: 1.55 }}>
+                  💡 {msg}
+                </div>
+              ) : null
+            })()}
           </div>
 
           {/* Mission tasks — use generated daily mission if available */}

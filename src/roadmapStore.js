@@ -32,6 +32,48 @@ function calcReadiness(nodes) {
   return Math.round((solid * 1.0 + shaky * 0.6) / total * 100)
 }
 
+// Map readiness % + optional drill avg → letter grade
+// drillAvg: 0-100 from recent drill sessions (optional, defaults to readiness)
+export const GRADE_THRESHOLDS = [
+  { grade: 'A*', min: 90, color: '#A78BFA', glow: 'rgba(167,139,250,0.35)' },
+  { grade: 'A',  min: 78, color: '#818CF8', glow: 'rgba(129,140,248,0.30)' },
+  { grade: 'B',  min: 62, color: '#34D399', glow: 'rgba(52,211,153,0.30)' },
+  { grade: 'C',  min: 47, color: '#60A5FA', glow: 'rgba(96,165,250,0.28)' },
+  { grade: 'D',  min: 33, color: '#FBBF24', glow: 'rgba(251,191,36,0.28)' },
+  { grade: 'E',  min: 20, color: '#FB923C', glow: 'rgba(251,146,60,0.28)' },
+  { grade: 'U',  min: 0,  color: '#F87171', glow: 'rgba(248,113,113,0.25)' },
+]
+
+export function calcGrade(readiness, drillAvg = null) {
+  // Blend readiness (70%) with drill performance (30%) when drill data exists
+  const score = drillAvg !== null
+    ? Math.round(readiness * 0.7 + drillAvg * 0.3)
+    : readiness
+  return GRADE_THRESHOLDS.find(t => score >= t.min) || GRADE_THRESHOLDS[GRADE_THRESHOLDS.length - 1]
+}
+
+// What does the student need to reach the next grade?
+export function gradeGapMessage(currentGrade, targetGrade, readiness, weakTopics = []) {
+  const grades = GRADE_THRESHOLDS.map(t => t.grade)
+  const currentIdx = grades.indexOf(currentGrade)
+  const targetIdx  = grades.indexOf(targetGrade)
+  if (currentIdx <= targetIdx) return null // already at or above target
+
+  const next = GRADE_THRESHOLDS[currentIdx - 1] // one grade up
+  const needed = next.min - readiness
+  if (needed <= 0) return `You're on the boundary of ${next.grade} — nail your weak topics to push through.`
+  const weakMsg = weakTopics.length ? ` Focus on: ${weakTopics.slice(0, 3).join(', ')}.` : ''
+  return `You need ~${needed}% more readiness to reach grade ${next.grade}.${weakMsg}`
+}
+
+// Record a grade snapshot (called when readiness updates)
+export function snapshotGrade(gradeHistory = [], grade) {
+  const today = new Date().toDateString()
+  const last  = gradeHistory[gradeHistory.length - 1]
+  if (last?.date === today && last?.grade === grade) return gradeHistory // no change today
+  return [...gradeHistory.slice(-29), { date: today, grade }] // keep 30 days
+}
+
 export const useRoadmapStore = create((set, get) => {
   const stored = load()
   return {
@@ -64,11 +106,13 @@ export const useRoadmapStore = create((set, get) => {
           let nodes = r.nodes.map(n => n.id === nodeId ? { ...n, status: 'complete', confidence } : n)
           nodes = recalc(nodes)
           const readiness = calcReadiness(nodes)
+          const gradeObj  = calcGrade(readiness)
+          const gradeHistory = snapshotGrade(r.gradeHistory || [], gradeObj.grade)
           // If shaky, auto-add to weak areas
           const weakUpdate = confidence === 'shaky'
             ? { learningProfile: { ...(r.learningProfile || {}), weak: [...new Set([...(r.learningProfile?.weak || []), r.nodes.find(n => n.id === nodeId)?.topic || ''].filter(Boolean))] } }
             : {}
-          return { ...r, nodes, readiness, ...weakUpdate }
+          return { ...r, nodes, readiness, gradeHistory, ...weakUpdate }
         })
         const u = { ...s, roadmaps }; save(u); return u
       })
