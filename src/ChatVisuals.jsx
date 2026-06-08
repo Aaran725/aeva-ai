@@ -12,6 +12,7 @@
  *   [VIZ:venn|Left Name|Right Name|Left-only,items|Both,items|Right-only,items]
  */
 
+import { Component } from 'react'
 import { motion } from 'framer-motion'
 import katex from 'katex'
 import {
@@ -19,6 +20,13 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
 } from 'recharts'
+
+/* ── Error boundary — silently swallows render errors inside viz ── */
+class VizErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { crashed: false } }
+  static getDerivedStateFromError() { return { crashed: true } }
+  render() { return this.state.crashed ? null : this.props.children }
+}
 
 /* ── parse helpers ────────────────────────────────────── */
 
@@ -41,24 +49,29 @@ export function parseVizTag(line) {
 const COLORS = ['#818CF8', '#34D399', '#F472B6', '#FBBF24', '#60A5FA', '#FB923C', '#A78BFA', '#4ADE80']
 
 /* ── wrapper ──────────────────────────────────────────── */
-export function VizComponent({ type, raw, isLight }) {
-  try {
-    switch (type) {
-      case 'comparison':   return <ComparisonViz   raw={raw} isLight={isLight} />
-      case 'process':      return <ProcessViz      raw={raw} isLight={isLight} />
-      case 'timeline':     return <TimelineViz     raw={raw} isLight={isLight} />
-      case 'bar':
-      case 'bar_chart':    return <BarViz          raw={raw} isLight={isLight} />
-      case 'line':
-      case 'line_graph':   return <LineViz         raw={raw} isLight={isLight} />
-      case 'formula':
-      case 'formula_card': return <FormulaViz      raw={raw} isLight={isLight} />
-      case 'venn':         return <VennViz         raw={raw} isLight={isLight} />
-      default:             return null
-    }
-  } catch {
-    return null
+function VizInner({ type, raw, isLight }) {
+  switch (type) {
+    case 'comparison':   return <ComparisonViz   raw={raw} isLight={isLight} />
+    case 'process':      return <ProcessViz      raw={raw} isLight={isLight} />
+    case 'timeline':     return <TimelineViz     raw={raw} isLight={isLight} />
+    case 'bar':
+    case 'bar_chart':    return <BarViz          raw={raw} isLight={isLight} />
+    case 'line':
+    case 'line_graph':   return <LineViz         raw={raw} isLight={isLight} />
+    case 'formula':
+    case 'formula_card': return <FormulaViz      raw={raw} isLight={isLight} />
+    case 'venn':         return <VennViz         raw={raw} isLight={isLight} />
+    default:             return null
   }
+}
+
+export function VizComponent({ type, raw, isLight }) {
+  if (!type || !raw) return null
+  return (
+    <VizErrorBoundary>
+      <VizInner type={type} raw={raw} isLight={isLight} />
+    </VizErrorBoundary>
+  )
 }
 
 /* ══════════════════════════════════════════════════════
