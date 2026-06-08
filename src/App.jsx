@@ -3652,9 +3652,21 @@ ${guide.examTip ? `<div class="section"><div class="section-label">Exam Tip</div
 }
 
 /* ═══ CHAT BUBBLE ═════════════════════════════════ */
-function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false }) {
+function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false, isWidget = false }) {
   const isUser = msg.role === 'user'
 
+  /* ── Widget card style (Ai OS) ── */
+  const widgetBg = isUser
+    ? 'radial-gradient(ellipse at 72% 22%, rgba(130,50,20,0.55) 0%, rgba(18,6,4,0.82) 100%)'
+    : 'radial-gradient(ellipse at 28% 22%, rgba(65,40,120,0.55) 0%, rgba(10,8,26,0.82) 100%)'
+  const widgetBorder = isUser
+    ? '1px solid rgba(180,80,40,0.28)'
+    : '1px solid rgba(100,70,180,0.28)'
+  const widgetShadow = '0 8px 36px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.10)'
+  const widgetRadius = isUser ? '24px 24px 6px 24px' : '6px 24px 24px 24px'
+  const widgetPad = isUser ? '12px 20px' : '18px 22px'
+
+  /* ── Classic style ── */
   const bubbleBg = isUser
     ? isLight
       ? 'linear-gradient(135deg, rgba(99,102,241,0.16) 0%, rgba(109,113,225,0.12) 100%)'
@@ -3662,15 +3674,12 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false }) {
     : isLight
       ? 'rgba(0,0,0,0.04)'
       : 'rgba(255,255,255,0.055)'
-
   const bubbleBorder = isUser
     ? isLight ? '1px solid rgba(99,102,241,0.28)' : '1px solid rgba(139,143,255,0.40)'
     : isLight ? '1px solid rgba(0,0,0,0.07)' : '1px solid rgba(255,255,255,0.09)'
-
   const bubbleShadow = isUser
     ? isLight ? '0 2px 12px rgba(99,102,241,0.12)' : '0 4px 20px rgba(139,143,255,0.15), inset 0 1px 0 rgba(255,255,255,0.12)'
     : isLight ? '0 1px 8px rgba(0,0,0,0.06)' : '0 2px 16px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.06)'
-
   const textColor = isLight ? (isUser ? 'rgba(30,27,100,0.88)' : 'rgba(15,15,30,0.85)') : 'rgba(255,255,255,0.90)'
 
   return (
@@ -3681,7 +3690,7 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false }) {
       style={{
         display: 'flex',
         justifyContent: isUser ? 'flex-end' : 'flex-start',
-        marginBottom: 14,
+        marginBottom: isWidget ? 16 : 14,
         gap: 12,
         alignItems: 'flex-start',
       }}
@@ -3689,14 +3698,14 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false }) {
       <div style={{
         maxWidth: 700,
         width: isUser ? 'auto' : '100%',
-        padding: isUser ? '11px 18px' : '16px 20px',
-        borderRadius: isUser ? '22px 22px 6px 22px' : '6px 22px 22px 22px',
-        background: bubbleBg,
+        padding: isWidget ? widgetPad : (isUser ? '11px 18px' : '16px 20px'),
+        borderRadius: isWidget ? widgetRadius : (isUser ? '22px 22px 6px 22px' : '6px 22px 22px 22px'),
+        background: isWidget ? widgetBg : bubbleBg,
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
-        border: bubbleBorder,
-        borderLeft: !isUser ? (isLight ? '2px solid rgba(99,102,241,0.42)' : '2px solid rgba(99,102,241,0.55)') : bubbleBorder,
-        boxShadow: bubbleShadow,
+        border: isWidget ? widgetBorder : bubbleBorder,
+        borderLeft: (!isWidget && !isUser) ? (isLight ? '2px solid rgba(99,102,241,0.42)' : '2px solid rgba(99,102,241,0.55)') : (isWidget ? widgetBorder : bubbleBorder),
+        boxShadow: isWidget ? widgetShadow : bubbleShadow,
         color: textColor,
         fontFamily: "'Inter', system-ui, sans-serif",
       }}>
@@ -4976,6 +4985,19 @@ If no clear changes: {"changes":[]}`
   const isEmpty = messages.length === 0
   const isLight = !isMission && (chatSettings.chatBg || 'default') === 'white'
 
+  /* ── Widget layout toggle (Ai OS style) ── */
+  const { xp: chatXP, streak: chatStreak } = useXPStore()
+  const chatLevel = levelFromXP(chatXP)
+  const [chatLayout, setChatLayout] = useState(() => {
+    try { return localStorage.getItem('aeva_chat_layout') || 'classic' } catch { return 'classic' }
+  })
+  const toggleChatLayout = () => setChatLayout(prev => {
+    const next = prev === 'classic' ? 'widget' : 'classic'
+    try { localStorage.setItem('aeva_chat_layout', next) } catch {}
+    return next
+  })
+  const isWidget = chatLayout === 'widget' && !isMission
+
   const backBtnStyle = isLight
     ? { background: 'rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.12)', color: 'rgba(0,0,0,0.60)' }
     : { background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.13)', color: 'rgba(255,255,255,0.62)' }
@@ -4995,6 +5017,13 @@ If no clear changes: {"changes":[]}`
         background: 'rgba(255,255,255,0.90)',
         border: '1px solid rgba(0,0,0,0.12)',
         boxShadow: '0 2px 24px rgba(0,0,0,0.08)',
+      }
+    : isWidget
+    ? {
+        background: 'radial-gradient(ellipse at 50% 0%, rgba(50,38,90,0.70) 0%, rgba(8,7,20,0.90) 70%)',
+        border: '1px solid rgba(124,58,237,0.38)',
+        boxShadow: '0 0 0 1px rgba(124,58,237,0.12), 0 8px 40px rgba(0,0,0,0.55), 0 0 28px rgba(80,30,140,0.22)',
+        borderRadius: 999,
       }
     : {
         background: 'rgba(255,255,255,0.06)',
@@ -5023,7 +5052,9 @@ If no clear changes: {"changes":[]}`
       style={{
         position: 'relative', display: 'flex', flexDirection: 'column',
         width: '100%', height: '100vh', overflow: 'hidden',
-        background: missionBg,
+        background: isWidget
+          ? `radial-gradient(ellipse at 88% 8%, rgba(80,30,140,0.42) 0%, transparent 48%), radial-gradient(ellipse at 12% 92%, rgba(30,10,90,0.30) 0%, transparent 45%), #08071a`
+          : missionBg,
         fontFamily: "'Inter', system-ui, sans-serif",
       }}
     >
@@ -5224,6 +5255,17 @@ If no clear changes: {"changes":[]}`
                 </motion.button>
               </>
             )}
+            {/* Widget layout toggle */}
+            {!isMission && (
+              <motion.button
+                whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }}
+                onClick={toggleChatLayout}
+                title={isWidget ? 'Switch to Classic view' : 'Switch to Widget view'}
+                style={{ width: 30, height: 30, borderRadius: '50%', background: isWidget ? 'rgba(124,58,237,0.22)' : isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.07)', border: isWidget ? '1px solid rgba(124,58,237,0.45)' : isLight ? '1px solid rgba(0,0,0,0.12)' : '1px solid rgba(255,255,255,0.13)', color: isWidget ? '#C4B5FD' : isLight ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.45)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s, border 0.2s, color 0.2s' }}
+              >
+                <LayoutGrid size={12} />
+              </motion.button>
+            )}
             {/* Appearance gear */}
             <motion.button
               whileHover={{ scale: 1.08, rotate: 45 }} whileTap={{ scale: 0.94 }}
@@ -5238,6 +5280,32 @@ If no clear changes: {"changes":[]}`
             <span style={{ fontSize: 14.5, fontWeight: 800, color: logoColor, letterSpacing: '-0.03em' }}>aeva</span>
           </div>
         </div>
+
+        {/* Widget mode — "Today's Metrix" stats strip */}
+        {isWidget && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: [0.22,1,0.36,1] }}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '4px 24px 12px', flexShrink: 0 }}
+          >
+            {/* Session counter pill — "Today's Metrix" style */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderRadius: 99, background: 'radial-gradient(ellipse at 50% 0%, rgba(40,35,80,0.80) 0%, rgba(8,7,20,0.90) 80%)', border: '1px solid rgba(124,58,237,0.28)', boxShadow: '0 4px 20px rgba(0,0,0,0.40)', fontFamily:"'Inter',system-ui,sans-serif" }}>
+              <span style={{ fontSize: 10, color: 'rgba(196,181,253,0.60)', fontWeight: 600, letterSpacing: '0.06em' }}>+{Object.keys(masteryMap).length}</span>
+              <div style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.10)' }} />
+              <span style={{ fontSize: 13, fontWeight: 900, color: 'rgba(196,181,253,0.92)', letterSpacing: '-0.02em' }}>{exchangeCountRef.current || 0}</span>
+              <div style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.10)' }} />
+              <span style={{ fontSize: 10, color: 'rgba(196,181,253,0.60)', fontWeight: 600, letterSpacing: '0.06em' }}>exchanges</span>
+            </div>
+            {chatStreak > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 99, background: 'rgba(180,50,15,0.22)', border: '1px solid rgba(200,80,30,0.32)', fontSize: 11, fontWeight: 700, color: '#FDBA74', fontFamily:"'Inter',system-ui,sans-serif" }}>
+                🔥 {chatStreak}
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 99, background: 'rgba(124,58,237,0.18)', border: '1px solid rgba(124,58,237,0.30)', fontSize: 11, fontWeight: 700, color: '#C4B5FD', fontFamily:"'Inter',system-ui,sans-serif" }}>
+              <Zap size={10} fill="#C4B5FD" color="#C4B5FD" /> Lv {chatLevel}
+            </div>
+          </motion.div>
+        )}
 
         {/* Mission vitals HUD (startup / space) */}
         {isMission && <MissionVitalsBar />}
@@ -5577,7 +5645,7 @@ If no clear changes: {"changes":[]}`
                 {messages.map((msg, i) =>
                   isMission
                     ? <ThemedChatBubble key={i} msg={msg} mission={activeMission} />
-                    : <ChatBubble key={i} msg={msg} deepDiveCards={deepDiveMap[i] || []} onDismissCard={(cardId) => setDeepDiveMap(prev => ({ ...prev, [i]: (prev[i] || []).filter(c => c.id !== cardId) }))} isLight={isLight} />
+                    : <ChatBubble key={i} msg={msg} deepDiveCards={deepDiveMap[i] || []} onDismissCard={(cardId) => setDeepDiveMap(prev => ({ ...prev, [i]: (prev[i] || []).filter(c => c.id !== cardId) }))} isLight={isLight} isWidget={isWidget} />
                 )}
 
                 {/* Worksheet generating indicator */}
