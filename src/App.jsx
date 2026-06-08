@@ -2600,11 +2600,19 @@ function parseInline(text, isLight = false) {
         continue
       }
     }
-    // Bold **text**
+    // Bold **text** — colored, not just heavier
     const boldMatch = remaining.match(/^(.*?)\*\*(.+?)\*\*/)
     if (boldMatch) {
       if (boldMatch[1]) parts.push(<span key={key++}>{boldMatch[1]}</span>)
-      parts.push(<strong key={key++} style={{ fontWeight: 700, color: 'inherit' }}>{parseInline(boldMatch[2], isLight)}</strong>)
+      parts.push(
+        <strong key={key++} style={{
+          fontWeight: 700,
+          color: isLight ? '#4338CA' : '#C4B5FD',
+          letterSpacing: '-0.01em',
+        }}>
+          {parseInline(boldMatch[2], isLight)}
+        </strong>
+      )
       remaining = remaining.slice(boldMatch[0].length)
       continue
     }
@@ -2612,7 +2620,7 @@ function parseInline(text, isLight = false) {
     const italicMatch = remaining.match(/^(.*?)(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/)
     if (italicMatch) {
       if (italicMatch[1]) parts.push(<span key={key++}>{italicMatch[1]}</span>)
-      parts.push(<em key={key++} style={{ opacity: 0.82, fontStyle: 'italic' }}>{parseInline(italicMatch[2], isLight)}</em>)
+      parts.push(<em key={key++} style={{ color: isLight ? 'rgba(0,0,0,0.72)' : 'rgba(220,215,255,0.82)', fontStyle: 'italic' }}>{parseInline(italicMatch[2], isLight)}</em>)
       remaining = remaining.slice(italicMatch[0].length)
       continue
     }
@@ -2699,31 +2707,38 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
   let listItems = []
   let listType = null
 
+  const BULLET_COLORS = ['#818CF8','#34D399','#F472B6','#FBBF24','#60A5FA','#A78BFA']
+
   const flushList = () => {
     if (listItems.length === 0) return
     if (listType === 'ol') {
       elements.push(
-        <div key={`list-${elements.length}`} style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 7 }}>
+        <div key={`list-${elements.length}`} style={{ margin: '10px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {listItems.map((item, idx) => (
-            <div key={idx} style={{ display: 'flex', gap: 11, alignItems: 'flex-start' }}>
+            <div key={idx} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
               <span style={{
-                color: purple, flexShrink: 0, minWidth: 22, fontSize: 12.5,
-                fontWeight: 800, lineHeight: 1.75,
-                background: isLight ? 'rgba(99,102,241,0.08)' : 'rgba(99,102,241,0.15)',
-                borderRadius: 5, padding: '0 5px', textAlign: 'center',
+                color: BULLET_COLORS[idx % BULLET_COLORS.length],
+                flexShrink: 0, minWidth: 24, fontSize: 12,
+                fontWeight: 900, lineHeight: 1.85,
+                background: isLight ? `${BULLET_COLORS[idx % BULLET_COLORS.length]}18` : `${BULLET_COLORS[idx % BULLET_COLORS.length]}22`,
+                borderRadius: 6, padding: '0 5px', textAlign: 'center',
+                border: `1px solid ${BULLET_COLORS[idx % BULLET_COLORS.length]}35`,
               }}>{idx + 1}</span>
-              <span style={{ fontSize: 14.5, color: txtBody, lineHeight: 1.72 }}>{parseInline(item, isLight)}</span>
+              <span style={{ fontSize: 14.5, color: isLight ? 'rgba(0,0,0,0.84)' : 'rgba(255,255,255,0.88)', lineHeight: 1.75 }}>{parseInline(item, isLight)}</span>
             </div>
           ))}
         </div>
       )
     } else {
       elements.push(
-        <div key={`list-${elements.length}`} style={{ margin: '8px 0', display: 'flex', flexDirection: 'column', gap: 7 }}>
+        <div key={`list-${elements.length}`} style={{ margin: '10px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {listItems.map((item, idx) => (
-            <div key={idx} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <span style={{ color: purple, flexShrink: 0, marginTop: 8, fontSize: 7, opacity: 0.9 }}>◆</span>
-              <span style={{ fontSize: 14.5, color: txtBody, lineHeight: 1.72 }}>{parseInline(item, isLight)}</span>
+            <div key={idx} style={{ display: 'flex', gap: 11, alignItems: 'flex-start' }}>
+              <span style={{
+                color: BULLET_COLORS[idx % BULLET_COLORS.length],
+                flexShrink: 0, marginTop: 7, fontSize: 8, lineHeight: 1,
+              }}>◆</span>
+              <span style={{ fontSize: 14.5, color: isLight ? 'rgba(0,0,0,0.84)' : 'rgba(255,255,255,0.88)', lineHeight: 1.75 }}>{parseInline(item, isLight)}</span>
             </div>
           ))}
         </div>
@@ -2829,36 +2844,58 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
       continue
     }
 
-    // H3 ### — lavender, compact
+    // H3 ### — accent color, medium weight
     if (/^###\s/.test(trimmed)) {
       flushList()
       elements.push(
-        <div key={`h3-${i}`} style={{ fontWeight: 700, fontSize: 13.5, marginTop: 14, marginBottom: 2, color: isLight ? '#6D28D9' : '#C4B5FD', letterSpacing: '-0.01em', lineHeight: 1.4 }}>
+        <div key={`h3-${i}`} style={{
+          fontWeight: 700, fontSize: 13.5, marginTop: 18, marginBottom: 4,
+          color: isLight ? '#6D28D9' : '#A78BFA',
+          letterSpacing: '-0.01em', lineHeight: 1.4,
+          paddingLeft: 10,
+          borderLeft: `3px solid ${isLight ? '#8B5CF6' : '#7C3AED'}`,
+        }}>
           {parseInline(trimmed.replace(/^###\s/, ''), isLight)}
         </div>
       )
       i++; continue
     }
 
-    // H2 ## — section divider with subtle rule
+    // H2 ## — strong divider heading
     if (/^##\s/.test(trimmed)) {
       flushList()
       elements.push(
-        <div key={`h2-${i}`} style={{ marginTop: 22, marginBottom: 8 }}>
-          <div style={{ fontWeight: 800, fontSize: 15.5, color: isLight ? 'rgba(0,0,0,0.93)' : 'rgba(255,255,255,0.97)', letterSpacing: '-0.025em', lineHeight: 1.3, paddingBottom: 7, borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.10)'}` }}>
-            {parseInline(trimmed.replace(/^##\s/, ''), isLight)}
+        <div key={`h2-${i}`} style={{ marginTop: 26, marginBottom: 10 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            paddingBottom: 8,
+            borderBottom: `2px solid ${isLight ? 'rgba(99,102,241,0.25)' : 'rgba(139,143,255,0.20)'}`,
+          }}>
+            <div style={{ width: 4, height: 18, borderRadius: 2, background: isLight ? '#6366F1' : '#818CF8', flexShrink: 0 }} />
+            <span style={{ fontWeight: 800, fontSize: 16, color: isLight ? 'rgba(0,0,0,0.93)' : 'rgba(255,255,255,0.97)', letterSpacing: '-0.03em', lineHeight: 1.3 }}>
+              {parseInline(trimmed.replace(/^##\s/, ''), isLight)}
+            </span>
           </div>
         </div>
       )
       i++; continue
     }
 
-    // H1 # — large accent heading
+    // H1 # — large gradient heading
     if (/^#\s/.test(trimmed)) {
       flushList()
       elements.push(
-        <div key={`h1-${i}`} style={{ fontWeight: 900, fontSize: 17, marginTop: 20, marginBottom: 8, color: isLight ? '#000' : '#fff', letterSpacing: '-0.03em', lineHeight: 1.25 }}>
-          {parseInline(trimmed.replace(/^#\s/, ''), isLight)}
+        <div key={`h1-${i}`} style={{ marginTop: 22, marginBottom: 10 }}>
+          <div style={{
+            fontWeight: 900, fontSize: 19, letterSpacing: '-0.04em', lineHeight: 1.2,
+            background: isLight ? 'none' : 'linear-gradient(135deg, #fff 30%, #C4B5FD 100%)',
+            WebkitBackgroundClip: isLight ? undefined : 'text',
+            WebkitTextFillColor: isLight ? '#000' : 'transparent',
+            backgroundClip: isLight ? undefined : 'text',
+            color: isLight ? '#000' : undefined,
+          }}>
+            {parseInline(trimmed.replace(/^#\s/, ''), isLight)}
+          </div>
         </div>
       )
       i++; continue
@@ -2875,41 +2912,46 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
         const label = labelMatch[1]
         const body  = labelMatch[2]
         const cfg = {
-          example:     { bg: 'rgba(251,191,36,0.08)',  border: 'rgba(251,191,36,0.30)',  color: '#FBBF24', icon: '◎' },
-          definition:  { bg: 'rgba(96,165,250,0.08)',  border: 'rgba(96,165,250,0.28)',  color: '#60A5FA', icon: '◉' },
-          'key insight':{ bg: 'rgba(139,143,255,0.10)', border: 'rgba(139,143,255,0.34)', color: '#A5B4FC', icon: '◈' },
-          key:         { bg: 'rgba(139,143,255,0.10)', border: 'rgba(139,143,255,0.34)', color: '#A5B4FC', icon: '◈' },
-          note:        { bg: 'rgba(99,102,241,0.08)',  border: 'rgba(99,102,241,0.28)',  color: '#818CF8', icon: '◇' },
-          warning:     { bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.28)', color: '#F87171', icon: '⚠' },
-          tip:         { bg: 'rgba(52,211,153,0.08)',  border: 'rgba(52,211,153,0.28)',  color: '#34D399', icon: '→' },
-          recall:      { bg: 'rgba(251,191,36,0.07)',  border: 'rgba(251,191,36,0.24)',  color: '#FCD34D', icon: '↩' },
-        }[label.toLowerCase()] || { bg: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.28)', color: '#818CF8', icon: '◈' }
+          example:      { bg: 'rgba(251,191,36,0.10)',  border: 'rgba(251,191,36,0.35)',  color: '#FBBF24', icon: '◎', pill: 'rgba(251,191,36,0.18)' },
+          definition:   { bg: 'rgba(96,165,250,0.10)',  border: 'rgba(96,165,250,0.32)',  color: '#60A5FA', icon: '◉', pill: 'rgba(96,165,250,0.18)' },
+          'key insight':{ bg: 'rgba(139,143,255,0.12)', border: 'rgba(139,143,255,0.40)', color: '#A5B4FC', icon: '◈', pill: 'rgba(139,143,255,0.20)' },
+          key:          { bg: 'rgba(139,143,255,0.12)', border: 'rgba(139,143,255,0.40)', color: '#A5B4FC', icon: '◈', pill: 'rgba(139,143,255,0.20)' },
+          note:         { bg: 'rgba(99,102,241,0.10)',  border: 'rgba(99,102,241,0.32)',  color: '#818CF8', icon: '◇', pill: 'rgba(99,102,241,0.18)' },
+          warning:      { bg: 'rgba(248,113,113,0.10)', border: 'rgba(248,113,113,0.32)', color: '#F87171', icon: '⚠', pill: 'rgba(248,113,113,0.18)' },
+          tip:          { bg: 'rgba(52,211,153,0.10)',  border: 'rgba(52,211,153,0.32)',  color: '#34D399', icon: '→', pill: 'rgba(52,211,153,0.18)' },
+          recall:       { bg: 'rgba(251,191,36,0.09)',  border: 'rgba(251,191,36,0.28)',  color: '#FCD34D', icon: '↩', pill: 'rgba(251,191,36,0.16)' },
+        }[label.toLowerCase()] || { bg: 'rgba(99,102,241,0.10)', border: 'rgba(99,102,241,0.32)', color: '#818CF8', icon: '◈', pill: 'rgba(99,102,241,0.18)' }
 
         elements.push(
           <div key={`bq-${i}`} style={{
-            margin: '10px 0', padding: '12px 16px',
+            margin: '12px 0', padding: '13px 16px',
             background: cfg.bg,
             border: `1px solid ${cfg.border}`,
             borderLeft: `4px solid ${cfg.color}`,
             borderRadius: 14,
+            boxShadow: `0 2px 12px ${cfg.color}10`,
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: body ? 6 : 0 }}>
-              <span style={{ fontSize: 12, color: cfg.color, fontWeight: 700 }}>{cfg.icon}</span>
-              <span style={{ fontSize: 10.5, fontWeight: 900, color: cfg.color, letterSpacing: '0.10em', textTransform: 'uppercase' }}>{label}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: body ? 8 : 0 }}>
+              <span style={{ fontSize: 13, color: cfg.color, fontWeight: 700, lineHeight: 1 }}>{cfg.icon}</span>
+              <span style={{
+                fontSize: 10, fontWeight: 900, color: cfg.color,
+                letterSpacing: '0.12em', textTransform: 'uppercase',
+                background: cfg.pill, borderRadius: 20, padding: '2px 8px',
+              }}>{label}</span>
             </div>
-            {body && <div style={{ fontSize: 14, lineHeight: 1.72, color: isLight ? 'rgba(0,0,0,0.82)' : 'rgba(255,255,255,0.88)', fontWeight: 400 }}>{parseInline(body, isLight)}</div>}
+            {body && <div style={{ fontSize: 14.5, lineHeight: 1.75, color: isLight ? 'rgba(0,0,0,0.84)' : 'rgba(255,255,255,0.90)', fontWeight: 400 }}>{parseInline(body, isLight)}</div>}
           </div>
         )
       } else {
-        // Plain blockquote — slim left-border insight strip
+        // Plain blockquote — insight strip
         elements.push(
           <div key={`bq-${i}`} style={{
-            margin: '8px 0', padding: '10px 16px',
-            borderLeft: `4px solid ${isLight ? 'rgba(99,102,241,0.45)' : 'rgba(129,140,248,0.45)'}`,
-            background: isLight ? 'rgba(99,102,241,0.05)' : 'rgba(99,102,241,0.07)',
+            margin: '10px 0', padding: '12px 16px',
+            borderLeft: `4px solid ${isLight ? '#818CF8' : '#7C3AED'}`,
+            background: isLight ? 'rgba(99,102,241,0.07)' : 'rgba(99,102,241,0.10)',
             borderRadius: 12,
-            fontSize: 14, lineHeight: 1.70, fontStyle: 'italic',
-            color: isLight ? 'rgba(0,0,0,0.78)' : 'rgba(220,220,255,0.88)',
+            fontSize: 14.5, lineHeight: 1.75, fontStyle: 'italic',
+            color: isLight ? '#3730A3' : 'rgba(220,218,255,0.90)',
           }}>
             {parseInline(content, isLight)}
           </div>
@@ -3005,20 +3047,15 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
       i++; continue
     }
 
-    // Standalone bold line **Concept Name** → section heading (DocMarkdown H2 style)
+    // Standalone bold line **Concept Name** → section heading
     const standaloneBoldMatch = trimmed.match(/^\*\*([^*].+?)\*\*$/)
     if (standaloneBoldMatch) {
       flushList()
       elements.push(
-        <div key={`sh-${i}`} style={{ marginTop: 22, marginBottom: 6 }}>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            paddingBottom: 6,
-            borderBottom: `2px solid ${isLight ? 'rgba(99,102,241,0.22)' : 'rgba(139,143,255,0.22)'}`,
-            width: '100%',
-          }}>
-            <div style={{ width: 4, height: 16, borderRadius: 2, background: isLight ? '#6366F1' : '#818CF8', flexShrink: 0 }} />
-            <span style={{ fontWeight: 800, fontSize: 15.5, color: isLight ? 'rgba(0,0,0,0.93)' : 'rgba(255,255,255,0.97)', letterSpacing: '-0.025em', lineHeight: 1.3 }}>
+        <div key={`sh-${i}`} style={{ marginTop: 24, marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingBottom: 9, borderBottom: `2px solid ${isLight ? 'rgba(99,102,241,0.20)' : 'rgba(139,143,255,0.18)'}`, width: '100%' }}>
+            <div style={{ width: 5, height: 20, borderRadius: 3, background: isLight ? 'linear-gradient(180deg,#6366F1,#8B5CF6)' : 'linear-gradient(180deg,#818CF8,#C084FC)', flexShrink: 0 }} />
+            <span style={{ fontWeight: 800, fontSize: 16, color: isLight ? '#1e1b4b' : '#E2E0FF', letterSpacing: '-0.03em', lineHeight: 1.3 }}>
               {standaloneBoldMatch[1]}
             </span>
           </div>
@@ -3034,15 +3071,16 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
       flushList()
       elements.push(
         <div key={`qi-${i}`} style={{
-          marginTop: 14, padding: '11px 15px',
-          background: isLight ? 'rgba(234,179,8,0.06)' : 'rgba(251,191,36,0.07)',
-          border: isLight ? '1px solid rgba(234,179,8,0.28)' : '1px solid rgba(251,191,36,0.22)',
-          borderLeft: isLight ? '4px solid rgba(234,179,8,0.60)' : '4px solid rgba(251,191,36,0.55)',
-          borderRadius: 12,
-          display: 'flex', alignItems: 'flex-start', gap: 9,
+          marginTop: 16, padding: '13px 16px',
+          background: isLight ? 'rgba(234,179,8,0.08)' : 'rgba(251,191,36,0.09)',
+          border: isLight ? '1px solid rgba(234,179,8,0.35)' : '1px solid rgba(251,191,36,0.28)',
+          borderLeft: '4px solid #FBBF24',
+          borderRadius: 13,
+          display: 'flex', alignItems: 'flex-start', gap: 10,
+          boxShadow: '0 2px 12px rgba(251,191,36,0.08)',
         }}>
-          <span style={{ fontSize: 13, color: isLight ? 'rgba(180,130,0,0.80)' : 'rgba(251,191,36,0.70)', flexShrink: 0, marginTop: 1 }}>?</span>
-          <span style={{ fontSize: 14.5, color: isLight ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.80)', fontStyle: 'italic', lineHeight: 1.65, fontWeight: 450 }}>
+          <span style={{ fontSize: 16, color: '#FBBF24', flexShrink: 0, lineHeight: 1.3, marginTop: 1 }}>?</span>
+          <span style={{ fontSize: 15, color: isLight ? 'rgba(0,0,0,0.80)' : 'rgba(255,245,200,0.90)', fontStyle: 'italic', lineHeight: 1.65, fontWeight: 500, letterSpacing: '-0.01em' }}>
             {parseInline(trimmed.slice(1, -1), isLight)}
           </span>
         </div>
@@ -3093,7 +3131,7 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
     // Default paragraph
     flushList()
     elements.push(
-      <div key={`p-${i}`} style={{ marginTop: 4, fontSize: 14.5, color: txtP, lineHeight: 1.75 }}>
+      <div key={`p-${i}`} style={{ marginTop: 5, fontSize: 15, color: isLight ? 'rgba(0,0,0,0.82)' : 'rgba(235,233,255,0.84)', lineHeight: 1.80, letterSpacing: '-0.005em' }}>
         {parseInline(trimmed, isLight)}
       </div>
     )
@@ -3103,7 +3141,7 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
   flushList()
 
   return (
-    <div style={{ minWidth: 0, fontSize: 14.5, lineHeight: 1.75, color: txtBody, fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div style={{ minWidth: 0, fontSize: 15, lineHeight: 1.80, color: txtBody, fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: '-0.005em' }}>
       {elements}
       {streaming && (
         <motion.span
