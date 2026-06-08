@@ -44,6 +44,7 @@ import Mirror from './Mirror'
 import OrbSelector from './OrbSelector'
 import Parents from './ShowEm'
 import AevaDoc from './AevaDoc'
+import WidgetDashboard from './WidgetDashboard'
 import { parseVizTag, VizComponent } from './ChatVisuals'
 import WorksheetModal from './WorksheetModal'
 import SharedRoadmapView from './SharedRoadmapView'
@@ -2310,6 +2311,14 @@ function DashboardView({ onChatOpen, onSignOut }) {
   const [showEmOpen, setShowEmOpen] = useState(false)
   const [docOpen, setDocOpen]       = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [dashLayout, setDashLayout] = useState(() => {
+    try { return localStorage.getItem('aeva_dash_layout') || 'classic' } catch { return 'classic' }
+  })
+  const toggleDashLayout = () => setDashLayout(prev => {
+    const next = prev === 'classic' ? 'widget' : 'classic'
+    try { localStorage.setItem('aeva_dash_layout', next) } catch {}
+    return next
+  })
   const isMobile = useIsMobile()
   const { getStats } = useBrainStore()
   const brainStats = getStats()
@@ -2441,6 +2450,23 @@ function DashboardView({ onChatOpen, onSignOut }) {
                       <Settings size={14} />
                     </motion.button>
 
+                    {/* ── Layout toggle ── */}
+                    <motion.button
+                      whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.94 }}
+                      onClick={toggleDashLayout}
+                      title={dashLayout === 'classic' ? 'Switch to Widget view' : 'Switch to Classic view'}
+                      style={{
+                        width: 34, height: 34, borderRadius: 9,
+                        background: dashLayout === 'widget' ? 'rgba(124,58,237,0.22)' : 'rgba(255,255,255,0.06)',
+                        border: dashLayout === 'widget' ? '1px solid rgba(124,58,237,0.45)' : '1px solid rgba(255,255,255,0.09)',
+                        color: dashLayout === 'widget' ? '#C4B5FD' : 'rgba(255,255,255,0.45)',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                        transition: 'background 0.2s, border 0.2s, color 0.2s',
+                      }}
+                    >
+                      <LayoutGrid size={14} />
+                    </motion.button>
+
                     <UserAvatar onSignOut={onSignOut} />
                   </>
                 )
@@ -2464,25 +2490,65 @@ function DashboardView({ onChatOpen, onSignOut }) {
               </div>
               <span style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.04em', background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(233,163,100,0.80) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>aeva</span>
             </div>
-            <motion.button whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.92 }}
-              onClick={() => setDrawerOpen(true)}
-              style={{ width: 38, height: 38, borderRadius: 12, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.70)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Menu size={18} />
-            </motion.button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {/* Layout toggle — mobile */}
+              <motion.button
+                whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.92 }}
+                onClick={toggleDashLayout}
+                style={{
+                  width: 38, height: 38, borderRadius: 12,
+                  background: dashLayout === 'widget' ? 'rgba(124,58,237,0.22)' : 'rgba(255,255,255,0.07)',
+                  border: dashLayout === 'widget' ? '1px solid rgba(124,58,237,0.40)' : '1px solid rgba(255,255,255,0.12)',
+                  color: dashLayout === 'widget' ? '#C4B5FD' : 'rgba(255,255,255,0.70)',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <LayoutGrid size={17} />
+              </motion.button>
+              <motion.button whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.92 }}
+                onClick={() => setDrawerOpen(true)}
+                style={{ width: 38, height: 38, borderRadius: 12, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.70)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Menu size={18} />
+              </motion.button>
+            </div>
           </header>
         )}
 
-        <div className="bento-grid" style={{ padding: isMobile ? '16px 14px' : '0 24px', maxWidth: 1280, margin: '0 auto', paddingBottom: isMobile ? 'calc(80px + env(safe-area-inset-bottom))' : undefined }}>
-          <MissionCard onChatOpen={onChatOpen} onOrbClick={() => setOrbSelectorOpen(true)} />
-          <ConstellationCard />
-          <MoodCard />
-          <SkillDecayCard />
-          <TrainingLabCard />
-          <PerceptionCard />
-          <FingerprintCard onOpen={() => setFingerprintOpen(true)} />
-          <MemoryPalaceCard onOpen={() => setPalaceOpen(true)} />
-          <PersonalProgressCard />
-        </div>
+        <AnimatePresence mode="wait">
+          {dashLayout === 'widget' ? (
+            <WidgetDashboard
+              key="widget"
+              onChatOpen={onChatOpen}
+              onBrain={() => setBrainOpen(true)}
+              onDocs={() => setDocOpen(true)}
+              onShowEm={() => setShowEmOpen(true)}
+              onPalace={() => setPalaceOpen(true)}
+              onOrbClick={() => setOrbSelectorOpen(true)}
+              userName={name}
+              isMobile={isMobile}
+            />
+          ) : (
+            <motion.div
+              key="classic"
+              initial={{ opacity: 0, scale: 0.97 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.97 }}
+              transition={{ duration: 0.30, ease: [0.22, 1, 0.36, 1] }}
+              className="bento-grid"
+              style={{ padding: isMobile ? '16px 14px' : '0 24px', maxWidth: 1280, margin: '0 auto', paddingBottom: isMobile ? 'calc(80px + env(safe-area-inset-bottom))' : undefined }}
+            >
+              <MissionCard onChatOpen={onChatOpen} onOrbClick={() => setOrbSelectorOpen(true)} />
+              <ConstellationCard />
+              <MoodCard />
+              <SkillDecayCard />
+              <TrainingLabCard />
+              <PerceptionCard />
+              <FingerprintCard onOpen={() => setFingerprintOpen(true)} />
+              <MemoryPalaceCard onOpen={() => setPalaceOpen(true)} />
+              <PersonalProgressCard />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div style={{ height: isMobile ? 0 : 48 }} />
       </div>
