@@ -12,14 +12,9 @@
  *   [VIZ:venn|Left Name|Right Name|Left-only,items|Both,items|Right-only,items]
  */
 
-import { Component } from 'react'
+import { Component, useState } from 'react'
 import { motion } from 'framer-motion'
 import katex from 'katex'
-import {
-  BarChart, Bar, Cell, LineChart, Line,
-  XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer,
-} from 'recharts'
 
 /* ── Error boundary — silently swallows render errors inside viz ── */
 class VizErrorBoundary extends Component {
@@ -179,88 +174,175 @@ function TimelineViz({ raw, isLight }) {
 }
 
 /* ══════════════════════════════════════════════════════
-   BAR CHART  (Recharts)
+   BAR CHART  (pure SVG — no Recharts)
    Format: Chart Title|Label:Value|Label:Value|...
 ══════════════════════════════════════════════════════ */
-const darkTooltip = {
-  contentStyle: { background: '#0d0e1f', border: '1px solid rgba(139,143,255,0.28)', borderRadius: 10, fontSize: 13, color: 'rgba(255,255,255,0.88)', padding: '8px 12px' },
-  cursor: { fill: 'rgba(255,255,255,0.04)' },
-}
-const lightTooltip = {
-  contentStyle: { background: '#fff', border: '1px solid rgba(0,0,0,0.10)', borderRadius: 10, fontSize: 13, color: '#000', padding: '8px 12px' },
-  cursor: { fill: 'rgba(0,0,0,0.04)' },
-}
-
 function BarViz({ raw, isLight }) {
+  const [hovered, setHovered] = useState(null)
   const parts = raw.split('|')
   const title = parts[0]?.trim()
   const data  = parts.slice(1).map(p => {
     const [name, val] = splitFirst(p)
-    return { name: name?.trim(), value: parseFloat(val) || 0 }
+    return { name: name?.trim() || '', value: parseFloat(val) || 0 }
   }).filter(d => d.name)
 
-  const tt = isLight ? lightTooltip : darkTooltip
-  const gridColor = isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.06)'
-  const tickStyle = { fontSize: 11.5, fill: isLight ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.40)', fontFamily: 'Inter, system-ui' }
+  if (!data.length) return null
+
+  const W = 420, H = 170, PAD_L = 36, PAD_B = 36, PAD_T = 10, PAD_R = 10
+  const chartW = W - PAD_L - PAD_R
+  const chartH = H - PAD_T - PAD_B
+  const maxVal = Math.max(...data.map(d => d.value), 1)
+  const barW   = Math.min(42, (chartW / data.length) * 0.55)
+  const gap    = chartW / data.length
+
+  const labelColor = isLight ? 'rgba(0,0,0,0.42)' : 'rgba(255,255,255,0.38)'
+  const gridColor  = isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.06)'
+
+  // Y-axis ticks
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => ({
+    y: PAD_T + chartH * (1 - f),
+    label: f === 0 ? '0' : (maxVal * f % 1 === 0 ? String(Math.round(maxVal * f)) : (maxVal * f).toFixed(1)),
+  }))
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
       style={{ margin: '18px 0' }}>
-      {title && <div style={{ fontSize: 12.5, fontWeight: 700, color: isLight ? 'rgba(0,0,0,0.50)' : 'rgba(255,255,255,0.45)', marginBottom: 12, textAlign: 'center', letterSpacing: '0.02em' }}>{title}</div>}
-      <ResponsiveContainer width="100%" height={210}>
-        <BarChart data={data} margin={{ top: 4, right: 8, left: -18, bottom: 4 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-          <XAxis dataKey="name" tick={tickStyle} axisLine={false} tickLine={false} />
-          <YAxis tick={{ ...tickStyle, fontSize: 11 }} axisLine={false} tickLine={false} />
-          <Tooltip {...tt} />
-          <Bar dataKey="value" radius={[7, 7, 0, 0]}>
-            {data.map((_, i) => (
-              <Cell key={i} fill={COLORS[i % COLORS.length]} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+      {title && <div style={{ fontSize: 12.5, fontWeight: 700, color: isLight ? 'rgba(0,0,0,0.50)' : 'rgba(255,255,255,0.45)', marginBottom: 10, textAlign: 'center', letterSpacing: '0.02em' }}>{title}</div>}
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
+        {/* Grid lines */}
+        {ticks.map((t, i) => (
+          <g key={i}>
+            <line x1={PAD_L} y1={t.y} x2={W - PAD_R} y2={t.y} stroke={gridColor} strokeWidth="1" strokeDasharray="3 3" />
+            <text x={PAD_L - 5} y={t.y + 4} textAnchor="end" fontSize="10" fill={labelColor} fontFamily="Inter,system-ui">{t.label}</text>
+          </g>
+        ))}
+        {/* Bars */}
+        {data.map((d, i) => {
+          const bh  = (d.value / maxVal) * chartH
+          const bx  = PAD_L + gap * i + gap / 2 - barW / 2
+          const by  = PAD_T + chartH - bh
+          const col = COLORS[i % COLORS.length]
+          const isHov = hovered === i
+          return (
+            <g key={i} onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)} style={{ cursor: 'default' }}>
+              <rect x={bx} y={by} width={barW} height={bh}
+                rx="5" ry="5"
+                fill={col}
+                opacity={isHov ? 1 : 0.82}
+              />
+              {/* Tooltip on hover */}
+              {isHov && (
+                <g>
+                  <rect x={bx + barW / 2 - 28} y={by - 28} width={56} height={22} rx="6"
+                    fill={isLight ? 'rgba(0,0,0,0.80)' : 'rgba(255,255,255,0.14)'}
+                    stroke={col} strokeWidth="1" />
+                  <text x={bx + barW / 2} y={by - 12} textAnchor="middle" fontSize="11" fontWeight="700" fill={col} fontFamily="Inter,system-ui">
+                    {d.value}
+                  </text>
+                </g>
+              )}
+              {/* X label */}
+              <text x={bx + barW / 2} y={H - PAD_B + 14} textAnchor="middle" fontSize="10" fill={labelColor} fontFamily="Inter,system-ui">
+                {d.name.length > 9 ? d.name.slice(0, 8) + '…' : d.name}
+              </text>
+            </g>
+          )
+        })}
+        {/* Baseline */}
+        <line x1={PAD_L} y1={PAD_T + chartH} x2={W - PAD_R} y2={PAD_T + chartH} stroke={gridColor} strokeWidth="1" />
+      </svg>
     </motion.div>
   )
 }
 
 /* ══════════════════════════════════════════════════════
-   LINE GRAPH  (Recharts)
+   LINE GRAPH  (pure SVG — no Recharts)
    Format: Title|X label|Y label|x1:y1|x2:y2|...
 ══════════════════════════════════════════════════════ */
 function LineViz({ raw, isLight }) {
+  const [hovered, setHovered] = useState(null)
   const parts  = raw.split('|')
   const title  = parts[0]?.trim()
   const xLabel = parts[1]?.trim()
   const yLabel = parts[2]?.trim()
   const data   = parts.slice(3).map(p => {
     const [xRaw, yRaw] = splitFirst(p)
-    const x = xRaw?.trim()
-    const y = parseFloat(yRaw) || 0
-    return { x: isNaN(Number(x)) ? x : Number(x), y }
-  }).filter(d => d.x !== undefined && d.x !== '')
+    return { x: xRaw?.trim() || '', y: parseFloat(yRaw) || 0 }
+  }).filter(d => d.x !== '')
 
-  const tt = isLight ? lightTooltip : darkTooltip
-  const gridColor = isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.06)'
-  const tickStyle = { fontSize: 11.5, fill: isLight ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.40)', fontFamily: 'Inter, system-ui' }
+  if (data.length < 2) return null
+
+  const W = 420, H = 180, PAD_L = 42, PAD_B = 40, PAD_T = 14, PAD_R = 16
+  const chartW = W - PAD_L - PAD_R
+  const chartH = H - PAD_T - PAD_B
+  const minY = Math.min(...data.map(d => d.y))
+  const maxY = Math.max(...data.map(d => d.y), minY + 1)
+  const rangeY = maxY - minY
+
+  const toSvg = (i) => ({
+    sx: PAD_L + (i / (data.length - 1)) * chartW,
+    sy: PAD_T + chartH - ((data[i].y - minY) / rangeY) * chartH,
+  })
+
+  const points = data.map((_, i) => { const { sx, sy } = toSvg(i); return `${sx},${sy}` }).join(' ')
+
+  const labelColor = isLight ? 'rgba(0,0,0,0.42)' : 'rgba(255,255,255,0.38)'
+  const gridColor  = isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.06)'
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => ({
+    y: PAD_T + chartH * (1 - f),
+    label: (minY + rangeY * f).toFixed(rangeY < 5 ? 1 : 0),
+  }))
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
       style={{ margin: '18px 0' }}>
-      {title && <div style={{ fontSize: 12.5, fontWeight: 700, color: isLight ? 'rgba(0,0,0,0.50)' : 'rgba(255,255,255,0.45)', marginBottom: 12, textAlign: 'center' }}>{title}</div>}
-      <ResponsiveContainer width="100%" height={210}>
-        <LineChart data={data} margin={{ top: 4, right: 16, left: -18, bottom: xLabel ? 20 : 4 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-          <XAxis dataKey="x" tick={tickStyle} axisLine={false} tickLine={false}
-            label={xLabel ? { value: xLabel, position: 'insideBottom', offset: -12, style: { fontSize: 11, fill: isLight ? 'rgba(0,0,0,0.38)' : 'rgba(255,255,255,0.35)', fontFamily: 'Inter' } } : undefined} />
-          <YAxis tick={{ ...tickStyle, fontSize: 11 }} axisLine={false} tickLine={false}
-            label={yLabel ? { value: yLabel, angle: -90, position: 'insideLeft', offset: 14, style: { fontSize: 11, fill: isLight ? 'rgba(0,0,0,0.38)' : 'rgba(255,255,255,0.35)', fontFamily: 'Inter' } } : undefined} />
-          <Tooltip {...tt} />
-          <Line type="monotone" dataKey="y" stroke="#818CF8" strokeWidth={2.5}
-            dot={{ fill: '#818CF8', r: 4, strokeWidth: 0 }}
-            activeDot={{ r: 6, fill: '#C4B5FD', strokeWidth: 0 }} />
-        </LineChart>
-      </ResponsiveContainer>
+      {title && <div style={{ fontSize: 12.5, fontWeight: 700, color: isLight ? 'rgba(0,0,0,0.50)' : 'rgba(255,255,255,0.45)', marginBottom: 10, textAlign: 'center' }}>{title}</div>}
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
+        {/* Grid */}
+        {ticks.map((t, i) => (
+          <g key={i}>
+            <line x1={PAD_L} y1={t.y} x2={W - PAD_R} y2={t.y} stroke={gridColor} strokeWidth="1" strokeDasharray="3 3" />
+            <text x={PAD_L - 5} y={t.y + 4} textAnchor="end" fontSize="10" fill={labelColor} fontFamily="Inter,system-ui">{t.label}</text>
+          </g>
+        ))}
+        {/* Y label */}
+        {yLabel && <text x={10} y={H / 2} textAnchor="middle" fontSize="10" fill={labelColor} fontFamily="Inter,system-ui" transform={`rotate(-90,10,${H/2})`}>{yLabel}</text>}
+        {/* Line */}
+        <polyline points={points} fill="none" stroke="#818CF8" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+        {/* Gradient area under line */}
+        <defs>
+          <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#818CF8" stopOpacity="0.22" />
+            <stop offset="100%" stopColor="#818CF8" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <polygon points={`${PAD_L},${PAD_T + chartH} ${points} ${W - PAD_R},${PAD_T + chartH}`} fill="url(#lineGrad)" />
+        {/* Dots + hover */}
+        {data.map((d, i) => {
+          const { sx, sy } = toSvg(i)
+          return (
+            <g key={i} onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)} style={{ cursor: 'default' }}>
+              <circle cx={sx} cy={sy} r={hovered === i ? 6 : 4} fill="#818CF8" />
+              {hovered === i && (
+                <g>
+                  <rect x={sx - 28} y={sy - 30} width={56} height={22} rx="6"
+                    fill={isLight ? 'rgba(0,0,0,0.80)' : 'rgba(255,255,255,0.14)'}
+                    stroke="#818CF8" strokeWidth="1" />
+                  <text x={sx} y={sy - 14} textAnchor="middle" fontSize="11" fontWeight="700" fill="#C4B5FD" fontFamily="Inter,system-ui">{d.y}</text>
+                </g>
+              )}
+              {/* X tick */}
+              <text x={sx} y={H - PAD_B + 14} textAnchor="middle" fontSize="10" fill={labelColor} fontFamily="Inter,system-ui">
+                {String(d.x).length > 6 ? String(d.x).slice(0, 5) + '…' : d.x}
+              </text>
+            </g>
+          )
+        })}
+        {/* Baseline */}
+        <line x1={PAD_L} y1={PAD_T + chartH} x2={W - PAD_R} y2={PAD_T + chartH} stroke={gridColor} strokeWidth="1" />
+        {/* X label */}
+        {xLabel && <text x={W / 2} y={H - 2} textAnchor="middle" fontSize="10" fill={labelColor} fontFamily="Inter,system-ui">{xLabel}</text>}
+      </svg>
     </motion.div>
   )
 }
