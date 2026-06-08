@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText, BookOpen, Zap, Target, ClipboardList, Check, Lock, Clock, Trophy, Trash2, Brain, Dumbbell, GraduationCap, FlaskConical, Share2, Copy, AlertTriangle, RotateCcw } from 'lucide-react'
 import { useRoadmapStore, calcGrade, gradeGapMessage, GRADE_THRESHOLDS } from './roadmapStore'
 import { useLabStore } from './labStore'
+import { useSRStore } from './srStore'
 import { supabase } from './supabase'
 import { useXPStore } from './xpStore'
 import { useAevaControlStore } from './aevaControlStore'
@@ -1007,17 +1008,130 @@ function GradeTrendChart({ gradeHistory, targetGrade }) {
   )
 }
 
+/* ── Compute mission tasks from real drill data (no AI needed) ───────────── */
+function computeSmartTasks(nodes, drillHistory, daysLeft, roadmapTitle) {
+  const tasks = []
+
+  // Priority 1: Shaky nodes — student flagged they don't know this
+  const shakyNodes = nodes.filter(n => n.status === 'complete' && n.confidence === 'shaky')
+  if (shakyNodes.length > 0) {
+    const n = shakyNodes[0]
+    tasks.push({ id: `t_shaky_${n.id}`, type: 'drill', topic: n.topic, label: 'Revisit weak spot', status: 'pending', urgent: true })
+  }
+
+  // Priority 2: Completed nodes with low drill scores (under 70%)
+  if (tasks.length < 3) {
+    const weakNodes = nodes
+      .filter(n => n.status === 'complete' && !tasks.find(t => t.topic === n.topic))
+      .map(n => {
+        const scores = drillHistory.filter(h => h.topic.toLowerCase() === n.topic.toLowerCase())
+        return { n, best: scores.length ? Math.max(...scores.map(h => h.pct)) : 101 }
+      })
+      .filter(({ best }) => best <= 70)
+      .sort((a, b) => a.best - b.best)
+
+    weakNodes.slice(0, tasks.length === 0 ? 2 : 1).forEach(({ n, best }) => {
+      tasks.push({ id: `t_weak_${n.id}`, type: 'drill', topic: n.topic, label: `Boost score (${best}% → 80%+)`, status: 'pending' })
+    })
+  }
+
+  // Priority 3: Current available node
+  const available = nodes.find(n => n.status === 'available')
+  if (available && tasks.length < 3) {
+    const labelMap = { learn: 'Learn next topic', drill: 'Practice drill', check: 'Knowledge check', mock: 'Mock test' }
+    tasks.push({ id: `t_avail_${available.id}`, type: available.type, topic: available.topic, label: labelMap[available.type] || 'Next step', status: 'pending' })
+  }
+
+  // Fallback: suggest mock if close to exam and nothing else
+  if (tasks.length === 0 && daysLeft <= 5) {
+    tasks.push({ id: 't_mock_final', type: 'mock', topic: roadmapTitle, label: 'Final mock — exam is close', status: 'pending' })
+  }
+
+  return tasks
+}
+
+/* ── Gap analysis panel — weak spots that are costing grades ─────────────── */
+function GapAnalysisPanel({ nodes, drillHistory, onDrill, onRelearn }) {
+  const gaps = []
+
+  nodes.forEach(node => {
+    if (node.status !== 'complete') return
+    const topicLower = node.topic.toLowerCase()
+    const topicDrills = drillHistory.filter(h => h.topic.toLowerCase() === topicLower)
+    const bestScore   = topicDrills.length > 0 ? Math.max(...topicDrills.map(h => h.pct)) : null
+    const isShaky     = node.confidence === 'shaky'
+
+    if (isShaky) {
+      gaps.push({ node, bestScore, isShaky: true, sortKey: 0 })
+    } else if (bestScore !== null && bestScore < 68) {
+      gaps.push({ node, bestScore, isShaky: false, sortKey: bestScore })
+    }
+  })
+
+  gaps.sort((a, b) => a.sortKey - b.sortKey)
+  const topGaps = gaps.slice(0, 3)
+  if (topGaps.length === 0) return null
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+      style={{ margin: '12px 20px 0', borderRadius: 16, background: 'rgba(248,113,113,0.05)', border: '1px solid rgba(248,113,113,0.22)', overflow: 'hidden' }}>
+
+      <div style={{ padding: '12px 16px 10px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ width: 28, height: 28, borderRadius: 9, background: 'rgba(248,113,113,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Target size={13} color="#F87171" />
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 800, color: '#F87171' }}>
+            {topGaps.length} gap{topGaps.length !== 1 ? 's' : ''} holding your grade back
+          </div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
+            Drill these to close the gap
+          </div>
+        </div>
+      </div>
+
+      <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {topGaps.map(({ node, bestScore, isShaky }) => (
+          <div key={node.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 11, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{node.topic}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, marginTop: 1,
+                color: isShaky ? '#FCD34D' : bestScore !== null && bestScore < 50 ? '#F87171' : '#FBBF24' }}>
+                {isShaky ? '◐ Marked shaky — needs reinforcement' : `Best score ${bestScore}% — below target`}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+              <motion.button whileTap={{ scale: 0.94 }} onClick={() => onDrill(node.topic)}
+                style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.35)', color: '#A5B4FC', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Drill
+              </motion.button>
+              {isShaky && (
+                <motion.button whileTap={{ scale: 0.94 }} onClick={() => onRelearn(node.topic)}
+                  style={{ padding: '6px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  Re-learn
+                </motion.button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  )
+}
+
 function PathView() {
   const { getActive, completeNode, completeNodeWithConfidence, closeRoadmapHub, startNodeSession, endNodeSession, markLogSeen, flagNode } = useRoadmapStore()
   // Subscribe to roadmaps array so component re-renders when Aeva mutates nodes
   useRoadmapStore(state => state.roadmaps)
-  const { openLab, addOrder, setLabTab, setPendingAutoStart } = useLabStore()
+  const { openLab, addOrder, setLabTab, setPendingAutoStart, drillHistory } = useLabStore()
   const { addXP } = useXPStore()
   const { setPendingChatPrompt } = useAevaControlStore()
+  const { getDueCount } = useSRStore()
   const roadmap = getActive()
   const [askAevaFlash, setAskAevaFlash] = useState(false)
   const [selected, setSelected]     = useState(null)
   const [startedIds, setStartedIds] = useState(new Set())
+  const [shakyPrompt, setShakyPrompt] = useState(null) // { topic } — shown after marking shaky
   const containerRef = useRef(null)
   const scrollRef    = useRef(null)
   const [cw, setCw]  = useState(360)
@@ -1094,6 +1208,20 @@ function PathView() {
     endNodeSession()
     setStartedIds(prev => { const n = new Set(prev); n.delete(node.id); return n })
     setSelected(null)
+    if (confidence === 'shaky') {
+      setShakyPrompt({ topic: node.topic })
+    }
+  }
+
+  // Helpers for gap panel actions
+  const drillTopic = (topic) => {
+    setPendingAutoStart('flashcard', topic)
+    closeRoadmapHub()
+    openLab()
+  }
+  const relearnTopic = (topic) => {
+    setPendingChatPrompt(`Re-teach me "${topic}" for my ${roadmap?.title}. I've studied it before but I'm still shaky — please go through it again clearly with examples and then quiz me.`)
+    closeRoadmapHub()
   }
 
   // Behind-pace detection
@@ -1106,6 +1234,11 @@ function PathView() {
 
   const mission      = roadmap.dailyMission
   const missionTasks = mission?.tasks || []
+
+  // Smart tasks computed from actual drill data — always accurate, no AI needed
+  const smartTasks = computeSmartTasks(nodes, drillHistory || [], daysLeft, roadmap.title)
+  const hasWeakSpots = smartTasks.some(t => t.urgent || t.id.startsWith('t_shaky') || t.id.startsWith('t_weak'))
+  const displayTasks = smartTasks.length > 0 ? smartTasks : missionTasks
 
   return (
     <motion.div ref={scrollRef} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -1120,14 +1253,26 @@ function PathView() {
           boxShadow: '0 8px 32px rgba(99,102,241,0.20)',
         }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div>
-              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', marginBottom: 4 }}>Today's Mission</div>
-              <div style={{ fontSize: 17, fontWeight: 900, color: '#fff', letterSpacing: '-0.03em' }}>
-                {available ? `Master ${available.topic}` : '🎉 Roadmap complete!'}
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase' }}>Today's Plan</div>
+                {hasWeakSpots && (
+                  <span style={{ fontSize: 9.5, fontWeight: 800, color: '#F87171', background: 'rgba(248,113,113,0.18)', padding: '1px 7px', borderRadius: 99, border: '1px solid rgba(248,113,113,0.30)', letterSpacing: '0.06em' }}>
+                    GAPS DETECTED
+                  </span>
+                )}
               </div>
+              <div style={{ fontSize: 16, fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.25 }}>
+                {hasWeakSpots
+                  ? 'Close your weak spots first'
+                  : available ? `Next: ${available.topic}` : '🎉 Roadmap complete!'}
+              </div>
+              {hasWeakSpots && (
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', marginTop: 3 }}>Fixing gaps moves your grade faster than new topics</div>
+              )}
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
-              <div style={{ fontSize: 18, fontWeight: 900, color: '#fff' }}>{daysLeft}d</div>
+              <div style={{ fontSize: 18, fontWeight: 900, color: daysLeft <= 3 ? '#F87171' : daysLeft <= 7 ? '#FBBF24' : '#fff' }}>{daysLeft}d</div>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>until exam</div>
             </div>
           </div>
@@ -1185,55 +1330,56 @@ function PathView() {
             })()}
           </div>
 
-          {/* Mission tasks — use generated daily mission if available */}
-          {(missionTasks.length > 0 || available) && (
+          {/* Mission tasks — smart computed from real drill data */}
+          {displayTasks.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginTop: 14 }}>
-              {(missionTasks.length > 0 ? missionTasks : ['learn','drill','check'].map((type,i) => ({ id: `t${i}`, type, topic: available?.topic, label: NODE_CFG[type].label, status: 'pending' }))).map(task => {
+              {displayTasks.map((task, taskIdx) => {
                 const cfg = NODE_CFG[task.type] || NODE_CFG.learn
                 const done = task.status === 'complete'
+                const isUrgentTask = task.urgent || task.id?.startsWith('t_shaky')
                 const TaskIcon = cfg.Icon
                 return (
-                  <motion.button key={task.id}
-                    whileHover={!done ? { scale: 1.02, background: 'rgba(255,255,255,0.14)' } : {}}
+                  <motion.button key={task.id || taskIdx}
+                    whileHover={!done ? { scale: 1.02, background: isUrgentTask ? 'rgba(248,113,113,0.20)' : 'rgba(255,255,255,0.14)' } : {}}
                     whileTap={!done ? { scale: 0.98 } : {}}
                     onClick={() => {
                       if (done) return
-                      const t = { id: task.id, topic: task.topic, type: task.type }
-                      if (t.type === 'learn') {
-                        setPendingChatPrompt(`Teach me "${t.topic}" for my ${roadmap.title}. I have ${daysLeft} days until the exam.`)
+                      if (task.type === 'learn') {
+                        setPendingChatPrompt(`Teach me "${task.topic}" for my ${roadmap.title}. I have ${daysLeft} days until the exam.`)
                         closeRoadmapHub()
-                      } else if (t.type === 'drill') {
-                        setPendingAutoStart('flashcard', t.topic); closeRoadmapHub(); openLab()
-                      } else if (t.type === 'check') {
-                        setPendingAutoStart('shortanswer', t.topic); closeRoadmapHub(); openLab()
-                      } else if (t.type === 'mock') {
+                      } else if (task.type === 'drill') {
+                        setPendingAutoStart('flashcard', task.topic); closeRoadmapHub(); openLab()
+                      } else if (task.type === 'check') {
+                        setPendingAutoStart('shortanswer', task.topic); closeRoadmapHub(); openLab()
+                      } else if (task.type === 'mock') {
                         addOrder({ title: `Mock Test — ${roadmap.title}`, description: `Full mock test on ${roadmap.title}.`, subject: roadmap.title }); closeRoadmapHub(); setLabTab('orders'); openLab()
                       }
                     }}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10,
                       padding: '10px 14px', borderRadius: 11,
-                      background: done ? 'rgba(74,222,128,0.08)' : 'rgba(255,255,255,0.10)',
-                      border: done ? '1px solid rgba(74,222,128,0.25)' : '1px solid rgba(255,255,255,0.12)',
+                      background: done ? 'rgba(74,222,128,0.08)' : isUrgentTask ? 'rgba(248,113,113,0.12)' : 'rgba(255,255,255,0.10)',
+                      border: done ? '1px solid rgba(74,222,128,0.25)' : isUrgentTask ? '1px solid rgba(248,113,113,0.30)' : '1px solid rgba(255,255,255,0.12)',
                       cursor: done ? 'default' : 'pointer', fontFamily: 'inherit', textAlign: 'left',
                       opacity: done ? 0.7 : 1,
                     }}>
-                    <div style={{ width: 28, height: 28, borderRadius: 8, background: done ? 'rgba(74,222,128,0.18)' : `${cfg.color}28`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      {done ? <Check size={14} color="#4ADE80" strokeWidth={3} /> : <TaskIcon size={14} color={cfg.color} strokeWidth={2.2} />}
+                    <div style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                      background: done ? 'rgba(74,222,128,0.18)' : isUrgentTask ? 'rgba(248,113,113,0.20)' : `${cfg.color}28`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {done ? <Check size={14} color="#4ADE80" strokeWidth={3} />
+                        : isUrgentTask ? <span style={{ fontSize: 11 }}>◐</span>
+                        : <TaskIcon size={14} color={cfg.color} strokeWidth={2.2} />}
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: done ? '#4ADE80' : '#fff' }}>{task.label}</div>
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>{task.topic}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: done ? '#4ADE80' : isUrgentTask ? '#FCA5A5' : '#fff' }}>{task.label}</div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.topic}</div>
                     </div>
-                    {!done && <div style={{ fontSize: 11, fontWeight: 800, color: cfg.color }}>+{task.type === 'check' ? 40 : task.type === 'drill' ? 30 : 50} XP</div>}
+                    {!done && <div style={{ fontSize: 11, fontWeight: 800, color: isUrgentTask ? '#F87171' : cfg.color, flexShrink: 0 }}>
+                      +{task.type === 'check' ? 40 : task.type === 'drill' ? 30 : 50} XP
+                    </div>}
                   </motion.button>
                 )
               })}
-              {mission?.estimatedMinutes && (
-                <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.35)', fontWeight: 500, marginTop: 4, paddingLeft: 2 }}>
-                  ⏱ Est. {mission.estimatedMinutes} min
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -1275,6 +1421,14 @@ function PathView() {
       {(roadmap.gradeHistory?.length || 0) >= 2 && (
         <GradeTrendChart gradeHistory={roadmap.gradeHistory} targetGrade={roadmap.targetGrade} />
       )}
+
+      {/* ── Gap analysis — weak spots costing grades ─────────────────────── */}
+      <GapAnalysisPanel
+        nodes={nodes}
+        drillHistory={drillHistory || []}
+        onDrill={drillTopic}
+        onRelearn={relearnTopic}
+      />
 
       {/* ── Ask Aeva button ──────────────────────────────────────────────── */}
       <div style={{ flexShrink: 0, padding: '12px 20px 0' }}>
@@ -1490,6 +1644,26 @@ function PathView() {
                 <div style={{ position: 'absolute', top: -4, left: -4, width: 16, height: 16, borderRadius: '50%', background: '#818CF8', border: '2px solid rgba(8,9,24,1)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3, fontSize: 8 }}>✦</div>
               )}
 
+              {/* Drill score badge — shows best drill score on completed nodes */}
+              {isComplete && (() => {
+                const topicDrills = (drillHistory || []).filter(h => h.topic.toLowerCase() === node.topic.toLowerCase())
+                if (topicDrills.length === 0) return null
+                const best = Math.max(...topicDrills.map(h => h.pct))
+                const col  = best >= 80 ? '#4ADE80' : best >= 60 ? '#FBBF24' : '#F87171'
+                const bgCol = best >= 80 ? 'rgba(22,101,52,0.95)' : best >= 60 ? 'rgba(92,64,5,0.95)' : 'rgba(127,29,29,0.95)'
+                return (
+                  <div style={{
+                    position: 'absolute', bottom: -4, right: NODE_R * -0.55,
+                    background: bgCol, color: col,
+                    fontSize: 9, fontWeight: 900,
+                    padding: '2px 5px', borderRadius: 6,
+                    border: `1.5px solid ${col}60`,
+                    zIndex: 4, letterSpacing: '0.02em',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.50)',
+                  }}>{best}%</div>
+                )
+              })()}
+
               {/* Topic label */}
               <div style={{
                 position: 'absolute', top: NODE_R * 2 + 14,
@@ -1640,6 +1814,56 @@ function PathView() {
           )
         })}
       </div>
+
+      {/* ── Shaky node drill prompt ──────────────────────────────────────── */}
+      <AnimatePresence>
+        {shakyPrompt && (
+          <motion.div
+            key="shaky-prompt"
+            initial={{ opacity: 0, y: 24, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.96 }}
+            transition={{ type: 'spring', stiffness: 340, damping: 26 }}
+            style={{
+              position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+              width: 'calc(100% - 40px)', maxWidth: 420, zIndex: 300,
+              background: 'rgba(9,10,28,0.97)',
+              border: '1px solid rgba(245,158,11,0.45)',
+              borderRadius: 18, padding: '14px 16px',
+              boxShadow: '0 12px 40px rgba(0,0,0,0.65), 0 0 0 1px rgba(245,158,11,0.15)',
+            }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 12, background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.30)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span style={{ fontSize: 18, lineHeight: 1 }}>◐</span>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: '#FCD34D', marginBottom: 2 }}>Marked shaky</div>
+                <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.48)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  Drill <strong style={{ color: 'rgba(255,255,255,0.72)' }}>{shakyPrompt.topic}</strong> now to actually lock it in
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 7, flexShrink: 0 }}>
+                <motion.button whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    const t = shakyPrompt.topic
+                    setShakyPrompt(null)
+                    setPendingAutoStart('flashcard', t)
+                    closeRoadmapHub()
+                    openLab()
+                  }}
+                  style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(245,158,11,0.22)', border: '1px solid rgba(245,158,11,0.50)', color: '#FCD34D', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                  Drill now
+                </motion.button>
+                <motion.button whileTap={{ scale: 0.94 }}
+                  onClick={() => setShakyPrompt(null)}
+                  style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.40)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <X size={13} />
+                </motion.button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }
