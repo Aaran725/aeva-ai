@@ -168,90 +168,90 @@ export const translations = {
     theLab:         'ラボ',
     unleashArcade:  'アーケード',
     chat:           'チャット',
-    myProfile:      '👤 マイプロフィール',
-    signOut:        'サインアウト',
+    myProfile:      '👤 プロフィール',
+    signOut:        'ログアウト',
     menu:           'メニュー',
     backToDashboard: 'ダッシュボード',
     arcade:         'アーケード',
     lab:            'ラボ',
 
     // ── Settings ──
-    appearance:           '外観',
+    appearance:           '見た目',
     language:             '言語',
     dashboardBackground:  'ダッシュボード背景',
     chatBackground:       'チャット背景',
     cardStyle:            'カードスタイル',
-    fontStyle:            'フォントスタイル',
+    fontStyle:            'フォント',
     english:              'English',
     japanese:             '日本語',
 
     // ── Dashboard cards ──
-    missionBriefing:  'ミッション概要',
+    missionBriefing:  '今日のミッション',
     startMission:     'ミッション開始',
-    chatWithAeva:     'Aevaとチャット',
+    chatWithAeva:     'Aevaに聞いてみる',
     knowledgeMap:     '知識マップ',
-    chatToGrowMap:    'チャットしてマップを育てよう',
+    chatToGrowMap:    'チャットしてマップを広げよう',
     aevaMode:         'Aevaモード',
-    skillRetention:   'スキル保持率',
-    liveDecay:        '最後の練習からの定着率',
+    skillRetention:   '定着率',
+    liveDecay:        '前回の練習からの定着具合',
     drillToStopDecay: 'ラボでドリルして定着させよう →',
     trainingLab:      'トレーニングラボ',
-    drillMasteryHub:  'ドリル＆習熟ハブ',
-    theArcadeCreates: 'アーケードで必要性を作り、ラボでスキルを磨こう。',
-    aevasPerception:  'Aevaの認識',
-    adaptingNow:      '適応中',
-    coreInterests:    '主な関心領域',
+    drillMasteryHub:  'ドリル＆習熟',
+    theArcadeCreates: 'アーケードで必要性を作って、ラボでスキルを磨こう。',
+    aevasPerception:  'Aevaの見方',
+    adaptingNow:      '調整中',
+    coreInterests:    '得意・興味',
     shareMyProfile:   'プロフィールをシェア',
-    learningFingerprint: '学習フィンガープリント',
-    calibrated:       '確定済み',
-    tapToExplore:     'タップして詳細へ →',
+    learningFingerprint: '学習タイプ',
+    calibrated:       '確定',
+    tapToExplore:     'タップして見てみる →',
     memoryPalace:     '記憶の宮殿',
     startChattingPalace: 'チャットして概念マップを作ろう。',
-    explorePalace:    '宮殿を探索',
-    conceptsMapped:   (n) => `${n}個の概念をマッピング済み`,
-    personalProgress: '個人の進捗',
+    explorePalace:    '宮殿を見る',
+    conceptsMapped:   (n) => `${n}個の概念をマップ済み`,
+    personalProgress: '自分の進捗',
 
     // ── Mood card ──
-    inTheZone:           'ゾーン状態',
-    lockedIn:            '集中モード',
+    inTheZone:           'ゾーン入ってる',
+    lockedIn:            '集中してる',
     criticalMode:        '批判的思考',
-    findingFocus:        'フォーカス中',
-    momentum:            'モメンタム',
-    frustrated:          'フラスト',
-    calibrating:         '調整中',
+    findingFocus:        '集中中',
+    momentum:            '勢いあり',
+    frustrated:          'しんどい',
+    calibrating:         '把握中',
     onAWinningStreak:    '連勝中',
-    questioningEverything: 'すべてを疑問視中',
-    rebuildingFromHere:  'ここから再構築',
-    buildingFast:        '急速に成長中',
-    fullFocusEngaged:    '完全集中モード',
-    aevaIsSimplifying:   'Aevaが簡略化中',
+    questioningEverything: '色々と疑問中',
+    rebuildingFromHere:  'ここから立て直し',
+    buildingFast:        'どんどん伸びてる',
+    fullFocusEngaged:    '完全集中',
+    aevaIsSimplifying:   'Aevaが噛み砕き中',
     gettingToKnowYou:    'あなたを把握中…',
 
     // ── Session phases ──
     diagnosing:     '診断中',
     building:       '構築中',
-    stressTesting:  'ストレステスト',
+    stressTesting:  'テスト中',
     consolidating:  '定着中',
 
     // ── Chat ──
-    whatCanIHelpWith: '何をお手伝いしますか？',
-    headsUp:          '注意',
-    prepNow:          '今すぐ準備',
+    whatCanIHelpWith: '何か聞きたいこと、ある？',
+    headsUp:          'ちょっと待って',
+    prepNow:          '今すぐやろう',
     socraticMode:     '🧘 ソクラテス式',
     feynmanMode:      '⚡ ファインマン',
     studyGuide:       '📖 学習ガイド',
     exitSocratic:     'ソクラテス式を終了',
     customise:        'カスタマイズ',
     done:             '✓ 完了',
-    exitMission:      'ミッションを終了',
+    exitMission:      'ミッション終了',
 
     // ── Learning fingerprint ──
-    analogyThinker:   '比喩思考型',
-    spatialReasoner:  '空間思考型',
-    systemsBuilder:   'システム思考型',
-    concreteLearner:  '具体的学習型',
-    principleSeeker:  '原理探求型',
-    confirmedStyle:   '確定済みスタイル',
+    analogyThinker:   '例え話タイプ',
+    spatialReasoner:  '空間把握タイプ',
+    systemsBuilder:   '全体像タイプ',
+    concreteLearner:  '具体例タイプ',
+    principleSeeker:  '原理追求タイプ',
+    confirmedStyle:   '確定スタイル',
     calibratedPct:    (n) => `${n}%確定`,
     readingYourStyle: 'スタイルを読み取り中…',
     chatToCalibrate:  'チャットして確定',
@@ -262,57 +262,72 @@ export const translations = {
     matchGrid:       'マッチグリッド',
 
     // ── Mission card headings ──
-    firstMissionAwaits: ['最初のミッションが', '待っている。'],
-    keepBuilding:        ['習熟度を', '高め続けよう。'],
-    readyToStart:        ['今日のミッションを', '始めよう。'],
+    firstMissionAwaits: ['最初のミッションが', '待ってるよ。'],
+    keepBuilding:        ['どんどん', '伸ばしていこう。'],
+    readyToStart:        ['今日のミッション、','やってみる？'],
 
     // ── Mission quotes by vibe ──
     missionQuote: (vibe, topic) => {
       const q = {
-        Proud:     topic ? `${topic}の習熟度が上がっています。どこまで理解できているか確認しましょう。`
-                         : '昨日は良いセッションでした。今日はさらに先へ進みましょう。',
-        Skeptical: topic ? `${topic}への疑問は正しい感覚です。しっかりと検証しましょう。`
-                         : '批判的な思考が活性化しています。疑う価値のあるものを見つけましょう。',
-        Concerned: topic ? `前回${topic}で詰まりましたね。別のアプローチで試みましょう。`
-                         : '前のセッションでうまくいかない部分がありました。一からやり直しましょう。',
-        Impressed: topic ? `${topic}の洞察は本物でした。さらに難しいところに応用してみましょう。`
-                         : '良い勢いですね。難易度を上げていきましょう。',
-        Engaged:   topic ? `${topic}があなたの現在のフロンティアです。本当に何を知っていますか？`
-                         : '集中できています。今日を有意義にしましょう。',
-        Focused:   topic ? `${topic}に戻りましょう。まだ不明な点は何ですか？`
-                         : '準備ができたら始めましょう。何に取り組みますか？',
+        Proud:     topic ? `${topic}、結構わかってきてるじゃん。どこまで本当に理解してるか確かめてみよう。`
+                         : '昨日いい感じだったね。今日もそのまま突き進もう。',
+        Skeptical: topic ? `${topic}に疑問持つのは正しいよ。ちゃんと確認していこう。`
+                         : '色々と疑問湧いてる感じだね。それ、一緒に掘り下げよう。',
+        Concerned: topic ? `前回${topic}でちょっと詰まってたね。別の角度からやってみよう。`
+                         : '前のセッション、うまくいかないとこあったね。一から整理しよう。',
+        Impressed: topic ? `${topic}の見方、なかなか鋭かったよ。もっと難しいとこに使ってみよう。`
+                         : 'いい勢いじゃん。もうちょっと難しくしてみよう。',
+        Engaged:   topic ? `${topic}、今のあなたの限界に近いとこだよ。実際どこまで分かってる？`
+                         : '集中できてるね。今日も有意義にいこう。',
+        Focused:   topic ? `${topic}、また戻ってきたね。まだよく分かってないとこはどこ？`
+                         : '準備できたら始めよう。何からいく？',
       }
-      return q[vibe] || (topic ? `${topic}が次です。すでに何を知っていますか？`
-                                : 'あなたのプロフィールを調整中です。思考の仕方を探ってみましょう。')
+      return q[vibe] || (topic ? `${topic}が次だよ。もう何か知ってる？`
+                                : 'あなたのこと把握中。どういう考え方するか見せて。')
     },
-    missionQuoteNew: 'より深く理解したいことを一つ教えてください。そこから始めましょう。',
+    missionQuoteNew: 'もっと深く理解したいこと、一つ教えて。そっから始めよう。',
 
     // ── Orb selector ──
-    chooseYourAeva:   'あなたのAevaを選択',
-    eachOrbChanges:   '各オーブはAevaの教え方と応答スタイルを変えます',
+    chooseYourAeva:   'あなたのAevaを選ぼう',
+    eachOrbChanges:   'オーブによってAevaの教え方や返し方が変わるよ',
     activeLabel:      '使用中',
     unlocksAtLevel:   (n) => `レベル${n}で解放`,
-    levelsAwayLabel:  (lvl, n) => `レベル${lvl} · あと${n}レベル`,
+    levelsAwayLabel:  (lvl, n) => `レベル${lvl} · あと${n}`,
 
     // ── Orb taglines ──
     orbTaglines: {
-      balanced:   '温かく、適応的で、励ましてくれる。',
-      challenger: '直接的で厳しく、甘えは一切なし。',
-      scholar:    '正確で丁寧、学術的に構造化された。',
-      mystic:     'すべてを比喩と類推で伝える。',
+      balanced:   '温かくて、柔軟で、背中を押してくれる。',
+      challenger: 'ストレートで厳しい。甘えなし。',
+      scholar:    '正確で丁寧、学術的にしっかり構造化。',
+      mystic:     '全部を比喩と類推で伝えてくる。',
       void:       '純粋なソクラテス式。冷静、簡潔、徹底的。',
-      ember:      '情熱的でエネルギッシュ、熱狂を伝染させる。',
-      aurora:     '領域を横断した創造的なつながり。',
-      phantom:    '神秘的。ヒントだけ。自分で組み立てさせる。',
+      ember:      '情熱的でエネルギッシュ、熱量が伝染する。',
+      aurora:     '分野をまたいで創造的なつながりを作る。',
+      phantom:    'ミステリアス。ヒントだけ。自分で組み立てさせる。',
     },
 
     // ── Aeva language directive (injected into AI system prompt) ──
     aevaLanguageDirective: `
 
-━━━ 言語設定 ━━━
-CRITICAL: You MUST respond ENTIRELY in Japanese (日本語). Every single word of your response must be in Japanese — explanations, examples, questions, analogies, everything. Do NOT use English at all in your response body.
-The [CORRECT: ...], [PARTIAL: ...], [INCORRECT: ...] tags must contain Japanese text after the colon.
-The [TERM: word | definition] tag: keep the term itself in its original language but write the definition in Japanese.`,
+━━━ 言語設定：日本語（カジュアル） ━━━
+ABSOLUTE RULE — 100% ENFORCED: Every single word of your response must be in Japanese. No English whatsoever in the response body. This overrides everything else.
+
+STYLE — casual everyday Japanese (ため口), like how a Japanese person your age would text a friend:
+- Use だ・だよ・だね・じゃん endings. NEVER use です・ます (except in fixed phrases like set definitions)
+- WRONG: "これは重要です。理解できましたか？"
+- RIGHT: "これ大事だよ。分かった？"
+- Use natural kanji mix like a real person: 分かる、問題、理解、難しい、大事、結局、確認、例えば
+- Use casual connectors: だから、でも、あと、ちょっと、やっぱ、～って、～じゃん、～とか、～けど
+- Short punchy sentences. Real Japanese, not textbook stiff Japanese.
+- Casual questions: "分かった？" "試してみる？" "どう思う？" not "ご理解いただけましたか？"
+- When excited or emphasising: ほんとに、マジで、めっちゃ — natural but not overdone
+- Do NOT write everything in hiragana only — use kanji naturally as any Japanese person would
+
+TAGS (keep these in English as-is, just fill content in Japanese):
+- [CORRECT: 日本語で内容を書く]
+- [PARTIAL: 日本語で内容を書く]
+- [INCORRECT: 日本語で内容を書く]
+- [TERM: word | 日本語で定義を書く]`,
   },
 }
 

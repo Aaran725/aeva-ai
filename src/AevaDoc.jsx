@@ -82,11 +82,27 @@ Your role:
 - Use markdown (bold, bullets) for clarity
 - If asked to check an answer, do so honestly and explain why
 
-Formatting rules:
-- For multi-step solutions, number each step as "1: Step Title" (e.g. "1: Assume the form")
-- Wrap ALL maths in LaTeX: inline with $...$ and display equations with \\[...\\]
-- Never write bare equations as plain text — always use LaTeX delimiters
-- Keep steps short and clear`
+Formatting — use these exact patterns (they render as rich visual cards):
+- ## Section Title → purple divider heading
+- > **Key Insight:** text → blue callout card
+- > **Definition:** text → blue definition card
+- > **Example:** text → yellow worked example card
+- > **Tip:** text → green tip card
+- > **Note:** text → purple note card
+- > **Warning:** text → red warning card
+- $$LaTeX$$ → large centred formula block (dark background)
+- $LaTeX$ → inline rendered math
+- 1. 2. 3. numbered list → coloured circle numbers
+- - bullet list → coloured diamond bullets
+- *question for student* → amber question card
+- **Bold term** on its own line → section divider
+
+Rules:
+- Wrap ALL maths in LaTeX: inline with $...$ and display with $$...$$
+- Use > **Label:** callout cards for key concepts, examples, tips
+- Use 1. 2. 3. for steps (renders as beautiful coloured circles)
+- Never write bare equations as plain text
+- Keep responses focused — teach clearly, don't dump everything at once`
 }
 
 // ─── Streaming helper ─────────────────────────────────────────────────────────
@@ -158,77 +174,67 @@ function getContextualChips(scanCtx, messages) {
   return chips.slice(0, 4)
 }
 
-// ─── KaTeX helpers ────────────────────────────────────────────────────────────
+// ─── parseInline — matches MarkdownRenderer in App.jsx exactly ───────────────
 
-function renderMathSafe(tex, displayMode = false) {
-  try {
-    return katex.renderToString(tex, { throwOnError: false, displayMode, output: 'html' })
-  } catch {
-    return `<span style="color:#F87171">${tex}</span>`
-  }
-}
+const BULLET_COLORS = ['#818CF8','#34D399','#F472B6','#FBBF24','#60A5FA','#A78BFA']
 
-// Split text on inline $...$ math, return array of {type, content}
-function splitInlineMath(text) {
-  const segs = []
-  const re = /\$([^$\n]+?)\$/g
-  let last = 0, m
-  while ((m = re.exec(text)) !== null) {
-    if (m.index > last) segs.push({ type: 'text', content: text.slice(last, m.index) })
-    segs.push({ type: 'inline-math', content: m[1] })
-    last = m.index + m[0].length
-  }
-  if (last < text.length) segs.push({ type: 'text', content: text.slice(last) })
-  return segs
-}
-
-// Render a run of plain text with bold / italic / inline-code markup
-function renderPlain(text) {
+function parseInline(text) {
   const parts = []
-  // Order matters: **bold** before *italic* so ** isn't consumed as two *
-  const re = /\*\*(.+?)\*\*|\*([^*\n]+?)\*|`([^`\n]+?)`/g
-  let last = 0, m, k = 0
-  while ((m = re.exec(text)) !== null) {
-    if (m.index > last) parts.push(<span key={k++}>{text.slice(last, m.index)}</span>)
-    if (m[1] !== undefined)
-      parts.push(<strong key={k++} style={{ fontWeight: 700, color: '#fff' }}>{m[1]}</strong>)
-    else if (m[2] !== undefined)
-      parts.push(<em key={k++} style={{ fontStyle: 'italic', color: 'rgba(255,255,255,0.78)' }}>{m[2]}</em>)
-    else if (m[3] !== undefined)
-      parts.push(
-        <code key={k++} style={{
-          fontFamily: "'Fira Code', 'JetBrains Mono', Consolas, monospace",
-          fontSize: '0.855em', background: 'rgba(99,102,241,0.20)',
-          borderRadius: 5, padding: '2px 7px', color: '#93C5FD',
-          border: '1px solid rgba(99,102,241,0.28)', letterSpacing: 0,
-        }}>{m[3]}</code>
-      )
-    last = m.index + m[0].length
-  }
-  if (last < text.length) parts.push(<span key={k++}>{text.slice(last)}</span>)
-  return parts.length ? parts : text
-}
-
-// Render an inline line with math + bold/italic/code
-function renderInline(text) {
-  const segs = splitInlineMath(text)
-  return segs.map((seg, i) => {
-    if (seg.type === 'inline-math') {
-      return (
-        <span key={i}
-          style={{
-            display: 'inline-block', verticalAlign: 'middle',
-            background: 'rgba(139,92,246,0.13)',
-            border: '1px solid rgba(139,92,246,0.28)',
-            borderRadius: 5, padding: '0 5px', margin: '0 2px',
-            color: '#C4B5FD', lineHeight: 1.4,
-          }}
-          dangerouslySetInnerHTML={{ __html: renderMathSafe(seg.content, false) }}
-        />
-      )
+  let remaining = text
+  let key = 0
+  while (remaining.length > 0) {
+    // Display math $$...$$
+    const dblMatch = remaining.match(/^(.*?)\$\$([^$]+?)\$\$/)
+    if (dblMatch) {
+      if (dblMatch[1]) parts.push(<span key={key++}>{dblMatch[1]}</span>)
+      try {
+        const html = katex.renderToString(dblMatch[2].trim(), { throwOnError: false, displayMode: false })
+        parts.push(<span key={key++} dangerouslySetInnerHTML={{ __html: html }} style={{ verticalAlign: 'middle', display: 'inline-block', padding: '0 2px', fontSize: '1.15em', lineHeight: 1 }} />)
+      } catch { parts.push(<span key={key++} style={{ fontFamily: 'monospace', fontSize: '0.9em' }}>{dblMatch[2]}</span>) }
+      remaining = remaining.slice(dblMatch[0].length); continue
     }
-    return <span key={i}>{renderPlain(seg.content)}</span>
-  })
+    // Inline math $...$
+    const mathMatch = remaining.match(/^(.*?)\$([^$\n]+?)\$/)
+    if (mathMatch) {
+      const mc = mathMatch[2]
+      const isMath = !(/^\d+[,\s]/.test(mc) || (mc.length > 25 && !/[\\^_=+\-/<>{}]/.test(mc) && (mc.match(/\s/g)||[]).length > 3))
+      if (isMath) {
+        if (mathMatch[1]) parts.push(<span key={key++}>{mathMatch[1]}</span>)
+        try {
+          const html = katex.renderToString(mc, { throwOnError: false, displayMode: false })
+          parts.push(<span key={key++} dangerouslySetInnerHTML={{ __html: html }} style={{ verticalAlign: 'middle', display: 'inline-block', padding: '0 2px', fontSize: '1.15em', lineHeight: 1 }} />)
+        } catch { parts.push(<span key={key++} style={{ fontFamily: 'monospace', fontSize: '0.9em' }}>{mc}</span>) }
+        remaining = remaining.slice(mathMatch[0].length); continue
+      } else {
+        if (mathMatch[1]) parts.push(<span key={key++}>{mathMatch[1]}</span>)
+        parts.push(<span key={key++}>${mc}$</span>)
+        remaining = remaining.slice(mathMatch[0].length); continue
+      }
+    }
+    // Bold **text**
+    const boldMatch = remaining.match(/^(.*?)\*\*(.+?)\*\*/)
+    if (boldMatch) {
+      if (boldMatch[1]) parts.push(<span key={key++}>{boldMatch[1]}</span>)
+      parts.push(<strong key={key++} style={{ fontWeight: 700, color: '#C4B5FD', letterSpacing: '-0.01em' }}>{parseInline(boldMatch[2])}</strong>)
+      remaining = remaining.slice(boldMatch[0].length); continue
+    }
+    // Italic *text*
+    const italicMatch = remaining.match(/^(.*?)(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/)
+    if (italicMatch) {
+      if (italicMatch[1]) parts.push(<span key={key++}>{italicMatch[1]}</span>)
+      parts.push(<em key={key++} style={{ color: 'rgba(220,215,255,0.82)', fontStyle: 'italic' }}>{parseInline(italicMatch[2])}</em>)
+      remaining = remaining.slice(italicMatch[0].length); continue
+    }
+    // Inline code `code`
+    const codeMatch = remaining.match(/^(.*?)`([^`]+)`/)
+    if (codeMatch) {
+      if (codeMatch[1]) parts.push(<span key={key++}>{codeMatch[1]}</span>)
+      parts.push(<code key={key++} style={{ fontFamily: '"JetBrains Mono","Fira Code",monospace', fontSize: '0.88em', background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 5, padding: '1px 6px', color: '#7DD3FC' }}>{codeMatch[2]}</code>)
+      remaining = remaining.slice(codeMatch[0].length); continue
+    }
+    parts.push(<span key={key++}>{remaining}</span>); break
+  }
+  return parts
 }
 
 // ─── Code block ───────────────────────────────────────────────────────────────
@@ -273,7 +279,7 @@ function DocTable({ rows }) {
           <tr>
             {header.map((h, i) => (
               <th key={i} style={{ padding: '9px 13px', textAlign: 'left', fontWeight: 700, color: 'rgba(255,255,255,0.90)', background: 'rgba(99,102,241,0.12)', borderBottom: '1.5px solid rgba(99,102,241,0.25)', fontSize: 12.5, whiteSpace: 'nowrap' }}>
-                {renderInline(h)}
+                {parseInline(h)}
               </th>
             ))}
           </tr>
@@ -283,7 +289,7 @@ function DocTable({ rows }) {
             <tr key={ri} style={{ background: ri % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
               {row.map((cell, ci) => (
                 <td key={ci} style={{ padding: '8px 13px', color: 'rgba(255,255,255,0.72)', borderBottom: '1px solid rgba(255,255,255,0.05)', lineHeight: 1.5 }}>
-                  {renderInline(cell)}
+                  {parseInline(cell)}
                 </td>
               ))}
             </tr>
@@ -294,172 +300,265 @@ function DocTable({ rows }) {
   )
 }
 
-// ─── Markdown + KaTeX renderer ────────────────────────────────────────────────
+// ─── DocMarkdown — same rendering engine as MarkdownRenderer in chat ─────────
 
 function DocMarkdown({ text }) {
+  const lines = text.split('\n')
   const elements = []
-  let key = 0
+  let i = 0
+  let listItems = []
+  let listType = null
 
-  // Split on block math first so we don't mangle \[...\] or $$...$$
-  const mathChunks = []
-  const blockMathRe = /\\\[([\s\S]*?)\\\]|\$\$([\s\S]*?)\$\$/g
-  let lastMath = 0, mm
-  while ((mm = blockMathRe.exec(text)) !== null) {
-    if (mm.index > lastMath) mathChunks.push({ type: 'md', content: text.slice(lastMath, mm.index) })
-    mathChunks.push({ type: 'block-math', content: (mm[1] ?? mm[2]).trim() })
-    lastMath = mm.index + mm[0].length
+  const flushList = () => {
+    if (!listItems.length) return
+    elements.push(
+      <div key={`list-${elements.length}`} style={{ margin: '10px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {listItems.map((item, idx) => (
+          listType === 'ol' ? (
+            <div key={idx} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+              <span style={{
+                color: BULLET_COLORS[idx % BULLET_COLORS.length], flexShrink: 0, minWidth: 24,
+                fontSize: 12, fontWeight: 900, lineHeight: 1.85,
+                background: `${BULLET_COLORS[idx % BULLET_COLORS.length]}22`,
+                borderRadius: 6, padding: '0 5px', textAlign: 'center',
+                border: `1px solid ${BULLET_COLORS[idx % BULLET_COLORS.length]}35`,
+              }}>{idx + 1}</span>
+              <span style={{ fontSize: 14.5, color: 'rgba(255,255,255,0.88)', lineHeight: 1.75 }}>{parseInline(item)}</span>
+            </div>
+          ) : (
+            <div key={idx} style={{ display: 'flex', gap: 11, alignItems: 'flex-start' }}>
+              <span style={{ color: BULLET_COLORS[idx % BULLET_COLORS.length], flexShrink: 0, marginTop: 7, fontSize: 8, lineHeight: 1 }}>◆</span>
+              <span style={{ fontSize: 14.5, color: 'rgba(255,255,255,0.88)', lineHeight: 1.75 }}>{parseInline(item)}</span>
+            </div>
+          )
+        ))}
+      </div>
+    )
+    listItems = []; listType = null
   }
-  if (lastMath < text.length) mathChunks.push({ type: 'md', content: text.slice(lastMath) })
 
-  for (const chunk of mathChunks) {
-    if (chunk.type === 'block-math') {
-      elements.push(
-        <div key={key++}
-          style={{
-            margin: '18px 0', padding: '18px 22px', borderRadius: 14,
-            background: 'rgba(99,102,241,0.09)',
-            border: '1px solid rgba(139,92,246,0.30)',
-            borderLeft: '3px solid rgba(139,92,246,0.65)',
-            textAlign: 'center', overflowX: 'auto', fontSize: 16,
-          }}
-          dangerouslySetInnerHTML={{ __html: renderMathSafe(chunk.content, true) }}
-        />
-      )
+  while (i < lines.length) {
+    const line = lines[i]
+    const trimmed = line.trim()
+
+    // Empty line
+    if (!trimmed) { flushList(); elements.push(<div key={`g-${i}`} style={{ height: 10 }} />); i++; continue }
+
+    // Horizontal rule
+    if (trimmed === '---' || trimmed === '___') {
+      flushList()
+      elements.push(<div key={`hr-${i}`} style={{ margin: '12px 0', height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.09) 20%, rgba(255,255,255,0.09) 80%, transparent)' }} />)
+      i++; continue
+    }
+
+    // Display math $$...$$ or \[...\]
+    if (/^\$\$/.test(trimmed) || /^\\\[/.test(trimmed)) {
+      flushList()
+      const isDouble = /^\$\$/.test(trimmed)
+      const closeRe  = isDouble ? /^\$\$/ : /^\\\]/
+      const mathLines = []
+      const startI = i
+      const firstContent = isDouble
+        ? trimmed.replace(/^\$\$/, '').replace(/\$\$$/, '').trim()
+        : trimmed.replace(/^\\\[/, '').replace(/\\\]$/, '').trim()
+      if (firstContent) { mathLines.push(firstContent); i++ }
+      else {
+        i++
+        while (i < lines.length && !closeRe.test(lines[i].trim())) { mathLines.push(lines[i]); i++ }
+        i++
+      }
+      const mathContent = mathLines.join('\n').trim()
+      try {
+        const html = katex.renderToString(mathContent, { throwOnError: false, displayMode: true })
+        elements.push(
+          <div key={`dm-${startI}`} style={{
+            overflowX: 'auto', margin: '16px 0', padding: '26px 28px',
+            textAlign: 'center', borderRadius: 16, fontSize: 19,
+            background: 'rgba(14,16,48,0.80)',
+            border: '1px solid rgba(99,102,241,0.30)',
+            boxShadow: '0 4px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(165,170,255,0.07)',
+          }} dangerouslySetInnerHTML={{ __html: html }} />
+        )
+      } catch { elements.push(<p key={`dm-${startI}`} style={{ fontFamily: 'monospace', color: 'rgba(255,255,255,0.86)' }}>{mathContent}</p>) }
       continue
     }
 
-    // Process the markdown text segment line by line
-    const lines = chunk.content.split('\n')
-    let i = 0
-    while (i < lines.length) {
-      const line = lines[i]
-
-      // ── Code fence ──────────────────────────────────────────
-      if (line.startsWith('```')) {
-        const lang = line.slice(3).trim()
-        const codeLines = []
-        i++
-        while (i < lines.length && !lines[i].startsWith('```')) {
-          codeLines.push(lines[i])
-          i++
-        }
-        i++ // skip closing ```
-        elements.push(<DocCodeBlock key={key++} code={codeLines.join('\n')} lang={lang} />)
-        continue
-      }
-
-      // ── Table ───────────────────────────────────────────────
-      if (line.includes('|') && lines[i + 1]?.match(/^\|?[\s\-|:]+\|?$/)) {
-        const tableLines = []
-        while (i < lines.length && lines[i].includes('|')) {
-          tableLines.push(lines[i])
-          i++
-        }
-        elements.push(<DocTable key={key++} rows={tableLines} />)
-        continue
-      }
-
-      // ── Blockquote ──────────────────────────────────────────
-      if (line.startsWith('> ')) {
-        const bqLines = []
-        while (i < lines.length && lines[i].startsWith('> ')) {
-          bqLines.push(lines[i].slice(2))
-          i++
-        }
-        elements.push(
-          <div key={key++} style={{ borderLeft: '3px solid rgba(99,102,241,0.45)', paddingLeft: 14, margin: '10px 0', color: 'rgba(255,255,255,0.58)', fontStyle: 'italic', lineHeight: 1.65 }}>
-            {bqLines.map((l, li) => <div key={li}>{renderInline(l)}</div>)}
+    // Feedback tags [CORRECT/PARTIAL/INCORRECT: ...]
+    const feedbackMatch = trimmed.match(/^\[(CORRECT|PARTIAL|INCORRECT)(?::\s*(.*))?\]/)
+    if (feedbackMatch) {
+      flushList()
+      const type = feedbackMatch[1], msg = feedbackMatch[2] || ''
+      const cfg = {
+        CORRECT:   { bg: 'rgba(74,222,128,0.10)', border: 'rgba(74,222,128,0.28)', color: '#4ADE80', icon: '✓', label: 'Correct' },
+        PARTIAL:   { bg: 'rgba(251,191,36,0.09)', border: 'rgba(251,191,36,0.25)', color: '#FCD34D', icon: '◑', label: 'Partially correct' },
+        INCORRECT: { bg: 'rgba(248,113,113,0.10)', border: 'rgba(248,113,113,0.25)', color: '#F87171', icon: '✗', label: 'Not quite' },
+      }[type]
+      elements.push(
+        <div key={`fb-${i}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, margin: '10px 0', padding: '13px 16px', background: cfg.bg, border: `1px solid ${cfg.border}`, borderLeft: `4px solid ${cfg.color}`, borderRadius: 14 }}>
+          <span style={{ fontSize: 20, fontWeight: 900, color: cfg.color, flexShrink: 0, lineHeight: 1.3, marginTop: 1 }}>{cfg.icon}</span>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 900, color: cfg.color, letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: msg ? 5 : 0 }}>{cfg.label}</div>
+            {msg && <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.88)', lineHeight: 1.65, fontWeight: 500 }}>{parseInline(msg)}</div>}
           </div>
-        )
-        continue
-      }
-
-      // ── Step badge "1: Title" or "Step 1: Title" ────────────
-      const stepMatch = line.match(/^(?:Step\s+)?(\d+):\s+(.+)/)
-      if (stepMatch && line.length < 90) {
-        elements.push(
-          <div key={key++} style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 20, marginBottom: 6 }}>
-            <div style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg, rgba(99,102,241,0.40), rgba(139,92,246,0.28))', border: '1px solid rgba(99,102,241,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#A5B4FC', boxShadow: '0 2px 8px rgba(99,102,241,0.22)', letterSpacing: '-0.02em' }}>
-              {stepMatch[1]}
-            </div>
-            <span style={{ fontWeight: 700, fontSize: 14.5, color: 'rgba(255,255,255,0.96)', letterSpacing: '-0.01em' }}>{renderInline(stepMatch[2])}</span>
-          </div>
-        )
-        i++
-        continue
-      }
-
-      // ── Headings ────────────────────────────────────────────
-      if (line.startsWith('### ')) {
-        elements.push(
-          <div key={key++} style={{ fontWeight: 700, fontSize: 15, marginTop: 20, marginBottom: 5, color: '#C4B5FD', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ width: 3, height: 15, borderRadius: 99, background: 'rgba(139,92,246,0.60)', flexShrink: 0, display: 'inline-block' }} />
-            {renderInline(line.slice(4))}
-          </div>
-        )
-        i++; continue
-      }
-      if (line.startsWith('## ')) {
-        elements.push(
-          <div key={key++} style={{ fontWeight: 800, fontSize: 18, marginTop: 26, marginBottom: 8, color: '#fff', letterSpacing: '-0.03em', borderBottom: '1.5px solid rgba(139,92,246,0.25)', paddingBottom: 7 }}>
-            {renderInline(line.slice(3))}
-          </div>
-        )
-        i++; continue
-      }
-      if (line.startsWith('# ')) {
-        elements.push(
-          <div key={key++} style={{ fontWeight: 900, fontSize: 22, marginTop: 28, marginBottom: 10, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1.15 }}>
-            {renderInline(line.slice(2))}
-          </div>
-        )
-        i++; continue
-      }
-
-      // ── Bullet list ─────────────────────────────────────────
-      if (line.startsWith('- ') || line.startsWith('• ') || line.startsWith('* ')) {
-        const content = line.slice(2)
-        elements.push(
-          <div key={key++} style={{ display: 'flex', gap: 10, marginTop: 6, alignItems: 'flex-start' }}>
-            <span style={{ color: '#818CF8', flexShrink: 0, marginTop: 7, fontSize: 6, lineHeight: 1 }}>◆</span>
-            <span style={{ lineHeight: 1.72, flex: 1 }}>{renderInline(content)}</span>
-          </div>
-        )
-        i++; continue
-      }
-
-      // ── Numbered list ───────────────────────────────────────
-      const numMatch = line.match(/^(\d+)[.)]\s+(.*)/)
-      if (numMatch) {
-        elements.push(
-          <div key={key++} style={{ display: 'flex', gap: 10, marginTop: 6, alignItems: 'flex-start' }}>
-            <span style={{ color: '#818CF8', flexShrink: 0, minWidth: 22, fontSize: 13, fontWeight: 700, marginTop: 1, textAlign: 'right' }}>{numMatch[1]}.</span>
-            <span style={{ lineHeight: 1.72, flex: 1 }}>{renderInline(numMatch[2])}</span>
-          </div>
-        )
-        i++; continue
-      }
-
-      // ── Horizontal rule ─────────────────────────────────────
-      if (/^---+$/.test(line.trim())) {
-        elements.push(<div key={key++} style={{ height: 1, background: 'rgba(255,255,255,0.09)', margin: '14px 0' }} />)
-        i++; continue
-      }
-
-      // ── Empty line ──────────────────────────────────────────
-      if (!line.trim()) {
-        elements.push(<div key={key++} style={{ height: 8 }} />)
-        i++; continue
-      }
-
-      // ── Paragraph ───────────────────────────────────────────
-      elements.push(<div key={key++} style={{ marginTop: 5, lineHeight: 1.78 }}>{renderInline(line)}</div>)
-      i++
+        </div>
+      )
+      i++; continue
     }
+
+    // Markdown table
+    if (/^\|/.test(trimmed) && i + 1 < lines.length && /^\|[\s\-:|]+\|/.test(lines[i + 1])) {
+      flushList()
+      const tableLines = []
+      while (i < lines.length && /^\|/.test(lines[i].trim())) { tableLines.push(lines[i]); i++ }
+      if (tableLines.length >= 2) elements.push(<DocTable key={`tbl-${elements.length}`} rows={tableLines} />)
+      continue
+    }
+
+    // H3 ###
+    if (/^###\s/.test(trimmed)) {
+      flushList()
+      elements.push(
+        <div key={`h3-${i}`} style={{ fontWeight: 700, fontSize: 13.5, marginTop: 18, marginBottom: 4, color: '#A78BFA', letterSpacing: '-0.01em', lineHeight: 1.4, paddingLeft: 10, borderLeft: '3px solid #7C3AED' }}>
+          {parseInline(trimmed.replace(/^###\s/, ''))}
+        </div>
+      )
+      i++; continue
+    }
+
+    // H2 ##
+    if (/^##\s/.test(trimmed)) {
+      flushList()
+      elements.push(
+        <div key={`h2-${i}`} style={{ marginTop: 26, marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingBottom: 8, borderBottom: '2px solid rgba(139,143,255,0.20)' }}>
+            <div style={{ width: 4, height: 18, borderRadius: 2, background: '#818CF8', flexShrink: 0 }} />
+            <span style={{ fontWeight: 800, fontSize: 16, color: 'rgba(255,255,255,0.97)', letterSpacing: '-0.03em', lineHeight: 1.3 }}>{parseInline(trimmed.replace(/^##\s/, ''))}</span>
+          </div>
+        </div>
+      )
+      i++; continue
+    }
+
+    // H1 #
+    if (/^#\s/.test(trimmed)) {
+      flushList()
+      elements.push(
+        <div key={`h1-${i}`} style={{ marginTop: 22, marginBottom: 10, fontWeight: 900, fontSize: 19, letterSpacing: '-0.04em', lineHeight: 1.2, background: 'linear-gradient(135deg, #fff 30%, #C4B5FD 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+          {parseInline(trimmed.replace(/^#\s/, ''))}
+        </div>
+      )
+      i++; continue
+    }
+
+    // Blockquote > — callout cards OR plain strip
+    if (/^>/.test(trimmed)) {
+      flushList()
+      const content = trimmed.replace(/^>\s*/, '')
+      const labelMatch = content.match(/^\*\*(Example|Definition|Key Insight|Key|Note|Warning|Tip|Recall):\*\*\s*(.*)$/i)
+      if (labelMatch) {
+        const label = labelMatch[1], body = labelMatch[2]
+        const cfg = {
+          example:       { bg: 'rgba(251,191,36,0.10)',  border: 'rgba(251,191,36,0.35)',  color: '#FBBF24', icon: '◎', pill: 'rgba(251,191,36,0.18)' },
+          definition:    { bg: 'rgba(96,165,250,0.10)',  border: 'rgba(96,165,250,0.32)',  color: '#60A5FA', icon: '◉', pill: 'rgba(96,165,250,0.18)' },
+          'key insight': { bg: 'rgba(139,143,255,0.12)', border: 'rgba(139,143,255,0.40)', color: '#A5B4FC', icon: '◈', pill: 'rgba(139,143,255,0.20)' },
+          key:           { bg: 'rgba(139,143,255,0.12)', border: 'rgba(139,143,255,0.40)', color: '#A5B4FC', icon: '◈', pill: 'rgba(139,143,255,0.20)' },
+          note:          { bg: 'rgba(99,102,241,0.10)',  border: 'rgba(99,102,241,0.32)',  color: '#818CF8', icon: '◇', pill: 'rgba(99,102,241,0.18)' },
+          warning:       { bg: 'rgba(248,113,113,0.10)', border: 'rgba(248,113,113,0.32)', color: '#F87171', icon: '⚠', pill: 'rgba(248,113,113,0.18)' },
+          tip:           { bg: 'rgba(52,211,153,0.10)',  border: 'rgba(52,211,153,0.32)',  color: '#34D399', icon: '→', pill: 'rgba(52,211,153,0.18)' },
+          recall:        { bg: 'rgba(251,191,36,0.09)',  border: 'rgba(251,191,36,0.28)',  color: '#FCD34D', icon: '↩', pill: 'rgba(251,191,36,0.16)' },
+        }[label.toLowerCase()] || { bg: 'rgba(99,102,241,0.10)', border: 'rgba(99,102,241,0.32)', color: '#818CF8', icon: '◈', pill: 'rgba(99,102,241,0.18)' }
+        elements.push(
+          <div key={`bq-${i}`} style={{ margin: '12px 0', padding: '13px 16px', background: cfg.bg, border: `1px solid ${cfg.border}`, borderLeft: `4px solid ${cfg.color}`, borderRadius: 14, boxShadow: `0 2px 12px ${cfg.color}10` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: body ? 8 : 0 }}>
+              <span style={{ fontSize: 13, color: cfg.color, fontWeight: 700, lineHeight: 1 }}>{cfg.icon}</span>
+              <span style={{ fontSize: 10, fontWeight: 900, color: cfg.color, letterSpacing: '0.12em', textTransform: 'uppercase', background: cfg.pill, borderRadius: 20, padding: '2px 8px' }}>{label}</span>
+            </div>
+            {body && <div style={{ fontSize: 14.5, lineHeight: 1.75, color: 'rgba(255,255,255,0.90)', fontWeight: 400 }}>{parseInline(body)}</div>}
+          </div>
+        )
+      } else {
+        elements.push(
+          <div key={`bq-${i}`} style={{ margin: '10px 0', padding: '12px 16px', borderLeft: '4px solid #7C3AED', background: 'rgba(99,102,241,0.10)', borderRadius: 12, fontSize: 14.5, lineHeight: 1.75, fontStyle: 'italic', color: 'rgba(220,218,255,0.90)' }}>
+            {parseInline(content)}
+          </div>
+        )
+      }
+      i++; continue
+    }
+
+    // Code block ```
+    if (/^```/.test(trimmed)) {
+      flushList()
+      const lang = trimmed.replace(/^```/, '').trim()
+      const codeLines = []
+      i++
+      while (i < lines.length && !/^```/.test(lines[i].trim())) { codeLines.push(lines[i]); i++ }
+      i++
+      elements.push(<DocCodeBlock key={`code-${elements.length}`} code={codeLines.join('\n')} lang={lang} />)
+      continue
+    }
+
+    // Step heading "1: Title" or "Step 1: Title"
+    const stepMatch = trimmed.match(/^(?:\*\*)?(?:Step\s+)?(\d+):\s+(.+?)(?:\*\*)?$/)
+    if (stepMatch && trimmed.replace(/\*\*/g, '').length < 100) {
+      flushList()
+      elements.push(
+        <div key={`step-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 13, marginTop: 24, marginBottom: 8 }}>
+          <div style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 10, background: 'linear-gradient(135deg,rgba(99,102,241,0.40),rgba(79,70,229,0.28))', border: '1px solid rgba(139,143,255,0.50)', boxShadow: '0 2px 8px rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 900, color: '#C4B5FD', letterSpacing: '-0.02em' }}>
+            {stepMatch[1]}
+          </div>
+          <span style={{ fontWeight: 700, fontSize: 15, color: 'rgba(255,255,255,0.97)', lineHeight: 1.3, letterSpacing: '-0.015em' }}>{parseInline(stepMatch[2])}</span>
+        </div>
+      )
+      i++; continue
+    }
+
+    // Ordered list 1. / 1)
+    const olMatch = trimmed.match(/^(\d+)[.)]\s+(.*)/)
+    if (olMatch) { if (listType !== 'ol') { flushList(); listType = 'ol' }; listItems.push(olMatch[2]); i++; continue }
+
+    // Unordered list - / * / •
+    const ulMatch = trimmed.match(/^[-*•]\s+(.*)/)
+    if (ulMatch) { if (listType !== 'ul') { flushList(); listType = 'ul' }; listItems.push(ulMatch[1]); i++; continue }
+
+    // Standalone bold **Concept** → section divider
+    const boldOnlyMatch = trimmed.match(/^\*\*([^*].+?)\*\*$/)
+    if (boldOnlyMatch) {
+      flushList()
+      elements.push(
+        <div key={`sh-${i}`} style={{ marginTop: 24, marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingBottom: 9, borderBottom: '2px solid rgba(139,143,255,0.18)', width: '100%' }}>
+            <div style={{ width: 5, height: 20, borderRadius: 3, background: 'linear-gradient(180deg,#818CF8,#C084FC)', flexShrink: 0 }} />
+            <span style={{ fontWeight: 800, fontSize: 16, color: '#E2E0FF', letterSpacing: '-0.03em', lineHeight: 1.3 }}>{boldOnlyMatch[1]}</span>
+          </div>
+        </div>
+      )
+      i++; continue
+    }
+
+    // Standalone italic *text* → question card
+    const isStandaloneItalic = trimmed.startsWith('*') && trimmed.endsWith('*') && !trimmed.startsWith('**') && !trimmed.endsWith('**') && trimmed.length > 2
+    if (isStandaloneItalic) {
+      flushList()
+      elements.push(
+        <div key={`qi-${i}`} style={{ marginTop: 16, padding: '13px 16px', background: 'rgba(251,191,36,0.09)', border: '1px solid rgba(251,191,36,0.28)', borderLeft: '4px solid #FBBF24', borderRadius: 13, display: 'flex', alignItems: 'flex-start', gap: 10, boxShadow: '0 2px 12px rgba(251,191,36,0.08)' }}>
+          <span style={{ fontSize: 16, color: '#FBBF24', flexShrink: 0, lineHeight: 1.3, marginTop: 1 }}>?</span>
+          <span style={{ fontSize: 15, color: 'rgba(255,245,200,0.90)', fontStyle: 'italic', lineHeight: 1.65, fontWeight: 500, letterSpacing: '-0.01em' }}>{parseInline(trimmed.slice(1, -1))}</span>
+        </div>
+      )
+      i++; continue
+    }
+
+    // Default paragraph
+    flushList()
+    elements.push(<div key={`p-${i}`} style={{ marginTop: 5, fontSize: 15, color: 'rgba(235,233,255,0.84)', lineHeight: 1.80, letterSpacing: '-0.005em' }}>{parseInline(trimmed)}</div>)
+    i++
   }
 
+  flushList()
+
   return (
-    <div style={{ fontSize: 14.5, color: 'rgba(255,255,255,0.88)', fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: '-0.005em' }}>
+    <div style={{ minWidth: 0, fontSize: 15, lineHeight: 1.80, color: 'rgba(255,255,255,0.86)', fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: '-0.005em' }}>
       {elements}
     </div>
   )
