@@ -3651,17 +3651,87 @@ ${guide.examTip ? `<div class="section"><div class="section-label">Exam Tip</div
   )
 }
 
+/* ═══ CHAT THEMES (Ai OS palette) ════════════════ */
+const CHAT_THEMES = {
+  purple: {
+    swatch: '#7C3AED', label: 'Purple',
+    bg: 'radial-gradient(ellipse at 88% 8%, rgba(80,30,140,0.42) 0%, transparent 48%), radial-gradient(ellipse at 12% 92%, rgba(30,10,90,0.30) 0%, transparent 45%), #08071a',
+    inputBg: 'radial-gradient(ellipse at 50% 0%, rgba(50,38,90,0.70) 0%, rgba(8,7,20,0.90) 70%)',
+    inputBorder: 'rgba(124,58,237,0.38)',
+    inputGlow: '0 0 0 1px rgba(124,58,237,0.12), 0 8px 40px rgba(0,0,0,0.55), 0 0 28px rgba(80,30,140,0.22)',
+    accent: '#C4B5FD', accentBg: 'rgba(124,58,237,0.18)', accentBorder: 'rgba(124,58,237,0.30)',
+    aiBg: 'radial-gradient(ellipse at 28% 22%, rgba(65,40,120,0.55) 0%, rgba(10,8,26,0.82) 100%)',
+    userBg: 'radial-gradient(ellipse at 72% 22%, rgba(130,50,20,0.55) 0%, rgba(18,6,4,0.82) 100%)',
+    aiBorder: '1px solid rgba(100,70,180,0.28)', userBorder: '1px solid rgba(180,80,40,0.28)',
+  },
+  ember: {
+    swatch: '#C84518', label: 'Ember',
+    bg: 'radial-gradient(ellipse at 88% 8%, rgba(140,30,20,0.45) 0%, transparent 50%), radial-gradient(ellipse at 12% 92%, rgba(80,10,10,0.30) 0%, transparent 45%), #0A0404',
+    inputBg: 'radial-gradient(ellipse at 50% 0%, rgba(80,25,15,0.70) 0%, rgba(10,4,4,0.90) 70%)',
+    inputBorder: 'rgba(200,70,30,0.38)',
+    inputGlow: '0 0 0 1px rgba(200,70,30,0.12), 0 8px 40px rgba(0,0,0,0.55), 0 0 28px rgba(140,30,20,0.22)',
+    accent: '#FDBA74', accentBg: 'rgba(200,70,30,0.18)', accentBorder: 'rgba(200,70,30,0.30)',
+    aiBg: 'radial-gradient(ellipse at 28% 22%, rgba(120,30,15,0.55) 0%, rgba(20,6,4,0.82) 100%)',
+    userBg: 'radial-gradient(ellipse at 72% 22%, rgba(160,40,10,0.55) 0%, rgba(22,5,2,0.82) 100%)',
+    aiBorder: '1px solid rgba(200,70,30,0.28)', userBorder: '1px solid rgba(220,80,30,0.28)',
+  },
+  teal: {
+    swatch: '#1EC4AA', label: 'Teal',
+    bg: 'radial-gradient(ellipse at 88% 8%, rgba(20,130,110,0.40) 0%, transparent 50%), radial-gradient(ellipse at 12% 92%, rgba(10,80,70,0.28) 0%, transparent 45%), #020E0C',
+    inputBg: 'radial-gradient(ellipse at 50% 0%, rgba(15,80,68,0.70) 0%, rgba(2,12,10,0.90) 70%)',
+    inputBorder: 'rgba(30,196,170,0.38)',
+    inputGlow: '0 0 0 1px rgba(30,196,170,0.12), 0 8px 40px rgba(0,0,0,0.55), 0 0 28px rgba(20,130,110,0.22)',
+    accent: '#5EEAD4', accentBg: 'rgba(30,196,170,0.18)', accentBorder: 'rgba(30,196,170,0.30)',
+    aiBg: 'radial-gradient(ellipse at 28% 22%, rgba(15,100,85,0.55) 0%, rgba(2,14,12,0.82) 100%)',
+    userBg: 'radial-gradient(ellipse at 72% 22%, rgba(20,130,110,0.55) 0%, rgba(4,18,14,0.82) 100%)',
+    aiBorder: '1px solid rgba(30,196,170,0.28)', userBorder: '1px solid rgba(40,210,180,0.28)',
+  },
+  cerise: {
+    swatch: '#E01E6A', label: 'Cerise',
+    bg: 'radial-gradient(ellipse at 88% 8%, rgba(150,20,70,0.42) 0%, transparent 50%), radial-gradient(ellipse at 12% 92%, rgba(80,10,40,0.30) 0%, transparent 45%), #0A0208',
+    inputBg: 'radial-gradient(ellipse at 50% 0%, rgba(90,15,45,0.70) 0%, rgba(10,2,8,0.90) 70%)',
+    inputBorder: 'rgba(224,30,106,0.38)',
+    inputGlow: '0 0 0 1px rgba(224,30,106,0.12), 0 8px 40px rgba(0,0,0,0.55), 0 0 28px rgba(150,20,70,0.22)',
+    accent: '#F9A8D4', accentBg: 'rgba(224,30,106,0.18)', accentBorder: 'rgba(224,30,106,0.30)',
+    aiBg: 'radial-gradient(ellipse at 28% 22%, rgba(120,20,55,0.55) 0%, rgba(15,4,10,0.82) 100%)',
+    userBg: 'radial-gradient(ellipse at 72% 22%, rgba(150,25,65,0.55) 0%, rgba(18,4,10,0.82) 100%)',
+    aiBorder: '1px solid rgba(224,30,106,0.28)', userBorder: '1px solid rgba(240,50,110,0.28)',
+  },
+  navy: {
+    swatch: '#1E3A9A', label: 'Navy',
+    bg: 'radial-gradient(ellipse at 88% 8%, rgba(20,40,130,0.42) 0%, transparent 50%), radial-gradient(ellipse at 12% 92%, rgba(10,20,80,0.30) 0%, transparent 45%), #020408',
+    inputBg: 'radial-gradient(ellipse at 50% 0%, rgba(15,30,90,0.70) 0%, rgba(2,4,18,0.90) 70%)',
+    inputBorder: 'rgba(30,60,200,0.38)',
+    inputGlow: '0 0 0 1px rgba(30,60,200,0.12), 0 8px 40px rgba(0,0,0,0.55), 0 0 28px rgba(20,40,130,0.22)',
+    accent: '#93C5FD', accentBg: 'rgba(30,60,200,0.18)', accentBorder: 'rgba(30,60,200,0.30)',
+    aiBg: 'radial-gradient(ellipse at 28% 22%, rgba(15,35,100,0.55) 0%, rgba(2,4,20,0.82) 100%)',
+    userBg: 'radial-gradient(ellipse at 72% 22%, rgba(20,40,120,0.55) 0%, rgba(4,6,24,0.82) 100%)',
+    aiBorder: '1px solid rgba(30,60,200,0.28)', userBorder: '1px solid rgba(50,80,220,0.28)',
+  },
+  olive: {
+    swatch: '#8A9A1E', label: 'Olive',
+    bg: 'radial-gradient(ellipse at 88% 8%, rgba(90,100,20,0.40) 0%, transparent 50%), radial-gradient(ellipse at 12% 92%, rgba(50,60,10,0.28) 0%, transparent 45%), #080A02',
+    inputBg: 'radial-gradient(ellipse at 50% 0%, rgba(55,65,12,0.70) 0%, rgba(8,10,2,0.90) 70%)',
+    inputBorder: 'rgba(140,160,30,0.38)',
+    inputGlow: '0 0 0 1px rgba(140,160,30,0.12), 0 8px 40px rgba(0,0,0,0.55), 0 0 28px rgba(90,100,20,0.22)',
+    accent: '#BEF264', accentBg: 'rgba(140,160,30,0.18)', accentBorder: 'rgba(140,160,30,0.30)',
+    aiBg: 'radial-gradient(ellipse at 28% 22%, rgba(70,80,15,0.55) 0%, rgba(8,10,2,0.82) 100%)',
+    userBg: 'radial-gradient(ellipse at 72% 22%, rgba(90,100,20,0.55) 0%, rgba(10,12,2,0.82) 100%)',
+    aiBorder: '1px solid rgba(140,160,30,0.28)', userBorder: '1px solid rgba(160,180,40,0.28)',
+  },
+}
+
 /* ═══ CHAT BUBBLE ═════════════════════════════════ */
-function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false, isWidget = false }) {
+function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false, isWidget = false, widgetTheme = null }) {
   const isUser = msg.role === 'user'
 
   /* ── Widget card style (Ai OS) ── */
   const widgetBg = isUser
-    ? 'radial-gradient(ellipse at 72% 22%, rgba(130,50,20,0.55) 0%, rgba(18,6,4,0.82) 100%)'
-    : 'radial-gradient(ellipse at 28% 22%, rgba(65,40,120,0.55) 0%, rgba(10,8,26,0.82) 100%)'
+    ? (widgetTheme?.userBg || 'radial-gradient(ellipse at 72% 22%, rgba(130,50,20,0.55) 0%, rgba(18,6,4,0.82) 100%)')
+    : (widgetTheme?.aiBg || 'radial-gradient(ellipse at 28% 22%, rgba(65,40,120,0.55) 0%, rgba(10,8,26,0.82) 100%)')
   const widgetBorder = isUser
-    ? '1px solid rgba(180,80,40,0.28)'
-    : '1px solid rgba(100,70,180,0.28)'
+    ? (widgetTheme?.userBorder || '1px solid rgba(180,80,40,0.28)')
+    : (widgetTheme?.aiBorder || '1px solid rgba(100,70,180,0.28)')
   const widgetShadow = '0 8px 36px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.10)'
   const widgetRadius = isUser ? '24px 24px 6px 24px' : '6px 24px 24px 24px'
   const widgetPad = isUser ? '12px 20px' : '18px 22px'
@@ -4998,6 +5068,18 @@ If no clear changes: {"changes":[]}`
   })
   const isWidget = chatLayout === 'widget' && !isMission
 
+  /* ── Chat colour theme (Ai OS palette) ── */
+  const [chatTheme, setChatThemeKey] = useState(() => {
+    try { return localStorage.getItem('aeva_chat_theme') || 'purple' } catch { return 'purple' }
+  })
+  const [showThemePicker, setShowThemePicker] = useState(false)
+  const activeTheme = CHAT_THEMES[chatTheme] || CHAT_THEMES.purple
+  const applyChatTheme = (id) => {
+    setChatThemeKey(id)
+    try { localStorage.setItem('aeva_chat_theme', id) } catch {}
+    setShowThemePicker(false)
+  }
+
   const backBtnStyle = isLight
     ? { background: 'rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.12)', color: 'rgba(0,0,0,0.60)' }
     : { background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.13)', color: 'rgba(255,255,255,0.62)' }
@@ -5020,9 +5102,9 @@ If no clear changes: {"changes":[]}`
       }
     : isWidget
     ? {
-        background: 'radial-gradient(ellipse at 50% 0%, rgba(50,38,90,0.70) 0%, rgba(8,7,20,0.90) 70%)',
-        border: '1px solid rgba(124,58,237,0.38)',
-        boxShadow: '0 0 0 1px rgba(124,58,237,0.12), 0 8px 40px rgba(0,0,0,0.55), 0 0 28px rgba(80,30,140,0.22)',
+        background: activeTheme.inputBg,
+        border: `1px solid ${activeTheme.inputBorder}`,
+        boxShadow: activeTheme.inputGlow,
         borderRadius: 999,
       }
     : {
@@ -5053,7 +5135,7 @@ If no clear changes: {"changes":[]}`
         position: 'relative', display: 'flex', flexDirection: 'column',
         width: '100%', height: '100vh', overflow: 'hidden',
         background: isWidget
-          ? `radial-gradient(ellipse at 88% 8%, rgba(80,30,140,0.42) 0%, transparent 48%), radial-gradient(ellipse at 12% 92%, rgba(30,10,90,0.30) 0%, transparent 45%), #08071a`
+          ? activeTheme.bg
           : missionBg,
         fontFamily: "'Inter', system-ui, sans-serif",
       }}
@@ -5266,6 +5348,60 @@ If no clear changes: {"changes":[]}`
                 <LayoutGrid size={12} />
               </motion.button>
             )}
+            {/* Widget theme palette picker */}
+            {isWidget && (
+              <div style={{ position: 'relative' }}>
+                <motion.button
+                  whileHover={{ scale: 1.10 }} whileTap={{ scale: 0.92 }}
+                  onClick={() => setShowThemePicker(v => !v)}
+                  title={`Theme: ${activeTheme.label}`}
+                  style={{
+                    width: 30, height: 30, borderRadius: '50%', cursor: 'pointer', padding: 0,
+                    background: `radial-gradient(circle at 38% 38%, ${activeTheme.swatch}55, ${activeTheme.swatch}22)`,
+                    border: `1.5px solid ${activeTheme.swatch}80`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: showThemePicker ? `0 0 12px ${activeTheme.swatch}60` : 'none',
+                    transition: 'box-shadow 0.2s',
+                  }}
+                >
+                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: activeTheme.swatch, boxShadow: `0 0 7px ${activeTheme.swatch}` }} />
+                </motion.button>
+                {showThemePicker && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6, scale: 0.92 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4, scale: 0.94 }}
+                    transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                    style={{
+                      position: 'absolute', top: 38, right: 0,
+                      background: 'rgba(8,7,20,0.94)',
+                      border: '1px solid rgba(255,255,255,0.10)',
+                      borderRadius: 16, padding: '10px 12px',
+                      display: 'flex', gap: 8,
+                      backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
+                      boxShadow: '0 16px 48px rgba(0,0,0,0.65)',
+                      zIndex: 200,
+                    }}
+                  >
+                    {Object.entries(CHAT_THEMES).map(([id, t]) => (
+                      <motion.button
+                        key={id}
+                        whileHover={{ scale: 1.18 }} whileTap={{ scale: 0.88 }}
+                        onClick={() => applyChatTheme(id)}
+                        title={t.label}
+                        style={{
+                          width: 22, height: 22, borderRadius: '50%', cursor: 'pointer', padding: 0,
+                          background: t.swatch,
+                          border: chatTheme === id ? '2.5px solid rgba(255,255,255,0.90)' : '2px solid transparent',
+                          boxShadow: chatTheme === id ? `0 0 10px ${t.swatch}` : `0 0 4px ${t.swatch}60`,
+                          transition: 'border 0.15s, box-shadow 0.15s',
+                        }}
+                      />
+                    ))}
+                  </motion.div>
+                )}
+              </div>
+            )}
             {/* Appearance gear */}
             <motion.button
               whileHover={{ scale: 1.08, rotate: 45 }} whileTap={{ scale: 0.94 }}
@@ -5289,20 +5425,20 @@ If no clear changes: {"changes":[]}`
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '4px 24px 12px', flexShrink: 0 }}
           >
             {/* Session counter pill — "Today's Metrix" style */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderRadius: 99, background: 'radial-gradient(ellipse at 50% 0%, rgba(40,35,80,0.80) 0%, rgba(8,7,20,0.90) 80%)', border: '1px solid rgba(124,58,237,0.28)', boxShadow: '0 4px 20px rgba(0,0,0,0.40)', fontFamily:"'Inter',system-ui,sans-serif" }}>
-              <span style={{ fontSize: 10, color: 'rgba(196,181,253,0.60)', fontWeight: 600, letterSpacing: '0.06em' }}>+{Object.keys(masteryMap).length}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderRadius: 99, background: activeTheme.inputBg, border: `1px solid ${activeTheme.accentBorder}`, boxShadow: '0 4px 20px rgba(0,0,0,0.40)', fontFamily:"'Inter',system-ui,sans-serif" }}>
+              <span style={{ fontSize: 10, color: `${activeTheme.accent}99`, fontWeight: 600, letterSpacing: '0.06em' }}>+{Object.keys(masteryMap).length}</span>
               <div style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.10)' }} />
-              <span style={{ fontSize: 13, fontWeight: 900, color: 'rgba(196,181,253,0.92)', letterSpacing: '-0.02em' }}>{exchangeCountRef.current || 0}</span>
+              <span style={{ fontSize: 13, fontWeight: 900, color: activeTheme.accent, letterSpacing: '-0.02em' }}>{exchangeCountRef.current || 0}</span>
               <div style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.10)' }} />
-              <span style={{ fontSize: 10, color: 'rgba(196,181,253,0.60)', fontWeight: 600, letterSpacing: '0.06em' }}>exchanges</span>
+              <span style={{ fontSize: 10, color: `${activeTheme.accent}99`, fontWeight: 600, letterSpacing: '0.06em' }}>exchanges</span>
             </div>
             {chatStreak > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 99, background: 'rgba(180,50,15,0.22)', border: '1px solid rgba(200,80,30,0.32)', fontSize: 11, fontWeight: 700, color: '#FDBA74', fontFamily:"'Inter',system-ui,sans-serif" }}>
                 🔥 {chatStreak}
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 99, background: 'rgba(124,58,237,0.18)', border: '1px solid rgba(124,58,237,0.30)', fontSize: 11, fontWeight: 700, color: '#C4B5FD', fontFamily:"'Inter',system-ui,sans-serif" }}>
-              <Zap size={10} fill="#C4B5FD" color="#C4B5FD" /> Lv {chatLevel}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 99, background: activeTheme.accentBg, border: `1px solid ${activeTheme.accentBorder}`, fontSize: 11, fontWeight: 700, color: activeTheme.accent, fontFamily:"'Inter',system-ui,sans-serif" }}>
+              <Zap size={10} fill={activeTheme.accent} color={activeTheme.accent} /> Lv {chatLevel}
             </div>
           </motion.div>
         )}
@@ -5645,7 +5781,7 @@ If no clear changes: {"changes":[]}`
                 {messages.map((msg, i) =>
                   isMission
                     ? <ThemedChatBubble key={i} msg={msg} mission={activeMission} />
-                    : <ChatBubble key={i} msg={msg} deepDiveCards={deepDiveMap[i] || []} onDismissCard={(cardId) => setDeepDiveMap(prev => ({ ...prev, [i]: (prev[i] || []).filter(c => c.id !== cardId) }))} isLight={isLight} isWidget={isWidget} />
+                    : <ChatBubble key={i} msg={msg} deepDiveCards={deepDiveMap[i] || []} onDismissCard={(cardId) => setDeepDiveMap(prev => ({ ...prev, [i]: (prev[i] || []).filter(c => c.id !== cardId) }))} isLight={isLight} isWidget={isWidget} widgetTheme={isWidget ? activeTheme : null} />
                 )}
 
                 {/* Worksheet generating indicator */}
