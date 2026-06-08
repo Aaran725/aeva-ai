@@ -3652,78 +3652,79 @@ ${guide.examTip ? `<div class="section"><div class="section-label">Exam Tip</div
 }
 
 /* ═══ CHAT THEMES (Ai OS palette) ════════════════ */
-// Each bg: bright vivid colour at the TOP/corner edge → fades to near-black at bottom-centre
+// Bright vivid colour at corner → fades to a DARK VERSION OF THE SAME HUE (never black)
+// Wide ellipse so colour fills generously before the centre darkens
 const CHAT_THEMES = {
   purple: {
-    // Balance card — soft lavender bright at top-left, dark at bottom-centre
+    // Balance card — soft lavender corner glow, dark violet centre
     swatch: '#9B72BC', label: 'Lavender',
-    bg: 'radial-gradient(ellipse 120% 90% at 22% 0%, #D0B0E0 0%, #9B72BC 28%, #5A3090 52%, #241050 72%, #070412 100%)',
-    inputBg: 'radial-gradient(ellipse at 50% 0%, #6A40A8 0%, #1A0830 65%, #070412 100%)',
+    bg: 'radial-gradient(ellipse 160% 120% at 18% 0%, #D0B0E8 0%, #A880CC 22%, #7048A8 44%, #4A2888 64%, #2C1268 82%, #18084A 100%)',
+    inputBg: 'radial-gradient(ellipse at 50% 0%, #6A40A8 0%, #2A1060 70%, #180840 100%)',
     inputBorder: 'rgba(200,168,216,0.45)',
-    inputGlow: '0 0 0 1px rgba(155,114,188,0.20), 0 8px 40px rgba(0,0,0,0.55), 0 0 32px rgba(155,114,188,0.32)',
+    inputGlow: '0 0 0 1px rgba(155,114,188,0.20), 0 8px 40px rgba(0,0,0,0.40), 0 0 32px rgba(155,114,188,0.32)',
     accent: '#E0C8F0', accentBg: 'rgba(155,114,188,0.22)', accentBorder: 'rgba(200,168,216,0.38)',
-    aiBg: 'radial-gradient(ellipse at 25% 0%, #7A58A8 0%, #301860 55%, #070412 100%)',
-    userBg: 'radial-gradient(ellipse at 75% 0%, #904020 0%, #3C1008 55%, #0A0402 100%)',
+    aiBg: 'radial-gradient(ellipse at 20% 0%, #8058B0 0%, #401870 55%, #200A40 100%)',
+    userBg: 'radial-gradient(ellipse at 80% 0%, #904020 0%, #481008 55%, #280804 100%)',
     aiBorder: '1px solid rgba(200,168,216,0.25)', userBorder: '1px solid rgba(220,130,80,0.25)',
   },
   ember: {
-    // Weather/Streak card — vivid red-orange bright at top-left, dark bottom-centre
+    // Weather/Streak card — red-orange corner, deep maroon centre
     swatch: '#C84518', label: 'Ember',
-    bg: 'radial-gradient(ellipse 130% 85% at 25% 0%, #E06828 0%, #C04018 25%, #881010 50%, #3C0606 72%, #0C0202 100%)',
-    inputBg: 'radial-gradient(ellipse at 50% 0%, #A03010 0%, #320606 65%, #0C0202 100%)',
+    bg: 'radial-gradient(ellipse 160% 120% at 20% 0%, #E87030 0%, #C84818 20%, #A02808 42%, #781010 62%, #500808 80%, #300404 100%)',
+    inputBg: 'radial-gradient(ellipse at 50% 0%, #A03010 0%, #4A0808 70%, #280404 100%)',
     inputBorder: 'rgba(200,100,50,0.50)',
-    inputGlow: '0 0 0 1px rgba(200,70,24,0.20), 0 8px 40px rgba(0,0,0,0.55), 0 0 32px rgba(200,70,24,0.38)',
+    inputGlow: '0 0 0 1px rgba(200,70,24,0.20), 0 8px 40px rgba(0,0,0,0.40), 0 0 32px rgba(200,70,24,0.38)',
     accent: '#FDBA74', accentBg: 'rgba(200,70,24,0.22)', accentBorder: 'rgba(200,100,50,0.40)',
-    aiBg: 'radial-gradient(ellipse at 25% 0%, #B83810 0%, #500808 55%, #0A0202 100%)',
-    userBg: 'radial-gradient(ellipse at 75% 0%, #D04A14 0%, #620A04 55%, #0C0202 100%)',
+    aiBg: 'radial-gradient(ellipse at 22% 0%, #C04018 0%, #601008 55%, #300404 100%)',
+    userBg: 'radial-gradient(ellipse at 78% 0%, #D05018 0%, #700C04 55%, #380404 100%)',
     aiBorder: '1px solid rgba(200,100,50,0.28)', userBorder: '1px solid rgba(220,120,60,0.28)',
   },
   teal: {
-    // Sleep card — vivid cyan-teal bright at top-RIGHT, dark bottom-left
+    // Sleep card — bright cyan top-right, deep forest-teal centre
     swatch: '#1EC4AA', label: 'Teal',
-    bg: 'radial-gradient(ellipse 130% 85% at 80% 0%, #22D8BC 0%, #10A890 25%, #067870 50%, #023A32 72%, #010C0A 100%)',
-    inputBg: 'radial-gradient(ellipse at 50% 0%, #0E9880 0%, #022E26 65%, #010C0A 100%)',
+    bg: 'radial-gradient(ellipse 160% 120% at 82% 0%, #24DCC0 0%, #10B898 20%, #08908A 42%, #046870 62%, #024A52 80%, #022E38 100%)',
+    inputBg: 'radial-gradient(ellipse at 50% 0%, #0E9880 0%, #034848 70%, #022830 100%)',
     inputBorder: 'rgba(30,196,170,0.50)',
-    inputGlow: '0 0 0 1px rgba(30,196,170,0.20), 0 8px 40px rgba(0,0,0,0.55), 0 0 32px rgba(30,196,170,0.32)',
+    inputGlow: '0 0 0 1px rgba(30,196,170,0.20), 0 8px 40px rgba(0,0,0,0.40), 0 0 32px rgba(30,196,170,0.32)',
     accent: '#5EEAD4', accentBg: 'rgba(30,196,170,0.20)', accentBorder: 'rgba(30,196,170,0.40)',
-    aiBg: 'radial-gradient(ellipse at 75% 0%, #12A890 0%, #043C34 55%, #010C0A 100%)',
-    userBg: 'radial-gradient(ellipse at 25% 0%, #14B098 0%, #044038 55%, #010E0C 100%)',
+    aiBg: 'radial-gradient(ellipse at 78% 0%, #14B098 0%, #045858 55%, #022830 100%)',
+    userBg: 'radial-gradient(ellipse at 22% 0%, #18C0A0 0%, #056060 55%, #022C38 100%)',
     aiBorder: '1px solid rgba(30,196,170,0.28)', userBorder: '1px solid rgba(50,220,190,0.28)',
   },
   cerise: {
-    // Enhance/Mood card — hot pink bright at upper-centre-left, dark bottom corners
+    // Enhance/Mood card — hot pink upper-centre glow, deep dark-pink centre
     swatch: '#E01E6A', label: 'Cerise',
-    bg: 'radial-gradient(ellipse 110% 90% at 38% 5%, #F03082 0%, #C81060 26%, #880848 52%, #340220 74%, #0C0208 100%)',
-    inputBg: 'radial-gradient(ellipse at 50% 0%, #A80E50 0%, #340612 65%, #0C0208 100%)',
+    bg: 'radial-gradient(ellipse 150% 120% at 40% 5%, #F83888 0%, #D01868 20%, #A00850 42%, #780438 62%, #500228 80%, #300118 100%)',
+    inputBg: 'radial-gradient(ellipse at 50% 0%, #A80E50 0%, #4A0428 70%, #280118 100%)',
     inputBorder: 'rgba(224,30,106,0.50)',
-    inputGlow: '0 0 0 1px rgba(224,30,106,0.20), 0 8px 40px rgba(0,0,0,0.55), 0 0 32px rgba(224,30,106,0.38)',
+    inputGlow: '0 0 0 1px rgba(224,30,106,0.20), 0 8px 40px rgba(0,0,0,0.40), 0 0 32px rgba(224,30,106,0.38)',
     accent: '#F9A8D4', accentBg: 'rgba(224,30,106,0.22)', accentBorder: 'rgba(224,30,106,0.42)',
-    aiBg: 'radial-gradient(ellipse at 35% 0%, #C01860 0%, #540820 55%, #0C0208 100%)',
-    userBg: 'radial-gradient(ellipse at 65% 0%, #D82268 0%, #620A2A 55%, #0E0206 100%)',
+    aiBg: 'radial-gradient(ellipse at 38% 0%, #C81860 0%, #5C0830 55%, #300118 100%)',
+    userBg: 'radial-gradient(ellipse at 62% 0%, #D82070 0%, #680830 55%, #380120 100%)',
     aiBorder: '1px solid rgba(224,30,106,0.28)', userBorder: '1px solid rgba(240,60,120,0.28)',
   },
   navy: {
-    // Skin Damage card — deep blue bright at top-right, very dark bottom
+    // Skin Damage card — royal blue top-right, deep midnight-blue centre
     swatch: '#1E3A9A', label: 'Navy',
-    bg: 'radial-gradient(ellipse 130% 85% at 72% 0%, #2848D0 0%, #1030A8 26%, #081870 52%, #030830 74%, #010208 100%)',
-    inputBg: 'radial-gradient(ellipse at 50% 0%, #102080 0%, #040A30 65%, #010208 100%)',
+    bg: 'radial-gradient(ellipse 160% 120% at 80% 0%, #2C50D8 0%, #1838B8 20%, #0E2490 42%, #081470 62%, #040A50 80%, #020630 100%)',
+    inputBg: 'radial-gradient(ellipse at 50% 0%, #102080 0%, #050A40 70%, #020530 100%)',
     inputBorder: 'rgba(60,100,240,0.50)',
-    inputGlow: '0 0 0 1px rgba(30,58,154,0.22), 0 8px 40px rgba(0,0,0,0.55), 0 0 32px rgba(30,58,154,0.40)',
+    inputGlow: '0 0 0 1px rgba(30,58,154,0.22), 0 8px 40px rgba(0,0,0,0.40), 0 0 32px rgba(30,58,154,0.40)',
     accent: '#93C5FD', accentBg: 'rgba(30,58,154,0.22)', accentBorder: 'rgba(60,100,240,0.40)',
-    aiBg: 'radial-gradient(ellipse at 70% 0%, #1838A8 0%, #080E50 55%, #010208 100%)',
-    userBg: 'radial-gradient(ellipse at 30% 0%, #1C3098 0%, #081248 55%, #020408 100%)',
+    aiBg: 'radial-gradient(ellipse at 76% 0%, #1C3CB8 0%, #080E60 55%, #030540 100%)',
+    userBg: 'radial-gradient(ellipse at 24% 0%, #2040C0 0%, #0A1258 55%, #040838 100%)',
     aiBorder: '1px solid rgba(60,100,240,0.28)', userBorder: '1px solid rgba(80,120,255,0.28)',
   },
   olive: {
-    // Natural vs Artificial — olive-green bright at top-centre, dark bottom
+    // Natural vs Artificial — olive-green top-centre, dark forest-green centre
     swatch: '#7A8E18', label: 'Olive',
-    bg: 'radial-gradient(ellipse 110% 90% at 50% 0%, #A0B228 0%, #6A7A10 26%, #3A4408 52%, #181C04 74%, #060802 100%)',
-    inputBg: 'radial-gradient(ellipse at 50% 0%, #5A6810 0%, #1A1E04 65%, #060802 100%)',
+    bg: 'radial-gradient(ellipse 150% 120% at 50% 0%, #AABC30 0%, #7A8E18 22%, #566410 42%, #384208 62%, #202804 80%, #101602 100%)',
+    inputBg: 'radial-gradient(ellipse at 50% 0%, #5A6810 0%, #222804 70%, #101402 100%)',
     inputBorder: 'rgba(160,185,30,0.50)',
-    inputGlow: '0 0 0 1px rgba(138,158,32,0.20), 0 8px 40px rgba(0,0,0,0.55), 0 0 32px rgba(138,158,32,0.32)',
+    inputGlow: '0 0 0 1px rgba(138,158,32,0.20), 0 8px 40px rgba(0,0,0,0.40), 0 0 32px rgba(138,158,32,0.32)',
     accent: '#BEF264', accentBg: 'rgba(138,158,32,0.20)', accentBorder: 'rgba(160,185,30,0.40)',
-    aiBg: 'radial-gradient(ellipse at 40% 0%, #687A14 0%, #282E06 55%, #060802 100%)',
-    userBg: 'radial-gradient(ellipse at 60% 0%, #788C18 0%, #2E3408 55%, #080A02 100%)',
+    aiBg: 'radial-gradient(ellipse at 42% 0%, #708018 0%, #2E3806 55%, #181E04 100%)',
+    userBg: 'radial-gradient(ellipse at 58% 0%, #809018 0%, #363E06 55%, #1C2204 100%)',
     aiBorder: '1px solid rgba(160,185,30,0.28)', userBorder: '1px solid rgba(180,210,40,0.28)',
   },
 }
