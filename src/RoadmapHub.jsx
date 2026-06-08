@@ -863,6 +863,150 @@ function ActualResultCard({ roadmap }) {
   )
 }
 
+/* ── Grade trend line chart ──────────────────────────────────────────────── */
+function GradeTrendChart({ gradeHistory, targetGrade }) {
+  const GRADE_ORDER = ['U', 'E', 'D', 'C', 'B', 'A', 'A*']
+  const GRADE_VAL   = { 'U': 0, 'E': 1, 'D': 2, 'C': 3, 'B': 4, 'A': 5, 'A*': 6 }
+  const gradId = useRef(`tg_${Math.random().toString(36).slice(2,7)}`).current
+
+  if (!gradeHistory?.length || gradeHistory.length < 2) return null
+
+  const history = gradeHistory.slice(-20)
+  const vals    = history.map(h => GRADE_VAL[h.grade] ?? 0)
+  const minV    = Math.max(0, Math.min(...vals) - 0.8)
+  const maxV    = Math.min(6, Math.max(...vals) + 0.8)
+
+  const VB_W = 300, VB_H = 96
+  const PL = 26, PR = 10, PT = 10, PB = 14
+  const plotW = VB_W - PL - PR
+  const plotH = VB_H - PT - PB
+
+  const xAt = (i) => PL + (history.length > 1 ? i / (history.length - 1) : 0.5) * plotW
+  const yAt = (v) => PT + plotH - ((v - minV) / Math.max(0.1, maxV - minV)) * plotH
+
+  const pts = history.map((h, i) => ({
+    x: xAt(i), y: yAt(GRADE_VAL[h.grade] ?? 0), grade: h.grade, date: h.date,
+  }))
+
+  // Smooth cubic bezier through all points
+  let linePath = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`
+  for (let i = 1; i < pts.length; i++) {
+    const dx = (pts[i].x - pts[i-1].x) / 2
+    linePath += ` C ${(pts[i-1].x + dx).toFixed(1)} ${pts[i-1].y.toFixed(1)} ${(pts[i].x - dx).toFixed(1)} ${pts[i].y.toFixed(1)} ${pts[i].x.toFixed(1)} ${pts[i].y.toFixed(1)}`
+  }
+  const areaPath = `${linePath} L ${pts[pts.length-1].x.toFixed(1)} ${(PT + plotH).toFixed(1)} L ${pts[0].x.toFixed(1)} ${(PT + plotH).toFixed(1)} Z`
+
+  const firstGrade = history[0].grade
+  const lastGrade  = history[history.length - 1].grade
+  const trending   = (GRADE_VAL[lastGrade] ?? 0) - (GRADE_VAL[firstGrade] ?? 0)
+
+  const lastThreshold = GRADE_THRESHOLDS.find(t => t.grade === lastGrade) || GRADE_THRESHOLDS[GRADE_THRESHOLDS.length - 1]
+  const lineColor = lastThreshold.color
+
+  const yLabels = GRADE_ORDER.filter(g => {
+    const v = GRADE_VAL[g]
+    return v >= Math.floor(minV) && v <= Math.ceil(maxV)
+  })
+
+  const fmtDate = (ds) => {
+    const d = new Date(ds)
+    if (isNaN(d)) return ds
+    return `${d.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]}`
+  }
+
+  const first  = new Date(history[0].date)
+  const last   = new Date(history[history.length - 1].date)
+  const days   = Math.max(1, Math.round((last - first) / 86400000))
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+      style={{ margin: '12px 20px 0', borderRadius: 16, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+
+      {/* Header row */}
+      <div style={{ padding: '11px 14px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ fontSize: 10.5, fontWeight: 800, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+          Grade Progress
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {firstGrade !== lastGrade && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ fontSize: 13, fontWeight: 900, color: 'rgba(255,255,255,0.35)' }}>{firstGrade}</span>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.18)' }}>→</span>
+              <span style={{ fontSize: 13, fontWeight: 900, color: lineColor }}>{lastGrade}</span>
+            </div>
+          )}
+          {trending > 0 ? (
+            <span style={{ fontSize: 9.5, fontWeight: 700, color: '#4ADE80', background: 'rgba(74,222,128,0.12)', padding: '2px 7px', borderRadius: 99 }}>↑ {days}d</span>
+          ) : trending < 0 ? (
+            <span style={{ fontSize: 9.5, fontWeight: 700, color: '#F87171', background: 'rgba(248,113,113,0.12)', padding: '2px 7px', borderRadius: 99 }}>↓</span>
+          ) : (
+            <span style={{ fontSize: 9.5, fontWeight: 700, color: lineColor, background: `${lineColor}18`, padding: '2px 7px', borderRadius: 99 }}>{lastGrade}</span>
+          )}
+        </div>
+      </div>
+
+      {/* SVG chart */}
+      <svg viewBox={`0 0 ${VB_W} ${VB_H}`} style={{ width: '100%', display: 'block' }} aria-hidden="true">
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={lineColor} stopOpacity="0.22" />
+            <stop offset="100%" stopColor={lineColor} stopOpacity="0.01" />
+          </linearGradient>
+        </defs>
+
+        {/* Grade grid lines + y-axis labels */}
+        {yLabels.map(g => {
+          const yp   = yAt(GRADE_VAL[g])
+          const tCol = GRADE_THRESHOLDS.find(t => t.grade === g)?.color || 'rgba(255,255,255,0.18)'
+          return (
+            <g key={g}>
+              <line x1={PL} y1={yp} x2={VB_W - PR} y2={yp} stroke="rgba(255,255,255,0.05)" strokeWidth="0.8" />
+              <text x={PL - 5} y={yp + 3.5} fontSize="7" textAnchor="end" fontWeight="700"
+                fill={g === lastGrade ? tCol : 'rgba(255,255,255,0.22)'}
+                fontFamily="Inter, system-ui, sans-serif">{g}</text>
+            </g>
+          )
+        })}
+
+        {/* Target grade dashed line */}
+        {targetGrade && GRADE_VAL[targetGrade] !== undefined && (() => {
+          const tv = GRADE_VAL[targetGrade]
+          if (tv < minV - 0.1 || tv > maxV + 0.1) return null
+          const ty  = yAt(tv)
+          const tc  = GRADE_THRESHOLDS.find(t => t.grade === targetGrade)?.color || '#fff'
+          return <line x1={PL} y1={ty} x2={VB_W - PR} y2={ty} stroke={tc} strokeWidth="0.8" strokeDasharray="3 2.5" opacity="0.40" />
+        })()}
+
+        {/* Area fill */}
+        <path d={areaPath} fill={`url(#${gradId})`} />
+
+        {/* Line — animated opacity */}
+        <motion.path d={linePath} fill="none" stroke={lineColor} strokeWidth="1.8"
+          strokeLinecap="round" strokeLinejoin="round"
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6 }} />
+
+        {/* Dots */}
+        {pts.map((p, i) => {
+          const isLast  = i === pts.length - 1
+          const dotCol  = GRADE_THRESHOLDS.find(t => t.grade === p.grade)?.color || lineColor
+          return (
+            <circle key={i} cx={p.x} cy={p.y} r={isLast ? 3.5 : 1.8}
+              fill={isLast ? dotCol : 'rgba(255,255,255,0.18)'}
+              stroke={isLast ? 'rgba(8,9,24,0.9)' : 'none'}
+              strokeWidth={isLast ? 1.5 : 0} />
+          )
+        })}
+      </svg>
+
+      {/* Footer: date range */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1px 14px 9px', fontSize: 9.5, color: 'rgba(255,255,255,0.18)', fontWeight: 500 }}>
+        <span>{fmtDate(history[0].date)}</span>
+        <span>{fmtDate(history[history.length - 1].date)}</span>
+      </div>
+    </motion.div>
+  )
+}
+
 function PathView() {
   const { getActive, completeNode, completeNodeWithConfidence, closeRoadmapHub, startNodeSession, endNodeSession, markLogSeen, flagNode } = useRoadmapStore()
   // Subscribe to roadmaps array so component re-renders when Aeva mutates nodes
@@ -1126,6 +1270,11 @@ function PathView() {
           </div>
         )
       })()}
+
+      {/* ── Grade trend chart ────────────────────────────────────────────── */}
+      {(roadmap.gradeHistory?.length || 0) >= 2 && (
+        <GradeTrendChart gradeHistory={roadmap.gradeHistory} targetGrade={roadmap.targetGrade} />
+      )}
 
       {/* ── Ask Aeva button ──────────────────────────────────────────────── */}
       <div style={{ flexShrink: 0, padding: '12px 20px 0' }}>

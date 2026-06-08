@@ -939,6 +939,62 @@ async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _at
   }
 }
 
+/* ── Vision streaming — image + text → llama-4-scout ─────────────────────── */
+const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
+
+async function streamGroqVision(base64, mimeType, userText, systemPrompt, onChunk, signal) {
+  const key = nextGroqKey()
+  const content = [
+    { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
+    { type: 'text', text: userText || 'What is in this image? Please teach me about this topic.' },
+  ]
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      model: VISION_MODEL,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content },
+      ],
+      stream: true,
+      temperature: 0.65,
+      max_tokens: 700,
+    }),
+  })
+  if (!res.ok) throw new Error(`Groq vision error ${res.status}`)
+  const reader  = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop()
+    for (const line of lines) {
+      const l = line.trim()
+      if (!l.startsWith('data: ') || l === 'data: [DONE]') continue
+      try {
+        const chunk = JSON.parse(l.slice(6))
+        const delta = chunk.choices?.[0]?.delta?.content
+        if (delta) onChunk(delta)
+      } catch { /* partial JSON */ }
+    }
+  }
+}
+
+/* ─── fileToBase64 helper (also used by photo-in-chat) ───────────────────── */
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader()
+    r.onload  = () => resolve({ base64: r.result.split(',')[1], dataUrl: r.result, mimeType: file.type || 'image/jpeg' })
+    r.onerror = reject
+    r.readAsDataURL(file)
+  })
+}
+
 /* gridCSS moved to index.css */
 
 /* ═══ USER CONTEXT ═══════════════════════════════ */
@@ -3579,7 +3635,16 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false }) {
         fontFamily: "'Inter', system-ui, sans-serif",
       }}>
         {isUser ? (
-          <span style={{ fontSize: 15, lineHeight: 1.65, whiteSpace: 'pre-wrap', fontWeight: 400 }}>{msg.text}</span>
+          <div>
+            {msg.image && (
+              <img
+                src={msg.image}
+                alt="Photo"
+                style={{ display: 'block', maxWidth: 220, maxHeight: 220, borderRadius: 12, objectFit: 'cover', marginBottom: msg.text ? 10 : 0, border: '1px solid rgba(255,255,255,0.15)' }}
+              />
+            )}
+            {msg.text && <span style={{ fontSize: 15, lineHeight: 1.65, whiteSpace: 'pre-wrap', fontWeight: 400 }}>{msg.text}</span>}
+          </div>
         ) : (
           <>
             {msg.lockIn && (
@@ -3771,6 +3836,8 @@ function ChatView({ onBack }) {
   const [visualInsights, setVisualInsights] = useState([])
   const [chatDocOpen, setChatDocOpen] = useState(false)
   const lensInputRef = useRef(null)
+  const photoInputRef = useRef(null)
+  const [photoAttachment, setPhotoAttachment] = useState(null) // { file, dataUrl, base64, mimeType }
   const [orderToast, setOrderToast] = useState(null)
   const [drillOpen, setDrillOpen] = useState(false)
   const [sessionSummary, setSessionSummary] = useState(null)
@@ -4076,7 +4143,66 @@ function ChatView({ onBack }) {
     }
   }
 
+  // ── Photo-in-chat send ────────────────────────────────────────────────────
+  const sendPhoto = async () => {
+    if (!photoAttachment || isThinking) return
+    const userText = input.trim() || 'Can you teach me about this? Explain everything I need to know.'
+    setInput('')
+    const snap = photoAttachment
+    setPhotoAttachment(null)
+
+    const userMsg = { role: 'user', text: userText, image: snap.dataUrl }
+    setMessages(prev => [...prev, userMsg, { role: 'model', text: '', streaming: true }])
+    setIsThinking(true)
+
+    const controller = new AbortController()
+    abortRef.current = controller
+    let rawResponse = ''
+
+    const systemPrompt = `You are Aeva, an expert AI tutor. A student has sent you a photo of something they're studying — a textbook page, past paper question, worksheet, whiteboard, or diagram.
+
+Your job: be their personal tutor for what's in the image.
+
+RULES:
+- First, briefly acknowledge what you can see in the image (1 sentence).
+- Then teach it clearly: explain the core concept, break down any equations/diagrams/text, give worked examples if relevant.
+- Use a conversational tutoring tone — not a list dump. Teach like a brilliant teacher talking to a student.
+- Be specific to what's actually in the image. Don't be vague.
+- End with ONE targeted check question to make sure they understood.
+- Keep it to 3-5 paragraphs max. No waffle.`
+
+    try {
+      await streamGroqVision(
+        snap.base64, snap.mimeType, userText, systemPrompt,
+        chunk => {
+          rawResponse += chunk
+          const visible = cleanText(rawResponse)
+          setMessages(prev => {
+            const copy = [...prev]
+            copy[copy.length - 1] = { ...copy[copy.length - 1], text: visible }
+            return copy
+          })
+        },
+        controller.signal,
+      )
+    } catch (err) {
+      if (!controller.signal.aborted) {
+        setMessages(prev => {
+          const copy = [...prev]
+          copy[copy.length - 1] = { ...copy[copy.length - 1], text: "Sorry, I couldn't read the image. Make sure it's clear and try again.", streaming: false }
+          return copy
+        })
+      }
+    } finally {
+      setIsThinking(false)
+      setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, streaming: false } : m))
+    }
+  }
+
   const sendWithText = async (overrideText) => {
+    // If a photo is attached, route to vision send instead
+    if (photoAttachment && !overrideText) { sendPhoto(); return }
+
     const userText = overrideText || input.trim()
     if (!userText || isThinking) return
     if (!overrideText) setInput('')
@@ -4778,7 +4904,9 @@ If no clear changes: {"changes":[]}`
   const inputTextColor = isLight ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.88)'
   const placeholderNote = isMission
     ? `Respond to ${activeMission?.title || 'the mission'}…`
-    : 'Ask Aeva anything…'
+    : photoAttachment
+      ? 'Add a message (optional) — or just press send…'
+      : 'Ask Aeva anything…'
 
   const sendBtnStyle = isMission && activeMission
     ? { background: `linear-gradient(145deg, ${activeMission.color}80, ${activeMission.color}40)`, border: `1.5px solid ${activeMission.color}60`, boxShadow: `0 4px 14px ${activeMission.glow}` }
@@ -5634,17 +5762,82 @@ If no clear changes: {"changes":[]}`
                   e.target.value = ''
                 }}
               />
+              {/* Hidden file input for photo-in-chat — capture="environment" = rear camera on mobile */}
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                style={{ display: 'none' }}
+                onChange={async e => {
+                  const f = e.target.files?.[0]
+                  if (!f) return
+                  e.target.value = ''
+                  try {
+                    const result = await readFileAsBase64(f)
+                    setPhotoAttachment({ file: f, ...result })
+                  } catch {}
+                }}
+              />
+
+              {/* Photo preview strip — shown when a photo is attached */}
+              <AnimatePresence>
+                {photoAttachment && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, height: 0 }}
+                    animate={{ opacity: 1, y: 0, height: 'auto' }}
+                    exit={{ opacity: 0, y: 8, height: 0 }}
+                    style={{ width: '100%', maxWidth: isMission ? 720 : 640, margin: '0 auto 10px', overflow: 'hidden' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, padding: '10px 14px', borderRadius: 20, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' }}>
+                      {/* Thumbnail */}
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                        <img
+                          src={photoAttachment.dataUrl}
+                          alt="Attached"
+                          style={{ width: 72, height: 72, borderRadius: 12, objectFit: 'cover', display: 'block', border: '1px solid rgba(255,255,255,0.15)' }}
+                        />
+                        <motion.button
+                          whileTap={{ scale: 0.88 }}
+                          onClick={() => setPhotoAttachment(null)}
+                          style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'rgba(30,30,50,0.95)', border: '1px solid rgba(255,255,255,0.25)', color: 'rgba(255,255,255,0.70)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          <X size={10} strokeWidth={2.5} />
+                        </motion.button>
+                      </div>
+                      {/* Label */}
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: 'rgba(255,255,255,0.80)', marginBottom: 3 }}>Photo attached</div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', lineHeight: 1.5 }}>
+                          Add a message below or just press send — Aeva will tutor you on what's in the image.
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <div className="chat-input-bar" style={{ width: '100%', maxWidth: isMission ? 720 : 640, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 10px 10px 16px', backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)', borderRadius: 999, transition: 'border 0.3s, box-shadow 0.3s', ...inputBarStyle }}>
-                {/* Lens camera button + Custom Drill button */}
+                {/* Lens camera button + photo-in-chat button + Custom Drill button */}
                 {!isMission && (
                   <>
                     <motion.button
                       whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.90 }}
                       onClick={() => lensInputRef.current?.click()}
-                      title="Aeva Lens — analyse an image"
+                      title="Aeva Lens — deep solve & analyse"
                       style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,200,255,0.10)', border: '1.5px solid rgba(0,200,255,0.28)', cursor: 'pointer', color: 'rgba(0,200,255,0.70)' }}
                     >
                       <Camera size={14} strokeWidth={2} />
+                    </motion.button>
+                    {/* Photo-in-chat button — sends photo directly to Aeva in chat */}
+                    <motion.button
+                      whileHover={{ scale: 1.08, background: photoAttachment ? 'rgba(167,139,250,0.30)' : 'rgba(167,139,250,0.18)' }}
+                      whileTap={{ scale: 0.90 }}
+                      onClick={() => photoInputRef.current?.click()}
+                      title="Send a photo — Aeva reads your textbook/notes/past paper"
+                      style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: photoAttachment ? 'rgba(167,139,250,0.28)' : 'rgba(167,139,250,0.10)', border: photoAttachment ? '1.5px solid rgba(167,139,250,0.70)' : '1.5px solid rgba(167,139,250,0.30)', cursor: 'pointer', color: photoAttachment ? '#C4B5FD' : 'rgba(167,139,250,0.75)', transition: 'all 0.15s' }}
+                    >
+                      <BookOpen size={14} strokeWidth={2} />
                     </motion.button>
                     <motion.button
                       whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.90 }}
