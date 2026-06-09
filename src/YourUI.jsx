@@ -173,7 +173,7 @@ function MiniPreview({ theme }) {
 ══════════════════════════════════════════════════════════════════════════════ */
 export default function YourUI({ onClose }) {
   const store = useUITheme()
-  const { bgFrom, bgTo, bgAngle, accent, font, radius, motion, density, hidden } = store
+  const { bgFrom, bgTo, bgAngle, accent, font, radius, motion: motionEnabled, density, hidden } = store
 
   // Local draft state — apply live but can be reset
   const set = (patch) => store.setUI(patch)
@@ -386,8 +386,8 @@ export default function YourUI({ onClose }) {
           {/* MOTION */}
           <Section title="Animations">
             <div style={{ display: 'flex', gap: 8 }}>
-              <Pill active={motion === true}  onClick={() => set({ motion: true  })}>On</Pill>
-              <Pill active={motion === false} onClick={() => set({ motion: false })}>Off</Pill>
+              <Pill active={motionEnabled === true}  onClick={() => set({ motion: true  })}>On</Pill>
+              <Pill active={motionEnabled === false} onClick={() => set({ motion: false })}>Off</Pill>
             </div>
           </Section>
 
