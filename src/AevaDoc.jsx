@@ -863,9 +863,10 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
       exit={{ opacity: 0 }}
       style={{
         position: 'fixed', inset: 0, zIndex: 300,
-        background: 'rgba(6,7,20,0.97)',
+        background: activeTheme ? activeTheme.bg : 'rgba(6,7,20,0.97)',
         fontFamily: "'Inter', system-ui, sans-serif",
         display: 'flex', flexDirection: 'column',
+        transition: 'background 0.4s ease',
       }}
     >
       {/* ── Top bar ─────────────────────────────────────────────────────────── */}
@@ -874,7 +875,7 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
         height: 56, padding: '0 20px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         borderBottom: '1px solid rgba(255,255,255,0.07)',
-        background: 'rgba(10,11,28,0.90)',
+        background: 'rgba(0,0,0,0.32)',
         backdropFilter: 'blur(20px)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -965,7 +966,7 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
         {scanCtx?.questions?.length > 0 && (
           <motion.div
             initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-            style={{ flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(5,6,18,0.80)', overflow: 'hidden' }}>
+            style={{ flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.28)', overflow: 'hidden' }}>
             <div style={{ padding: '7px 20px', display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto' }}>
               <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.22)', letterSpacing: '0.10em', textTransform: 'uppercase', flexShrink: 0 }}>Questions</span>
               <div style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.08)', flexShrink: 0 }} />
@@ -1094,7 +1095,7 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
         )}
 
         {/* ── Right: Chat panel ────────────────────────────────────────────── */}
-        <div style={{ flex: 1, display: isMobile && file && mobileTab === 'doc' ? 'none' : 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, background: activeTheme ? activeTheme.bg : 'transparent', transition: 'background 0.4s ease' }}>
+        <div style={{ flex: 1, display: isMobile && file && mobileTab === 'doc' ? 'none' : 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
 
           {/* Messages */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '22px 22px 8px', display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
