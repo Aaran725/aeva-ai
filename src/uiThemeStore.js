@@ -101,8 +101,8 @@ export function applyCSS(theme) {
   const fam = FONT_OPTIONS.find(f => f.id === font)?.family || FONT_OPTIONS[0].family
   r.style.setProperty('--ui-font', fam)
   r.style.fontFamily = fam
-  // Body background
-  document.body.style.background = `linear-gradient(${bgAngle}deg, ${bgFrom} 0%, ${bgTo} 100%)`
+  // Clear any previously-set body background so the dark html fallback shows at edges
+  document.body.style.background = ''
 }
 
 /* ── Convenience selector ──────────────────────────────────────────────────── */

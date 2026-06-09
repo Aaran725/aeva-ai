@@ -2362,6 +2362,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
             padding: '18px 28px 16px',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             maxWidth: 1280, margin: '0 auto',
+            overflow: 'hidden',
             backdropFilter: 'blur(32px)',
             WebkitBackdropFilter: 'blur(32px)',
           }}>
@@ -2371,7 +2372,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
               </div>
               <span style={{ fontSize: 17, fontWeight: 900, letterSpacing: '-0.04em', background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(233,163,100,0.80) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>aeva</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
 
               {/* ── Shared nav button style ── */}
               {(() => {
