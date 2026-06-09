@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion'
-import { X, FlaskConical, ChevronRight, RotateCcw, CheckCircle2, XCircle, ArrowRight, Settings, History, Zap, RefreshCw } from 'lucide-react'
+import { X, FlaskConical, ChevronRight, RotateCcw, CheckCircle2, XCircle, ArrowRight, Settings, History, Zap, RefreshCw, LayoutGrid, Rows3 } from 'lucide-react'
 import { DRILLS, DIFFICULTIES, useLabStore } from './labStore'
+import { DotMatrix } from './WidgetDashboard'
 import { useNeuralStore } from './neuralStore'
 import { useSRStore } from './srStore'
 import { useRoadmapStore } from './roadmapStore'
@@ -246,6 +247,67 @@ function WrongItemCard({ item, topic }) {
   )
 }
 
+/* ═══ Ai OS LED RESULT THEMES (by grade band) ═══════ */
+const LAB_RESULT_THEMES = {
+  mastery: {  // 90+ → Sleep card (teal)
+    bg: 'radial-gradient(circle at 50% 44%, #3DE8D0 0%, #1FC8B2 30%, #14A092 52%, rgba(20,160,146,0) 72%), linear-gradient(165deg, #18B0A0 0%, #0E8A80 38%, #0A6A66 68%, #084E50 100%)',
+    dot: 'rgba(190,255,244,0.97)', dim: 'rgba(255,255,255,0.05)', accent: '#5EEAD4', label: '#BFF5EC',
+  },
+  solid: {    // 70-89 → Skin Damage card (navy)
+    bg: 'radial-gradient(circle at 52% 56%, #2E64E0 0%, #1E48C4 30%, #122E96 54%, rgba(18,46,150,0) 76%), linear-gradient(200deg, #0C1A78 0%, #0A1466 38%, #080F50 70%, #060A3C 100%)',
+    dot: 'rgba(205,225,255,0.97)', dim: 'rgba(255,255,255,0.05)', accent: '#93C5FD', label: '#BFD4FF',
+  },
+  developing: {  // 50-69 → Weather/Streak card (ember)
+    bg: 'radial-gradient(circle at 48% 46%, #FF8A3D 0%, #E8631E 28%, #B83C10 50%, rgba(184,60,16,0) 74%), linear-gradient(160deg, #9A2808 0%, #741810 40%, #4E1010 70%, #340A0A 100%)',
+    dot: 'rgba(255,228,195,0.97)', dim: 'rgba(255,255,255,0.05)', accent: '#FCD34D', label: '#FCE0B0',
+  },
+  needswork: {   // <50 → Enhance card (cerise)
+    bg: 'radial-gradient(circle at 46% 42%, #FF3A8E 0%, #E81E72 26%, #B01055 48%, rgba(176,16,85,0) 72%), linear-gradient(155deg, #800840 0%, #5A0230 40%, #3C0120 70%, #260114 100%)',
+    dot: 'rgba(255,205,228,0.97)', dim: 'rgba(255,255,255,0.05)', accent: '#F9A8D4', label: '#FBC8E0',
+  },
+}
+
+/* Ai OS–style LED result card: gradient + dot-matrix score */
+function LedResultView({ pct, grade, band, score, drillType }) {
+  const t = LAB_RESULT_THEMES[band]
+  const missed = Math.max(0, score.total - score.correct)
+  return (
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* Hero score card */}
+      <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
+        style={{ position: 'relative', borderRadius: 24, background: t.bg, padding: '20px 22px 24px', overflow: 'hidden', minHeight: 230, boxShadow: '0 14px 44px rgba(0,0,0,0.40)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>{grade.label}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.55)', marginTop: 1, textTransform: 'capitalize' }}>{drillType || 'Drill'}</div>
+          </div>
+          <span style={{ fontSize: 24 }}>{grade.emoji}</span>
+        </div>
+        {/* LED dot-matrix percentage */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 6, padding: '26px 0 22px' }}>
+          <DotMatrix value={String(pct)} color={t.dot} dimColor={t.dim} dotSize={9} gap={2} />
+          <span style={{ fontSize: 22, fontWeight: 700, color: t.dot, marginTop: 4 }}>%</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: t.label }}>{score.correct} of {score.total} correct</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Score</span>
+        </div>
+      </motion.div>
+      {/* Two stat tiles */}
+      <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ flex: 1, borderRadius: 18, background: LAB_RESULT_THEMES.mastery.bg, padding: '14px 16px', minHeight: 96, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 8px 26px rgba(0,0,0,0.35)' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.65)', letterSpacing: '0.04em' }}>Correct</span>
+          <DotMatrix value={String(score.correct)} color={LAB_RESULT_THEMES.mastery.dot} dimColor="rgba(255,255,255,0.05)" dotSize={6} gap={2} />
+        </div>
+        <div style={{ flex: 1, borderRadius: 18, background: LAB_RESULT_THEMES.needswork.bg, padding: '14px 16px', minHeight: 96, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 8px 26px rgba(0,0,0,0.35)' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.65)', letterSpacing: '0.04em' }}>Missed</span>
+          <DotMatrix value={String(missed)} color={LAB_RESULT_THEMES.needswork.dot} dimColor="rgba(255,255,255,0.05)" dotSize={6} gap={2} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ═══ DRILL COMPLETE SCREEN ══════════════════════════ */
 function DrillComplete({ score, wrongItems = [], onExit, onRetry, onGoHarder, topic, drillType }) {
   const { difficulty, setDifficulty, closeLab, exitDrill } = useLabStore()
@@ -261,12 +323,14 @@ function DrillComplete({ score, wrongItems = [], onExit, onRetry, onGoHarder, to
     openRoadmapHub()
   }
   const pct = Math.round((score.correct / score.total) * 100)
-  const grade = pct >= 90 ? { label: 'Mastery', color: '#4ADE80', emoji: '🏆' }
-    : pct >= 70 ? { label: 'Solid', color: '#60A5FA', emoji: '✅' }
-    : pct >= 50 ? { label: 'Developing', color: '#FBBF24', emoji: '📈' }
-    : { label: 'Needs Work', color: '#F87171', emoji: '🔁' }
+  const grade = pct >= 90 ? { label: 'Mastery', color: '#4ADE80', emoji: '🏆', band: 'mastery' }
+    : pct >= 70 ? { label: 'Solid', color: '#60A5FA', emoji: '✅', band: 'solid' }
+    : pct >= 50 ? { label: 'Developing', color: '#FBBF24', emoji: '📈', band: 'developing' }
+    : { label: 'Needs Work', color: '#F87171', emoji: '🔁', band: 'needswork' }
   const [analysis, setAnalysis] = useState(null)
   const [loadingAnalysis, setLoadingAnalysis] = useState(false)
+  const [widgetMode, setWidgetMode] = useState(() => localStorage.getItem('aeva_lab_widget') === '1')
+  const toggleWidget = () => setWidgetMode(m => { const n = !m; localStorage.setItem('aeva_lab_widget', n ? '1' : '0'); return n })
 
   useEffect(() => {
     if (wrongItems.length > 0 && pct < 90) {
@@ -290,12 +354,28 @@ function DrillComplete({ score, wrongItems = [], onExit, onRetry, onGoHarder, to
   return (
     <motion.div initial={{ opacity: 0, scale: 0.93 }} animate={{ opacity: 1, scale: 1 }}
       style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, overflowY: 'auto', paddingTop: 8 }}>
-      <div style={{ fontSize: 44 }}>{grade.emoji}</div>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 52, fontWeight: 800, color: grade.color, letterSpacing: '-0.04em', lineHeight: 1 }}>{pct}%</div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: grade.color, marginTop: 5, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{grade.label}</div>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.38)', marginTop: 4 }}>{score.correct} / {score.total} correct</div>
+
+      {/* View toggle: classic ↔ Ai OS LED widget */}
+      <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end', marginBottom: -4 }}>
+        <button onClick={toggleWidget}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 11px', borderRadius: 99, background: widgetMode ? 'rgba(99,102,241,0.16)' : 'rgba(255,255,255,0.05)', border: `1px solid ${widgetMode ? 'rgba(129,140,248,0.40)' : 'rgba(255,255,255,0.10)'}`, color: widgetMode ? '#A5B4FC' : 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.02em' }}>
+          {widgetMode ? <Rows3 size={13} /> : <LayoutGrid size={13} />}
+          {widgetMode ? 'Classic' : 'Widget'}
+        </button>
       </div>
+
+      {widgetMode ? (
+        <LedResultView pct={pct} grade={grade} band={grade.band} score={score} drillType={drillType} />
+      ) : (
+        <>
+          <div style={{ fontSize: 44 }}>{grade.emoji}</div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 52, fontWeight: 800, color: grade.color, letterSpacing: '-0.04em', lineHeight: 1 }}>{pct}%</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: grade.color, marginTop: 5, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{grade.label}</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.38)', marginTop: 4 }}>{score.correct} / {score.total} correct</div>
+          </div>
+        </>
+      )}
 
       {/* Post-drill analysis */}
       {(loadingAnalysis || analysis) && (

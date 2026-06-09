@@ -19,7 +19,7 @@ import AevaOrbComponent from './AevaOrb'
 /* ─────────────────────────────────────────────────────
    DOT-MATRIX DIGITS  (5 cols × 7 rows, 1 = lit dot)
 ───────────────────────────────────────────────────── */
-const DOT_DIGITS = {
+export const DOT_DIGITS = {
   '0': [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
   '1': [[0,0,1,0,0],[0,1,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,1,1,1,0]],
   '2': [[0,1,1,1,0],[1,0,0,0,1],[0,0,0,0,1],[0,0,0,1,0],[0,0,1,0,0],[0,1,0,0,0],[1,1,1,1,1]],
@@ -34,7 +34,7 @@ const DOT_DIGITS = {
 }
 
 /* Larger dots, near-invisible off-state — matches the reference LED look */
-function DotMatrix({
+export function DotMatrix({
   value,
   dotSize = 8,
   gap = 2,
