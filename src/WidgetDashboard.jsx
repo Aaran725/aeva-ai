@@ -90,23 +90,27 @@ function Sparkline({
   frequency = 1.55,
   phase = 0.45,
 }) {
+  // Always use a fixed numeric width internally — never accept "100%" strings
+  const w = typeof width === 'number' && width > 0 ? width : 170
   const steps = 70
   const wave = (freq, ph) =>
     Array.from({ length: steps + 1 }, (_, i) => {
-      const x = (i / steps) * width
+      const x = (i / steps) * w
       const y = height / 2 + amplitude * Math.sin((i / steps) * Math.PI * 2 * freq + ph)
       return `${x.toFixed(1)},${y.toFixed(1)}`
     }).join(' L ')
 
   /* triangle marker sits on first wave at ~65% */
-  const mx = width * 0.65
+  const mx = w * 0.65
   const my =
     height / 2 + amplitude * Math.sin(0.65 * Math.PI * 2 * frequency + phase)
 
   return (
     <svg
-      width={width}
+      width="100%"
       height={height}
+      viewBox={`0 0 ${w} ${height}`}
+      preserveAspectRatio="none"
       style={{ overflow: 'visible', display: 'block' }}
     >
       {/* secondary wave — slightly offset, lower opacity */}
@@ -446,7 +450,7 @@ function ReadinessWidget({ pct, roadmapTitle }) {
 
       {/* amber sine-wave sparkline identical to the Balance card */}
       <div style={{ marginTop:18 }}>
-        <Sparkline width="100%" height={36} color="#F59E0B" amplitude={9} frequency={1.55} phase={0.5} />
+        <Sparkline width={170} height={36} color="#F59E0B" amplitude={9} frequency={1.55} phase={0.5} />
       </div>
 
       <div style={{ marginTop:8, fontSize:9.5, color:'rgba(220,205,255,0.40)', fontFamily:"'Inter',system-ui,sans-serif" }}>
