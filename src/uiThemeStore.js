@@ -127,10 +127,11 @@ export function applyCSS(theme) {
   r.style.setProperty('--aeva-space-lg', `${Math.round(24 * density)}px`)
   r.style.setProperty('--aeva-space-xl', `${Math.round(40 * density)}px`)
 
-  // Set gradient on <html> (not body) — html is clipped to viewport by overflow-x:hidden
-  // in index.css so it can never bleed past the right edge. body stays transparent so
-  // the body::before mesh overlay and app content layer cleanly on top.
-  document.documentElement.style.background = bg
+  // Set html background to a SOLID color (bgFrom), never a gradient.
+  // A gradient on <html> always bleeds its end-color into the scrollbar gutter at the
+  // right edge — even with overflow-x:hidden the browser paints that 15px strip.
+  // The visible atmosphere gradient comes exclusively from body::before (see _ui_theme below).
+  document.documentElement.style.background = bgFrom
   document.body.style.background = 'transparent'
 
   // Dynamic stylesheet: accent + component targets that can't read vars from inline JS.
@@ -149,8 +150,8 @@ export function applyCSS(theme) {
         radial-gradient(ellipse 58% 48% at 88% 12%, ${accent}38 0%, transparent 58%),
         radial-gradient(ellipse 55% 45% at 68% 88%, ${accent}2e 0%, transparent 58%),
         radial-gradient(ellipse 42% 38% at 42% 52%, ${accent}1a 0%, transparent 55%),
-        radial-gradient(ellipse 200% 120% at 100% 0%, ${bgTo}bb 0%, transparent 58%),
-        radial-gradient(ellipse 200% 120% at 0% 100%, ${bgFrom}cc 0%, transparent 58%) !important;
+        radial-gradient(ellipse 48% 36% at 85% 10%, ${bgTo}99 0%, transparent 55%),
+        radial-gradient(ellipse 48% 36% at 15% 90%, ${bgFrom}88 0%, transparent 55%) !important;
       background-color: ${bgFrom} !important;
     }
 
