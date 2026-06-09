@@ -92,13 +92,14 @@ body::before {
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 72% 58% at 12% 22%, var(--atm-1, rgba(129,140,248,0.48)) 0%, transparent 62%),
-    radial-gradient(ellipse 58% 48% at 88% 12%, var(--atm-2, rgba(129,140,248,0.36)) 0%, transparent 58%),
-    radial-gradient(ellipse 55% 45% at 68% 88%, var(--atm-3, rgba(129,140,248,0.28)) 0%, transparent 58%),
-    radial-gradient(ellipse 42% 38% at 42% 52%, var(--atm-4, rgba(129,140,248,0.16)) 0%, transparent 55%),
-    radial-gradient(ellipse 32% 28% at 80% 58%, var(--atm-5, rgba(13,15,53,0.80))   0%, transparent 52%),
-    radial-gradient(ellipse 26% 20% at 20% 78%, var(--atm-6, rgba(5,6,26,0.70))     0%, transparent 50%);
-  background-color: var(--atm-base, #05061a);
+    radial-gradient(ellipse 72% 58% at 12% 22%, var(--atm-1, rgba(129,140,248,0.70)) 0%, transparent 62%),
+    radial-gradient(ellipse 58% 48% at 88% 12%, var(--atm-2, rgba(129,140,248,0.55)) 0%, transparent 58%),
+    radial-gradient(ellipse 55% 45% at 68% 88%, var(--atm-3, rgba(129,140,248,0.42)) 0%, transparent 58%),
+    radial-gradient(ellipse 42% 38% at 42% 52%, var(--atm-4, rgba(129,140,248,0.26)) 0%, transparent 55%),
+    radial-gradient(ellipse 32% 28% at 80% 58%, var(--atm-5, rgba(30,36,128,0.22))  0%, transparent 52%),
+    radial-gradient(ellipse 26% 20% at 20% 78%, var(--atm-6, rgba(6,7,30,0.18))     0%, transparent 50%);
+  /* transparent: body carries the linear-gradient base so themes are clearly visible */
+  background-color: var(--atm-base, transparent);
   background-size: 200% 200%;
   animation: meshDrift 28s ease-in-out infinite alternate;
 }

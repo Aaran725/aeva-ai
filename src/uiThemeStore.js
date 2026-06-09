@@ -42,8 +42,8 @@ export const HIDEABLE = [
 
 /* ── Defaults ──────────────────────────────────────────────────────────────── */
 export const DEFAULT_UI = {
-  bgFrom:         '#05061a',
-  bgTo:           '#0d0f35',
+  bgFrom:         '#06071e',
+  bgTo:           '#1e2480',
   bgAngle:        145,
   accent:         '#818CF8',
   font:           'inter',
@@ -127,28 +127,31 @@ export function applyCSS(theme) {
   r.style.setProperty('--aeva-space-lg', `${Math.round(24 * density)}px`)
   r.style.setProperty('--aeva-space-xl', `${Math.round(40 * density)}px`)
 
-  // html background-color is driven by var(--atm-base) in index.css — no inline
-  // style needed, and removing it stops any stale gradient value bleeding into
-  // the scrollbar gutter on the right edge.
-  document.documentElement.style.background = ''
-  document.body.style.background = 'transparent'
+  /* ── Background layers ──────────────────────────────────────────────────────
+     body carries the actual gradient (the visible theme base).
+     html gets bgFrom as a solid match for the scrollbar gutter — since the
+     gradient starts at bgFrom, the gutter blends in rather than creating a stripe.
+     body::before (in index.css) has transparent base so the gradient shows through,
+     with animated accent blobs floating on top for atmosphere.
+  ── */
+  document.documentElement.style.background = bgFrom
+  document.body.style.background = `linear-gradient(${bgAngle}deg, ${bgFrom} 0%, ${bgTo} 100%)`
 
   /* ── Atmosphere CSS variables → body::before reads these in index.css ──────
-     The blob colours use the accent colour so the atmosphere shifts when the
-     user changes accent or picks a theme. bgFrom/bgTo tint corners so the
-     gradient direction/base colour also affect what you see.
+     Accent blobs at higher opacity so colour is clearly visible.
+     bgTo/bgFrom shadow blobs kept very low so the gradient base shows through.
   ── */
   const hexToRgb = h => [1,3,5].map(i => parseInt(h.slice(i,i+2),16))
   const [ar,ag,ab] = hexToRgb(accent)
   const [fr,fg,fb] = hexToRgb(bgFrom)
   const [tr,tg,tb] = hexToRgb(bgTo)
-  r.style.setProperty('--atm-1', `rgba(${ar},${ag},${ab},0.52)`)
-  r.style.setProperty('--atm-2', `rgba(${ar},${ag},${ab},0.40)`)
-  r.style.setProperty('--atm-3', `rgba(${ar},${ag},${ab},0.30)`)
-  r.style.setProperty('--atm-4', `rgba(${ar},${ag},${ab},0.18)`)
-  r.style.setProperty('--atm-5', `rgba(${tr},${tg},${tb},0.82)`)
-  r.style.setProperty('--atm-6', `rgba(${fr},${fg},${fb},0.72)`)
-  r.style.setProperty('--atm-base', bgFrom)
+  r.style.setProperty('--atm-1', `rgba(${ar},${ag},${ab},0.70)`)
+  r.style.setProperty('--atm-2', `rgba(${ar},${ag},${ab},0.55)`)
+  r.style.setProperty('--atm-3', `rgba(${ar},${ag},${ab},0.42)`)
+  r.style.setProperty('--atm-4', `rgba(${ar},${ag},${ab},0.26)`)
+  r.style.setProperty('--atm-5', `rgba(${tr},${tg},${tb},0.22)`)
+  r.style.setProperty('--atm-6', `rgba(${fr},${fg},${fb},0.18)`)
+  r.style.setProperty('--atm-base', 'transparent')
 
   // Dynamic stylesheet: accent + component targets that can't read vars from inline JS.
   let s = document.getElementById('_ui_theme')
