@@ -37,12 +37,15 @@ Difficulty: ${diffInstr}
 Focus: ${focusInstr}
 Return ONLY valid JSON with this exact structure:
 {"questions":[{"q":"question text","options":["option A text","option B text","option C text","option D text"],"correctAnswer":"the exact text of the correct option, copied verbatim from the options array","explanation":"why correct in 1 sentence"}]}
-CRITICAL RULES:
-- "correctAnswer" must be the EXACT TEXT of the correct option, copied character-for-character from the "options" array.
-- Do NOT use an index number. Do NOT use A/B/C/D. Copy the answer text exactly.
-- Example: if options are ["Paris","London","Berlin","Madrid"] and Paris is correct, write "correctAnswer":"Paris"
-- Every question must have exactly 4 options. The correct answer must appear in the options array.
-- Make distractors plausibly wrong but clearly incorrect on reflection.`,
+CRITICAL RULES — follow in this order for EVERY question:
+1. SOLVE the problem yourself first to get the right answer.
+2. Put that answer as one of the 4 options (exact text, e.g. "4" not "four").
+3. Set "correctAnswer" to that SAME exact text.
+4. Write "explanation" that confirms the same answer — it must agree with correctAnswer.
+5. VERIFY: re-read your question, solve it again, confirm correctAnswer matches your solution.
+- Do NOT use an index number for correctAnswer. Copy the answer text exactly from options.
+- Example: options ["Paris","London","Berlin","Madrid"], correct is Paris → "correctAnswer":"Paris"
+- Every question must have exactly 4 options. Make distractors plausibly wrong but clearly incorrect.`,
 
     feynman: `Generate a Feynman challenge for "${topic}".
 Difficulty: ${diffInstr}
