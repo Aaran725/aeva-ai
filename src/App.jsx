@@ -2375,8 +2375,8 @@ function DashboardView({ onChatOpen, onSignOut }) {
               overflow: 'hidden',
             }}>
 
-              {/* ── Left: logo ── */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {/* ── Left: logo — right-aligned so it sits right next to the nav ── */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, paddingRight: 20 }}>
                 <div style={{ width: 26, height: 26, borderRadius: 8, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(45,48,142,0.45)', flexShrink: 0 }}>
                   <Star size={11} color="white" fill="white" />
                 </div>
@@ -2403,7 +2403,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
                 }
                 const div = <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.10)' }} />
                 return (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <motion.button whileHover={{ scale: 1.04, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.96 }} onClick={() => setLibraryOpen(true)} style={nb}>
                       <BookOpen size={12} />Library
                       {sessions.length > 0 && <span style={badge}>{sessions.length}</span>}
@@ -2461,8 +2461,8 @@ function DashboardView({ onChatOpen, onSignOut }) {
                 )
               })()}
 
-              {/* ── Right: actions ── */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'flex-end' }}>
+              {/* ── Right: actions — left-aligned so it sits right next to the nav ── */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'flex-start', paddingLeft: 20 }}>
                 <motion.button whileHover={{ scale: 1.06, rotate: 45 }} whileTap={{ scale: 0.94 }} onClick={() => setAppSettingsOpen(true)}
                   style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.40)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Settings size={13} />
