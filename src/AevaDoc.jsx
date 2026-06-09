@@ -12,9 +12,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import katex from 'katex'
 import {
   X, Upload, FileText, Send, Loader,
-  Star, AlertCircle, RotateCcw, ChevronDown,
+  Star, AlertCircle, RotateCcw, ChevronDown, Palette,
 } from 'lucide-react'
 import { nextGroqKey as gKey, GROQ_URL } from './groqClient'
+import { CHAT_THEMES } from './chatThemes'
 import * as pdfjsLib from 'pdfjs-dist'
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).href
 
@@ -651,6 +652,15 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
   const [dragOver, setDragOver]   = useState(false)
   const [mobileTab, setMobileTab] = useState('doc')
   const [docCollapsed, setDocCollapsed] = useState(false)
+  const [docTheme, setDocTheme] = useState(() => localStorage.getItem('aeva_doc_theme') || null) // null = default dark
+  const [showThemePicker, setShowThemePicker] = useState(false)
+  const activeTheme = docTheme ? CHAT_THEMES[docTheme] : null
+  const applyDocTheme = (id) => {
+    setDocTheme(id)
+    if (id) localStorage.setItem('aeva_doc_theme', id)
+    else localStorage.removeItem('aeva_doc_theme')
+    setShowThemePicker(false)
+  }
 
   const fileInputRef = useRef(null)
   const inputRef     = useRef(null)
@@ -893,7 +903,41 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
             </div>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', position: 'relative' }}>
+          {/* Ai OS theme picker */}
+          <div style={{ position: 'relative' }}>
+            <motion.button
+              whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+              onClick={() => setShowThemePicker(s => !s)}
+              title="Background theme"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px', borderRadius: 99, background: activeTheme ? activeTheme.accentBg : 'rgba(255,255,255,0.06)', border: `1.5px solid ${activeTheme ? activeTheme.swatch : 'rgba(255,255,255,0.12)'}`, color: activeTheme ? activeTheme.accent : 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: activeTheme ? `0 0 12px ${activeTheme.swatch}55` : 'none' }}
+            >
+              <Palette size={13} />
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: activeTheme ? activeTheme.swatch : 'rgba(255,255,255,0.25)', boxShadow: activeTheme ? `0 0 8px ${activeTheme.swatch}` : 'none' }} />
+            </motion.button>
+            <AnimatePresence>
+              {showThemePicker && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                  style={{ position: 'absolute', top: 42, right: 0, zIndex: 50, padding: 12, borderRadius: 16, background: 'rgba(14,15,30,0.97)', border: '1px solid rgba(255,255,255,0.12)', backdropFilter: 'blur(20px)', boxShadow: '0 12px 40px rgba(0,0,0,0.55)', width: 200 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.40)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 10 }}>Background</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                    {/* Default (dark) */}
+                    <motion.button whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }} onClick={() => applyDocTheme(null)}
+                      title="Default"
+                      style={{ aspectRatio: '1', borderRadius: 12, cursor: 'pointer', background: 'rgba(6,7,20,0.97)', border: `2px solid ${!docTheme ? '#fff' : 'rgba(255,255,255,0.14)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.45)', fontSize: 9, fontWeight: 700 }}>
+                      OFF
+                    </motion.button>
+                    {Object.entries(CHAT_THEMES).map(([id, t]) => (
+                      <motion.button key={id} whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }} onClick={() => applyDocTheme(id)}
+                        title={t.label}
+                        style={{ aspectRatio: '1', borderRadius: 12, cursor: 'pointer', background: t.bg, border: `2px solid ${docTheme === id ? '#fff' : 'rgba(255,255,255,0.14)'}` }} />
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
           {file && (
             <motion.button
               whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
@@ -1047,7 +1091,7 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
         )}
 
         {/* ── Right: Chat panel ────────────────────────────────────────────── */}
-        <div style={{ flex: 1, display: isMobile && file && mobileTab === 'doc' ? 'none' : 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
+        <div style={{ flex: 1, display: isMobile && file && mobileTab === 'doc' ? 'none' : 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, background: activeTheme ? activeTheme.bg : 'transparent', transition: 'background 0.4s ease' }}>
 
           {/* Messages */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '22px 22px 8px', display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
@@ -1145,10 +1189,11 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
           <div style={{ flexShrink: 0, padding: '10px 20px 24px' }}>
             <div style={{
               display: 'flex', gap: 10, alignItems: 'center',
-              background: 'rgba(255,255,255,0.06)',
-              border: '1.5px solid rgba(255,255,255,0.10)',
+              background: activeTheme ? activeTheme.inputBg : 'rgba(255,255,255,0.06)',
+              border: `1.5px solid ${activeTheme ? activeTheme.inputBorder : 'rgba(255,255,255,0.10)'}`,
               borderRadius: 999, padding: '10px 10px 10px 18px',
-              transition: 'border-color 0.2s',
+              boxShadow: activeTheme ? activeTheme.inputGlow : 'none',
+              transition: 'border-color 0.2s, background 0.4s ease',
             }}>
               <input
                 ref={inputRef}
