@@ -15,7 +15,6 @@ import { useIsHidden } from './uiThemeStore'
 
 export default function FeatureSpotlight({ id, icon, title, body, accentColor = '#818CF8' }) {
   const tipsHidden = useIsHidden('tips')
-  if (tipsHidden) return null
   const storageKey = `aeva_seen_tip_${id}`
 
   const [dismissed, setDismissed] = useState(() => {
@@ -39,6 +38,9 @@ export default function FeatureSpotlight({ id, icon, title, body, accentColor = 
 
   const lightAccent = accentColor + '22'
   const borderAccent = accentColor + '44'
+
+  // All hooks called — now safe to conditionally return
+  if (tipsHidden) return null
 
   return (
     <div style={{ flexShrink: 0, position: 'relative' }}>

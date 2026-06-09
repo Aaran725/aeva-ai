@@ -109,3 +109,8 @@ export function applyCSS(theme) {
 export function useIsHidden(key) {
   return useUITheme(s => s.hidden.includes(key))
 }
+
+/* ── Auto-apply on module load (runs once when the store is first imported) ── */
+if (typeof window !== 'undefined') {
+  applyCSS(useUITheme.getState())
+}

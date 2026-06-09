@@ -6589,7 +6589,6 @@ function LoginScreen({ onBack }) {
 /* ── Streak Moment banner ────────────────────────────────────────────────── */
 function StreakMoment({ streak }) {
   const streakHidden = useIsHidden('streak')
-  if (streakHidden) return null
   const todayKey = `aeva_streak_shown_${new Date().toDateString()}`
   const [visible, setVisible] = useState(() => {
     if (streak < 2) return false
@@ -6603,7 +6602,8 @@ function StreakMoment({ streak }) {
     return () => clearTimeout(t)
   }, [visible]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (streak < 2) return null
+  // All hooks called — now safe to conditionally return
+  if (streak < 2 || streakHidden) return null
 
   return (
     <AnimatePresence>
@@ -6847,9 +6847,6 @@ function AppLoader() {
 }
 
 export default function App() {
-  // ── Apply YOUR UI theme on first render ─────────────────────────────────────
-  useEffect(() => { applyCSS(useUITheme.getState()) }, [])
-
   // ── Shared roadmap route: /r/:code ──────────────────────────────────────────
   const _pathMatch = window.location.pathname.match(/^\/r\/([a-z0-9]+)$/i)
   if (_pathMatch) return (
