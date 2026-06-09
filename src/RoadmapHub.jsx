@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText, BookOpen, Zap, Target, ClipboardList, Check, Lock, Clock, Trophy, Trash2, Brain, Dumbbell, GraduationCap, FlaskConical, Share2, Copy, AlertTriangle, RotateCcw, LayoutGrid, Rows3 } from 'lucide-react'
+import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText, BookOpen, Zap, Target, ClipboardList, Check, Lock, Clock, Trophy, Trash2, Brain, Dumbbell, GraduationCap, FlaskConical, Share2, Copy, AlertTriangle, RotateCcw } from 'lucide-react'
+import WidgetToggle from './WidgetToggle'
 import { useRoadmapStore, calcGrade, gradeGapMessage, GRADE_THRESHOLDS } from './roadmapStore'
 import { DotMatrix } from './WidgetDashboard'
 import { useLabStore } from './labStore'
@@ -245,11 +246,7 @@ export default function RoadmapHub() {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {view === 'home' && (
             <>
-              <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-                onClick={toggleWidget} title={widgetMode ? 'Classic list' : 'Ai OS widgets'}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 99, background: widgetMode ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.06)', border: `1px solid ${widgetMode ? 'rgba(129,140,248,0.40)' : 'rgba(255,255,255,0.12)'}`, color: widgetMode ? '#A5B4FC' : 'rgba(255,255,255,0.50)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-                {widgetMode ? <Rows3 size={13} /> : <LayoutGrid size={13} />}
-              </motion.button>
+              <WidgetToggle active={widgetMode} onToggle={toggleWidget} />
               <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
                 onClick={() => setView('create')}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 99, background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.40)', color: '#A5B4FC', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>

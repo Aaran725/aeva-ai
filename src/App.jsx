@@ -45,6 +45,7 @@ import OrbSelector from './OrbSelector'
 import Parents from './ShowEm'
 import AevaDoc from './AevaDoc'
 import WidgetDashboard from './WidgetDashboard'
+import WidgetToggle from './WidgetToggle'
 import { CHAT_THEMES } from './chatThemes'
 import { parseVizTag, VizComponent } from './ChatVisuals'
 import WorksheetModal from './WorksheetModal'
@@ -2452,21 +2453,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
                     </motion.button>
 
                     {/* ── Layout toggle ── */}
-                    <motion.button
-                      whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.94 }}
-                      onClick={toggleDashLayout}
-                      title={dashLayout === 'classic' ? 'Switch to Widget view' : 'Switch to Classic view'}
-                      style={{
-                        width: 34, height: 34, borderRadius: 9,
-                        background: dashLayout === 'widget' ? 'rgba(124,58,237,0.22)' : 'rgba(255,255,255,0.06)',
-                        border: dashLayout === 'widget' ? '1px solid rgba(124,58,237,0.45)' : '1px solid rgba(255,255,255,0.09)',
-                        color: dashLayout === 'widget' ? '#C4B5FD' : 'rgba(255,255,255,0.45)',
-                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                        transition: 'background 0.2s, border 0.2s, color 0.2s',
-                      }}
-                    >
-                      <LayoutGrid size={14} />
-                    </motion.button>
+                    <WidgetToggle active={dashLayout === 'widget'} onToggle={toggleDashLayout} />
 
                     <UserAvatar onSignOut={onSignOut} />
                   </>
@@ -2493,19 +2480,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {/* Layout toggle — mobile */}
-              <motion.button
-                whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.92 }}
-                onClick={toggleDashLayout}
-                style={{
-                  width: 38, height: 38, borderRadius: 12,
-                  background: dashLayout === 'widget' ? 'rgba(124,58,237,0.22)' : 'rgba(255,255,255,0.07)',
-                  border: dashLayout === 'widget' ? '1px solid rgba(124,58,237,0.40)' : '1px solid rgba(255,255,255,0.12)',
-                  color: dashLayout === 'widget' ? '#C4B5FD' : 'rgba(255,255,255,0.70)',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                <LayoutGrid size={17} />
-              </motion.button>
+              <WidgetToggle active={dashLayout === 'widget'} onToggle={toggleDashLayout} />
               <motion.button whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.92 }}
                 onClick={() => setDrawerOpen(true)}
                 style={{ width: 38, height: 38, borderRadius: 12, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.70)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -5286,14 +5261,7 @@ If no clear changes: {"changes":[]}`
             )}
             {/* Widget layout toggle */}
             {!isMission && (
-              <motion.button
-                whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }}
-                onClick={toggleChatLayout}
-                title={isWidget ? 'Switch to Classic view' : 'Switch to Widget view'}
-                style={{ width: 30, height: 30, borderRadius: '50%', background: isWidget ? 'rgba(124,58,237,0.22)' : isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.07)', border: isWidget ? '1px solid rgba(124,58,237,0.45)' : isLight ? '1px solid rgba(0,0,0,0.12)' : '1px solid rgba(255,255,255,0.13)', color: isWidget ? '#C4B5FD' : isLight ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.45)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s, border 0.2s, color 0.2s' }}
-              >
-                <LayoutGrid size={12} />
-              </motion.button>
+              <WidgetToggle active={isWidget} onToggle={toggleChatLayout} />
             )}
             {/* Widget theme palette picker */}
             {isWidget && (

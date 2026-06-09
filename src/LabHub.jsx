@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion'
-import { X, FlaskConical, ChevronRight, RotateCcw, CheckCircle2, XCircle, ArrowRight, Settings, History, Zap, RefreshCw, LayoutGrid, Rows3 } from 'lucide-react'
+import { X, FlaskConical, ChevronRight, RotateCcw, CheckCircle2, XCircle, ArrowRight, Settings, History, Zap, RefreshCw } from 'lucide-react'
 import { DRILLS, DIFFICULTIES, useLabStore } from './labStore'
 import { DotMatrix } from './WidgetDashboard'
+import WidgetToggle from './WidgetToggle'
 import { useNeuralStore } from './neuralStore'
 import { useSRStore } from './srStore'
 import { useRoadmapStore } from './roadmapStore'
@@ -309,7 +310,7 @@ function LedResultView({ pct, grade, band, score, drillType }) {
 }
 
 /* ═══ DRILL COMPLETE SCREEN ══════════════════════════ */
-function DrillComplete({ score, wrongItems = [], onExit, onRetry, onGoHarder, topic, drillType }) {
+function DrillComplete({ score, wrongItems = [], onExit, onRetry, onGoHarder, topic, drillType, widgetMode = false }) {
   const { difficulty, setDifficulty, closeLab, exitDrill } = useLabStore()
   const { activeNodeSession, endNodeSession, completeNode, openRoadmapHub } = useRoadmapStore()
   const { addXP } = useXPStore()
@@ -329,8 +330,6 @@ function DrillComplete({ score, wrongItems = [], onExit, onRetry, onGoHarder, to
     : { label: 'Needs Work', color: '#F87171', emoji: '🔁', band: 'needswork' }
   const [analysis, setAnalysis] = useState(null)
   const [loadingAnalysis, setLoadingAnalysis] = useState(false)
-  const [widgetMode, setWidgetMode] = useState(() => localStorage.getItem('aeva_lab_widget') === '1')
-  const toggleWidget = () => setWidgetMode(m => { const n = !m; localStorage.setItem('aeva_lab_widget', n ? '1' : '0'); return n })
 
   useEffect(() => {
     if (wrongItems.length > 0 && pct < 90) {
@@ -355,14 +354,6 @@ function DrillComplete({ score, wrongItems = [], onExit, onRetry, onGoHarder, to
     <motion.div initial={{ opacity: 0, scale: 0.93 }} animate={{ opacity: 1, scale: 1 }}
       style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, overflowY: 'auto', paddingTop: 8 }}>
 
-      {/* View toggle: classic ↔ Ai OS LED widget */}
-      <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end', marginBottom: -4 }}>
-        <button onClick={toggleWidget}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 11px', borderRadius: 99, background: widgetMode ? 'rgba(99,102,241,0.16)' : 'rgba(255,255,255,0.05)', border: `1px solid ${widgetMode ? 'rgba(129,140,248,0.40)' : 'rgba(255,255,255,0.10)'}`, color: widgetMode ? '#A5B4FC' : 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.02em' }}>
-          {widgetMode ? <Rows3 size={13} /> : <LayoutGrid size={13} />}
-          {widgetMode ? 'Classic' : 'Widget'}
-        </button>
-      </div>
 
       {widgetMode ? (
         <LedResultView pct={pct} grade={grade} band={grade.band} score={score} drillType={drillType} />
@@ -448,7 +439,7 @@ function DrillComplete({ score, wrongItems = [], onExit, onRetry, onGoHarder, to
 }
 
 /* ═══ FLASHCARD SPRINT ═══════════════════════════════ */
-function FlashcardDrill({ data, topic, onExit, onGoHarder }) {
+function FlashcardDrill({ data, topic, onExit, onGoHarder, widgetMode = false }) {
   const { setDrillScore, recordDrillResult, currentTopic } = useLabStore()
   const { recordCard } = useSRStore()
   const [idx, setIdx] = useState(0)
@@ -506,6 +497,7 @@ function FlashcardDrill({ data, topic, onExit, onGoHarder }) {
         onExit={onExit}
         onRetry={() => { setIdx(0); setFlipped(false); setResults([]); setWrongItems([]); setDone(false) }}
         onGoHarder={onGoHarder}
+              widgetMode={widgetMode}
       />
     )
   }
@@ -610,7 +602,7 @@ function SwipeCard({ card, onResult, cardIndex, total, flipped, onFlip }) {
 }
 
 /* ═══ SPACED REVIEW DRILL ════════════════════════════ */
-function ReviewDrill({ data, onExit, onNewDrill }) {
+function ReviewDrill({ data, onExit, onNewDrill, widgetMode = false }) {
   const { recordCard, completeSession } = useSRStore()
   const cards = data?.cards || []
   const [idx, setIdx]           = useState(0)
@@ -802,7 +794,7 @@ function ReviewDrill({ data, onExit, onNewDrill }) {
 }
 
 /* ═══ SPEED ROUND ════════════════════════════════════ */
-function SpeedRoundDrill({ data, topic, onExit, onGoHarder }) {
+function SpeedRoundDrill({ data, topic, onExit, onGoHarder, widgetMode = false }) {
   const { setDrillScore, recordDrillResult, currentTopic } = useLabStore()
   const cards = data.cards || []
   const [idx, setIdx] = useState(0)
@@ -858,6 +850,7 @@ function SpeedRoundDrill({ data, topic, onExit, onGoHarder }) {
         topic={topic}
         drillType="speedround"
         onGoHarder={onGoHarder}
+              widgetMode={widgetMode}
       />
     )
   }
@@ -935,7 +928,7 @@ function SpeedRoundDrill({ data, topic, onExit, onGoHarder }) {
 }
 
 /* ═══ MOCK TEST ══════════════════════════════════════ */
-function MockTestDrill({ data, topic, onExit }) {
+function MockTestDrill({ data, topic, onExit, widgetMode = false }) {
   const { setDrillScore, recordDrillResult, currentTopic } = useLabStore()
   const questions = data.questions || []
 
@@ -1201,7 +1194,7 @@ function MockTestDrill({ data, topic, onExit }) {
 }
 
 /* ═══ FEYNMAN TEST ═══════════════════════════════════ */
-function FeynmanDrill({ data, topic, onExit }) {
+function FeynmanDrill({ data, topic, onExit, widgetMode = false }) {
   const { recordDrillResult, currentTopic } = useLabStore()
   const [explanation, setExplanation] = useState('')
   const [grading, setGrading] = useState(false)
@@ -1355,7 +1348,7 @@ function FeynmanDrill({ data, topic, onExit }) {
 }
 
 /* ═══ CLOZE (FILL THE GAPS) ══════════════════════════ */
-function ClozeDrill({ data, topic, onExit, onGoHarder }) {
+function ClozeDrill({ data, topic, onExit, onGoHarder, widgetMode = false }) {
   const { setDrillScore, recordDrillResult, currentTopic } = useLabStore()
   const passage = data.passage || ''
   const answers = data.blanks || []
@@ -1389,6 +1382,7 @@ function ClozeDrill({ data, topic, onExit, onGoHarder }) {
         onExit={onExit}
         onRetry={() => { setInputs(Array(answers.length).fill('')); setSubmitted(false); setResults([]) }}
         onGoHarder={onGoHarder}
+              widgetMode={widgetMode}
       />
     )
   }
@@ -1479,7 +1473,7 @@ async function gradeShortAnswer(topic, question, modelAnswer, keyPoints, userAns
   return JSON.parse(json.choices[0].message.content)
 }
 
-function ShortAnswerDrill({ data, topic, onExit, onGoHarder }) {
+function ShortAnswerDrill({ data, topic, onExit, onGoHarder, widgetMode = false }) {
   const { setDrillScore, recordDrillResult, currentTopic } = useLabStore()
   const questions = data.questions || []
   const [idx, setIdx] = useState(0)
@@ -1531,6 +1525,7 @@ function ShortAnswerDrill({ data, topic, onExit, onGoHarder }) {
         onExit={onExit}
         onRetry={() => { setIdx(0); setAnswers(Array(questions.length).fill('')); setGrades([]); setCurrentGrade(null); setDone(false) }}
         onGoHarder={onGoHarder}
+              widgetMode={widgetMode}
       />
     )
   }
@@ -1860,7 +1855,8 @@ function MatchGridDrill({ data, topic, onExit, onGoHarder }) {
       onExit={onExit}
       onRetry={() => { setMatched([]); setSelectedTerm(null); setSelectedDef(null); setDone(false) }}
       onGoHarder={onGoHarder}
-    />
+            widgetMode={widgetMode}
+      />
   )
 
   const progress = (matched.length / pairs.length) * 100
@@ -2672,6 +2668,8 @@ export default function LabHub() {
   }
 
   const inputRef = useRef(null)
+  const [widgetMode, setWidgetMode] = useState(() => localStorage.getItem('aeva_lab_widget') === '1')
+  const toggleWidget = () => setWidgetMode(m => { const n = !m; localStorage.setItem('aeva_lab_widget', n ? '1' : '0'); return n })
 
   const pendingCount = orders.filter(o => !o.completedAt).length
 
@@ -2769,6 +2767,7 @@ export default function LabHub() {
                       style={{ width: 5, height: 5, borderRadius: '50%', background: '#3B82F6', boxShadow: '0 0 6px #3B82F6' }} />
                     <span style={{ fontSize: 10, fontWeight: 700, color: '#60A5FA', letterSpacing: '0.10em', textTransform: 'uppercase' }}>Scan Mode</span>
                   </div>
+                  <WidgetToggle active={widgetMode} onToggle={toggleWidget} />
                   <motion.button whileHover={{ scale: 1.08, rotate: 90 }} whileTap={{ scale: 0.92 }}
                     onClick={() => { exitDrill(); closeLab() }}
                     style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(255,255,255,0.50)' }}>
@@ -2824,20 +2823,20 @@ export default function LabHub() {
                   {activeDrill === 'review'
                     ? (drillData
                         ? <ReviewDrill data={drillData} onExit={exitDrill}
-                            onNewDrill={() => { exitDrill(); setLabTab('drill') }} />
+                            onNewDrill={() => { exitDrill(); setLabTab('drill') }} widgetMode={widgetMode} />
                         : <LabLoading topic="Spaced Review" />
                       )
                     : drillLoading
                       ? <LabLoading topic={currentTopic} />
                       : drillData
-                        ? activeDrill === 'flashcard'    ? <FlashcardDrill    data={drillData} topic={currentTopic} onExit={exitDrill} onGoHarder={handleRestartDrill} />
-                          : activeDrill === 'speedround'  ? <SpeedRoundDrill   data={drillData} topic={currentTopic} onExit={exitDrill} onGoHarder={handleRestartDrill} />
-                          : activeDrill === 'mocktest'    ? <MockTestDrill     data={drillData} topic={currentTopic} onExit={exitDrill} />
-                          : activeDrill === 'feynman'     ? <FeynmanDrill      data={drillData} topic={currentTopic} onExit={exitDrill} />
-                          : activeDrill === 'cloze'       ? <ClozeDrill        data={drillData} topic={currentTopic} onExit={exitDrill} onGoHarder={handleRestartDrill} />
-                          : activeDrill === 'shortanswer'   ? <ShortAnswerDrill   data={drillData} topic={currentTopic} onExit={exitDrill} onGoHarder={handleRestartDrill} />
-                          : activeDrill === 'examPractice'  ? <ExamPracticeDrill  data={drillData} topic={currentTopic} onExit={exitDrill} />
-                                                           : <MatchGridDrill      data={drillData} topic={currentTopic} onExit={exitDrill} onGoHarder={handleRestartDrill} />
+                        ? activeDrill === 'flashcard'    ? <FlashcardDrill    data={drillData} topic={currentTopic} onExit={exitDrill} onGoHarder={handleRestartDrill} widgetMode={widgetMode} />
+                          : activeDrill === 'speedround'  ? <SpeedRoundDrill   data={drillData} topic={currentTopic} onExit={exitDrill} onGoHarder={handleRestartDrill} widgetMode={widgetMode} />
+                          : activeDrill === 'mocktest'    ? <MockTestDrill     data={drillData} topic={currentTopic} onExit={exitDrill} widgetMode={widgetMode} />
+                          : activeDrill === 'feynman'     ? <FeynmanDrill      data={drillData} topic={currentTopic} onExit={exitDrill} widgetMode={widgetMode} />
+                          : activeDrill === 'cloze'       ? <ClozeDrill        data={drillData} topic={currentTopic} onExit={exitDrill} onGoHarder={handleRestartDrill} widgetMode={widgetMode} />
+                          : activeDrill === 'shortanswer'   ? <ShortAnswerDrill   data={drillData} topic={currentTopic} onExit={exitDrill} onGoHarder={handleRestartDrill} widgetMode={widgetMode} />
+                          : activeDrill === 'examPractice'  ? <ExamPracticeDrill  data={drillData} topic={currentTopic} onExit={exitDrill} widgetMode={widgetMode} />
+                                                           : <MatchGridDrill      data={drillData} topic={currentTopic} onExit={exitDrill} onGoHarder={handleRestartDrill} widgetMode={widgetMode} />
                         : <LabLoading topic={currentTopic} />
                   }
                 </>
