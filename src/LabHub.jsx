@@ -35,8 +35,9 @@ Questions must be answerable in under 15 seconds. Crisp, unambiguous.`,
     mocktest: `Generate exactly ${Math.min(count, 10)} multiple-choice questions about "${topic}".
 Difficulty: ${diffInstr}
 Focus: ${focusInstr}
-Return ONLY valid JSON: {"questions":[{"q":"question","options":["A","B","C","D"],"correct":0,"explanation":"why correct in 1 sentence"}]}
-"correct" is 0-based index. Make wrong options plausibly wrong.`,
+Return ONLY valid JSON with this exact structure:
+{"questions":[{"q":"question text","options":["option text A","option text B","option text C","option text D"],"correct":0,"explanation":"why correct in 1 sentence"}]}
+CRITICAL: "correct" MUST be an integer 0, 1, 2, or 3 — the index of the correct option in the "options" array. 0 = first option, 1 = second option, 2 = third option, 3 = fourth option. Never use letters A/B/C/D for "correct". Make distractors plausibly wrong.`,
 
     feynman: `Generate a Feynman challenge for "${topic}".
 Difficulty: ${diffInstr}
@@ -935,7 +936,11 @@ function SpeedRoundDrill({ data, topic, onExit, onGoHarder, widgetMode = false }
 /* ═══ MOCK TEST ══════════════════════════════════════ */
 function MockTestDrill({ data, topic, onExit, widgetMode = false }) {
   const { setDrillScore, recordDrillResult, currentTopic } = useLabStore()
-  const questions = data.questions || []
+  // Normalise q.correct to always be a JS number (AI sometimes returns "0" as a string)
+  const rawQuestions = (data.questions || []).map(q => ({ ...q, correct: parseInt(q.correct, 10) || 0 }))
+  // Detect if AI slipped into 1-based indexing: if every question's correct is ≥ 1, shift all down by 1
+  const allOneBased = rawQuestions.length > 0 && rawQuestions.every(q => q.correct >= 1 && q.correct <= 4)
+  const questions = allOneBased ? rawQuestions.map(q => ({ ...q, correct: q.correct - 1 })) : rawQuestions
 
   // answers[i] = chosen option index or null
   const [answers, setAnswers]     = useState(() => Array(questions.length).fill(null))
