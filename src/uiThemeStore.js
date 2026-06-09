@@ -117,6 +117,7 @@ export function applyCSS(theme) {
   r.style.setProperty('--aeva-radius-sm',   `${Math.round(radius * 0.5)}px`)
   r.style.setProperty('--aeva-radius-md',   `${radius}px`)
   r.style.setProperty('--aeva-radius-lg',   `${Math.round(radius * 1.5)}px`)
+  r.style.setProperty('--aeva-radius-xl',   `${Math.min(Math.round(radius * 2), 48)}px`)
   // --aeva-radius-pill stays at 99px (set in :root, never changes)
 
   /* ── Layer 2 derived: spacing scale (density-responsive) ── */
@@ -137,6 +138,22 @@ export function applyCSS(theme) {
   let s = document.getElementById('_ui_theme')
   if (!s) { s = document.createElement('style'); s.id = '_ui_theme'; document.head.appendChild(s) }
   s.textContent = `
+    /* ── Background atmosphere ──────────────────────────────────────────────────
+       body::before is the animated mesh overlay. We override its background-image
+       here so that accent color + bg gradient actually change the visible atmosphere.
+       6 layers match the 6 background-positions in the meshDrift keyframe animation.
+    ── */
+    body::before {
+      background-image:
+        radial-gradient(ellipse 72% 58% at 12% 22%, ${accent}4d 0%, transparent 62%),
+        radial-gradient(ellipse 58% 48% at 88% 12%, ${accent}38 0%, transparent 58%),
+        radial-gradient(ellipse 55% 45% at 68% 88%, ${accent}2e 0%, transparent 58%),
+        radial-gradient(ellipse 42% 38% at 42% 52%, ${accent}1a 0%, transparent 55%),
+        radial-gradient(ellipse 200% 120% at 100% 0%, ${bgTo}bb 0%, transparent 58%),
+        radial-gradient(ellipse 200% 120% at 0% 100%, ${bgFrom}cc 0%, transparent 58%) !important;
+      background-color: ${bgFrom} !important;
+    }
+
     /* ── Scrollbar ── */
     ::-webkit-scrollbar-thumb          { background: ${accent}35 !important; }
     ::-webkit-scrollbar-thumb:hover    { background: ${accent}60 !important; }
@@ -164,7 +181,7 @@ export function applyCSS(theme) {
     .aeva-card-glow:hover { box-shadow: var(--aeva-shadow-raised), 0 0 32px 4px ${accent}28; }
 
     /* ── Accent utility classes ── */
-    .aeva-accent         { color: ${accent}; }
+    .aeva-accent          { color: ${accent}; }
     .aeva-accent-bg-faint { background: ${accent}12; }
     .aeva-accent-bg-soft  { background: ${accent}22; }
     .aeva-accent-border   { border-color: ${accent}44 !important; }

@@ -144,7 +144,7 @@ function MiniPreview({ theme }) {
 
   return (
     <div style={{
-      borderRadius: 20, overflow: 'hidden',
+      borderRadius: 'var(--aeva-radius-lg)', overflow: 'hidden',
       border: '1px solid rgba(255,255,255,0.10)',
       boxShadow: '0 24px 80px rgba(0,0,0,0.70)',
       background: bg,

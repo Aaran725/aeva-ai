@@ -227,7 +227,7 @@ function Widget({ children, style, onClick, idx = 0 }) {
       whileTap={onClick ? { scale: 0.975 } : undefined}
       onClick={onClick}
       style={{
-        borderRadius: 32,
+        borderRadius: 'var(--aeva-radius-xl)',
         padding: 22,
         position: 'relative',
         overflow: 'hidden',

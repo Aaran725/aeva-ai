@@ -664,7 +664,7 @@ function OrderToast({ order, onJump, onDismiss }) {
       style={{
         position: 'absolute', bottom: 96, left: 16, right: 16,
         zIndex: 100, maxWidth: 480, margin: '0 auto',
-        padding: '13px 15px', borderRadius: 16,
+        padding: '13px 15px', borderRadius: 'var(--aeva-radius-md)',
         background: 'rgba(8,10,28,0.97)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
         border: '1px solid rgba(59,130,246,0.40)',
         boxShadow: '0 8px 40px rgba(0,0,0,0.65), 0 0 0 1px rgba(59,130,246,0.10)',
@@ -1078,7 +1078,7 @@ function AppSettingsPanel({ onClose }) {
       <motion.div
         initial={{ scale: 0.92, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.92, y: 20 }}
         transition={{ type: 'spring', stiffness: 340, damping: 28 }}
-        style={{ width: '100%', maxWidth: 540, borderRadius: 28, background: 'rgba(8,10,26,0.99)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 40px 120px rgba(0,0,0,0.80)', overflow: 'hidden', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+        style={{ width: '100%', maxWidth: 540, borderRadius: 'var(--aeva-radius-xl)', background: 'rgba(8,10,26,0.99)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 40px 120px rgba(0,0,0,0.80)', overflow: 'hidden', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
       >
         {/* Header */}
         <div style={{ flexShrink: 0, padding: '18px 22px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -3489,7 +3489,7 @@ ${guide.examTip ? `<div class="section"><div class="section-label">Exam Tip</div
       <motion.div
         initial={{ scale: 0.91, y: 22 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.91, y: 20 }}
         transition={{ type: 'spring', stiffness: 340, damping: 28 }}
-        style={{ width: '100%', maxWidth: 560, maxHeight: '90vh', borderRadius: 28, overflow: 'hidden', background: 'rgba(8,10,26,0.98)', border: '1px solid rgba(255,255,255,0.10)', display: 'flex', flexDirection: 'column', fontFamily: ff }}
+        style={{ width: '100%', maxWidth: 560, maxHeight: '90vh', borderRadius: 'var(--aeva-radius-xl)', overflow: 'hidden', background: 'rgba(8,10,26,0.98)', border: '1px solid rgba(255,255,255,0.10)', display: 'flex', flexDirection: 'column', fontFamily: ff }}
       >
         {/* Header */}
         <div style={{ padding: '20px 22px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
