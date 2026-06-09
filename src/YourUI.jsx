@@ -20,31 +20,31 @@ export const AEVA_THEMES = [
   {
     id: 'midnight',
     name: 'Midnight',
-    bgFrom: '#08091a', bgTo: '#0f0f2e', bgAngle: 145,
+    bgFrom: '#05061a', bgTo: '#0d0f35', bgAngle: 145,
     accent: '#818CF8', radius: 16, font: 'inter', surfaceOpacity: 0.96,
   },
   {
     id: 'aurora',
     name: 'Aurora',
-    bgFrom: '#03100d', bgTo: '#061a18', bgAngle: 145,
+    bgFrom: '#021a10', bgTo: '#042e1c', bgAngle: 145,
     accent: '#34D399', radius: 20, font: 'inter', surfaceOpacity: 0.94,
   },
   {
     id: 'ember',
     name: 'Ember',
-    bgFrom: '#120a06', bgTo: '#1c0e08', bgAngle: 145,
+    bgFrom: '#1a0800', bgTo: '#2d1200', bgAngle: 145,
     accent: '#FB923C', radius: 16, font: 'inter', surfaceOpacity: 0.96,
   },
   {
     id: 'bloom',
     name: 'Bloom',
-    bgFrom: '#120818', bgTo: '#1c0e26', bgAngle: 145,
+    bgFrom: '#160520', bgTo: '#220838', bgAngle: 145,
     accent: '#F472B6', radius: 24, font: 'rounded', surfaceOpacity: 0.90,
   },
   {
     id: 'mono',
     name: 'Mono',
-    bgFrom: '#0a0a0a', bgTo: '#141414', bgAngle: 180,
+    bgFrom: '#080808', bgTo: '#141416', bgAngle: 180,
     accent: '#CBD5E1', radius: 8, font: 'mono', surfaceOpacity: 0.97,
   },
 ]

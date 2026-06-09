@@ -42,8 +42,8 @@ export const HIDEABLE = [
 
 /* ── Defaults ──────────────────────────────────────────────────────────────── */
 export const DEFAULT_UI = {
-  bgFrom:         '#08091a',
-  bgTo:           '#0f0f2e',
+  bgFrom:         '#05061a',
+  bgTo:           '#0d0f35',
   bgAngle:        145,
   accent:         '#818CF8',
   font:           'inter',
@@ -140,19 +140,22 @@ export function applyCSS(theme) {
   if (!s) { s = document.createElement('style'); s.id = '_ui_theme'; document.head.appendChild(s) }
   s.textContent = `
     /* ── Background atmosphere ──────────────────────────────────────────────────
-       body::before is the animated mesh overlay. We override its background-image
-       here so that accent color + bg gradient actually change the visible atmosphere.
-       6 layers match the 6 background-positions in the meshDrift keyframe animation.
+       body::before is position:fixed inset:0 — it physically covers the viewport.
+       We override background-image to show the user's gradient + accent atmosphere.
+       7 layers: 4 accent blobs + 2 bg-tint blobs + 1 base gradient.
+       (meshDrift animates 6 positions; layer 7 cycles to position 1 — fine for a
+       linear-gradient since position doesn't change its visual.)
     ── */
     body::before {
       background-image:
-        radial-gradient(ellipse 72% 58% at 12% 22%, ${accent}4d 0%, transparent 62%),
-        radial-gradient(ellipse 58% 48% at 88% 12%, ${accent}38 0%, transparent 58%),
-        radial-gradient(ellipse 55% 45% at 68% 88%, ${accent}2e 0%, transparent 58%),
-        radial-gradient(ellipse 42% 38% at 42% 52%, ${accent}1a 0%, transparent 55%),
+        radial-gradient(ellipse 72% 58% at 12% 22%, ${accent}66 0%, transparent 62%),
+        radial-gradient(ellipse 58% 48% at 88% 12%, ${accent}44 0%, transparent 58%),
+        radial-gradient(ellipse 55% 45% at 68% 88%, ${accent}33 0%, transparent 58%),
+        radial-gradient(ellipse 42% 38% at 42% 52%, ${accent}22 0%, transparent 55%),
         radial-gradient(ellipse 48% 36% at 85% 10%, ${bgTo}99 0%, transparent 55%),
-        radial-gradient(ellipse 48% 36% at 15% 90%, ${bgFrom}88 0%, transparent 55%) !important;
-      background-color: ${bgFrom} !important;
+        radial-gradient(ellipse 48% 36% at 15% 90%, ${bgFrom}88 0%, transparent 55%),
+        linear-gradient(${bgAngle}deg, ${bgFrom} 0%, ${bgTo} 100%) !important;
+      background-color: transparent !important;
     }
 
     /* ── Scrollbar ── */
