@@ -10,8 +10,11 @@
  */
 import { motion } from 'framer-motion'
 import { LayoutGrid, Rows3 } from 'lucide-react'
+import { useIsHidden } from './uiThemeStore'
 
 export default function WidgetToggle({ active, onToggle, style = {} }) {
+  const hidden = useIsHidden('widgetToggle')
+  if (hidden) return null
   return (
     <motion.button
       whileHover={{ scale: 1.05 }}

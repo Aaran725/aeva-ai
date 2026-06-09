@@ -53,8 +53,10 @@ const AevaDoc            = lazy(() => import('./AevaDoc'))
 const WidgetDashboard    = lazy(() => import('./WidgetDashboard'))
 const WorksheetModal     = lazy(() => import('./WorksheetModal'))
 const SharedRoadmapView  = lazy(() => import('./SharedRoadmapView'))
+const YourUI             = lazy(() => import('./YourUI'))
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
 import { useMemoryStore } from './memoryStore'
+import { useUITheme, applyCSS, useIsHidden } from './uiThemeStore'
 import './index.css'
 
 /* ─── Groq API (keys + URL imported at top of file) ─── */
@@ -2158,7 +2160,7 @@ function PersonalProgressCard() {
 
 /* ═══ DASHBOARD VIEW ══════════════════════════════ */
 /* ═══ MOBILE DRAWER ══════════════════════════════ */
-function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings, onProfile, onShowEm, onDocs, onRoadmap, onSignOut }) {
+function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings, onProfile, onShowEm, onDocs, onRoadmap, onYourUI, onSignOut }) {
   const T = useT()
   const items = [
     { label: 'Roadmaps',     icon: <span style={{ fontSize: 17 }}>🗺️</span>,   color: '#A78BFA', bg: 'rgba(124,58,237,0.10)', border: 'rgba(124,58,237,0.22)', action: onRoadmap },
@@ -2167,6 +2169,7 @@ function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings,
     { label: T.mirror,       icon: <span style={{ fontSize: 17 }}>🪞</span>, color: '#D8B4FE', bg: 'rgba(139,92,246,0.10)', border: 'rgba(139,92,246,0.22)', action: onMirror },
     { label: 'Parents',      icon: <Users size={17} />,                        color: '#34D399', bg: 'rgba(52,211,153,0.10)', border: 'rgba(52,211,153,0.22)', action: onShowEm },
     { label: 'Docs',         icon: <FileText size={17} />,                     color: '#60A5FA', bg: 'rgba(96,165,250,0.10)', border: 'rgba(96,165,250,0.22)', action: onDocs },
+    { label: 'YOUR UI',      icon: <span style={{ fontSize: 17 }}>🎨</span>,   color: '#A5B4FC', bg: 'rgba(129,140,248,0.10)', border: 'rgba(129,140,248,0.25)', action: onYourUI },
     { label: T.myProfile,    icon: <Star size={17} />,      color: '#E9A364', bg: 'rgba(233,163,100,0.10)', border: 'rgba(233,163,100,0.22)', action: onProfile },
     { label: T.appearance,   icon: <Settings size={17} />,  color: 'rgba(255,255,255,0.55)', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.10)', action: onSettings },
   ]
@@ -2314,8 +2317,9 @@ function DashboardView({ onChatOpen, onSignOut }) {
   const [mirrorOpen, setMirrorOpen] = useState(false)
   const [orbSelectorOpen, setOrbSelectorOpen] = useState(false)
   const [showEmOpen, setShowEmOpen] = useState(false)
-  const [docOpen, setDocOpen]       = useState(false)
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [docOpen, setDocOpen]         = useState(false)
+  const [yourUIOpen, setYourUIOpen]   = useState(false)
+  const [drawerOpen, setDrawerOpen]   = useState(false)
   const [dashLayout, setDashLayout] = useState(() => {
     try { return localStorage.getItem('aeva_dash_layout') || 'classic' } catch { return 'classic' }
   })
@@ -2455,6 +2459,11 @@ function DashboardView({ onChatOpen, onSignOut }) {
                       <Settings size={14} />
                     </motion.button>
 
+                    <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={() => setYourUIOpen(true)}
+                      style={{ ...nb, background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.28)', color: '#A5B4FC', fontWeight: 700 }}>
+                      🎨 YOUR UI
+                    </motion.button>
+
                     {/* ── Layout toggle ── */}
                     <WidgetToggle active={dashLayout === 'widget'} onToggle={toggleDashLayout} />
 
@@ -2549,6 +2558,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
           onBrain={() => setBrainOpen(true)}
           onMirror={() => setMirrorOpen(true)}
           onSettings={() => setAppSettingsOpen(true)}
+          onYourUI={() => { setDrawerOpen(false); setYourUIOpen(true) }}
           onProfile={() => setProfileOpen(true)}
           onRoadmap={() => { setDrawerOpen(false); openRoadmapHub() }}
           onShowEm={() => { setDrawerOpen(false); setShowEmOpen(true) }}
@@ -2634,6 +2644,10 @@ function DashboardView({ onChatOpen, onSignOut }) {
 
       <AnimatePresence>
         {appSettingsOpen && <AppSettingsPanel onClose={() => setAppSettingsOpen(false)} />}
+
+      <AnimatePresence>
+        {yourUIOpen && <YourUI onClose={() => setYourUIOpen(false)} />}
+      </AnimatePresence>
       </AnimatePresence>
 
       <AnimatePresence>
@@ -4988,6 +5002,9 @@ If no clear changes: {"changes":[]}`
   const isEmpty = messages.length === 0
   const isLight = !isMission && (chatSettings.chatBg || 'default') === 'white'
   const isMobile = useIsMobile()
+  const xpHiddenChat     = useIsHidden('xp')
+  const streakHiddenChat = useIsHidden('streak')
+  const statsHiddenChat  = useIsHidden('stats')
 
   /* ── Widget layout toggle (Ai OS style) ── */
   const { xp: chatXP, streak: chatStreak } = useXPStore()
@@ -5367,7 +5384,7 @@ If no clear changes: {"changes":[]}`
         {!isMission && <StreakMoment streak={chatStreak} />}
 
         {/* Widget mode — "Today's Metrix" stats strip */}
-        {isWidget && (
+        {isWidget && !statsHiddenChat && (
           isMobile ? (
             /* ── Mobile: collapsed tap-to-expand pill ── */
             <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 24px 10px', flexShrink: 0 }}>
@@ -5386,14 +5403,16 @@ If no clear changes: {"changes":[]}`
                       <div style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.10)' }} />
                       <span style={{ fontSize: 10, color: `${activeTheme.accent}99`, fontWeight: 600, letterSpacing: '0.06em' }}>exchanges</span>
                     </div>
-                    {chatStreak > 0 && (
+                    {!streakHiddenChat && chatStreak > 0 && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 99, background: 'rgba(180,50,15,0.22)', border: '1px solid rgba(200,80,30,0.32)', fontSize: 11, fontWeight: 700, color: '#FDBA74', fontFamily:"'Inter',system-ui,sans-serif" }}>
                         🔥 {chatStreak}
                       </div>
                     )}
+                    {!xpHiddenChat && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 99, background: activeTheme.accentBg, border: `1px solid ${activeTheme.accentBorder}`, fontSize: 11, fontWeight: 700, color: activeTheme.accent, fontFamily:"'Inter',system-ui,sans-serif" }}>
                       <Zap size={10} fill={activeTheme.accent} color={activeTheme.accent} /> Lv {chatLevel}
                     </div>
+                    )}
                     <motion.button
                       whileTap={{ scale: 0.90 }}
                       onClick={() => setStatsExpanded(false)}
@@ -6569,6 +6588,8 @@ function LoginScreen({ onBack }) {
 /* ═══ APP ROOT ════════════════════════════════════ */
 /* ── Streak Moment banner ────────────────────────────────────────────────── */
 function StreakMoment({ streak }) {
+  const streakHidden = useIsHidden('streak')
+  if (streakHidden) return null
   const todayKey = `aeva_streak_shown_${new Date().toDateString()}`
   const [visible, setVisible] = useState(() => {
     if (streak < 2) return false
@@ -6626,6 +6647,7 @@ function StreakMoment({ streak }) {
 
 /* ── XP Toast ─────────────────────────────────────── */
 function XPToast() {
+  const xpHidden = useIsHidden('xp')
   const { pendingToast, clearToast } = useXPStore()
   useEffect(() => {
     if (!pendingToast) return
@@ -6635,6 +6657,8 @@ function XPToast() {
   }, [pendingToast]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const isBig = pendingToast?.size === 'big'
+
+  if (xpHidden) return null
 
   return (
     <AnimatePresence>
@@ -6823,6 +6847,9 @@ function AppLoader() {
 }
 
 export default function App() {
+  // ── Apply YOUR UI theme on first render ─────────────────────────────────────
+  useEffect(() => { applyCSS(useUITheme.getState()) }, [])
+
   // ── Shared roadmap route: /r/:code ──────────────────────────────────────────
   const _pathMatch = window.location.pathname.match(/^\/r\/([a-z0-9]+)$/i)
   if (_pathMatch) return (

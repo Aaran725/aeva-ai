@@ -11,8 +11,11 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, HelpCircle } from 'lucide-react'
+import { useIsHidden } from './uiThemeStore'
 
 export default function FeatureSpotlight({ id, icon, title, body, accentColor = '#818CF8' }) {
+  const tipsHidden = useIsHidden('tips')
+  if (tipsHidden) return null
   const storageKey = `aeva_seen_tip_${id}`
 
   const [dismissed, setDismissed] = useState(() => {
