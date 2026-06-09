@@ -36,8 +36,13 @@ Questions must be answerable in under 15 seconds. Crisp, unambiguous.`,
 Difficulty: ${diffInstr}
 Focus: ${focusInstr}
 Return ONLY valid JSON with this exact structure:
-{"questions":[{"q":"question text","options":["option text A","option text B","option text C","option text D"],"correct":0,"explanation":"why correct in 1 sentence"}]}
-CRITICAL: "correct" MUST be an integer 0, 1, 2, or 3 — the index of the correct option in the "options" array. 0 = first option, 1 = second option, 2 = third option, 3 = fourth option. Never use letters A/B/C/D for "correct". Make distractors plausibly wrong.`,
+{"questions":[{"q":"question text","options":["option A text","option B text","option C text","option D text"],"correctAnswer":"the exact text of the correct option, copied verbatim from the options array","explanation":"why correct in 1 sentence"}]}
+CRITICAL RULES:
+- "correctAnswer" must be the EXACT TEXT of the correct option, copied character-for-character from the "options" array.
+- Do NOT use an index number. Do NOT use A/B/C/D. Copy the answer text exactly.
+- Example: if options are ["Paris","London","Berlin","Madrid"] and Paris is correct, write "correctAnswer":"Paris"
+- Every question must have exactly 4 options. The correct answer must appear in the options array.
+- Make distractors plausibly wrong but clearly incorrect on reflection.`,
 
     feynman: `Generate a Feynman challenge for "${topic}".
 Difficulty: ${diffInstr}
@@ -936,11 +941,22 @@ function SpeedRoundDrill({ data, topic, onExit, onGoHarder, widgetMode = false }
 /* ═══ MOCK TEST ══════════════════════════════════════ */
 function MockTestDrill({ data, topic, onExit, widgetMode = false }) {
   const { setDrillScore, recordDrillResult, currentTopic } = useLabStore()
-  // Normalise q.correct to always be a JS number (AI sometimes returns "0" as a string)
-  const rawQuestions = (data.questions || []).map(q => ({ ...q, correct: parseInt(q.correct, 10) || 0 }))
-  // Detect if AI slipped into 1-based indexing: if every question's correct is ≥ 1, shift all down by 1
-  const allOneBased = rawQuestions.length > 0 && rawQuestions.every(q => q.correct >= 1 && q.correct <= 4)
-  const questions = allOneBased ? rawQuestions.map(q => ({ ...q, correct: q.correct - 1 })) : rawQuestions
+  // Resolve each question's correct index robustly.
+  // New API: AI returns "correctAnswer" as exact option text → find its index.
+  // Legacy fallback: numeric "correct" field, with 1-based shift when needed.
+  const _raw = (data.questions || []).map(q => {
+    if (q.correctAnswer !== undefined) {
+      const txt = String(q.correctAnswer).trim()
+      let idx = q.options.findIndex(o => String(o).trim() === txt)
+      if (idx === -1) idx = q.options.findIndex(o => String(o).trim().toLowerCase() === txt.toLowerCase())
+      return { ...q, correct: idx !== -1 ? idx : 0 }
+    }
+    const n = parseInt(q.correct, 10)
+    return { ...q, correct: isNaN(n) ? 0 : n }
+  })
+  const _allLegacy1Based = _raw.every(q => q.correctAnswer === undefined) &&
+    _raw.length > 0 && _raw.every(q => q.correct >= 1 && q.correct <= 4)
+  const questions = _allLegacy1Based ? _raw.map(q => ({ ...q, correct: q.correct - 1 })) : _raw
 
   // answers[i] = chosen option index or null
   const [answers, setAnswers]     = useState(() => Array(questions.length).fill(null))
