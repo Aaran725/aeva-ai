@@ -3937,6 +3937,7 @@ function ChatView({ onBack }) {
   const countdownRef = useRef(null)
   const abortRef = useRef(null)
   const bottomRef = useRef(null)
+  const messagesScrollRef = useRef(null)
   const inputRef = useRef(null)
   const exchangeCountRef = useRef(0)
   const recentCriticRef = useRef([])       // last 3 critic results for trend detection
@@ -4003,7 +4004,16 @@ function ChatView({ onBack }) {
   }, [isMission])
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const el = messagesScrollRef.current
+    if (!el) { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); return }
+    // Only auto-scroll if the user is already near the bottom — lets them scroll
+    // up to re-read history mid-stream without the view yanking back down.
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    if (distanceFromBottom < 120) {
+      // Instant during streaming (last msg streaming) to avoid janky queued smooth-scrolls
+      const streaming = messages[messages.length - 1]?.streaming
+      bottomRef.current?.scrollIntoView({ behavior: streaming ? 'auto' : 'smooth' })
+    }
   }, [messages])
 
   // 30-second countdown timer for mission mode
@@ -4070,17 +4080,21 @@ function ChatView({ onBack }) {
     }
     if (challengeTimerRef.current) clearInterval(challengeTimerRef.current)
     challengeTimerRef.current = setInterval(() => {
+      let expired = false
       setChallengeTimer(prev => {
         if (!prev) return null
         if (prev.remaining <= 1) {
           clearInterval(challengeTimerRef.current)
           challengeTimerRef.current = null
-          // Timer ran out — inject a message
-          setMessages(m => [...m, { role: 'model', text: `⏱ Time's up. Let's see where you got to.`, streaming: false }])
+          expired = true
           return null
         }
         return { ...prev, remaining: prev.remaining - 1 }
       })
+      // Inject the timeout message OUTSIDE the updater (avoids nested setState warning)
+      if (expired) {
+        setMessages(m => [...m, { role: 'model', text: `⏱ Time's up. Let's see where you got to.`, streaming: false }])
+      }
     }, 1000)
     return () => { if (challengeTimerRef.current) clearInterval(challengeTimerRef.current) }
   }, [challengeTimer?.label]) // re-run only when a new timer is set, not on every tick
@@ -5303,6 +5317,10 @@ If no clear changes: {"changes":[]}`
                   <div style={{ width: 10, height: 10, borderRadius: '50%', background: activeTheme.swatch, boxShadow: `0 0 6px ${activeTheme.swatch}` }} />
                 </motion.button>
                 {showThemePicker && (
+                  <div onClick={() => setShowThemePicker(false)}
+                    style={{ position: 'fixed', inset: 0, zIndex: 150 }} />
+                )}
+                {showThemePicker && (
                   <motion.div
                     initial={{ opacity: 0, y: -6, scale: 0.92 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -5627,6 +5645,7 @@ If no clear changes: {"changes":[]}`
 
             {/* Messages */}
             <div
+              ref={messagesScrollRef}
               className="chat-messages"
               style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', justifyContent: isEmpty ? 'flex-end' : 'flex-start' }}
             >

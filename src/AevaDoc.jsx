@@ -915,6 +915,9 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
               <Palette size={13} />
               <span style={{ width: 10, height: 10, borderRadius: '50%', background: activeTheme ? activeTheme.swatch : 'rgba(255,255,255,0.25)', boxShadow: activeTheme ? `0 0 8px ${activeTheme.swatch}` : 'none' }} />
             </motion.button>
+            {showThemePicker && (
+              <div onClick={() => setShowThemePicker(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+            )}
             <AnimatePresence>
               {showThemePicker && (
                 <motion.div
