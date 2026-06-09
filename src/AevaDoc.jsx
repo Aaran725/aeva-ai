@@ -652,8 +652,9 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
   const [dragOver, setDragOver]   = useState(false)
   const [mobileTab, setMobileTab] = useState('doc')
   const [docCollapsed, setDocCollapsed] = useState(false)
-  const [docTheme, setDocTheme] = useState(() => localStorage.getItem('aeva_doc_theme') || null) // null = default dark
+  const [docTheme, setDocTheme] = useState(() => localStorage.getItem('aeva_doc_theme') || null)
   const [showThemePicker, setShowThemePicker] = useState(false)
+  const themePickerRef = useRef(null)
   const activeTheme = docTheme ? CHAT_THEMES[docTheme] : null
   const applyDocTheme = (id) => {
     setDocTheme(id)
@@ -661,6 +662,17 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
     else localStorage.removeItem('aeva_doc_theme')
     setShowThemePicker(false)
   }
+  // Close picker on outside click — avoids backdrop z-index stacking context issues
+  useEffect(() => {
+    if (!showThemePicker) return
+    const handler = (e) => {
+      if (themePickerRef.current && !themePickerRef.current.contains(e.target)) {
+        setShowThemePicker(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showThemePicker])
 
   const fileInputRef = useRef(null)
   const inputRef     = useRef(null)
@@ -906,7 +918,7 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', position: 'relative' }}>
           {/* Ai OS theme picker */}
-          <div style={{ position: 'relative' }}>
+          <div ref={themePickerRef} style={{ position: 'relative' }}>
             <motion.button
               whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
               onClick={() => setShowThemePicker(s => !s)}
@@ -916,14 +928,11 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
               <Palette size={13} />
               <span style={{ width: 10, height: 10, borderRadius: '50%', background: activeTheme ? activeTheme.swatch : 'rgba(255,255,255,0.25)', boxShadow: activeTheme ? `0 0 8px ${activeTheme.swatch}` : 'none' }} />
             </motion.button>
-            {showThemePicker && (
-              <div onClick={() => setShowThemePicker(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
-            )}
             <AnimatePresence>
               {showThemePicker && (
                 <motion.div
                   initial={{ opacity: 0, y: -6, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.96 }}
-                  style={{ position: 'absolute', top: 42, right: 0, zIndex: 50, padding: 12, borderRadius: 16, background: 'rgba(14,15,30,0.97)', border: '1px solid rgba(255,255,255,0.12)', backdropFilter: 'blur(20px)', boxShadow: '0 12px 40px rgba(0,0,0,0.55)', width: 200 }}>
+                  style={{ position: 'fixed', top: 64, right: 20, zIndex: 9999, padding: 12, borderRadius: 16, background: 'rgba(14,15,30,0.97)', border: '1px solid rgba(255,255,255,0.12)', backdropFilter: 'blur(20px)', boxShadow: '0 12px 40px rgba(0,0,0,0.55)', width: 200 }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.40)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 10 }}>Background</div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
                     {/* Default (dark) */}
