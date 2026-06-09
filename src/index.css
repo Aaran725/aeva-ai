@@ -176,6 +176,16 @@ body {
   box-shadow: 0 8px 48px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.12), inset 0 1px 0 rgba(255,255,255,0.12) !important;
 }
 
+/* ── Aeva OS card hover lift ── */
+.aeva-card-hover {
+  transition: box-shadow 0.22s ease, border-color 0.22s ease, transform 0.18s ease;
+}
+.aeva-card-hover:hover {
+  box-shadow: var(--aeva-shadow-raised);
+  border-color: var(--aeva-border-strong);
+  transform: translateY(-1px);
+}
+
 /* ════════════════════════════════════════════════
    MOBILE — everything below 768px
 ════════════════════════════════════════════════ */
