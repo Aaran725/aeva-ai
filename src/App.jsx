@@ -2359,119 +2359,124 @@ function DashboardView({ onChatOpen, onSignOut }) {
         {!isMobile && (
           <header className="dash-header" style={{
             position: 'sticky', top: 0, zIndex: 50,
-            padding: '18px 28px 16px',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            maxWidth: 1280, margin: '0 auto',
-            overflow: 'hidden',
+            width: '100%',
+            borderBottom: '1px solid rgba(255,255,255,0.07)',
             backdropFilter: 'blur(32px)',
             WebkitBackdropFilter: 'blur(32px)',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-              <div style={{ width: 30, height: 30, borderRadius: 10, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 14px rgba(45,48,142,0.50)' }}>
-                <Star size={13} color="white" fill="white" />
-              </div>
-              <span style={{ fontSize: 17, fontWeight: 900, letterSpacing: '-0.04em', background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(233,163,100,0.80) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>aeva</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden', minWidth: 0, flexShrink: 1 }}>
+            {/* 3-column grid: logo | centred nav | right actions */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr auto 1fr',
+              alignItems: 'center',
+              maxWidth: 1440, margin: '0 auto',
+              padding: '0 20px',
+              height: 48,
+              overflow: 'hidden',
+            }}>
 
-              {/* ── Shared nav button style ── */}
+              {/* ── Left: logo ── */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 26, height: 26, borderRadius: 8, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(45,48,142,0.45)', flexShrink: 0 }}>
+                  <Star size={11} color="white" fill="white" />
+                </div>
+                <span style={{ fontSize: 16, fontWeight: 900, letterSpacing: '-0.04em', background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(233,163,100,0.80) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>aeva</span>
+              </div>
+
+              {/* ── Centre: nav items ── */}
               {(() => {
                 const nb = {
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  height: 34, padding: '0 13px', borderRadius: 9,
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.09)',
-                  color: 'rgba(255,255,255,0.62)',
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  height: 30, padding: '0 10px', borderRadius: 8,
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: 'rgba(255,255,255,0.58)',
                   fontFamily: "'Inter', system-ui, sans-serif",
-                  fontSize: 13, fontWeight: 500, cursor: 'pointer',
-                  whiteSpace: 'nowrap', letterSpacing: '-0.01em',
+                  fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                  whiteSpace: 'nowrap', letterSpacing: '-0.01em', flexShrink: 0,
                 }
                 const badge = {
-                  padding: '1px 5px', borderRadius: 99,
-                  background: 'rgba(255,255,255,0.12)',
-                  fontSize: 9.5, fontWeight: 800,
+                  padding: '1px 4px', borderRadius: 99,
+                  background: 'rgba(255,255,255,0.13)',
+                  fontSize: 9, fontWeight: 800,
                   color: 'rgba(255,255,255,0.55)',
                 }
+                const div = <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.10)' }} />
                 return (
-                  <>
-                    <motion.button whileHover={{ scale: 1.03, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.97 }} onClick={() => setLibraryOpen(true)} style={nb}>
-                      <BookOpen size={13} />Library
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <motion.button whileHover={{ scale: 1.04, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.96 }} onClick={() => setLibraryOpen(true)} style={nb}>
+                      <BookOpen size={12} />Library
                       {sessions.length > 0 && <span style={badge}>{sessions.length}</span>}
                     </motion.button>
 
-                    <motion.button whileHover={{ scale: 1.03, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.97 }} onClick={() => setBrainOpen(true)} style={nb}>
-                      <Brain size={13} />Brain
+                    <motion.button whileHover={{ scale: 1.04, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.96 }} onClick={() => setBrainOpen(true)} style={nb}>
+                      <Brain size={12} />Brain
                       {brainStats.total > 0 && <span style={badge}>{brainStats.total}</span>}
                     </motion.button>
 
-                    <motion.button whileHover={{ scale: 1.03, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.97 }} onClick={() => setMirrorOpen(true)} style={nb}>
-                      <span style={{ fontSize: 12 }}>🪞</span>Mirror
+                    <motion.button whileHover={{ scale: 1.04, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.96 }} onClick={() => setMirrorOpen(true)} style={nb}>
+                      <span style={{ fontSize: 11 }}>🪞</span>Mirror
                     </motion.button>
 
-                    {/* Divider */}
-                    <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.10)', margin: '0 2px' }} />
+                    {div}
 
-                    <motion.button whileHover={{ scale: 1.03, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.97 }} onClick={openLab} style={{ ...nb, position: 'relative' }}>
-                      <FlaskConical size={13} />Lab
+                    <motion.button whileHover={{ scale: 1.04, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.96 }} onClick={openLab} style={{ ...nb, position: 'relative' }}>
+                      <FlaskConical size={12} />Lab
                       {labBadgeCount > 0 && (
                         <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400 }}
-                          style={{ position: 'absolute', top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 99, background: pendingOrderCount > 0 ? '#60A5FA' : '#4ADE80', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: '#050a1a', padding: '0 3px', boxShadow: pendingOrderCount > 0 ? '0 0 8px rgba(96,165,250,0.60)' : '0 0 8px rgba(74,222,128,0.60)' }}>
+                          style={{ position: 'absolute', top: -4, right: -4, minWidth: 14, height: 14, borderRadius: 99, background: pendingOrderCount > 0 ? '#60A5FA' : '#4ADE80', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 800, color: '#050a1a', padding: '0 3px', boxShadow: pendingOrderCount > 0 ? '0 0 6px rgba(96,165,250,0.60)' : '0 0 6px rgba(74,222,128,0.60)' }}>
                           {labBadgeCount}
                         </motion.div>
                       )}
                     </motion.button>
 
-                    {/* Roadmaps */}
-                    <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={openRoadmapHub}
-                      style={{ ...nb, background: 'rgba(124,58,237,0.18)', border: '1px solid rgba(124,58,237,0.35)', color: 'rgba(255,255,255,0.88)', fontWeight: 600 }}>
-                      <span style={{ fontSize: 12 }}>🗺️</span>Roadmaps
+                    <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={openRoadmapHub}
+                      style={{ ...nb, background: 'rgba(124,58,237,0.16)', border: '1px solid rgba(124,58,237,0.32)', color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>
+                      <span style={{ fontSize: 11 }}>🗺️</span>Maps
                     </motion.button>
 
-                    {/* Arcade — only one that stands out */}
-                    <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={openArcade}
-                      style={{ ...nb, background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.35)', color: 'rgba(255,255,255,0.88)', fontWeight: 600 }}>
-                      <Gamepad2 size={13} />Arcade
+                    <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={openArcade}
+                      style={{ ...nb, background: 'rgba(99,102,241,0.16)', border: '1px solid rgba(99,102,241,0.32)', color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>
+                      <Gamepad2 size={12} />Arcade
                     </motion.button>
 
-                    {/* Divider */}
-                    <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.10)', margin: '0 2px' }} />
+                    {div}
 
-                    <motion.button whileHover={{ scale: 1.03, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.97 }} onClick={onChatOpen} style={nb}>
-                      <MessageCircle size={13} />Chat
+                    <motion.button whileHover={{ scale: 1.04, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.96 }} onClick={onChatOpen} style={nb}>
+                      <MessageCircle size={12} />Chat
                     </motion.button>
 
-                    <motion.button whileHover={{ scale: 1.03, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.97 }} onClick={() => setDocOpen(true)} style={nb}>
-                      <FileText size={13} />Docs
+                    <motion.button whileHover={{ scale: 1.04, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.96 }} onClick={() => setDocOpen(true)} style={nb}>
+                      <FileText size={12} />Docs
                     </motion.button>
 
-                    <motion.button whileHover={{ scale: 1.03, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.97 }} onClick={() => setShowEmOpen(true)} style={nb}>
-                      <Users size={13} />Parents
+                    <motion.button whileHover={{ scale: 1.04, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.96 }} onClick={() => setShowEmOpen(true)} style={nb}>
+                      <Users size={12} />Parents
                     </motion.button>
 
-                    {/* Divider */}
-                    <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.10)', margin: '0 2px' }} />
-
-                    <motion.button whileHover={{ scale: 1.03, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.97 }} onClick={() => setProfileOpen(true)} style={nb}>
-                      <Star size={13} />Profile
+                    <motion.button whileHover={{ scale: 1.04, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.96 }} onClick={() => setProfileOpen(true)} style={nb}>
+                      <Star size={12} />Profile
                     </motion.button>
-
-                    <motion.button whileHover={{ scale: 1.05, rotate: 45 }} whileTap={{ scale: 0.94 }} onClick={() => setAppSettingsOpen(true)}
-                      style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.45)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Settings size={14} />
-                    </motion.button>
-
-                    <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={() => setYourUIOpen(true)}
-                      style={{ ...nb, background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.28)', color: '#A5B4FC', fontWeight: 700 }}>
-                      🎨 YOUR UI
-                    </motion.button>
-
-                    {/* ── Layout toggle ── */}
-                    <WidgetToggle active={dashLayout === 'widget'} onToggle={toggleDashLayout} />
-
-                    <UserAvatar onSignOut={onSignOut} />
-                  </>
+                  </div>
                 )
               })()}
+
+              {/* ── Right: actions ── */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'flex-end' }}>
+                <motion.button whileHover={{ scale: 1.06, rotate: 45 }} whileTap={{ scale: 0.94 }} onClick={() => setAppSettingsOpen(true)}
+                  style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.40)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Settings size={13} />
+                </motion.button>
+
+                <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={() => setYourUIOpen(true)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 30, padding: '0 10px', borderRadius: 8, background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.28)', color: '#A5B4FC', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  🎨 YOUR UI
+                </motion.button>
+
+                <WidgetToggle active={dashLayout === 'widget'} onToggle={toggleDashLayout} style={{ height: 30, fontSize: 11, padding: '0 9px' }} />
+
+                <UserAvatar onSignOut={onSignOut} />
+              </div>
             </div>
           </header>
         )}
