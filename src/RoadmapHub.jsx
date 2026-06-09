@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText, BookOpen, Zap, Target, ClipboardList, Check, Lock, Clock, Trophy, Trash2, Brain, Dumbbell, GraduationCap, FlaskConical, Share2, Copy, AlertTriangle, RotateCcw } from 'lucide-react'
+import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText, BookOpen, Zap, Target, ClipboardList, Check, Lock, Clock, Trophy, Trash2, Brain, Dumbbell, GraduationCap, FlaskConical, Share2, Copy, AlertTriangle, RotateCcw, LayoutGrid, Rows3 } from 'lucide-react'
 import { useRoadmapStore, calcGrade, gradeGapMessage, GRADE_THRESHOLDS } from './roadmapStore'
+import { DotMatrix } from './WidgetDashboard'
 import { useLabStore } from './labStore'
 import { useSRStore } from './srStore'
 import { supabase } from './supabase'
@@ -196,6 +197,8 @@ export default function RoadmapHub() {
   })
   const [pendingForm, setPending] = useState(null)  // holds form data during generation
   const [showShare, setShowShare] = useState(false)
+  const [widgetMode, setWidgetMode] = useState(() => localStorage.getItem('aeva_roadmap_widget') === '1')
+  const toggleWidget = () => setWidgetMode(m => { const n = !m; localStorage.setItem('aeva_roadmap_widget', n ? '1' : '0'); return n })
 
   const active = getActive()
 
@@ -241,11 +244,18 @@ export default function RoadmapHub() {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {view === 'home' && (
-            <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-              onClick={() => setView('create')}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 99, background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.40)', color: '#A5B4FC', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-              <Plus size={13} /> New
-            </motion.button>
+            <>
+              <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                onClick={toggleWidget} title={widgetMode ? 'Classic list' : 'Ai OS widgets'}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 99, background: widgetMode ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.06)', border: `1px solid ${widgetMode ? 'rgba(129,140,248,0.40)' : 'rgba(255,255,255,0.12)'}`, color: widgetMode ? '#A5B4FC' : 'rgba(255,255,255,0.50)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                {widgetMode ? <Rows3 size={13} /> : <LayoutGrid size={13} />}
+              </motion.button>
+              <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                onClick={() => setView('create')}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 99, background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.40)', color: '#A5B4FC', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                <Plus size={13} /> New
+              </motion.button>
+            </>
           )}
           {view === 'path' && active && (
             <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
@@ -269,7 +279,7 @@ export default function RoadmapHub() {
       {/* Body */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         <AnimatePresence mode="wait">
-          {view === 'home'       && <HomeView       key="home"       onCreate={() => setView('create')} onOpen={() => setView('path')} />}
+          {view === 'home'       && <HomeView       key="home"       onCreate={() => setView('create')} onOpen={() => setView('path')} widgetMode={widgetMode} />}
           {view === 'create'     && <CreateView     key="create"     onGenerate={(fd) => { setPending(fd); setView('generating') }} />}
           {view === 'generating' && <GeneratingView key="generating" formData={pendingForm} onDone={() => { setPending(null); setView('path') }} />}
           {view === 'path'       && <PathView       key="path" />}
@@ -279,7 +289,94 @@ export default function RoadmapHub() {
   )
 }
 
-function HomeView({ onCreate, onOpen }) {
+/* ═══ Ai OS LED gradient themes (by readiness band) ═══ */
+const ROADMAP_WIDGET_THEMES = {
+  high: {   // 80+ / complete → Sleep card (teal)
+    bg: 'radial-gradient(circle at 50% 44%, #3DE8D0 0%, #1FC8B2 30%, #14A092 52%, rgba(20,160,146,0) 72%), linear-gradient(165deg, #18B0A0 0%, #0E8A80 38%, #0A6A66 68%, #084E50 100%)',
+    dot: 'rgba(190,255,244,0.97)', accent: '#5EEAD4', sub: '#BFF5EC', chipBg: 'rgba(94,234,212,0.16)', chipBorder: 'rgba(94,234,212,0.34)',
+  },
+  mid: {    // 60-79 → Skin Damage card (navy)
+    bg: 'radial-gradient(circle at 52% 56%, #2E64E0 0%, #1E48C4 30%, #122E96 54%, rgba(18,46,150,0) 76%), linear-gradient(200deg, #0C1A78 0%, #0A1466 38%, #080F50 70%, #060A3C 100%)',
+    dot: 'rgba(205,225,255,0.97)', accent: '#93C5FD', sub: '#BFD4FF', chipBg: 'rgba(147,197,253,0.16)', chipBorder: 'rgba(147,197,253,0.34)',
+  },
+  low: {    // 40-59 → Balance card (lavender)
+    bg: 'radial-gradient(ellipse 110% 85% at 42% 28%, #C9ABDC 0%, #B492CE 42%, rgba(180,146,206,0) 78%), linear-gradient(160deg, #B69ECC 0%, #A082BE 38%, #8A6CA8 68%, #6E5290 100%)',
+    dot: 'rgba(255,255,255,0.97)', accent: '#F0E0FF', sub: '#EADBFF', chipBg: 'rgba(255,255,255,0.18)', chipBorder: 'rgba(255,255,255,0.32)',
+  },
+  start: {  // <40 → Enhance card (cerise)
+    bg: 'radial-gradient(circle at 46% 42%, #FF3A8E 0%, #E81E72 26%, #B01055 48%, rgba(176,16,85,0) 72%), linear-gradient(155deg, #800840 0%, #5A0230 40%, #3C0120 70%, #260114 100%)',
+    dot: 'rgba(255,205,228,0.97)', accent: '#F9A8D4', sub: '#FBC8E0', chipBg: 'rgba(249,168,212,0.16)', chipBorder: 'rgba(249,168,212,0.34)',
+  },
+}
+function readinessBand(pct, isAllDone) {
+  if (isAllDone || pct >= 80) return 'high'
+  if (pct >= 60) return 'mid'
+  if (pct >= 40) return 'low'
+  return 'start'
+}
+
+/* Ai OS gradient widget version of a roadmap card */
+function WidgetRoadmapCard({ r, onOpen, onDelete, confirmDelete, setConfirmDelete }) {
+  const daysLeft = Math.max(0, Math.ceil((new Date(r.examDate) - Date.now()) / 86400000))
+  const completed = r.nodes?.filter(n => n.status === 'complete').length || 0
+  const total = r.nodes?.length || 0
+  const isAllDone = total > 0 && completed === total
+  const availNode = r.nodes?.find(n => n.status === 'available')
+  const currentPhase = isAllDone ? 'Complete' : (availNode?.phase || null)
+  const t = ROADMAP_WIDGET_THEMES[readinessBand(r.readiness, isAllDone)]
+
+  return (
+    <div style={{ width: '100%', maxWidth: 480 }}>
+      <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
+        whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.995 }}
+        onClick={() => onOpen(r.id)}
+        style={{ position: 'relative', borderRadius: 24, background: t.bg, padding: '18px 20px 20px', overflow: 'hidden', minHeight: 200, cursor: 'pointer', boxShadow: '0 14px 44px rgba(0,0,0,0.40)' }}>
+        {/* Header row */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{r.title}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.62)', marginTop: 2 }}>{isAllDone ? '🎉 Complete' : (currentPhase || 'In progress')}</div>
+          </div>
+          <motion.button whileTap={{ scale: 0.90 }}
+            onClick={(e) => { e.stopPropagation(); setConfirmDelete(confirmDelete === r.id ? null : r.id) }}
+            style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0, background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(255,255,255,0.18)', color: 'rgba(255,255,255,0.70)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Trash2 size={13} />
+          </motion.button>
+        </div>
+        {/* LED readiness */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 5, padding: '20px 0 18px' }}>
+          <DotMatrix value={String(r.readiness)} color={t.dot} dimColor="rgba(255,255,255,0.06)" dotSize={8} gap={2} />
+          <span style={{ fontSize: 18, fontWeight: 700, color: t.dot, marginTop: 3 }}>%</span>
+        </div>
+        {/* Footer stats */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 12.5, fontWeight: 600, color: t.sub }}>{completed}/{total} steps · {daysLeft}d left</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Ready</span>
+        </div>
+      </motion.div>
+
+      {/* Confirm delete */}
+      <AnimatePresence>
+        {confirmDelete === r.id && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
+            <div style={{ display: 'flex', gap: 8, padding: '8px 0 0' }}>
+              <motion.button whileTap={{ scale: 0.96 }} onClick={() => { onDelete(r.id); setConfirmDelete(null) }}
+                style={{ flex: 1, padding: '10px 0', borderRadius: 12, background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.38)', color: '#F87171', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <Trash2 size={13} /> Delete roadmap
+              </motion.button>
+              <motion.button whileTap={{ scale: 0.96 }} onClick={() => setConfirmDelete(null)}
+                style={{ padding: '10px 18px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.50)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Cancel
+              </motion.button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function HomeView({ onCreate, onOpen, widgetMode }) {
   const { roadmaps, setActive, deleteRoadmap } = useRoadmapStore()
   const [confirmDelete, setConfirmDelete] = useState(null)
 
@@ -301,7 +398,13 @@ function HomeView({ onCreate, onOpen }) {
       ) : (
         <>
           <div style={{ width: '100%', maxWidth: 480, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.30)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 4 }}>Your Roadmaps</div>
-          {roadmaps.map(r => {
+          {widgetMode && roadmaps.map(r => (
+            <WidgetRoadmapCard key={r.id} r={r}
+              onOpen={(id) => { setActive(id); onOpen() }}
+              onDelete={deleteRoadmap}
+              confirmDelete={confirmDelete} setConfirmDelete={setConfirmDelete} />
+          ))}
+          {!widgetMode && roadmaps.map(r => {
             const daysLeft = Math.max(0, Math.ceil((new Date(r.examDate) - Date.now()) / 86400000))
             const completed = r.nodes?.filter(n => n.status === 'complete').length || 0
             const total = r.nodes?.length || 0
