@@ -102,7 +102,7 @@ function MiniPreview({ theme }) {
       boxShadow: '0 24px 80px rgba(0,0,0,0.70)',
       background: bg,
       fontFamily: fam,
-      minWidth: 260, maxWidth: 320,
+      width: '100%', maxWidth: 480,
       userSelect: 'none',
     }}>
       {/* Header */}
@@ -230,7 +230,7 @@ export default function YourUI({ onClose }) {
       <div style={{ flex: 1, display: 'flex', gap: 0, overflow: 'hidden', minHeight: 0 }}>
 
         {/* ── Left: Controls ───────────────────────────────────────────────── */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px', minWidth: 0, maxWidth: 560 }}>
+        <div style={{ width: 420, flexShrink: 0, overflowY: 'auto', padding: '28px 32px' }}>
 
           {/* BACKGROUND */}
           <Section title="Background">
@@ -419,7 +419,7 @@ export default function YourUI({ onClose }) {
 
         {/* ── Right: Live preview ───────────────────────────────────────────── */}
         <div style={{
-          width: 340, flexShrink: 0, padding: '28px 24px',
+          flex: 1, minWidth: 0, padding: '28px 40px',
           borderLeft: '1px solid rgba(255,255,255,0.07)',
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           position: 'sticky', top: 0, height: '100%',
