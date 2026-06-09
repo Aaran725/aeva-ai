@@ -125,8 +125,8 @@ function MiniPreview({ theme }) {
         </div>
       </div>
 
-      {/* Chat area */}
-      <div style={{ padding: '14px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* Chat area — dark overlay like the real chat, gradient shows in the shell around it */}
+      <div style={{ padding: '14px 14px', display: 'flex', flexDirection: 'column', gap: 8, background: 'rgba(4,5,18,0.72)', backdropFilter: 'blur(12px)' }}>
         {/* Aeva bubble */}
         <div style={{ display: 'flex', gap: 7, alignItems: 'flex-start' }}>
           <div style={{ width: 22, height: 22, borderRadius: Math.min(r, 8), background: accentDim, border: `1px solid ${accentBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -156,7 +156,7 @@ function MiniPreview({ theme }) {
       </div>
 
       {/* Input bar */}
-      <div style={{ padding: '10px 12px 12px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ padding: '10px 12px 12px', borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(4,5,18,0.72)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: `${Math.min(r, 16)}px`, background: 'rgba(255,255,255,0.05)', border: `1px solid ${accentBorder}` }}>
           <div style={{ flex: 1, fontSize: 10.5, color: 'rgba(255,255,255,0.28)' }}>Ask a follow-up…</div>
           <div style={{ width: 22, height: 22, borderRadius: `${Math.min(r, 12)}px`, background: accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
