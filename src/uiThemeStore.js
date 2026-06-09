@@ -147,13 +147,17 @@ export function applyCSS(theme) {
        linear-gradient since position doesn't change its visual.)
     ── */
     body::before {
+      /* background-size 100%/100% pins blobs to exact viewport coords so they're
+         visible. The meshDrift animation still runs but position changes have no
+         effect when tile = element size — static visible > invisible animated. */
+      background-size: 100% 100% !important;
       background-image:
-        radial-gradient(ellipse 72% 58% at 12% 22%, ${accent}66 0%, transparent 62%),
-        radial-gradient(ellipse 58% 48% at 88% 12%, ${accent}44 0%, transparent 58%),
-        radial-gradient(ellipse 55% 45% at 68% 88%, ${accent}33 0%, transparent 58%),
-        radial-gradient(ellipse 42% 38% at 42% 52%, ${accent}22 0%, transparent 55%),
-        radial-gradient(ellipse 48% 36% at 85% 10%, ${bgTo}99 0%, transparent 55%),
-        radial-gradient(ellipse 48% 36% at 15% 90%, ${bgFrom}88 0%, transparent 55%),
+        radial-gradient(ellipse 58% 44% at 18% 22%, ${accent}cc 0%, transparent 55%),
+        radial-gradient(ellipse 52% 40% at 80% 16%, ${accent}88 0%, transparent 50%),
+        radial-gradient(ellipse 48% 38% at 62% 82%, ${accent}66 0%, transparent 50%),
+        radial-gradient(ellipse 36% 30% at 42% 50%, ${accent}44 0%, transparent 52%),
+        radial-gradient(ellipse 42% 34% at 88% 8%,  ${bgTo}cc   0%, transparent 52%),
+        radial-gradient(ellipse 44% 36% at 12% 90%, ${bgFrom}bb 0%, transparent 52%),
         linear-gradient(${bgAngle}deg, ${bgFrom} 0%, ${bgTo} 100%) !important;
       background-color: transparent !important;
     }
