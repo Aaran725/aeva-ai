@@ -3659,9 +3659,9 @@ ${guide.examTip ? `<div class="section"><div class="section-label">Exam Tip</div
 // NOT a single wide radial that fades to black.
 const CHAT_THEMES = {
   purple: {
-    // Balance card — soft uniform lavender, gentle glow top-left over purple base
+    // Balance card — soft PASTEL lavender, gentle diffuse glow upper area, stays light/muted (never dark)
     swatch: '#9B72BC', label: 'Lavender',
-    bg: 'radial-gradient(ellipse 85% 60% at 18% 12%, #C8A0E0 0%, rgba(200,155,224,0) 62%), linear-gradient(145deg, #7848B0 0%, #5830A0 40%, #401878 70%, #2C1068 100%)',
+    bg: 'radial-gradient(ellipse 110% 85% at 42% 28%, #C9ABDC 0%, #B492CE 42%, rgba(180,146,206,0) 78%), linear-gradient(160deg, #B69ECC 0%, #A082BE 38%, #8A6CA8 68%, #6E5290 100%)',
     inputBg: 'radial-gradient(ellipse at 50% 0%, #6840A8 0%, #321470 70%, #1E0850 100%)',
     inputBorder: 'rgba(200,168,216,0.45)',
     inputGlow: '0 0 0 1px rgba(155,114,188,0.20), 0 8px 40px rgba(0,0,0,0.35), 0 0 32px rgba(155,114,188,0.30)',
@@ -3683,9 +3683,9 @@ const CHAT_THEMES = {
     aiBorder: '1px solid rgba(200,100,50,0.25)', userBorder: '1px solid rgba(220,130,60,0.25)',
   },
   teal: {
-    // Sleep card — bright cyan glow top-right over dark teal base (stays teal throughout)
+    // Sleep card — bright cyan CIRCLE glow in the centre, deepening to teal-green at edges
     swatch: '#1EC4AA', label: 'Teal',
-    bg: 'radial-gradient(ellipse 85% 62% at 82% 8%, #20D8C0 0%, rgba(28,210,190,0) 60%), linear-gradient(220deg, #10A890 0%, #0A7870 40%, #085860 70%, #054848 100%)',
+    bg: 'radial-gradient(circle at 50% 44%, #3DE8D0 0%, #1FC8B2 30%, #14A092 52%, rgba(20,160,146,0) 72%), linear-gradient(165deg, #18B0A0 0%, #0E8A80 38%, #0A6A66 68%, #084E50 100%)',
     inputBg: 'radial-gradient(ellipse at 50% 0%, #0E9880 0%, #065858 70%, #044848 100%)',
     inputBorder: 'rgba(30,196,170,0.50)',
     inputGlow: '0 0 0 1px rgba(30,196,170,0.20), 0 8px 40px rgba(0,0,0,0.35), 0 0 32px rgba(30,196,170,0.30)',
@@ -3697,7 +3697,7 @@ const CHAT_THEMES = {
   cerise: {
     // Enhance/Mood card — hot pink glows FROM THE CENTRE outward, dark magenta base
     swatch: '#E01E6A', label: 'Cerise',
-    bg: 'radial-gradient(ellipse 80% 68% at 44% 38%, #F02880 0%, rgba(240,40,128,0) 62%), linear-gradient(150deg, #880840 0%, #600230 40%, #420120 70%, #2C0118 100%)',
+    bg: 'radial-gradient(circle at 46% 42%, #FF3A8E 0%, #E81E72 26%, #B01055 48%, rgba(176,16,85,0) 72%), linear-gradient(155deg, #800840 0%, #5A0230 40%, #3C0120 70%, #260114 100%)',
     inputBg: 'radial-gradient(ellipse at 50% 50%, #A80850 0%, rgba(168,8,80,0) 65%), linear-gradient(150deg, #600230 0%, #2C0118 100%)',
     inputBorder: 'rgba(224,30,106,0.50)',
     inputGlow: '0 0 0 1px rgba(224,30,106,0.20), 0 8px 40px rgba(0,0,0,0.35), 0 0 32px rgba(224,30,106,0.35)',
@@ -3707,9 +3707,9 @@ const CHAT_THEMES = {
     aiBorder: '1px solid rgba(224,30,106,0.25)', userBorder: '1px solid rgba(240,60,120,0.25)',
   },
   navy: {
-    // Skin Damage card — subtle blue glow top-right, deep dark navy throughout
+    // Skin Damage card — blue glow centre/lower over rich navy base (deepens toward top edge)
     swatch: '#1E3A9A', label: 'Navy',
-    bg: 'radial-gradient(ellipse 80% 58% at 78% 8%, #2040C0 0%, rgba(32,64,192,0) 58%), linear-gradient(215deg, #0E1878 0%, #080E58 40%, #060A48 70%, #040838 100%)',
+    bg: 'radial-gradient(circle at 52% 56%, #2E64E0 0%, #1E48C4 30%, #122E96 54%, rgba(18,46,150,0) 76%), linear-gradient(200deg, #0C1A78 0%, #0A1466 38%, #080F50 70%, #060A3C 100%)',
     inputBg: 'radial-gradient(ellipse at 50% 0%, #0E1878 0%, #060A48 70%, #040838 100%)',
     inputBorder: 'rgba(60,100,240,0.50)',
     inputGlow: '0 0 0 1px rgba(30,58,154,0.22), 0 8px 40px rgba(0,0,0,0.35), 0 0 32px rgba(30,58,154,0.38)',
