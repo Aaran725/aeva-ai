@@ -2347,12 +2347,10 @@ function DashboardView({ onChatOpen, onSignOut }) {
       style={{
         position: 'relative', minHeight: '100vh', width: '100%',
         overflowX: 'hidden', overflowY: 'auto',
-        background: dashBgPreset.gradient,
+        background: 'var(--ui-bg)',
         fontFamily,
       }}
     >
-      <div aria-hidden style={{ position: 'absolute', top: '-5%', left: '15%', width: 700, height: 700, borderRadius: '50%', background: 'radial-gradient(circle, rgba(45,48,142,0.22) 0%, transparent 70%)', filter: 'blur(60px)', pointerEvents: 'none' }} />
-      <div aria-hidden style={{ position: 'absolute', bottom: '5%', right: '5%', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle, rgba(233,163,100,0.13) 0%, transparent 70%)', filter: 'blur(55px)', pointerEvents: 'none' }} />
 
       <div style={{ position: 'relative' }}>
         {/* ── Desktop header (hidden on mobile) ── */}
@@ -5100,7 +5098,7 @@ If no clear changes: {"changes":[]}`
         width: '100%', height: '100vh', overflow: 'hidden',
         background: isWidget
           ? activeTheme.bg
-          : missionBg,
+          : isMission ? missionBg : 'var(--ui-bg)',
         fontFamily: "'Inter', system-ui, sans-serif",
       }}
     >
