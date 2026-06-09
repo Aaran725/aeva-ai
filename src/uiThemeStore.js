@@ -126,9 +126,11 @@ export function applyCSS(theme) {
   r.style.setProperty('--aeva-space-lg', `${Math.round(24 * density)}px`)
   r.style.setProperty('--aeva-space-xl', `${Math.round(40 * density)}px`)
 
-  // Apply background to body (the mesh overlay sits on top via body::before z-index:0,
-  // so this tints the whole app shell without leaking — nav overflow is now fixed)
-  document.body.style.background = bg
+  // Set gradient on <html> (not body) — html is clipped to viewport by overflow-x:hidden
+  // in index.css so it can never bleed past the right edge. body stays transparent so
+  // the body::before mesh overlay and app content layer cleanly on top.
+  document.documentElement.style.background = bg
+  document.body.style.background = 'transparent'
 
   // Dynamic stylesheet: accent + component targets that can't read vars from inline JS.
   // Extend this list as more components adopt Aeva OS tokens.
