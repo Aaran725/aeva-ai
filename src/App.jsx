@@ -46,6 +46,7 @@ import Parents from './ShowEm'
 import AevaDoc from './AevaDoc'
 import WidgetDashboard from './WidgetDashboard'
 import WidgetToggle from './WidgetToggle'
+import FeatureSpotlight from './FeatureSpotlight'
 import { CHAT_THEMES } from './chatThemes'
 import { parseVizTag, VizComponent } from './ChatVisuals'
 import WorksheetModal from './WorksheetModal'
@@ -2489,6 +2490,14 @@ function DashboardView({ onChatOpen, onSignOut }) {
             </div>
           </header>
         )}
+
+        <FeatureSpotlight
+          id="home"
+          icon="⚡"
+          title="Ai OS widget mode"
+          body="Tap the Widget button in the header to flip your stats into interactive Ai OS gradient cards — your streak, level, readiness and more as LED dot-matrix displays."
+          accentColor="#A5B4FC"
+        />
 
         <AnimatePresence mode="wait">
           {dashLayout === 'widget' ? (
@@ -5338,6 +5347,17 @@ If no clear changes: {"changes":[]}`
             <span style={{ fontSize: 14.5, fontWeight: 800, color: logoColor, letterSpacing: '-0.03em' }}>aeva</span>
           </div>
         </div>
+
+        {/* Feature spotlight — one-time tip */}
+        {!isMission && (
+          <FeatureSpotlight
+            id="chat"
+            icon="🧠"
+            title="Aeva learns how you think"
+            body="The longer you chat, the smarter she gets — she tracks your mastery, adapts difficulty, and remembers your weak spots across sessions. Try Socratic mode to be questioned instead of told."
+            accentColor="#C4B5FD"
+          />
+        )}
 
         {/* Widget mode — "Today's Metrix" stats strip */}
         {isWidget && (

@@ -4,6 +4,7 @@ import { X, FlaskConical, ChevronRight, RotateCcw, CheckCircle2, XCircle, ArrowR
 import { DRILLS, DIFFICULTIES, useLabStore } from './labStore'
 import { DotMatrix } from './WidgetDashboard'
 import WidgetToggle from './WidgetToggle'
+import FeatureSpotlight from './FeatureSpotlight'
 import { useNeuralStore } from './neuralStore'
 import { useSRStore } from './srStore'
 import { useRoadmapStore } from './roadmapStore'
@@ -2832,6 +2833,17 @@ export default function LabHub() {
                   })}
                 </div>
               </div>
+            )}
+
+            {/* Feature spotlight */}
+            {!activeDrill && (
+              <FeatureSpotlight
+                id="lab"
+                icon="🧪"
+                title="8 drill types, any topic"
+                body="Type any subject above — Aeva generates flashcards, speed rounds, mock tests, Feynman challenges, cloze tests and more on the fly. Widget mode shows your score as Ai OS gradient cards."
+                accentColor="#60A5FA"
+              />
             )}
 
             {/* Body */}

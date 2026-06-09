@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText, BookOpen, Zap, Target, ClipboardList, Check, Lock, Clock, Trophy, Trash2, Brain, Dumbbell, GraduationCap, FlaskConical, Share2, Copy, AlertTriangle, RotateCcw } from 'lucide-react'
 import WidgetToggle from './WidgetToggle'
+import FeatureSpotlight from './FeatureSpotlight'
 import { useRoadmapStore, calcGrade, gradeGapMessage, GRADE_THRESHOLDS } from './roadmapStore'
 import { DotMatrix } from './WidgetDashboard'
 import { useLabStore } from './labStore'
@@ -272,6 +273,17 @@ export default function RoadmapHub() {
       <AnimatePresence>
         {showShare && active && <ShareModal roadmap={active} onClose={() => setShowShare(false)} />}
       </AnimatePresence>
+
+      {/* Feature spotlight */}
+      {view === 'path' && (
+        <FeatureSpotlight
+          id="roadmap"
+          icon="🗺️"
+          title="Aeva edits your roadmap live"
+          body={"Chat with Aeva about your roadmap — she can flag urgent topics, remove nodes you don't need, and inject new ones mid-conversation. Tap \"Ask Aeva to review\" on the path view to start."}
+          accentColor="#818CF8"
+        />
+      )}
 
       {/* Body */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
