@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, createContext, useContext } from 'react'
+import { useState, useRef, useEffect, createContext, useContext, lazy, Suspense } from 'react'
 import { GROQ_KEYS, GROQ_URL, nextGroqKey } from './groqClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import katex from 'katex'
@@ -18,39 +18,41 @@ import AevaViz from './AevaViz'
 import AevaCanvas from './AevaCanvas'
 import { useCanvasStore } from './canvasStore'
 import { useNeuralStore } from './neuralStore'
-import ArcadeHub from './ArcadeHub'
-import LabHub from './LabHub'
-import RoadmapHub from './RoadmapHub'
 import { ChaosEventBanner, MissionVitalsBar, DebateLogicFeed, ThemedChatBubble, MissionBadge, ProTipBanner } from './SimCockpit'
-import LearningFingerprint from './LearningFingerprint'
-import MemoryPalace from './MemoryPalace'
-import PersonalProgress from './PersonalProgress'
 import { useSRStore } from './srStore'
-import AevaLens from './AevaLens'
-import DebateArena from './DebateArena'
-import AevaLibrary from './AevaLibrary'
-import CustomDrill from './CustomDrill'
-import FeynmanMode from './FeynmanMode'
-import UserProfile from './UserProfile'
 import { useLibraryStore } from './libraryStore'
-import LandingPage from './LandingPage'
-import Onboarding from './Onboarding'
 import AevaOrbComponent from './AevaOrb'
-import AdminLogin from './AdminLogin'
-import AdminPanel from './AdminPanel'
-import SecondBrain from './SecondBrain'
 import { useBrainStore } from './brainStore'
-import Mirror from './Mirror'
-import OrbSelector from './OrbSelector'
-import Parents from './ShowEm'
-import AevaDoc from './AevaDoc'
-import WidgetDashboard from './WidgetDashboard'
 import WidgetToggle from './WidgetToggle'
 import FeatureSpotlight from './FeatureSpotlight'
 import { CHAT_THEMES } from './chatThemes'
 import { parseVizTag, VizComponent } from './ChatVisuals'
-import WorksheetModal from './WorksheetModal'
-import SharedRoadmapView from './SharedRoadmapView'
+
+// ── Lazy-loaded chunks (split by route / feature) ─────────────────────────────
+const ArcadeHub          = lazy(() => import('./ArcadeHub'))
+const LabHub             = lazy(() => import('./LabHub'))
+const RoadmapHub         = lazy(() => import('./RoadmapHub'))
+const LearningFingerprint = lazy(() => import('./LearningFingerprint'))
+const MemoryPalace       = lazy(() => import('./MemoryPalace'))
+const PersonalProgress   = lazy(() => import('./PersonalProgress'))
+const AevaLens           = lazy(() => import('./AevaLens'))
+const DebateArena        = lazy(() => import('./DebateArena'))
+const AevaLibrary        = lazy(() => import('./AevaLibrary'))
+const CustomDrill        = lazy(() => import('./CustomDrill'))
+const FeynmanMode        = lazy(() => import('./FeynmanMode'))
+const UserProfile        = lazy(() => import('./UserProfile'))
+const LandingPage        = lazy(() => import('./LandingPage'))
+const Onboarding         = lazy(() => import('./Onboarding'))
+const AdminLogin         = lazy(() => import('./AdminLogin'))
+const AdminPanel         = lazy(() => import('./AdminPanel'))
+const SecondBrain        = lazy(() => import('./SecondBrain'))
+const Mirror             = lazy(() => import('./Mirror'))
+const OrbSelector        = lazy(() => import('./OrbSelector'))
+const Parents            = lazy(() => import('./ShowEm'))
+const AevaDoc            = lazy(() => import('./AevaDoc'))
+const WidgetDashboard    = lazy(() => import('./WidgetDashboard'))
+const WorksheetModal     = lazy(() => import('./WorksheetModal'))
+const SharedRoadmapView  = lazy(() => import('./SharedRoadmapView'))
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
 import { useMemoryStore } from './memoryStore'
 import './index.css'
@@ -6809,10 +6811,25 @@ function useInactivityIntervention() {
   }, [])
 }
 
+/* ── Lazy-load fallback ───────────────────────────────────────────────────── */
+function AppLoader() {
+  return (
+    <div style={{ width: '100%', height: '100vh', background: '#08091a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.6, repeat: Infinity }}>
+        <AevaOrb size={80} />
+      </motion.div>
+    </div>
+  )
+}
+
 export default function App() {
   // ── Shared roadmap route: /r/:code ──────────────────────────────────────────
   const _pathMatch = window.location.pathname.match(/^\/r\/([a-z0-9]+)$/i)
-  if (_pathMatch) return <SharedRoadmapView shareCode={_pathMatch[1]} />
+  if (_pathMatch) return (
+    <Suspense fallback={<AppLoader />}>
+      <SharedRoadmapView shareCode={_pathMatch[1]} />
+    </Suspense>
+  )
 
   useInactivityIntervention()
   const [view, setView] = useState('dashboard')
@@ -6878,19 +6895,23 @@ export default function App() {
   // Admin panel — completely separate from user auth
   if (adminMode) {
     return (
-      <AdminPanel onLogout={() => {
-        sessionStorage.removeItem('aeva_admin_session')
-        setAdminMode(false)
-      }} />
+      <Suspense fallback={<AppLoader />}>
+        <AdminPanel onLogout={() => {
+          sessionStorage.removeItem('aeva_admin_session')
+          setAdminMode(false)
+        }} />
+      </Suspense>
     )
   }
 
   if (showAdminLogin) {
     return (
-      <AdminLogin
-        onSuccess={() => { setAdminMode(true); setShowAdminLogin(false) }}
-        onCancel={() => setShowAdminLogin(false)}
-      />
+      <Suspense fallback={<AppLoader />}>
+        <AdminLogin
+          onSuccess={() => { setAdminMode(true); setShowAdminLogin(false) }}
+          onCancel={() => setShowAdminLogin(false)}
+        />
+      </Suspense>
     )
   }
 
@@ -6907,9 +6928,14 @@ export default function App() {
 
   // Not logged in — landing page or login screen
   if (!authUser) {
-    return showLogin
-      ? <LoginScreen onBack={() => setShowLogin(false)} />
-      : <LandingPage onGetStarted={() => setShowLogin(true)} />
+    return (
+      <Suspense fallback={<AppLoader />}>
+        {showLogin
+          ? <LoginScreen onBack={() => setShowLogin(false)} />
+          : <LandingPage onGetStarted={() => setShowLogin(true)} />
+        }
+      </Suspense>
+    )
   }
 
   const firstName = (authUser.user_metadata?.full_name || authUser.email)?.split(' ')[0] || 'there'
@@ -6917,13 +6943,15 @@ export default function App() {
   // First-time onboarding
   if (!onboarded) {
     return (
-      <Onboarding
-        name={authUser.user_metadata?.full_name || firstName}
-        onComplete={() => {
-          localStorage.setItem('aeva_onboarded', '1')
-          setOnboarded(true)
-        }}
-      />
+      <Suspense fallback={<AppLoader />}>
+        <Onboarding
+          name={authUser.user_metadata?.full_name || firstName}
+          onComplete={() => {
+            localStorage.setItem('aeva_onboarded', '1')
+            setOnboarded(true)
+          }}
+        />
+      </Suspense>
     )
   }
 
@@ -6941,6 +6969,7 @@ export default function App() {
 
   return (
     <UserContext.Provider value={userValue}>
+      <Suspense fallback={null}>
       <XPToast />
       {/* Aeva Command Toast — slides from top when Aeva fires a command */}
       <AevaCommandToast />
@@ -6963,6 +6992,7 @@ export default function App() {
             : <ChatView key="chat" onBack={handleBack} />
         }
       </AnimatePresence>
+      </Suspense>
     </UserContext.Provider>
   )
 }
