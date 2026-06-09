@@ -127,41 +127,32 @@ export function applyCSS(theme) {
   r.style.setProperty('--aeva-space-lg', `${Math.round(24 * density)}px`)
   r.style.setProperty('--aeva-space-xl', `${Math.round(40 * density)}px`)
 
-  // Set html background to a SOLID color (bgFrom), never a gradient.
-  // A gradient on <html> always bleeds its end-color into the scrollbar gutter at the
-  // right edge — even with overflow-x:hidden the browser paints that 15px strip.
-  // The visible atmosphere gradient comes exclusively from body::before (see _ui_theme below).
+  // html gets bgFrom as solid fallback (prevents gradient bleed in scrollbar gutter).
+  // The actual visible atmosphere comes from body::before via --atm-* CSS variables.
   document.documentElement.style.background = bgFrom
   document.body.style.background = 'transparent'
 
+  /* ── Atmosphere CSS variables → body::before reads these in index.css ──────
+     The blob colours use the accent colour so the atmosphere shifts when the
+     user changes accent or picks a theme. bgFrom/bgTo tint corners so the
+     gradient direction/base colour also affect what you see.
+  ── */
+  const hexToRgb = h => [1,3,5].map(i => parseInt(h.slice(i,i+2),16))
+  const [ar,ag,ab] = hexToRgb(accent)
+  const [fr,fg,fb] = hexToRgb(bgFrom)
+  const [tr,tg,tb] = hexToRgb(bgTo)
+  r.style.setProperty('--atm-1', `rgba(${ar},${ag},${ab},0.52)`)
+  r.style.setProperty('--atm-2', `rgba(${ar},${ag},${ab},0.40)`)
+  r.style.setProperty('--atm-3', `rgba(${ar},${ag},${ab},0.30)`)
+  r.style.setProperty('--atm-4', `rgba(${ar},${ag},${ab},0.18)`)
+  r.style.setProperty('--atm-5', `rgba(${tr},${tg},${tb},0.82)`)
+  r.style.setProperty('--atm-6', `rgba(${fr},${fg},${fb},0.72)`)
+  r.style.setProperty('--atm-base', bgFrom)
+
   // Dynamic stylesheet: accent + component targets that can't read vars from inline JS.
-  // Extend this list as more components adopt Aeva OS tokens.
   let s = document.getElementById('_ui_theme')
   if (!s) { s = document.createElement('style'); s.id = '_ui_theme'; document.head.appendChild(s) }
   s.textContent = `
-    /* ── Background atmosphere ──────────────────────────────────────────────────
-       body::before is position:fixed inset:0 — it physically covers the viewport.
-       We override background-image to show the user's gradient + accent atmosphere.
-       7 layers: 4 accent blobs + 2 bg-tint blobs + 1 base gradient.
-       (meshDrift animates 6 positions; layer 7 cycles to position 1 — fine for a
-       linear-gradient since position doesn't change its visual.)
-    ── */
-    body::before {
-      /* background-size 100%/100% pins blobs to exact viewport coords so they're
-         visible. The meshDrift animation still runs but position changes have no
-         effect when tile = element size — static visible > invisible animated. */
-      background-size: 100% 100% !important;
-      background-image:
-        radial-gradient(ellipse 58% 44% at 18% 22%, ${accent}cc 0%, transparent 55%),
-        radial-gradient(ellipse 52% 40% at 80% 16%, ${accent}88 0%, transparent 50%),
-        radial-gradient(ellipse 48% 38% at 62% 82%, ${accent}66 0%, transparent 50%),
-        radial-gradient(ellipse 36% 30% at 42% 50%, ${accent}44 0%, transparent 52%),
-        radial-gradient(ellipse 42% 34% at 88% 8%,  ${bgTo}cc   0%, transparent 52%),
-        radial-gradient(ellipse 44% 36% at 12% 90%, ${bgFrom}bb 0%, transparent 52%),
-        linear-gradient(${bgAngle}deg, ${bgFrom} 0%, ${bgTo} 100%) !important;
-      background-color: transparent !important;
-    }
-
     /* ── Scrollbar ── */
     ::-webkit-scrollbar-thumb          { background: ${accent}35 !important; }
     ::-webkit-scrollbar-thumb:hover    { background: ${accent}60 !important; }

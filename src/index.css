@@ -69,7 +69,11 @@ html, body {
   color: rgba(255,255,255,0.95);
 }
 
-/* ── Animated mesh gradient ── */
+/* ── Animated mesh gradient ──
+   Blob colours are CSS variables set by applyCSS() in uiThemeStore.js
+   so they respond to the user's accent + background colour choices.
+   Defaults here match the Midnight preset so there's no flash on load.
+── */
 body::before {
   content: '';
   position: fixed;
@@ -77,12 +81,13 @@ body::before {
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 72% 58% at 12% 22%, rgba(88,28,135,0.48) 0%, transparent 62%),
-    radial-gradient(ellipse 58% 48% at 88% 12%, rgba(49,46,129,0.40) 0%, transparent 58%),
-    radial-gradient(ellipse 55% 45% at 68% 88%, rgba(30,27,75,0.44) 0%, transparent 58%),
-    radial-gradient(ellipse 42% 38% at 42% 52%, rgba(109,40,217,0.16) 0%, transparent 55%),
-    radial-gradient(ellipse 32% 28% at 80% 58%, rgba(180,83,9,0.11) 0%, transparent 52%),
-    radial-gradient(ellipse 26% 20% at 20% 78%, rgba(99,102,241,0.13) 0%, transparent 50%);
+    radial-gradient(ellipse 72% 58% at 12% 22%, var(--atm-1, rgba(129,140,248,0.48)) 0%, transparent 62%),
+    radial-gradient(ellipse 58% 48% at 88% 12%, var(--atm-2, rgba(129,140,248,0.36)) 0%, transparent 58%),
+    radial-gradient(ellipse 55% 45% at 68% 88%, var(--atm-3, rgba(129,140,248,0.28)) 0%, transparent 58%),
+    radial-gradient(ellipse 42% 38% at 42% 52%, var(--atm-4, rgba(129,140,248,0.16)) 0%, transparent 55%),
+    radial-gradient(ellipse 32% 28% at 80% 58%, var(--atm-5, rgba(13,15,53,0.80))   0%, transparent 52%),
+    radial-gradient(ellipse 26% 20% at 20% 78%, var(--atm-6, rgba(5,6,26,0.70))     0%, transparent 50%);
+  background-color: var(--atm-base, #05061a);
   background-size: 200% 200%;
   animation: meshDrift 28s ease-in-out infinite alternate;
 }
