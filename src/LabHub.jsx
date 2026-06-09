@@ -2252,8 +2252,32 @@ function DrillTab() {
         )}
 
         {!recentTopics.length && chips.length === 0 && (
-          <div style={{ marginTop: 10, padding: '10px 13px', borderRadius: 11, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', fontSize: 12, color: 'rgba(255,255,255,0.35)', lineHeight: 1.6 }}>
-            💬 Chat with Aeva about a topic first — she'll suggest drills and assign Orders. Or type any topic above.
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 8 }}>
+              Try a topic
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              {[
+                { icon: '🧬', label: 'Photosynthesis', sub: 'Biology · Light & dark reactions' },
+                { icon: '📐', label: 'Quadratic Equations', sub: 'Maths · Factorising & quadratic formula' },
+                { icon: '⚔️', label: 'World War 2', sub: 'History · Causes, key events & outcomes' },
+              ].map((t) => (
+                <motion.button key={t.label}
+                  whileHover={{ scale: 1.02, x: 3 }} whileTap={{ scale: 0.98 }}
+                  onClick={() => handleStart('flashcard', t.label)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 14px', borderRadius: 13, background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.18)', cursor: 'pointer', fontFamily: "'Inter', system-ui, sans-serif", textAlign: 'left' }}>
+                  <span style={{ fontSize: 20, flexShrink: 0 }}>{t.icon}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.88)' }}>{t.label}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{t.sub}</div>
+                  </div>
+                  <ChevronRight size={14} color="rgba(59,130,246,0.55)" style={{ flexShrink: 0 }} />
+                </motion.button>
+              ))}
+            </div>
+            <div style={{ marginTop: 10, fontSize: 11.5, color: 'rgba(255,255,255,0.28)', lineHeight: 1.5, textAlign: 'center' }}>
+              or type any topic above ↑
+            </div>
           </div>
         )}
       </div>

@@ -381,17 +381,41 @@ function HomeView({ onCreate, onOpen, widgetMode }) {
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
       style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: roadmaps.length ? 'flex-start' : 'center', padding: 24, gap: 12, overflowY: 'auto' }}>
       {roadmaps.length === 0 ? (
-        <div style={{ textAlign: 'center', maxWidth: 320 }}>
-          <div style={{ width: 64, height: 64, borderRadius: 20, background: 'linear-gradient(135deg,rgba(79,70,229,0.18),rgba(124,58,237,0.18))', border: '1px solid rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-            <Map size={28} color="#818CF8" />
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} style={{ width: '100%', maxWidth: 420, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Hero */}
+          <div style={{ textAlign: 'center', padding: '4px 0 8px' }}>
+            <div style={{ width: 60, height: 60, borderRadius: 18, background: 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 8px 28px rgba(99,102,241,0.35)' }}>
+              <Map size={26} color="white" />
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.03em', marginBottom: 6 }}>Build your exam path</div>
+            <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.50)', lineHeight: 1.6 }}>
+              Tell Aeva your subject and exam date — she builds a complete node-by-node study plan, then adapts it live as you learn.
+            </div>
           </div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', letterSpacing: '-0.03em', marginBottom: 8 }}>No roadmaps yet</div>
-          <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.45)', lineHeight: 1.6, marginBottom: 28 }}>Create a roadmap and Aeva builds your entire exam prep path — designed to get you 90%+ on the day.</div>
-          <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} onClick={onCreate}
-            style={{ padding: '13px 28px', borderRadius: 14, background: 'linear-gradient(135deg, #4F46E5, #7C3AED)', border: 'none', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-            Create first roadmap
+
+          {/* Feature strip */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[
+              { icon: '🗺️', title: 'Full path generated in seconds', sub: 'Learn → Drill → Check nodes, phased to your exam date' },
+              { icon: '🧠', title: 'Adapts as you go', sub: 'Aeva flags weak spots, skips what you know, adds what you need' },
+              { icon: '⚡', title: 'Drills built in', sub: 'Every node links straight to flashcards, mock tests & more' },
+            ].map((f) => (
+              <div key={f.title} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '11px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <span style={{ fontSize: 20, flexShrink: 0, marginTop: 1 }}>{f.icon}</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.88)', marginBottom: 2 }}>{f.title}</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)', lineHeight: 1.5 }}>{f.sub}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* CTA */}
+          <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={onCreate}
+            style={{ width: '100%', padding: '15px 28px', borderRadius: 16, background: 'linear-gradient(135deg, #4F46E5, #7C3AED)', border: 'none', color: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 8px 28px rgba(99,102,241,0.40)', letterSpacing: '-0.01em' }}>
+            Build my first roadmap →
           </motion.button>
-        </div>
+        </motion.div>
       ) : (
         <>
           <div style={{ width: '100%', maxWidth: 480, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.30)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 4 }}>Your Roadmaps</div>
