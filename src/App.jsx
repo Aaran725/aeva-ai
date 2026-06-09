@@ -4985,6 +4985,7 @@ If no clear changes: {"changes":[]}`
 
   const isEmpty = messages.length === 0
   const isLight = !isMission && (chatSettings.chatBg || 'default') === 'white'
+  const isMobile = useIsMobile()
 
   /* ── Widget layout toggle (Ai OS style) ── */
   const { xp: chatXP, streak: chatStreak } = useXPStore()
@@ -4997,6 +4998,7 @@ If no clear changes: {"changes":[]}`
     try { localStorage.setItem('aeva_chat_layout', next) } catch {}
     return next
   })
+  const [statsExpanded, setStatsExpanded] = useState(false)
   const isWidget = chatLayout === 'widget' && !isMission
 
   /* ── Chat colour theme (Ai OS palette) ── */
@@ -5364,28 +5366,80 @@ If no clear changes: {"changes":[]}`
 
         {/* Widget mode — "Today's Metrix" stats strip */}
         {isWidget && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, ease: [0.22,1,0.36,1] }}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '4px 24px 12px', flexShrink: 0 }}
-          >
-            {/* Session counter pill — "Today's Metrix" style */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderRadius: 99, background: activeTheme.inputBg, border: `1px solid ${activeTheme.accentBorder}`, boxShadow: '0 4px 20px rgba(0,0,0,0.40)', fontFamily:"'Inter',system-ui,sans-serif" }}>
-              <span style={{ fontSize: 10, color: `${activeTheme.accent}99`, fontWeight: 600, letterSpacing: '0.06em' }}>+{Object.keys(masteryMap).length}</span>
-              <div style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.10)' }} />
-              <span style={{ fontSize: 13, fontWeight: 900, color: activeTheme.accent, letterSpacing: '-0.02em' }}>{exchangeCountRef.current || 0}</span>
-              <div style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.10)' }} />
-              <span style={{ fontSize: 10, color: `${activeTheme.accent}99`, fontWeight: 600, letterSpacing: '0.06em' }}>exchanges</span>
+          isMobile ? (
+            /* ── Mobile: collapsed tap-to-expand pill ── */
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 24px 10px', flexShrink: 0 }}>
+              <AnimatePresence mode="wait">
+                {statsExpanded ? (
+                  <motion.div
+                    key="expanded"
+                    initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.92 }}
+                    transition={{ duration: 0.20 }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderRadius: 99, background: activeTheme.inputBg, border: `1px solid ${activeTheme.accentBorder}`, fontFamily:"'Inter',system-ui,sans-serif" }}>
+                      <span style={{ fontSize: 10, color: `${activeTheme.accent}99`, fontWeight: 600, letterSpacing: '0.06em' }}>+{Object.keys(masteryMap).length}</span>
+                      <div style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.10)' }} />
+                      <span style={{ fontSize: 13, fontWeight: 900, color: activeTheme.accent, letterSpacing: '-0.02em' }}>{exchangeCountRef.current || 0}</span>
+                      <div style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.10)' }} />
+                      <span style={{ fontSize: 10, color: `${activeTheme.accent}99`, fontWeight: 600, letterSpacing: '0.06em' }}>exchanges</span>
+                    </div>
+                    {chatStreak > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 99, background: 'rgba(180,50,15,0.22)', border: '1px solid rgba(200,80,30,0.32)', fontSize: 11, fontWeight: 700, color: '#FDBA74', fontFamily:"'Inter',system-ui,sans-serif" }}>
+                        🔥 {chatStreak}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 99, background: activeTheme.accentBg, border: `1px solid ${activeTheme.accentBorder}`, fontSize: 11, fontWeight: 700, color: activeTheme.accent, fontFamily:"'Inter',system-ui,sans-serif" }}>
+                      <Zap size={10} fill={activeTheme.accent} color={activeTheme.accent} /> Lv {chatLevel}
+                    </div>
+                    <motion.button
+                      whileTap={{ scale: 0.90 }}
+                      onClick={() => setStatsExpanded(false)}
+                      style={{ padding: '5px 10px', borderRadius: 99, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily:"'Inter',system-ui,sans-serif" }}
+                    >✕</motion.button>
+                  </motion.div>
+                ) : (
+                  <motion.button
+                    key="collapsed"
+                    initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.92 }}
+                    transition={{ duration: 0.20 }}
+                    whileTap={{ scale: 0.92 }}
+                    onClick={() => setStatsExpanded(true)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderRadius: 99, background: activeTheme.inputBg, border: `1px solid ${activeTheme.accentBorder}`, cursor: 'pointer', fontFamily:"'Inter',system-ui,sans-serif" }}
+                  >
+                    <Zap size={10} fill={activeTheme.accent} color={activeTheme.accent} />
+                    <span style={{ fontSize: 11, fontWeight: 700, color: activeTheme.accent }}>Lv {chatLevel}</span>
+                    <div style={{ width: 1, height: 10, background: 'rgba(255,255,255,0.15)' }} />
+                    <span style={{ fontSize: 11, fontWeight: 600, color: `${activeTheme.accent}99` }}>{exchangeCountRef.current || 0} exchanges</span>
+                    {chatStreak > 0 && <span style={{ fontSize: 11 }}>🔥 {chatStreak}</span>}
+                  </motion.button>
+                )}
+              </AnimatePresence>
             </div>
-            {chatStreak > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 99, background: 'rgba(180,50,15,0.22)', border: '1px solid rgba(200,80,30,0.32)', fontSize: 11, fontWeight: 700, color: '#FDBA74', fontFamily:"'Inter',system-ui,sans-serif" }}>
-                🔥 {chatStreak}
+          ) : (
+            /* ── Desktop: full strip ── */
+            <motion.div
+              initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: [0.22,1,0.36,1] }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '4px 24px 12px', flexShrink: 0 }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderRadius: 99, background: activeTheme.inputBg, border: `1px solid ${activeTheme.accentBorder}`, boxShadow: '0 4px 20px rgba(0,0,0,0.40)', fontFamily:"'Inter',system-ui,sans-serif" }}>
+                <span style={{ fontSize: 10, color: `${activeTheme.accent}99`, fontWeight: 600, letterSpacing: '0.06em' }}>+{Object.keys(masteryMap).length}</span>
+                <div style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.10)' }} />
+                <span style={{ fontSize: 13, fontWeight: 900, color: activeTheme.accent, letterSpacing: '-0.02em' }}>{exchangeCountRef.current || 0}</span>
+                <div style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.10)' }} />
+                <span style={{ fontSize: 10, color: `${activeTheme.accent}99`, fontWeight: 600, letterSpacing: '0.06em' }}>exchanges</span>
               </div>
-            )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 99, background: activeTheme.accentBg, border: `1px solid ${activeTheme.accentBorder}`, fontSize: 11, fontWeight: 700, color: activeTheme.accent, fontFamily:"'Inter',system-ui,sans-serif" }}>
-              <Zap size={10} fill={activeTheme.accent} color={activeTheme.accent} /> Lv {chatLevel}
-            </div>
-          </motion.div>
+              {chatStreak > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 99, background: 'rgba(180,50,15,0.22)', border: '1px solid rgba(200,80,30,0.32)', fontSize: 11, fontWeight: 700, color: '#FDBA74', fontFamily:"'Inter',system-ui,sans-serif" }}>
+                  🔥 {chatStreak}
+                </div>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 99, background: activeTheme.accentBg, border: `1px solid ${activeTheme.accentBorder}`, fontSize: 11, fontWeight: 700, color: activeTheme.accent, fontFamily:"'Inter',system-ui,sans-serif" }}>
+                <Zap size={10} fill={activeTheme.accent} color={activeTheme.accent} /> Lv {chatLevel}
+              </div>
+            </motion.div>
+          )
         )}
 
         {/* Mission vitals HUD (startup / space) */}

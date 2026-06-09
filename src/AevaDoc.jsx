@@ -994,27 +994,8 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
         )}
       </AnimatePresence>
 
-      {/* ── Mobile tab bar ───────────────────────────────────────────────── */}
-      {isMobile && file && (
-        <div style={{ flexShrink: 0, display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(8,9,24,0.95)' }}>
-          {[{ id: 'doc', label: '📄 Document' }, { id: 'chat', label: '💬 Chat' }].map(tab => (
-            <button key={tab.id} onClick={() => setMobileTab(tab.id)}
-              style={{
-                flex: 1, padding: '11px 0', border: 'none',
-                background: mobileTab === tab.id ? 'rgba(99,102,241,0.10)' : 'transparent',
-                borderBottom: mobileTab === tab.id ? '2px solid #6366F1' : '2px solid transparent',
-                color: mobileTab === tab.id ? '#A5B4FC' : 'rgba(255,255,255,0.35)',
-                fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-                transition: 'all 0.15s',
-              }}>
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* ── Body ────────────────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: isMobile ? 'column' : 'row', overflow: 'hidden', minHeight: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: isMobile ? 'column' : 'row', overflow: 'hidden', minHeight: 0, position: 'relative' }}>
 
         {/* ── Doc panel (left on desktop, full on mobile doc tab) ───────────── */}
         <AnimatePresence initial={false}>
@@ -1048,7 +1029,7 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
                 }}
               />
 
-              <div style={{ flex: 1, padding: 20, display: 'flex', flexDirection: 'column', overflowY: 'auto', minHeight: 0 }}>
+              <div style={{ flex: 1, padding: 20, paddingBottom: isMobile ? 72 : 20, display: 'flex', flexDirection: 'column', overflowY: 'auto', minHeight: 0 }}>
                 {!file ? (
                   /* Upload zone */
                   <UploadZone onFile={handleFile} dragOver={dragOver} setDragOver={setDragOver} fileInputRef={fileInputRef} compact={isMobile} />
@@ -1107,7 +1088,7 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
         <div style={{ flex: 1, display: isMobile && file && mobileTab === 'doc' ? 'none' : 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
 
           {/* Messages */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '22px 22px 8px', display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '22px 22px 8px', paddingBottom: isMobile ? 72 : 8, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
 
             {!file && (
               /* Empty state hint */
@@ -1246,6 +1227,49 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
             </div>
           </div>
         </div>
+
+        {/* ── Floating pill tab bar (mobile only) ─────────────────────────── */}
+        {isMobile && file && (
+          <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 20, pointerEvents: 'none' }}>
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 26 }}
+              style={{
+                display: 'flex', gap: 4,
+                background: 'rgba(8,9,24,0.88)',
+                backdropFilter: 'blur(18px)',
+                WebkitBackdropFilter: 'blur(18px)',
+                border: '1px solid rgba(255,255,255,0.11)',
+                borderRadius: 99, padding: '4px',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.55)',
+                pointerEvents: 'all',
+              }}
+            >
+              {[
+                { id: 'doc', label: '📄 Document' },
+                { id: 'chat', label: '💬 Chat' },
+              ].map(tab => (
+                <motion.button
+                  key={tab.id}
+                  whileTap={{ scale: 0.94 }}
+                  onClick={() => setMobileTab(tab.id)}
+                  style={{
+                    padding: '8px 20px', borderRadius: 99, border: 'none',
+                    background: mobileTab === tab.id
+                      ? 'linear-gradient(135deg, rgba(99,102,241,0.85), rgba(139,92,246,0.80))'
+                      : 'transparent',
+                    color: mobileTab === tab.id ? '#fff' : 'rgba(255,255,255,0.38)',
+                    fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    fontFamily: "'Inter', system-ui, sans-serif",
+                    boxShadow: mobileTab === tab.id ? '0 4px 14px rgba(99,102,241,0.38)' : 'none',
+                    transition: 'background 0.18s, color 0.18s',
+                  }}
+                >{tab.label}</motion.button>
+              ))}
+            </motion.div>
+          </div>
+        )}
       </div>
     </motion.div>
   )

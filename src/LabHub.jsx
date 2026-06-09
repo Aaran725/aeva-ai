@@ -561,8 +561,12 @@ function SwipeCard({ card, onResult, cardIndex, total, flipped, onFlip }) {
     else x.set(0)
   }, [flipped, onResult, x])
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+  const cardMinH = isMobile ? 'clamp(240px, 48vh, 380px)' : 280
+  const cardPad  = isMobile ? '32px 24px' : '40px 32px'
+
   return (
-    <div style={{ position: 'relative', width: '100%', maxWidth: 520, margin: '0 auto', minHeight: 300, userSelect: 'none' }}>
+    <div style={{ position: 'relative', width: '100%', maxWidth: 520, margin: '0 auto', minHeight: isMobile ? 'clamp(260px, 50vh, 400px)' : 300, userSelect: 'none' }}>
       {/* Swipe hint labels */}
       <motion.div style={{ position: 'absolute', top: 20, left: 16, opacity: missedOpacity, zIndex: 2 }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: '#F87171', background: 'rgba(239,68,68,0.15)', border: '2px solid rgba(239,68,68,0.50)', padding: '4px 12px', borderRadius: 99, letterSpacing: '0.06em' }}>✗ MISSED</span>
@@ -578,23 +582,23 @@ function SwipeCard({ card, onResult, cardIndex, total, flipped, onFlip }) {
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.8}
           onDragEnd={handleDragEnd}
-          style={{ x, rotate, cursor: flipped ? 'grab' : 'pointer', transformStyle: 'preserve-3d', position: 'relative', minHeight: 280 }}
+          style={{ x, rotate, cursor: flipped ? 'grab' : 'pointer', transformStyle: 'preserve-3d', position: 'relative', minHeight: cardMinH }}
           whileDrag={{ cursor: 'grabbing', scale: 1.03 }}
           onClick={() => !flipped && onFlip(true)}
           animate={{ rotateY: flipped ? 180 : 0 }}
           transition={{ duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
         >
           {/* Front face */}
-          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.28)', borderRadius: 24, padding: '40px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 14, minHeight: 280 }}>
+          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.28)', borderRadius: 24, padding: cardPad, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 14, minHeight: cardMinH }}>
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(59,130,246,0.70)', textTransform: 'uppercase' }}>Question</span>
-            <p style={{ fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.94)', lineHeight: 1.5, margin: 0 }}>{card?.front}</p>
-            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.26)' }}>tap to reveal · or press Space</span>
+            <p style={{ fontSize: isMobile ? 22 : 20, fontWeight: 600, color: 'rgba(255,255,255,0.94)', lineHeight: 1.5, margin: 0 }}>{card?.front}</p>
+            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.26)' }}>{isMobile ? '👆 tap to reveal' : 'tap to reveal · or press Space'}</span>
           </div>
           {/* Back face */}
-          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: 'rgba(6,182,212,0.10)', border: '1px solid rgba(6,182,212,0.30)', borderRadius: 24, padding: '40px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 14, minHeight: 280 }}>
+          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: 'rgba(6,182,212,0.10)', border: '1px solid rgba(6,182,212,0.30)', borderRadius: 24, padding: cardPad, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 14, minHeight: cardMinH }}>
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(6,182,212,0.70)', textTransform: 'uppercase' }}>Answer</span>
-            <p style={{ fontSize: 18, color: 'rgba(255,255,255,0.90)', lineHeight: 1.65, margin: 0, fontFamily: "'Georgia', serif" }}>{card?.back}</p>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', marginTop: 4 }}>← missed &nbsp;·&nbsp; swipe or arrow keys &nbsp;·&nbsp; got it →</span>
+            <p style={{ fontSize: isMobile ? 19 : 18, color: 'rgba(255,255,255,0.90)', lineHeight: 1.65, margin: 0, fontFamily: "'Georgia', serif" }}>{card?.back}</p>
+            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.22)', marginTop: 4 }}>{isMobile ? '← swipe left  ·  swipe right →' : '← missed · swipe or arrow keys · got it →'}</span>
           </div>
         </motion.div>
       </div>
