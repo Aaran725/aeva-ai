@@ -26,19 +26,19 @@ export const AEVA_THEMES = [
   {
     id: 'aurora',
     name: 'Aurora',
-    bgFrom: '#021a10', bgTo: '#042e1c', bgAngle: 145,
+    bgFrom: '#041a0f', bgTo: '#073322', bgAngle: 145,
     accent: '#34D399', radius: 20, font: 'inter', surfaceOpacity: 0.94,
   },
   {
     id: 'ember',
     name: 'Ember',
-    bgFrom: '#1a0800', bgTo: '#2d1200', bgAngle: 145,
+    bgFrom: '#1e0800', bgTo: '#361400', bgAngle: 145,
     accent: '#FB923C', radius: 16, font: 'inter', surfaceOpacity: 0.96,
   },
   {
     id: 'bloom',
     name: 'Bloom',
-    bgFrom: '#160520', bgTo: '#220838', bgAngle: 145,
+    bgFrom: '#1a0428', bgTo: '#2c0840', bgAngle: 145,
     accent: '#F472B6', radius: 24, font: 'rounded', surfaceOpacity: 0.90,
   },
   {
