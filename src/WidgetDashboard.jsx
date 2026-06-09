@@ -18,9 +18,11 @@ import AevaOrbComponent from './AevaOrb'
 
 /* ─────────────────────────────────────────────────────
    DotMatrix + DOT_DIGITS now live in src/aeva/DotMatrix.jsx
-   Re-exported here so existing imports keep working.
+   Imported into scope (for internal use) and re-exported
+   so existing imports from WidgetDashboard keep working.
 ───────────────────────────────────────────────────── */
-export { DotMatrix, DOT_DIGITS } from './aeva/DotMatrix'
+import { DotMatrix, DOT_DIGITS } from './aeva/DotMatrix'
+export { DotMatrix, DOT_DIGITS }
 
 /* ─────────────────────────────────────────────────────
    TWO-WAVE SPARKLINE  (matches Balance card in reference)
