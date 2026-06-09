@@ -127,9 +127,10 @@ export function applyCSS(theme) {
   r.style.setProperty('--aeva-space-lg', `${Math.round(24 * density)}px`)
   r.style.setProperty('--aeva-space-xl', `${Math.round(40 * density)}px`)
 
-  // html gets bgFrom as solid fallback (prevents gradient bleed in scrollbar gutter).
-  // The actual visible atmosphere comes from body::before via --atm-* CSS variables.
-  document.documentElement.style.background = bgFrom
+  // html background-color is driven by var(--atm-base) in index.css — no inline
+  // style needed, and removing it stops any stale gradient value bleeding into
+  // the scrollbar gutter on the right edge.
+  document.documentElement.style.background = ''
   document.body.style.background = 'transparent'
 
   /* ── Atmosphere CSS variables → body::before reads these in index.css ──────

@@ -56,10 +56,21 @@
   padding: 0;
 }
 
-html, body {
+html {
+  /* atm-base is set by applyCSS() in uiThemeStore.js and always equals bgFrom.
+     Using it here (instead of an inline style) means the scrollbar gutter area
+     matches the mesh background — no coloured stripe on the right edge. */
+  background-color: var(--atm-base, #05061a);
   width: 100%;
   height: 100%;
-  background: #050610;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  width: 100%;
+  height: 100%;
+  background: transparent;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
