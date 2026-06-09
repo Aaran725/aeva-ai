@@ -5359,6 +5359,9 @@ If no clear changes: {"changes":[]}`
           />
         )}
 
+        {/* Streak moment banner — shown once per day when streak > 1 */}
+        {!isMission && <StreakMoment streak={chatStreak} />}
+
         {/* Widget mode — "Today's Metrix" stats strip */}
         {isWidget && (
           <motion.div
@@ -5828,52 +5831,117 @@ If no clear changes: {"changes":[]}`
                 <AnimatePresence>
                   {sessionSummary && (
                     <motion.div
-                      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                      style={{ margin: '8px 0 16px', padding: '18px 20px', borderRadius: 16, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.22)', fontFamily: "'Inter', system-ui, sans-serif", position: 'relative' }}
+                      initial={{ opacity: 0, scale: 0.96, y: 16 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: 8 }}
+                      transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+                      style={{ margin: '8px 0 20px', borderRadius: 20, overflow: 'hidden', fontFamily: "'Inter', system-ui, sans-serif", boxShadow: '0 12px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(99,102,241,0.25)' }}
                     >
-                      <button onClick={() => setSessionSummary(null)} style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', color: 'rgba(255,255,255,0.30)', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>×</button>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: '#818CF8', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 12 }}>📋 Session Summary</div>
-
-                      {sessionSummary.keyInsight && (
-                        <div style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.82)', lineHeight: 1.55, marginBottom: 14, fontStyle: 'italic', borderLeft: '2px solid rgba(99,102,241,0.50)', paddingLeft: 12 }}>
-                          "{sessionSummary.keyInsight}"
+                      {/* Hero header */}
+                      <div style={{ padding: '20px 20px 16px', background: 'linear-gradient(135deg, rgba(79,70,229,0.28) 0%, rgba(124,58,237,0.18) 100%)', borderBottom: '1px solid rgba(99,102,241,0.22)', position: 'relative' }}>
+                        <motion.button
+                          whileHover={{ scale: 1.12 }} whileTap={{ scale: 0.90 }}
+                          onClick={() => setSessionSummary(null)}
+                          style={{ position: 'absolute', top: 14, right: 14, width: 24, height: 24, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.40)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}
+                        >×</motion.button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                          <motion.div
+                            initial={{ rotate: -20, scale: 0.6 }} animate={{ rotate: 0, scale: 1 }}
+                            transition={{ type: 'spring', stiffness: 400, damping: 18, delay: 0.1 }}
+                            style={{ fontSize: 26 }}
+                          >🏆</motion.div>
+                          <div>
+                            <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>Session Complete</div>
+                            <div style={{ fontSize: 11, color: 'rgba(165,180,252,0.70)', fontWeight: 500, marginTop: 1 }}>Here's what you covered today</div>
+                          </div>
                         </div>
-                      )}
+                        {/* Stats row */}
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          {sessionSummary.mastered?.length > 0 && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}
+                              style={{ flex: 1, padding: '9px 12px', borderRadius: 12, background: 'rgba(74,222,128,0.10)', border: '1px solid rgba(74,222,128,0.25)', textAlign: 'center' }}
+                            >
+                              <div style={{ fontSize: 20, fontWeight: 900, color: '#4ADE80', letterSpacing: '-0.04em' }}>{sessionSummary.mastered.length}</div>
+                              <div style={{ fontSize: 9.5, color: 'rgba(74,222,128,0.75)', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Mastered</div>
+                            </motion.div>
+                          )}
+                          {(sessionSummary.struggled ?? sessionSummary.needsWork)?.length > 0 && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.24 }}
+                              style={{ flex: 1, padding: '9px 12px', borderRadius: 12, background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)', textAlign: 'center' }}
+                            >
+                              <div style={{ fontSize: 20, fontWeight: 900, color: '#F59E0B', letterSpacing: '-0.04em' }}>{(sessionSummary.struggled ?? sessionSummary.needsWork).length}</div>
+                              <div style={{ fontSize: 9.5, color: 'rgba(245,158,11,0.75)', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Review</div>
+                            </motion.div>
+                          )}
+                          <motion.div
+                            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.30 }}
+                            style={{ flex: 1, padding: '9px 12px', borderRadius: 12, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)', textAlign: 'center' }}
+                          >
+                            <div style={{ fontSize: 20, fontWeight: 900, color: '#818CF8', letterSpacing: '-0.04em' }}>+{(sessionSummary.mastered?.length || 0) * 75}</div>
+                            <div style={{ fontSize: 9.5, color: 'rgba(129,140,248,0.75)', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>XP Earned</div>
+                          </motion.div>
+                        </div>
+                      </div>
 
-                      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-                        {sessionSummary.mastered?.length > 0 && (
-                          <div style={{ flex: '1 1 140px' }}>
-                            <div style={{ fontSize: 10, fontWeight: 700, color: '#4ADE80', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>✓ Mastered</div>
-                            {sessionSummary.mastered.map((t, i) => (
-                              <div key={i} style={{ fontSize: 12, color: 'rgba(255,255,255,0.68)', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#4ADE80', flexShrink: 0 }} />{t}
-                              </div>
-                            ))}
+                      {/* Body */}
+                      <div style={{ padding: '14px 20px 18px', background: 'rgba(8,9,26,0.96)' }}>
+                        {sessionSummary.keyInsight && (
+                          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.80)', lineHeight: 1.58, marginBottom: 14, fontStyle: 'italic', borderLeft: '2px solid rgba(99,102,241,0.55)', paddingLeft: 12 }}>
+                            "{sessionSummary.keyInsight}"
                           </div>
                         )}
+
+                        {/* Mastered pills */}
+                        {sessionSummary.mastered?.length > 0 && (
+                          <div style={{ marginBottom: 10 }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(74,222,128,0.75)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 7 }}>✓ Mastered</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                              {sessionSummary.mastered.map((t, i) => (
+                                <motion.span
+                                  key={i}
+                                  initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
+                                  transition={{ delay: 0.08 * i + 0.25, type: 'spring', stiffness: 420, damping: 22 }}
+                                  style={{ padding: '4px 10px', borderRadius: 99, background: 'rgba(74,222,128,0.10)', border: '1px solid rgba(74,222,128,0.28)', fontSize: 11.5, fontWeight: 600, color: '#86EFAC' }}
+                                >{t}</motion.span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Struggled pills */}
                         {(sessionSummary.struggled ?? sessionSummary.needsWork)?.length > 0 && (
-                          <div style={{ flex: '1 1 140px' }}>
-                            <div style={{ fontSize: 10, fontWeight: 700, color: '#F59E0B', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>↺ Struggled</div>
-                            {(sessionSummary.struggled ?? sessionSummary.needsWork).map((t, i) => (
-                              <div key={i} style={{ fontSize: 12, color: 'rgba(255,255,255,0.68)', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#F59E0B', flexShrink: 0 }} />{t}
-                              </div>
-                            ))}
+                          <div style={{ marginBottom: 10 }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(245,158,11,0.75)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 7 }}>↺ Needs review</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                              {(sessionSummary.struggled ?? sessionSummary.needsWork).map((t, i) => (
+                                <motion.span
+                                  key={i}
+                                  initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
+                                  transition={{ delay: 0.08 * i + 0.30, type: 'spring', stiffness: 420, damping: 22 }}
+                                  style={{ padding: '4px 10px', borderRadius: 99, background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.28)', fontSize: 11.5, fontWeight: 600, color: '#FCD34D' }}
+                                >{t}</motion.span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {sessionSummary.keyMistake && (
+                          <div style={{ fontSize: 12, color: 'rgba(248,113,113,0.85)', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10, marginTop: 4, marginBottom: 8, display: 'flex', gap: 6 }}>
+                            <span style={{ fontWeight: 700, color: '#F87171', flexShrink: 0 }}>⚠ Key mistake: </span>{sessionSummary.keyMistake}
+                          </div>
+                        )}
+
+                        {sessionSummary.nextStep && (
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)', marginTop: sessionSummary.keyMistake ? 8 : 4 }}>
+                            <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>→</span>
+                            <div style={{ fontSize: 12, color: 'rgba(165,180,252,0.88)', lineHeight: 1.5 }}>
+                              <span style={{ fontWeight: 700, color: '#818CF8' }}>Next: </span>{sessionSummary.nextStep}
+                            </div>
                           </div>
                         )}
                       </div>
-
-                      {sessionSummary.keyMistake && (
-                        <div style={{ fontSize: 12, color: 'rgba(248,113,113,0.85)', borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 10, marginTop: 4, marginBottom: 8, display: 'flex', gap: 6 }}>
-                          <span style={{ fontWeight: 700, color: '#F87171', flexShrink: 0 }}>⚠ Key mistake: </span>{sessionSummary.keyMistake}
-                        </div>
-                      )}
-
-                      {sessionSummary.nextStep && (
-                        <div style={{ fontSize: 12, color: 'rgba(165,180,252,0.80)', borderTop: sessionSummary.keyMistake ? 'none' : '1px solid rgba(255,255,255,0.07)', paddingTop: sessionSummary.keyMistake ? 0 : 10, marginTop: 4 }}>
-                          <span style={{ fontWeight: 700, color: '#818CF8' }}>Next: </span>{sessionSummary.nextStep}
-                        </div>
-                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -6443,39 +6511,116 @@ function LoginScreen({ onBack }) {
 }
 
 /* ═══ APP ROOT ════════════════════════════════════ */
+/* ── Streak Moment banner ────────────────────────────────────────────────── */
+function StreakMoment({ streak }) {
+  const todayKey = `aeva_streak_shown_${new Date().toDateString()}`
+  const [visible, setVisible] = useState(() => {
+    if (streak < 2) return false
+    try { return localStorage.getItem(todayKey) !== '1' } catch { return false }
+  })
+
+  useEffect(() => {
+    if (!visible) return
+    try { localStorage.setItem(todayKey, '1') } catch {}
+    const t = setTimeout(() => setVisible(false), 3600)
+    return () => clearTimeout(t)
+  }, [visible]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (streak < 2) return null
+
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          key="streak-banner"
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.30, ease: [0.16, 1, 0.3, 1] }}
+          style={{ overflow: 'hidden', flexShrink: 0 }}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '9px 16px',
+            background: 'linear-gradient(90deg, rgba(180,50,15,0.18) 0%, rgba(200,80,30,0.10) 100%)',
+            borderBottom: '1px solid rgba(200,80,30,0.25)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+              <motion.span
+                animate={{ scale: [1, 1.25, 1] }}
+                transition={{ duration: 0.6, delay: 0.2, repeat: 2 }}
+                style={{ fontSize: 18 }}
+              >🔥</motion.span>
+              <div>
+                <span style={{ fontSize: 13, fontWeight: 800, color: '#FDBA74', letterSpacing: '-0.01em' }}>{streak}-day streak</span>
+                <span style={{ fontSize: 12, color: 'rgba(253,186,116,0.65)', marginLeft: 6 }}>Keep it up!</span>
+              </div>
+            </div>
+            <motion.button
+              whileHover={{ scale: 1.12 }} whileTap={{ scale: 0.90 }}
+              onClick={() => setVisible(false)}
+              style={{ width: 20, height: 20, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.35)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}
+            >×</motion.button>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
 /* ── XP Toast ─────────────────────────────────────── */
 function XPToast() {
   const { pendingToast, clearToast } = useXPStore()
   useEffect(() => {
     if (!pendingToast) return
-    const t = setTimeout(clearToast, 3200)
+    const duration = pendingToast.size === 'big' ? 4200 : 3200
+    const t = setTimeout(clearToast, duration)
     return () => clearTimeout(t)
-  }, [pendingToast])
+  }, [pendingToast]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const isBig = pendingToast?.size === 'big'
 
   return (
     <AnimatePresence>
       {pendingToast && (
         <motion.div
           key={pendingToast.id}
-          initial={{ opacity: 0, y: 24, scale: 0.9 }}
+          initial={{ opacity: 0, y: 28, scale: isBig ? 0.80 : 0.90 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -12, scale: 0.9 }}
-          transition={{ type: 'spring', stiffness: 380, damping: 26 }}
+          exit={{ opacity: 0, y: -14, scale: isBig ? 0.80 : 0.90 }}
+          transition={{ type: 'spring', stiffness: isBig ? 460 : 380, damping: isBig ? 22 : 26 }}
           style={{
             position: 'fixed', bottom: 28, right: 24, zIndex: 999,
-            display: 'flex', flexDirection: 'column', gap: 4,
-            background: 'rgba(8,9,26,0.96)', border: '1px solid rgba(139,143,255,0.30)',
-            borderRadius: 16, padding: '12px 18px',
-            backdropFilter: 'blur(16px)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.50)',
+            display: 'flex', flexDirection: 'column', gap: isBig ? 6 : 4,
+            background: isBig
+              ? 'linear-gradient(135deg, rgba(79,70,229,0.96) 0%, rgba(109,40,217,0.96) 100%)'
+              : 'rgba(8,9,26,0.96)',
+            border: isBig ? '1px solid rgba(165,180,252,0.40)' : '1px solid rgba(139,143,255,0.30)',
+            borderRadius: isBig ? 20 : 16,
+            padding: isBig ? '16px 22px' : '12px 18px',
+            backdropFilter: 'blur(20px)',
+            boxShadow: isBig
+              ? '0 12px 48px rgba(99,102,241,0.55), 0 0 0 1px rgba(165,180,252,0.15)'
+              : '0 8px 32px rgba(0,0,0,0.50)',
             fontFamily: "'Inter', system-ui, sans-serif",
             pointerEvents: 'none',
           }}
         >
+          {isBig && (
+            <motion.div
+              initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 18, delay: 0.05 }}
+              style={{ fontSize: 28, textAlign: 'center', marginBottom: 2 }}
+            >⭐</motion.div>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Zap size={13} color="#8B8FFF" fill="#8B8FFF" />
-            <span style={{ fontSize: 14, fontWeight: 800, color: '#8B8FFF' }}>+{pendingToast.amount} XP</span>
-            <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.55)' }}>{pendingToast.label}</span>
+            {!isBig && <Zap size={13} color="#8B8FFF" fill="#8B8FFF" />}
+            <motion.span
+              animate={isBig ? { scale: [1, 1.12, 1] } : {}}
+              transition={{ duration: 0.4, delay: 0.15 }}
+              style={{ fontSize: isBig ? 22 : 14, fontWeight: 900, color: isBig ? '#fff' : '#8B8FFF', letterSpacing: isBig ? '-0.04em' : 0 }}
+            >+{pendingToast.amount} XP</motion.span>
+            <span style={{ fontSize: isBig ? 13 : 12.5, color: isBig ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.55)', fontWeight: isBig ? 600 : 400 }}>{pendingToast.label}</span>
           </div>
           {pendingToast.newOrb && (
             <div style={{ fontSize: 12, color: '#F59E0B', fontWeight: 700 }}>

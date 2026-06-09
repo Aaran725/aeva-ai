@@ -161,6 +161,7 @@ export const useXPStore = create((set, get) => {
             label: event.label,
             newOrb: newUnlocks[0] || null,
             id: Date.now(),
+            size: eventKey === 'TOPIC_MASTERED' ? 'big' : 'normal',
           },
         }
         save(updated)
