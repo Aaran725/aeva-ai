@@ -459,7 +459,7 @@ function FlashcardDrill({ data, topic, onExit, onGoHarder }) {
           exit={{ opacity: 0, scale: 0.92 }}
           transition={{ duration: 0.22 }}
         >
-          <SwipeCard card={card} onResult={handleResult} cardIndex={idx} total={cards.length} />
+          <SwipeCard card={card} onResult={handleResult} cardIndex={idx} total={cards.length} flipped={flipped} onFlip={setFlipped} />
         </motion.div>
       </AnimatePresence>
 
@@ -472,8 +472,8 @@ function FlashcardDrill({ data, topic, onExit, onGoHarder }) {
 }
 
 /* ═══ SWIPEABLE CARD (used by ReviewDrill) ══════════ */
-function SwipeCard({ card, onResult, cardIndex, total }) {
-  const [flipped, setFlipped] = useState(false)
+// flipped + onFlip are lifted to ReviewDrill so keyboard handler can access the state
+function SwipeCard({ card, onResult, cardIndex, total, flipped, onFlip }) {
   const x = useMotionValue(0)
   const rotate    = useTransform(x, [-160, 0, 160], [-18, 0, 18])
   const gotOpacity    = useTransform(x, [20, 80],  [0, 1])
@@ -498,42 +498,33 @@ function SwipeCard({ card, onResult, cardIndex, total }) {
         <span style={{ fontSize: 13, fontWeight: 800, color: '#4ADE80', background: 'rgba(74,222,128,0.15)', border: '2px solid rgba(74,222,128,0.50)', padding: '4px 12px', borderRadius: 99, letterSpacing: '0.06em' }}>✓ GOT IT</span>
       </motion.div>
 
-      <motion.div
-        drag={flipped ? 'x' : false}
-        dragConstraints={{ left: 0, right: 0 }}
-        dragElastic={0.8}
-        onDragEnd={handleDragEnd}
-        style={{ x, rotate, cursor: flipped ? 'grab' : 'pointer' }}
-        whileDrag={{ cursor: 'grabbing', scale: 1.03 }}
-        onClick={() => !flipped && setFlipped(true)}
-        animate={{ rotateY: flipped ? 180 : 0 }}
-        transition={{ duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
-        sx={{ transformStyle: 'preserve-3d' }}
-        className="sr-card"
-      >
-        {/* We render both faces as absolute children */}
-        <div style={{ position: 'relative', perspective: 1200, minHeight: 280 }}>
-          <motion.div style={{ background: cardBg }}
-            className="sr-card-inner"
-            animate={{ rotateY: flipped ? 180 : 0 }}
-            transition={{ duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
-            sx={{ transformStyle: 'preserve-3d', width: '100%', minHeight: 280 }}
-          >
-            {/* Front */}
-            <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.28)', borderRadius: 24, padding: '40px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 14, minHeight: 280 }}>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(59,130,246,0.70)', textTransform: 'uppercase' }}>Question</span>
-              <p style={{ fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.94)', lineHeight: 1.5, margin: 0 }}>{card?.front}</p>
-              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.26)' }}>tap to reveal</span>
-            </div>
-            {/* Back */}
-            <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: 'rgba(6,182,212,0.10)', border: '1px solid rgba(6,182,212,0.30)', borderRadius: 24, padding: '40px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 14, minHeight: 280 }}>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(6,182,212,0.70)', textTransform: 'uppercase' }}>Answer</span>
-              <p style={{ fontSize: 18, color: 'rgba(255,255,255,0.90)', lineHeight: 1.65, margin: 0, fontFamily: "'Georgia', serif" }}>{card?.back}</p>
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', marginTop: 4 }}>swipe right = got it · swipe left = missed</span>
-            </div>
-          </motion.div>
-        </div>
-      </motion.div>
+      {/* perspective wrapper so preserve-3d works correctly */}
+      <div style={{ perspective: 1200 }}>
+        <motion.div
+          drag={flipped ? 'x' : false}
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.8}
+          onDragEnd={handleDragEnd}
+          style={{ x, rotate, cursor: flipped ? 'grab' : 'pointer', transformStyle: 'preserve-3d', position: 'relative', minHeight: 280 }}
+          whileDrag={{ cursor: 'grabbing', scale: 1.03 }}
+          onClick={() => !flipped && onFlip(true)}
+          animate={{ rotateY: flipped ? 180 : 0 }}
+          transition={{ duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
+        >
+          {/* Front face */}
+          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.28)', borderRadius: 24, padding: '40px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 14, minHeight: 280 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(59,130,246,0.70)', textTransform: 'uppercase' }}>Question</span>
+            <p style={{ fontSize: 20, fontWeight: 600, color: 'rgba(255,255,255,0.94)', lineHeight: 1.5, margin: 0 }}>{card?.front}</p>
+            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.26)' }}>tap to reveal · or press Space</span>
+          </div>
+          {/* Back face */}
+          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: 'rgba(6,182,212,0.10)', border: '1px solid rgba(6,182,212,0.30)', borderRadius: 24, padding: '40px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 14, minHeight: 280 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.16em', color: 'rgba(6,182,212,0.70)', textTransform: 'uppercase' }}>Answer</span>
+            <p style={{ fontSize: 18, color: 'rgba(255,255,255,0.90)', lineHeight: 1.65, margin: 0, fontFamily: "'Georgia', serif" }}>{card?.back}</p>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', marginTop: 4 }}>← missed &nbsp;·&nbsp; swipe or arrow keys &nbsp;·&nbsp; got it →</span>
+          </div>
+        </motion.div>
+      </div>
     </div>
   )
 }
@@ -543,9 +534,13 @@ function ReviewDrill({ data, onExit, onNewDrill }) {
   const { recordCard, completeSession } = useSRStore()
   const cards = data?.cards || []
   const [idx, setIdx]           = useState(0)
+  const [flipped, setFlipped]   = useState(false)   // lifted from SwipeCard so keyboard handler can read it
   const [results, setResults]   = useState([])
   const [done, setDone]         = useState(false)
   const [schedule, setSchedule] = useState([]) // { front, result, days }
+
+  // Reset flip when card changes
+  useEffect(() => { setFlipped(false) }, [idx])
 
   const handleResult = useCallback((result) => {
     const card = cards[idx]
@@ -688,15 +683,15 @@ function ReviewDrill({ data, onExit, onNewDrill }) {
           style={{ width: '100%', minHeight: 200, position: 'relative', transformStyle: 'preserve-3d', cursor: 'pointer' }}
         >
           {/* Front */}
-          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: 20, padding: '28px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 12 }}>
+          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: 20, padding: '28px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 12 }}>
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(34,197,94,0.65)', textTransform: 'uppercase' }}>Due for Review</span>
             <p style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.92)', lineHeight: 1.55, margin: 0, fontFamily: "'Inter', system-ui, sans-serif" }}>
               {card?.front}
             </p>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', marginTop: 6 }}>tap to reveal</span>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', marginTop: 6 }}>tap to reveal · or press Space</span>
           </div>
           {/* Back */}
-          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.32)', borderRadius: 20, padding: '28px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 12 }}>
+          <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.32)', borderRadius: 20, padding: '28px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', gap: 12 }}>
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(34,197,94,0.65)', textTransform: 'uppercase' }}>Answer</span>
             <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.88)', lineHeight: 1.65, margin: 0, fontFamily: "'Georgia', serif" }}>
               {card?.back}
