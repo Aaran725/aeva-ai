@@ -2644,10 +2644,14 @@ function DashboardView({ onChatOpen, onSignOut }) {
 
       <AnimatePresence>
         {appSettingsOpen && <AppSettingsPanel onClose={() => setAppSettingsOpen(false)} />}
+      </AnimatePresence>
 
       <AnimatePresence>
-        {yourUIOpen && <YourUI onClose={() => setYourUIOpen(false)} />}
-      </AnimatePresence>
+        {yourUIOpen && (
+          <Suspense fallback={null}>
+            <YourUI onClose={() => setYourUIOpen(false)} />
+          </Suspense>
+        )}
       </AnimatePresence>
 
       <AnimatePresence>
