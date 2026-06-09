@@ -384,7 +384,7 @@ function HeroWidget({ name, level, xpPct, onOrbClick, activeOrbDef, orbPersonali
 function StreakWidget({ streak }) {
   return (
     <Widget idx={1} style={{
-      background: 'radial-gradient(ellipse 160% 120% at 18% 0%, #E87030 0%, #C84818 20%, #A02808 42%, #781010 62%, #501010 80%, #300808 100%)',
+      background: 'radial-gradient(ellipse 160% 130% at 16% 5%, #E87030 0%, #C85020 22%, #A03010 45%, #782010 66%, #521010 84%, #360808 100%)',
     }}>
       <Label>Streak</Label>
       <Sub color="rgba(255,200,170,0.45)">Days in a row</Sub>
@@ -409,7 +409,7 @@ function StreakWidget({ streak }) {
 function LevelWidget({ level, xpPct }) {
   return (
     <Widget idx={2} style={{
-      background: 'radial-gradient(ellipse 160% 120% at 84% 0%, #24DCC0 0%, #10B898 20%, #08908A 42%, #046870 62%, #034A52 80%, #022E38 100%)',
+      background: 'radial-gradient(ellipse 160% 130% at 84% 5%, #22D8BC 0%, #12B09A 22%, #0A8880 45%, #086868 66%, #054A52 84%, #033040 100%)',
     }}>
       {/* The distinctive golden crescent arcs */}
       <GoldenArc />
@@ -430,7 +430,7 @@ function LevelWidget({ level, xpPct }) {
 function ReadinessWidget({ pct, roadmapTitle }) {
   return (
     <Widget idx={3} style={{
-      background: 'radial-gradient(ellipse 160% 120% at 16% 0%, #C890E0 0%, #A068C8 20%, #7848A8 42%, #522888 62%, #341468 80%, #1E0850 100%)',
+      background: 'radial-gradient(ellipse 160% 130% at 18% 5%, #C8A0E0 0%, #A070C8 22%, #7848A8 45%, #5830A0 66%, #3E1888 84%, #261268 100%)',
       gridColumn: 'span 2',
     }}>
       <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
@@ -459,15 +459,16 @@ function ReadinessWidget({ pct, roadmapTitle }) {
 /* ── MODE  (Enhance/Mood card — deep cerise/fuchsia, equalizer bars) ── */
 function ModeWidget({ modeName, modeColor, modeSub }) {
   /* map mode color to Enhance-style card gradient */
+  // Mode card = Enhance/Mood style: glow FROM CENTRE outward, dark edges stay hued not black
   const bgMap = {
-    '#4ADE80': 'radial-gradient(ellipse 160% 120% at 32% 5%, #38D860 0%, #1CA840 20%, #0E7830 42%, #085020 62%, #063010 80%, #041808 100%)',
-    '#60A5FA': 'radial-gradient(ellipse 160% 120% at 32% 5%, #3C90F8 0%, #1C60D0 20%, #0C3898 42%, #081870 62%, #040C50 80%, #020830 100%)',
-    '#F87171': 'radial-gradient(ellipse 160% 120% at 32% 5%, #E84050 0%, #B01828 20%, #780818 42%, #500810 62%, #300808 80%, #180404 100%)',
-    '#FBBF24': 'radial-gradient(ellipse 160% 120% at 32% 5%, #E09818 0%, #A06800 20%, #704800 42%, #483000 62%, #301800 80%, #180C00 100%)',
-    '#A78BFA': 'radial-gradient(ellipse 160% 120% at 32% 5%, #9C60F8 0%, #6030C8 20%, #3A1898 42%, #201070 62%, #100850 80%, #080430 100%)',
-    '#F97316': 'radial-gradient(ellipse 160% 120% at 32% 5%, #E86818 0%, #B04008 20%, #782008 42%, #501008 62%, #300808 80%, #180404 100%)',
+    '#4ADE80': 'radial-gradient(ellipse 150% 130% at 40% 42%, #32D060 0%, #1EA840 20%, #0E7828 42%, #085020 64%, #063010 84%, #041808 100%)',
+    '#60A5FA': 'radial-gradient(ellipse 150% 130% at 40% 42%, #3C90F8 0%, #1C60D0 20%, #0C3898 42%, #081870 64%, #040C50 84%, #020830 100%)',
+    '#F87171': 'radial-gradient(ellipse 150% 130% at 40% 42%, #E84050 0%, #B01828 20%, #780818 42%, #500810 64%, #300808 84%, #180404 100%)',
+    '#FBBF24': 'radial-gradient(ellipse 150% 130% at 40% 42%, #E09818 0%, #A06800 20%, #704800 42%, #483000 64%, #301800 84%, #180C00 100%)',
+    '#A78BFA': 'radial-gradient(ellipse 150% 130% at 40% 42%, #9C60F8 0%, #6030C8 20%, #3A1898 42%, #201070 64%, #100850 84%, #080430 100%)',
+    '#F97316': 'radial-gradient(ellipse 150% 130% at 40% 42%, #E86818 0%, #B04008 20%, #782008 42%, #501008 64%, #300808 84%, #180404 100%)',
   }
-  const bg = bgMap[modeColor] || 'radial-gradient(ellipse 160% 120% at 32% 5%, #F03888 0%, #C01868 20%, #900848 42%, #600430 62%, #3C0220 80%, #200112 100%)'
+  const bg = bgMap[modeColor] || 'radial-gradient(ellipse 150% 130% at 40% 42%, #F03080 0%, #C01868 20%, #900848 42%, #600430 64%, #3C0220 84%, #220112 100%)'
 
   return (
     <Widget idx={4} style={{ background: bg }}>
@@ -491,7 +492,7 @@ function ModeWidget({ modeName, modeColor, modeSub }) {
 function DueWidget({ count, onLab }) {
   return (
     <Widget idx={5} onClick={onLab} style={{
-      background: 'radial-gradient(ellipse 160% 120% at 82% 0%, #C82838 0%, #901820 20%, #601010 42%, #400A10 62%, #280808 80%, #180404 100%)',
+      background: 'radial-gradient(ellipse 160% 130% at 82% 5%, #C82838 0%, #A01828 22%, #701018 45%, #501010 66%, #300808 84%, #1A0404 100%)',
     }}>
       <Label>Cards Due</Label>
       <Sub color="rgba(255,175,175,0.42)">Spaced repetition</Sub>
@@ -552,7 +553,7 @@ function QuickLaunchWidget({ onChat, onLab, onArcade, onRoadmaps, onDocs, onBrai
 function KnowledgeWidget({ concepts, onPalace }) {
   return (
     <Widget idx={7} onClick={onPalace} style={{
-      background: 'radial-gradient(ellipse 160% 120% at 78% 0%, #2C50D8 0%, #1838B8 20%, #0E2490 42%, #081470 62%, #050A50 80%, #030630 100%)',
+      background: 'radial-gradient(ellipse 160% 130% at 78% 5%, #2848D0 0%, #1830B0 22%, #0E2090 45%, #081470 66%, #050A50 84%, #030638 100%)',
       gridColumn: 'span 2',
     }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>

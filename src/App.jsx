@@ -3652,80 +3652,83 @@ ${guide.examTip ? `<div class="section"><div class="section-label">Exam Tip</div
 }
 
 /* ═══ CHAT THEMES (Ai OS palette) ════════════════ */
-// Bright vivid colour at corner → fades to a DARK VERSION OF THE SAME HUE (never black)
-// Wide ellipse so colour fills generously before the centre darkens
+// Rules from pixel analysis of reference:
+// 1. Corner-glow cards (lavender/ember/teal/navy): focal at corner, dark end = dark-hued NOT black
+// 2. Centre-glow cards (cerise): focal at ~42%,40% — glow radiates outward from centre
+// 3. Ellipse must be very wide (200%+) for full-screen so centre stays illuminated
+// 4. Darkest stop must still clearly show the hue — min brightness ~15-20% of peak
 const CHAT_THEMES = {
   purple: {
-    // Balance card — soft lavender corner glow, dark violet centre
+    // Balance card — lavender, focal top-left → dark violet (never black)
     swatch: '#9B72BC', label: 'Lavender',
-    bg: 'radial-gradient(ellipse 160% 120% at 18% 0%, #D0B0E8 0%, #A880CC 22%, #7048A8 44%, #4A2888 64%, #2C1268 82%, #18084A 100%)',
-    inputBg: 'radial-gradient(ellipse at 50% 0%, #6A40A8 0%, #2A1060 70%, #180840 100%)',
+    bg: 'radial-gradient(ellipse 200% 180% at 18% 5%, #C8A0E0 0%, #A070C8 20%, #7848A8 42%, #583090 62%, #3C1878 80%, #221060 100%)',
+    inputBg: 'radial-gradient(ellipse at 50% 0%, #6A40A8 0%, #381878 65%, #221060 100%)',
     inputBorder: 'rgba(200,168,216,0.45)',
-    inputGlow: '0 0 0 1px rgba(155,114,188,0.20), 0 8px 40px rgba(0,0,0,0.40), 0 0 32px rgba(155,114,188,0.32)',
+    inputGlow: '0 0 0 1px rgba(155,114,188,0.20), 0 8px 40px rgba(0,0,0,0.35), 0 0 32px rgba(155,114,188,0.30)',
     accent: '#E0C8F0', accentBg: 'rgba(155,114,188,0.22)', accentBorder: 'rgba(200,168,216,0.38)',
-    aiBg: 'radial-gradient(ellipse at 20% 0%, #8058B0 0%, #401870 55%, #200A40 100%)',
-    userBg: 'radial-gradient(ellipse at 80% 0%, #904020 0%, #481008 55%, #280804 100%)',
-    aiBorder: '1px solid rgba(200,168,216,0.25)', userBorder: '1px solid rgba(220,130,80,0.25)',
+    aiBg: 'radial-gradient(ellipse 140% 120% at 18% 5%, #8058B0 0%, #502880 45%, #3A1868 100%)',
+    userBg: 'radial-gradient(ellipse 140% 120% at 82% 5%, #A05828 0%, #582010 45%, #381008 100%)',
+    aiBorder: '1px solid rgba(200,168,216,0.22)', userBorder: '1px solid rgba(220,140,90,0.22)',
   },
   ember: {
-    // Weather/Streak card — red-orange corner, deep maroon centre
+    // Streak/Weather card — vivid red-orange, focal top-left → dark maroon
     swatch: '#C84518', label: 'Ember',
-    bg: 'radial-gradient(ellipse 160% 120% at 20% 0%, #E87030 0%, #C84818 20%, #A02808 42%, #781010 62%, #500808 80%, #300404 100%)',
-    inputBg: 'radial-gradient(ellipse at 50% 0%, #A03010 0%, #4A0808 70%, #280404 100%)',
+    bg: 'radial-gradient(ellipse 200% 180% at 18% 5%, #E87030 0%, #C85020 20%, #A03010 42%, #782010 62%, #521010 80%, #360808 100%)',
+    inputBg: 'radial-gradient(ellipse at 50% 0%, #A03010 0%, #501010 65%, #360808 100%)',
     inputBorder: 'rgba(200,100,50,0.50)',
-    inputGlow: '0 0 0 1px rgba(200,70,24,0.20), 0 8px 40px rgba(0,0,0,0.40), 0 0 32px rgba(200,70,24,0.38)',
+    inputGlow: '0 0 0 1px rgba(200,70,24,0.20), 0 8px 40px rgba(0,0,0,0.35), 0 0 32px rgba(200,70,24,0.35)',
     accent: '#FDBA74', accentBg: 'rgba(200,70,24,0.22)', accentBorder: 'rgba(200,100,50,0.40)',
-    aiBg: 'radial-gradient(ellipse at 22% 0%, #C04018 0%, #601008 55%, #300404 100%)',
-    userBg: 'radial-gradient(ellipse at 78% 0%, #D05018 0%, #700C04 55%, #380404 100%)',
-    aiBorder: '1px solid rgba(200,100,50,0.28)', userBorder: '1px solid rgba(220,120,60,0.28)',
+    aiBg: 'radial-gradient(ellipse 140% 120% at 18% 5%, #C04018 0%, #681010 45%, #400808 100%)',
+    userBg: 'radial-gradient(ellipse 140% 120% at 82% 5%, #D05018 0%, #741010 45%, #480808 100%)',
+    aiBorder: '1px solid rgba(200,100,50,0.25)', userBorder: '1px solid rgba(220,130,60,0.25)',
   },
   teal: {
-    // Sleep card — bright cyan top-right, deep forest-teal centre
+    // Sleep card — bright cyan, focal top-right → dark forest-teal (never black)
     swatch: '#1EC4AA', label: 'Teal',
-    bg: 'radial-gradient(ellipse 160% 120% at 82% 0%, #24DCC0 0%, #10B898 20%, #08908A 42%, #046870 62%, #024A52 80%, #022E38 100%)',
-    inputBg: 'radial-gradient(ellipse at 50% 0%, #0E9880 0%, #034848 70%, #022830 100%)',
+    bg: 'radial-gradient(ellipse 200% 180% at 82% 5%, #22D8BC 0%, #12B09A 20%, #0A8880 42%, #086868 62%, #054A52 80%, #033040 100%)',
+    inputBg: 'radial-gradient(ellipse at 50% 0%, #0E9880 0%, #064A52 65%, #033040 100%)',
     inputBorder: 'rgba(30,196,170,0.50)',
-    inputGlow: '0 0 0 1px rgba(30,196,170,0.20), 0 8px 40px rgba(0,0,0,0.40), 0 0 32px rgba(30,196,170,0.32)',
+    inputGlow: '0 0 0 1px rgba(30,196,170,0.20), 0 8px 40px rgba(0,0,0,0.35), 0 0 32px rgba(30,196,170,0.30)',
     accent: '#5EEAD4', accentBg: 'rgba(30,196,170,0.20)', accentBorder: 'rgba(30,196,170,0.40)',
-    aiBg: 'radial-gradient(ellipse at 78% 0%, #14B098 0%, #045858 55%, #022830 100%)',
-    userBg: 'radial-gradient(ellipse at 22% 0%, #18C0A0 0%, #056060 55%, #022C38 100%)',
-    aiBorder: '1px solid rgba(30,196,170,0.28)', userBorder: '1px solid rgba(50,220,190,0.28)',
+    aiBg: 'radial-gradient(ellipse 140% 120% at 80% 5%, #12A898 0%, #065858 45%, #033040 100%)',
+    userBg: 'radial-gradient(ellipse 140% 120% at 20% 5%, #16B8A0 0%, #086060 45%, #043848 100%)',
+    aiBorder: '1px solid rgba(30,196,170,0.25)', userBorder: '1px solid rgba(50,220,190,0.25)',
   },
   cerise: {
-    // Enhance/Mood card — hot pink upper-centre glow, deep dark-pink centre
+    // Enhance/Mood card — glow FROM CENTRE outward, dark edges stay pink not black
     swatch: '#E01E6A', label: 'Cerise',
-    bg: 'radial-gradient(ellipse 150% 120% at 40% 5%, #F83888 0%, #D01868 20%, #A00850 42%, #780438 62%, #500228 80%, #300118 100%)',
-    inputBg: 'radial-gradient(ellipse at 50% 0%, #A80E50 0%, #4A0428 70%, #280118 100%)',
+    bg: 'radial-gradient(ellipse 160% 140% at 42% 40%, #F03080 0%, #D01868 18%, #A80850 38%, #800438 58%, #580228 78%, #380118 100%)',
+    inputBg: 'radial-gradient(ellipse at 50% 50%, #A80E50 0%, #580228 60%, #380118 100%)',
     inputBorder: 'rgba(224,30,106,0.50)',
-    inputGlow: '0 0 0 1px rgba(224,30,106,0.20), 0 8px 40px rgba(0,0,0,0.40), 0 0 32px rgba(224,30,106,0.38)',
+    inputGlow: '0 0 0 1px rgba(224,30,106,0.20), 0 8px 40px rgba(0,0,0,0.35), 0 0 32px rgba(224,30,106,0.35)',
     accent: '#F9A8D4', accentBg: 'rgba(224,30,106,0.22)', accentBorder: 'rgba(224,30,106,0.42)',
-    aiBg: 'radial-gradient(ellipse at 38% 0%, #C81860 0%, #5C0830 55%, #300118 100%)',
-    userBg: 'radial-gradient(ellipse at 62% 0%, #D82070 0%, #680830 55%, #380120 100%)',
-    aiBorder: '1px solid rgba(224,30,106,0.28)', userBorder: '1px solid rgba(240,60,120,0.28)',
+    aiBg: 'radial-gradient(ellipse 140% 120% at 42% 40%, #C81860 0%, #680830 50%, #380118 100%)',
+    userBg: 'radial-gradient(ellipse 140% 120% at 58% 40%, #D82070 0%, #740830 50%, #440120 100%)',
+    aiBorder: '1px solid rgba(224,30,106,0.25)', userBorder: '1px solid rgba(240,60,120,0.25)',
   },
   navy: {
-    // Skin Damage card — royal blue top-right, deep midnight-blue centre
+    // Skin Damage card — deep royal blue, focal top-right → dark midnight navy
     swatch: '#1E3A9A', label: 'Navy',
-    bg: 'radial-gradient(ellipse 160% 120% at 80% 0%, #2C50D8 0%, #1838B8 20%, #0E2490 42%, #081470 62%, #040A50 80%, #020630 100%)',
-    inputBg: 'radial-gradient(ellipse at 50% 0%, #102080 0%, #050A40 70%, #020530 100%)',
+    bg: 'radial-gradient(ellipse 200% 180% at 80% 5%, #2848D0 0%, #1830B0 20%, #0E2090 42%, #081470 62%, #050A50 80%, #030638 100%)',
+    inputBg: 'radial-gradient(ellipse at 50% 0%, #102080 0%, #050A50 65%, #030638 100%)',
     inputBorder: 'rgba(60,100,240,0.50)',
-    inputGlow: '0 0 0 1px rgba(30,58,154,0.22), 0 8px 40px rgba(0,0,0,0.40), 0 0 32px rgba(30,58,154,0.40)',
+    inputGlow: '0 0 0 1px rgba(30,58,154,0.22), 0 8px 40px rgba(0,0,0,0.35), 0 0 32px rgba(30,58,154,0.38)',
     accent: '#93C5FD', accentBg: 'rgba(30,58,154,0.22)', accentBorder: 'rgba(60,100,240,0.40)',
-    aiBg: 'radial-gradient(ellipse at 76% 0%, #1C3CB8 0%, #080E60 55%, #030540 100%)',
-    userBg: 'radial-gradient(ellipse at 24% 0%, #2040C0 0%, #0A1258 55%, #040838 100%)',
-    aiBorder: '1px solid rgba(60,100,240,0.28)', userBorder: '1px solid rgba(80,120,255,0.28)',
+    aiBg: 'radial-gradient(ellipse 140% 120% at 78% 5%, #1A38B8 0%, #081070 45%, #040850 100%)',
+    userBg: 'radial-gradient(ellipse 140% 120% at 22% 5%, #1E40C0 0%, #0A1268 45%, #050A48 100%)',
+    aiBorder: '1px solid rgba(60,100,240,0.25)', userBorder: '1px solid rgba(80,120,255,0.25)',
   },
   olive: {
-    // Natural vs Artificial — olive-green top-centre, dark forest-green centre
+    // Natural vs Artificial — olive-green top-centre → dark forest-olive
     swatch: '#7A8E18', label: 'Olive',
-    bg: 'radial-gradient(ellipse 150% 120% at 50% 0%, #AABC30 0%, #7A8E18 22%, #566410 42%, #384208 62%, #202804 80%, #101602 100%)',
-    inputBg: 'radial-gradient(ellipse at 50% 0%, #5A6810 0%, #222804 70%, #101402 100%)',
+    bg: 'radial-gradient(ellipse 190% 170% at 50% 5%, #AABC30 0%, #7A8E18 20%, #587010 42%, #3C5008 62%, #263408 80%, #161E04 100%)',
+    inputBg: 'radial-gradient(ellipse at 50% 0%, #5A6810 0%, #283408 65%, #161E04 100%)',
     inputBorder: 'rgba(160,185,30,0.50)',
-    inputGlow: '0 0 0 1px rgba(138,158,32,0.20), 0 8px 40px rgba(0,0,0,0.40), 0 0 32px rgba(138,158,32,0.32)',
+    inputGlow: '0 0 0 1px rgba(138,158,32,0.20), 0 8px 40px rgba(0,0,0,0.35), 0 0 32px rgba(138,158,32,0.30)',
     accent: '#BEF264', accentBg: 'rgba(138,158,32,0.20)', accentBorder: 'rgba(160,185,30,0.40)',
-    aiBg: 'radial-gradient(ellipse at 42% 0%, #708018 0%, #2E3806 55%, #181E04 100%)',
-    userBg: 'radial-gradient(ellipse at 58% 0%, #809018 0%, #363E06 55%, #1C2204 100%)',
-    aiBorder: '1px solid rgba(160,185,30,0.28)', userBorder: '1px solid rgba(180,210,40,0.28)',
+    aiBg: 'radial-gradient(ellipse 140% 120% at 40% 5%, #708018 0%, #303808 45%, #1E2806 100%)',
+    userBg: 'radial-gradient(ellipse 140% 120% at 60% 5%, #809018 0%, #384008 45%, #222E06 100%)',
+    aiBorder: '1px solid rgba(160,185,30,0.25)', userBorder: '1px solid rgba(180,210,40,0.25)',
   },
 }
 
