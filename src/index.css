@@ -1,6 +1,55 @@
 @import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&family=Nunito:wght@400;600;700;800&family=Space+Grotesk:wght@400;500;600;700;800&display=swap');
 
+/* ════════════════════════════════════════════════
+   AEVA OS — Foundation token layer (Layer 1)
+   These never change. They define the DNA.
+   Layer 2 (YOUR UI) sits on top and personalises.
+════════════════════════════════════════════════ */
+:root {
+  /* ── Surfaces ── */
+  --aeva-surface-base:    #050610;
+  --aeva-surface-1:       rgba(8,9,26,0.96);      /* primary card / panel  */
+  --aeva-surface-2:       rgba(255,255,255,0.03); /* secondary layer        */
+  --aeva-surface-3:       rgba(255,255,255,0.06); /* modal / dropdown       */
+
+  /* ── Borders ── */
+  --aeva-border:          rgba(255,255,255,0.08);
+  --aeva-border-strong:   rgba(255,255,255,0.14); /* hover / focus           */
+  --aeva-border-section:  rgba(255,255,255,0.06); /* dividers                */
+
+  /* ── Text ── */
+  --aeva-text-1:          rgba(255,255,255,0.95); /* headings                */
+  --aeva-text-2:          rgba(255,255,255,0.55); /* body / secondary        */
+  --aeva-text-3:          rgba(255,255,255,0.30); /* placeholders / labels   */
+
+  /* ── Blur ── */
+  --aeva-blur-sm:         blur(12px);             /* cards                   */
+  --aeva-blur-md:         blur(28px);             /* overlays                */
+  --aeva-blur-lg:         blur(32px);             /* sticky header           */
+
+  /* ── Shadow ── */
+  --aeva-shadow-card:     0 4px 24px rgba(0,0,0,0.35);
+  --aeva-shadow-raised:   0 8px 48px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.10);
+  --aeva-shadow-modal:    0 40px 120px rgba(0,0,0,0.80);
+
+  /* ── Dot-matrix (signature element) ── */
+  --aeva-dot-size:        8px;
+  --aeva-dot-gap:         2px;
+
+  /* ── YOUR UI derived scales (overwritten by applyCSS on load) ── */
+  --aeva-radius-sm:       8px;
+  --aeva-radius-md:       16px;
+  --aeva-radius-lg:       24px;
+  --aeva-radius-pill:     99px;
+
+  --aeva-space-xs:        4px;
+  --aeva-space-sm:        8px;
+  --aeva-space-md:        16px;
+  --aeva-space-lg:        24px;
+  --aeva-space-xl:        40px;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;

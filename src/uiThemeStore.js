@@ -94,6 +94,8 @@ export function applyCSS(theme) {
   }
   const r = document.documentElement
   const bg = `linear-gradient(${bgAngle}deg, ${bgFrom} 0%, ${bgTo} 100%)`
+
+  /* ── Layer 2: YOUR UI base tokens ── */
   r.style.setProperty('--ui-bg',      bg)
   r.style.setProperty('--ui-accent',  accent)
   r.style.setProperty('--ui-radius',  `${radius}px`)
@@ -103,20 +105,59 @@ export function applyCSS(theme) {
   r.style.setProperty('--ui-font', fam)
   r.style.fontFamily = fam
 
+  /* ── Layer 2 derived: radius scale ── */
+  r.style.setProperty('--aeva-radius-sm',   `${Math.round(radius * 0.5)}px`)
+  r.style.setProperty('--aeva-radius-md',   `${radius}px`)
+  r.style.setProperty('--aeva-radius-lg',   `${Math.round(radius * 1.5)}px`)
+  // --aeva-radius-pill stays at 99px (set in :root, never changes)
+
+  /* ── Layer 2 derived: spacing scale (density-responsive) ── */
+  r.style.setProperty('--aeva-space-xs', `${Math.round(4  * density)}px`)
+  r.style.setProperty('--aeva-space-sm', `${Math.round(8  * density)}px`)
+  r.style.setProperty('--aeva-space-md', `${Math.round(16 * density)}px`)
+  r.style.setProperty('--aeva-space-lg', `${Math.round(24 * density)}px`)
+  r.style.setProperty('--aeva-space-xl', `${Math.round(40 * density)}px`)
+
   // Apply background to body (the mesh overlay sits on top via body::before z-index:0,
   // so this tints the whole app shell without leaking — nav overflow is now fixed)
   document.body.style.background = bg
 
-  // Inject a tiny dynamic stylesheet so accent + radius actually propagate to
-  // visible elements that can't easily read CSS vars from inline JS
+  // Dynamic stylesheet: accent + component targets that can't read vars from inline JS.
+  // Extend this list as more components adopt Aeva OS tokens.
   let s = document.getElementById('_ui_theme')
   if (!s) { s = document.createElement('style'); s.id = '_ui_theme'; document.head.appendChild(s) }
   s.textContent = `
+    /* ── Scrollbar ── */
     ::-webkit-scrollbar-thumb          { background: ${accent}35 !important; }
     ::-webkit-scrollbar-thumb:hover    { background: ${accent}60 !important; }
+
+    /* ── Text selection ── */
     ::selection                        { background: ${accent}44; color: #fff; }
-    .xp-bar-fill                       { background: linear-gradient(90deg, ${accent}, ${accent}cc) !important; }
-    .lv-pill                           { background: ${accent}22 !important; border-color: ${accent}55 !important; color: ${accent} !important; }
+
+    /* ── Dashboard elements ── */
+    .xp-bar-fill  { background: linear-gradient(90deg, ${accent}, ${accent}cc) !important; }
+    .lv-pill      { background: ${accent}22 !important; border-color: ${accent}55 !important; color: ${accent} !important; }
+
+    /* ── Nav feature buttons (Maps, Arcade) — respond to accent ── */
+    .nav-btn-feature {
+      background: ${accent}18 !important;
+      border: 1px solid ${accent}44 !important;
+      color: rgba(255,255,255,0.88) !important;
+    }
+    .nav-btn-feature:hover {
+      background: ${accent}28 !important;
+      border-color: ${accent}66 !important;
+    }
+
+    /* ── Aeva OS glass card accent glow (opt-in class) ── */
+    .aeva-card-glow { box-shadow: var(--aeva-shadow-card), 0 0 24px 2px ${accent}18; }
+    .aeva-card-glow:hover { box-shadow: var(--aeva-shadow-raised), 0 0 32px 4px ${accent}28; }
+
+    /* ── Accent utility classes ── */
+    .aeva-accent         { color: ${accent}; }
+    .aeva-accent-bg-faint { background: ${accent}12; }
+    .aeva-accent-bg-soft  { background: ${accent}22; }
+    .aeva-accent-border   { border-color: ${accent}44 !important; }
   `
 }
 

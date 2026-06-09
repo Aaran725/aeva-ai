@@ -2431,12 +2431,14 @@ function DashboardView({ onChatOpen, onSignOut }) {
                     </motion.button>
 
                     <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={openRoadmapHub}
-                      style={{ ...nb, background: 'rgba(124,58,237,0.16)', border: '1px solid rgba(124,58,237,0.32)', color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>
+                      className="nav-btn-feature"
+                      style={{ ...nb, fontWeight: 600 }}>
                       <span style={{ fontSize: 11 }}>🗺️</span>Maps
                     </motion.button>
 
                     <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={openArcade}
-                      style={{ ...nb, background: 'rgba(99,102,241,0.16)', border: '1px solid rgba(99,102,241,0.32)', color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>
+                      className="nav-btn-feature"
+                      style={{ ...nb, fontWeight: 600 }}>
                       <Gamepad2 size={12} />Arcade
                     </motion.button>
 
