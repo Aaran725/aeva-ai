@@ -1,7 +1,7 @@
 /**
- * YourUI — full-screen UI customisation editor.
+ * YourUI — Aeva OS Personalisation panel.
  *
- * Left panel:  all controls (background, accent, shape, font, motion, density, hidden elements)
+ * Left panel:  all controls (themes, background, accent, surface, shape, font, motion, density, hidden)
  * Right panel: live mini preview — updates instantly as you change anything
  *
  * Changes apply to CSS custom properties on :root in real time.
@@ -15,6 +15,40 @@ import {
   FONT_OPTIONS, ACCENT_PRESETS, HIDEABLE, DEFAULT_UI,
 } from './uiThemeStore'
 
+/* ── Aeva OS Theme presets ─────────────────────────────────────────────────── */
+export const AEVA_THEMES = [
+  {
+    id: 'midnight',
+    name: 'Midnight',
+    bgFrom: '#08091a', bgTo: '#0f0f2e', bgAngle: 145,
+    accent: '#818CF8', radius: 16, font: 'inter', surfaceOpacity: 0.96,
+  },
+  {
+    id: 'aurora',
+    name: 'Aurora',
+    bgFrom: '#03100d', bgTo: '#061a18', bgAngle: 145,
+    accent: '#34D399', radius: 20, font: 'inter', surfaceOpacity: 0.94,
+  },
+  {
+    id: 'ember',
+    name: 'Ember',
+    bgFrom: '#120a06', bgTo: '#1c0e08', bgAngle: 145,
+    accent: '#FB923C', radius: 16, font: 'inter', surfaceOpacity: 0.96,
+  },
+  {
+    id: 'bloom',
+    name: 'Bloom',
+    bgFrom: '#120818', bgTo: '#1c0e26', bgAngle: 145,
+    accent: '#F472B6', radius: 24, font: 'rounded', surfaceOpacity: 0.90,
+  },
+  {
+    id: 'mono',
+    name: 'Mono',
+    bgFrom: '#0a0a0a', bgTo: '#141414', bgAngle: 180,
+    accent: '#CBD5E1', radius: 8, font: 'mono', surfaceOpacity: 0.97,
+  },
+]
+
 /* ── Angle options ─────────────────────────────────────────────────────────── */
 const ANGLES = [
   { label: '↗', value: 45  },
@@ -26,6 +60,17 @@ const ANGLES = [
   { label: '↖', value: 315 },
   { label: '↑', value: 0   },
 ]
+
+/* ── Helpers to detect active theme ───────────────────────────────────────── */
+function activeThemeId(state) {
+  return AEVA_THEMES.find(t =>
+    t.bgFrom === state.bgFrom &&
+    t.bgTo   === state.bgTo   &&
+    t.accent === state.accent &&
+    t.radius === state.radius &&
+    t.font   === state.font
+  )?.id ?? null
+}
 
 /* ── Section wrapper ───────────────────────────────────────────────────────── */
 function Section({ title, children }) {
@@ -40,16 +85,16 @@ function Section({ title, children }) {
 }
 
 /* ── Pill button ───────────────────────────────────────────────────────────── */
-function Pill({ active, onClick, children }) {
+function Pill({ active, onClick, children, accent = '#818CF8' }) {
   return (
     <motion.button
       whileTap={{ scale: 0.94 }}
       onClick={onClick}
       style={{
-        flex: 1, padding: '8px 0', borderRadius: 10, border: 'none',
-        background: active ? 'rgba(129,140,248,0.22)' : 'rgba(255,255,255,0.05)',
-        border: active ? '1px solid rgba(129,140,248,0.45)' : '1px solid rgba(255,255,255,0.08)',
-        color: active ? '#A5B4FC' : 'rgba(255,255,255,0.40)',
+        flex: 1, padding: '8px 0', borderRadius: 10,
+        background: active ? `${accent}22` : 'rgba(255,255,255,0.05)',
+        border: active ? `1px solid ${accent}55` : '1px solid rgba(255,255,255,0.08)',
+        color: active ? accent : 'rgba(255,255,255,0.40)',
         fontSize: 12, fontWeight: 700, cursor: 'pointer',
         transition: 'all 0.15s',
         fontFamily: 'inherit',
@@ -59,7 +104,7 @@ function Pill({ active, onClick, children }) {
 }
 
 /* ── Toggle row ────────────────────────────────────────────────────────────── */
-function ToggleRow({ label, desc, active, onToggle }) {
+function ToggleRow({ label, desc, active, onToggle, accent = '#818CF8' }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
       <div>
@@ -71,15 +116,15 @@ function ToggleRow({ label, desc, active, onToggle }) {
         onClick={onToggle}
         style={{
           width: 44, height: 24, borderRadius: 99, flexShrink: 0, cursor: 'pointer',
-          background: active ? 'rgba(129,140,248,0.25)' : 'rgba(255,255,255,0.08)',
-          border: active ? '1px solid rgba(129,140,248,0.50)' : '1px solid rgba(255,255,255,0.12)',
+          background: active ? `${accent}25` : 'rgba(255,255,255,0.08)',
+          border: active ? `1px solid ${accent}50` : '1px solid rgba(255,255,255,0.12)',
           position: 'relative', transition: 'all 0.2s',
         }}
       >
         <motion.div
           animate={{ x: active ? 20 : 2 }}
           transition={{ type: 'spring', stiffness: 400, damping: 26 }}
-          style={{ position: 'absolute', top: 2, width: 18, height: 18, borderRadius: '50%', background: active ? '#A5B4FC' : 'rgba(255,255,255,0.30)' }}
+          style={{ position: 'absolute', top: 2, width: 18, height: 18, borderRadius: '50%', background: active ? accent : 'rgba(255,255,255,0.30)' }}
         />
       </motion.button>
     </div>
@@ -88,12 +133,14 @@ function ToggleRow({ label, desc, active, onToggle }) {
 
 /* ── Live mini preview ─────────────────────────────────────────────────────── */
 function MiniPreview({ theme }) {
-  const { bgFrom, bgTo, bgAngle, accent, font, radius, hidden } = theme
+  const { bgFrom, bgTo, bgAngle, accent, font, radius, hidden, surfaceOpacity = 0.96 } = theme
   const bg = `linear-gradient(${bgAngle}deg, ${bgFrom} 0%, ${bgTo} 100%)`
   const fam = FONT_OPTIONS.find(f => f.id === font)?.family || FONT_OPTIONS[0].family
-  const r = Math.min(radius, 24) // cap at 24px for the small preview
+  const r = Math.min(radius, 24)
   const accentDim = accent + '28'
   const accentBorder = accent + '55'
+  const op = Math.max(0.10, Math.min(0.97, surfaceOpacity))
+  const chatBg = `rgba(4,5,18,${(op * 0.75).toFixed(2)})`
 
   return (
     <div style={{
@@ -125,26 +172,21 @@ function MiniPreview({ theme }) {
         </div>
       </div>
 
-      {/* Chat area — dark overlay like the real chat, gradient shows in the shell around it */}
-      <div style={{ padding: '14px 14px', display: 'flex', flexDirection: 'column', gap: 8, background: 'rgba(4,5,18,0.72)', backdropFilter: 'blur(12px)' }}>
-        {/* Aeva bubble */}
+      {/* Chat area — opacity responds to surfaceOpacity slider */}
+      <div style={{ padding: '14px 14px', display: 'flex', flexDirection: 'column', gap: 8, background: chatBg, backdropFilter: 'blur(12px)' }}>
         <div style={{ display: 'flex', gap: 7, alignItems: 'flex-start' }}>
           <div style={{ width: 22, height: 22, borderRadius: Math.min(r, 8), background: accentDim, border: `1px solid ${accentBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <span style={{ fontSize: 9 }}>✦</span>
           </div>
           <div style={{ padding: '8px 11px', borderRadius: `4px ${r}px ${r}px ${r}px`, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', borderLeft: `2px solid ${accentBorder}`, flex: 1 }}>
-            <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.80)', lineHeight: 1.5 }}>Good — let's push this further. What happens when the gradient approaches zero?</div>
+            <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.80)', lineHeight: 1.5 }}>Good — let's push further. What happens when the gradient approaches zero?</div>
           </div>
         </div>
-
-        {/* User bubble */}
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <div style={{ padding: '8px 11px', borderRadius: `${r}px ${r}px 4px ${r}px`, background: `linear-gradient(135deg, ${accent}55, ${accent}33)`, border: `1px solid ${accent}44`, maxWidth: '70%' }}>
             <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.90)', lineHeight: 1.5 }}>It converges, so f′(x) → 0 as x → ∞</div>
           </div>
         </div>
-
-        {/* Another Aeva bubble */}
         <div style={{ display: 'flex', gap: 7, alignItems: 'flex-start' }}>
           <div style={{ width: 22, height: 22, borderRadius: Math.min(r, 8), background: accentDim, border: `1px solid ${accentBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <span style={{ fontSize: 9 }}>✦</span>
@@ -156,7 +198,7 @@ function MiniPreview({ theme }) {
       </div>
 
       {/* Input bar */}
-      <div style={{ padding: '10px 12px 12px', borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(4,5,18,0.72)' }}>
+      <div style={{ padding: '10px 12px 12px', borderTop: '1px solid rgba(255,255,255,0.06)', background: chatBg }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: `${Math.min(r, 16)}px`, background: 'rgba(255,255,255,0.05)', border: `1px solid ${accentBorder}` }}>
           <div style={{ flex: 1, fontSize: 10.5, color: 'rgba(255,255,255,0.28)' }}>Ask a follow-up…</div>
           <div style={{ width: 22, height: 22, borderRadius: `${Math.min(r, 12)}px`, background: accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -173,12 +215,9 @@ function MiniPreview({ theme }) {
 ══════════════════════════════════════════════════════════════════════════════ */
 export default function YourUI({ onClose }) {
   const store = useUITheme()
-  const { bgFrom, bgTo, bgAngle, accent, font, radius, motion: motionEnabled, density, hidden } = store
-
-  // Local draft state — apply live but can be reset
+  const { bgFrom, bgTo, bgAngle, accent, font, radius, motion: motionEnabled, density, surfaceOpacity = 0.96, hidden } = store
   const set = (patch) => store.setUI(patch)
-
-  const fontFamily = FONT_OPTIONS.find(f => f.id === font)?.family || FONT_OPTIONS[0].family
+  const currentThemeId = activeThemeId(store)
 
   return (
     <motion.div
@@ -205,7 +244,7 @@ export default function YourUI({ onClose }) {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 18 }}>🎨</span>
-          <span style={{ fontSize: 16, fontWeight: 900, color: '#fff', letterSpacing: '-0.03em' }}>YOUR UI</span>
+          <span style={{ fontSize: 16, fontWeight: 900, color: '#fff', letterSpacing: '-0.03em' }}>Personalise</span>
           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', fontWeight: 500, marginLeft: 4 }}>every change is live</span>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -232,41 +271,90 @@ export default function YourUI({ onClose }) {
         {/* ── Left: Controls ───────────────────────────────────────────────── */}
         <div style={{ width: 420, flexShrink: 0, overflowY: 'auto', padding: '28px 32px' }}>
 
-          {/* BACKGROUND */}
+          {/* ── AEVA OS THEMES ─────────────────────────────────────────────── */}
+          <Section title="Aeva OS Theme">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, marginBottom: 4 }}>
+              {AEVA_THEMES.map(t => {
+                const isActive = currentThemeId === t.id
+                const themeBg = `linear-gradient(${t.bgAngle}deg, ${t.bgFrom} 0%, ${t.bgTo} 100%)`
+                return (
+                  <motion.button
+                    key={t.id}
+                    whileHover={{ scale: 1.04 }}
+                    whileTap={{ scale: 0.94 }}
+                    onClick={() => set({
+                      bgFrom: t.bgFrom, bgTo: t.bgTo, bgAngle: t.bgAngle,
+                      accent: t.accent, radius: t.radius, font: t.font,
+                      surfaceOpacity: t.surfaceOpacity,
+                    })}
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                      padding: '10px 6px 8px', borderRadius: 14, cursor: 'pointer',
+                      background: isActive ? `${t.accent}18` : 'rgba(255,255,255,0.04)',
+                      border: isActive ? `1.5px solid ${t.accent}55` : '1px solid rgba(255,255,255,0.08)',
+                      transition: 'all 0.18s',
+                    }}
+                  >
+                    {/* Gradient swatch */}
+                    <div style={{
+                      width: '100%', height: 36, borderRadius: 8,
+                      background: themeBg,
+                      border: '1px solid rgba(255,255,255,0.10)',
+                      position: 'relative', overflow: 'hidden',
+                    }}>
+                      {/* Accent dot */}
+                      <div style={{
+                        position: 'absolute', bottom: 5, right: 5,
+                        width: 8, height: 8, borderRadius: '50%',
+                        background: t.accent,
+                        boxShadow: `0 0 6px ${t.accent}`,
+                      }} />
+                      {isActive && (
+                        <div style={{
+                          position: 'absolute', top: 4, left: 4,
+                          fontSize: 8, color: '#fff', fontWeight: 900,
+                          background: `${t.accent}cc`, borderRadius: 4, padding: '1px 4px',
+                        }}>✓</div>
+                      )}
+                    </div>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700,
+                      color: isActive ? t.accent : 'rgba(255,255,255,0.45)',
+                      letterSpacing: '0.01em',
+                    }}>{t.name}</span>
+                  </motion.button>
+                )
+              })}
+            </div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)', marginTop: 6 }}>
+              Pick a starting point — then fine-tune below.
+            </div>
+          </Section>
+
+          {/* ── BACKGROUND ─────────────────────────────────────────────────── */}
           <Section title="Background">
             <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
-              {/* From colour */}
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.35)', marginBottom: 6 }}>FROM</div>
                 <label style={{ display: 'block', position: 'relative', cursor: 'pointer' }}>
-                  <input
-                    type="color"
-                    value={bgFrom}
-                    onChange={e => set({ bgFrom: e.target.value })}
-                    style={{ opacity: 0, position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer' }}
-                  />
-                  <div style={{ height: 44, borderRadius: 12, background: bgFrom, border: '2px solid rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  <input type="color" value={bgFrom} onChange={e => set({ bgFrom: e.target.value })}
+                    style={{ opacity: 0, position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer' }} />
+                  <div style={{ height: 44, borderRadius: 12, background: bgFrom, border: '2px solid rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.55)', fontFamily: "'JetBrains Mono', monospace" }}>{bgFrom}</span>
                   </div>
                 </label>
               </div>
-              {/* To colour */}
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.35)', marginBottom: 6 }}>TO</div>
                 <label style={{ display: 'block', position: 'relative', cursor: 'pointer' }}>
-                  <input
-                    type="color"
-                    value={bgTo}
-                    onChange={e => set({ bgTo: e.target.value })}
-                    style={{ opacity: 0, position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer' }}
-                  />
-                  <div style={{ height: 44, borderRadius: 12, background: bgTo, border: '2px solid rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  <input type="color" value={bgTo} onChange={e => set({ bgTo: e.target.value })}
+                    style={{ opacity: 0, position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer' }} />
+                  <div style={{ height: 44, borderRadius: 12, background: bgTo, border: '2px solid rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.55)', fontFamily: "'JetBrains Mono', monospace" }}>{bgTo}</span>
                   </div>
                 </label>
               </div>
             </div>
-            {/* Angle */}
             <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>DIRECTION</div>
             <div style={{ display: 'flex', gap: 6 }}>
               {ANGLES.map(a => (
@@ -275,19 +363,18 @@ export default function YourUI({ onClose }) {
                   whileTap={{ scale: 0.90 }}
                   onClick={() => set({ bgAngle: a.value })}
                   style={{
-                    flex: 1, height: 34, borderRadius: 9, border: 'none',
-                    background: bgAngle === a.value ? 'rgba(129,140,248,0.22)' : 'rgba(255,255,255,0.05)',
-                    border: bgAngle === a.value ? '1px solid rgba(129,140,248,0.45)' : '1px solid rgba(255,255,255,0.08)',
-                    color: bgAngle === a.value ? '#A5B4FC' : 'rgba(255,255,255,0.40)',
-                    fontSize: 14, cursor: 'pointer',
-                    transition: 'all 0.15s',
+                    flex: 1, height: 34, borderRadius: 9,
+                    background: bgAngle === a.value ? `${accent}22` : 'rgba(255,255,255,0.05)',
+                    border: bgAngle === a.value ? `1px solid ${accent}45` : '1px solid rgba(255,255,255,0.08)',
+                    color: bgAngle === a.value ? accent : 'rgba(255,255,255,0.40)',
+                    fontSize: 14, cursor: 'pointer', transition: 'all 0.15s',
                   }}
                 >{a.label}</motion.button>
               ))}
             </div>
           </Section>
 
-          {/* ACCENT */}
+          {/* ── ACCENT ─────────────────────────────────────────────────────── */}
           <Section title="Accent Colour">
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
               {ACCENT_PRESETS.map(p => (
@@ -297,37 +384,65 @@ export default function YourUI({ onClose }) {
                   onClick={() => set({ accent: p.color })}
                   title={p.label}
                   style={{
-                    width: 36, height: 36, borderRadius: '50%', border: 'none', cursor: 'pointer',
+                    width: 36, height: 36, borderRadius: '50%', cursor: 'pointer',
                     background: p.color,
                     boxShadow: accent === p.color ? `0 0 0 3px rgba(255,255,255,0.15), 0 0 16px ${p.color}88` : `0 0 0 2px rgba(255,255,255,0.06)`,
                     transform: accent === p.color ? 'scale(1.15)' : 'scale(1)',
-                    transition: 'all 0.15s',
+                    transition: 'all 0.15s', border: 'none',
                   }}
                 />
               ))}
-              {/* Custom colour picker */}
               <label title="Custom colour" style={{ width: 36, height: 36, borderRadius: '50%', border: '2px dashed rgba(255,255,255,0.20)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', flexShrink: 0 }}>
-                <input
-                  type="color"
-                  value={accent}
-                  onChange={e => set({ accent: e.target.value })}
-                  style={{ opacity: 0, position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer' }}
-                />
+                <input type="color" value={accent} onChange={e => set({ accent: e.target.value })}
+                  style={{ opacity: 0, position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer' }} />
                 <span style={{ fontSize: 16, pointerEvents: 'none' }}>+</span>
               </label>
             </div>
-            {/* Accent preview bar */}
             <div style={{ height: 6, borderRadius: 99, background: `linear-gradient(90deg, ${accent}22, ${accent}, ${accent}22)` }} />
           </Section>
 
-          {/* SHAPE */}
+          {/* ── SURFACE ────────────────────────────────────────────────────── */}
+          <Section title="Surface">
+            <div style={{ marginBottom: 10 }}>
+              <input
+                type="range" min={20} max={97} step={1}
+                value={Math.round(surfaceOpacity * 100)}
+                onChange={e => set({ surfaceOpacity: Number(e.target.value) / 100 })}
+                style={{ width: '100%', accentColor: accent }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, alignItems: 'center' }}>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.30)' }}>Glass</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: accent }}>{Math.round(surfaceOpacity * 100)}%</span>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.30)' }}>Solid</span>
+              </div>
+            </div>
+            {/* Visual comparison */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[20, 55, 80, 97].map(v => {
+                const isActive = Math.abs(Math.round(surfaceOpacity * 100) - v) < 8
+                return (
+                  <motion.button
+                    key={v}
+                    whileTap={{ scale: 0.94 }}
+                    onClick={() => set({ surfaceOpacity: v / 100 })}
+                    style={{
+                      flex: 1, height: 38, borderRadius: 10, cursor: 'pointer',
+                      background: isActive ? `${accent}22` : `rgba(8,9,26,${v/100})`,
+                      border: isActive ? `1px solid ${accent}55` : '1px solid rgba(255,255,255,0.10)',
+                      color: isActive ? accent : 'rgba(255,255,255,0.40)',
+                      fontSize: 10, fontWeight: 700, transition: 'all 0.15s',
+                    }}
+                  >{v === 20 ? 'Frosted' : v === 55 ? 'Mid' : v === 80 ? 'Deep' : 'Solid'}</motion.button>
+                )
+              })}
+            </div>
+          </Section>
+
+          {/* ── SHAPE ──────────────────────────────────────────────────────── */}
           <Section title="Shape">
             <div style={{ marginBottom: 10 }}>
               <input
-                type="range"
-                min={0}
-                max={99}
-                value={radius}
+                type="range" min={0} max={99} value={radius}
                 onChange={e => set({ radius: Number(e.target.value) })}
                 style={{ width: '100%', accentColor: accent }}
               />
@@ -337,7 +452,6 @@ export default function YourUI({ onClose }) {
                 <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.30)' }}>Pill</span>
               </div>
             </div>
-            {/* Shape preview pills */}
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               {[0, 16, 32, 99].map(r => (
                 <motion.button
@@ -349,15 +463,14 @@ export default function YourUI({ onClose }) {
                     background: radius === r ? `${accent}22` : 'rgba(255,255,255,0.05)',
                     border: `1px solid ${radius === r ? accent + '55' : 'rgba(255,255,255,0.08)'}`,
                     color: radius === r ? accent : 'rgba(255,255,255,0.35)',
-                    fontSize: 10, fontWeight: 700,
-                    transition: 'all 0.15s',
+                    fontSize: 10, fontWeight: 700, transition: 'all 0.15s',
                   }}
                 >{r === 0 ? 'Sharp' : r === 16 ? 'Card' : r === 32 ? 'Soft' : 'Pill'}</motion.button>
               ))}
             </div>
           </Section>
 
-          {/* FONT */}
+          {/* ── FONT ───────────────────────────────────────────────────────── */}
           <Section title="Font">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {FONT_OPTIONS.map(f => (
@@ -383,24 +496,24 @@ export default function YourUI({ onClose }) {
             </div>
           </Section>
 
-          {/* MOTION */}
+          {/* ── ANIMATIONS ─────────────────────────────────────────────────── */}
           <Section title="Animations">
             <div style={{ display: 'flex', gap: 8 }}>
-              <Pill active={motionEnabled === true}  onClick={() => set({ motion: true  })}>On</Pill>
-              <Pill active={motionEnabled === false} onClick={() => set({ motion: false })}>Off</Pill>
+              <Pill active={motionEnabled === true}  onClick={() => set({ motion: true  })} accent={accent}>On</Pill>
+              <Pill active={motionEnabled === false} onClick={() => set({ motion: false })} accent={accent}>Off</Pill>
             </div>
           </Section>
 
-          {/* DENSITY */}
+          {/* ── DENSITY ────────────────────────────────────────────────────── */}
           <Section title="Density">
             <div style={{ display: 'flex', gap: 8 }}>
-              <Pill active={density === 0.85} onClick={() => set({ density: 0.85 })}>Compact</Pill>
-              <Pill active={density === 1}    onClick={() => set({ density: 1    })}>Normal</Pill>
-              <Pill active={density === 1.15} onClick={() => set({ density: 1.15 })}>Spacious</Pill>
+              <Pill active={density === 0.85} onClick={() => set({ density: 0.85 })} accent={accent}>Compact</Pill>
+              <Pill active={density === 1}    onClick={() => set({ density: 1    })} accent={accent}>Normal</Pill>
+              <Pill active={density === 1.15} onClick={() => set({ density: 1.15 })} accent={accent}>Spacious</Pill>
             </div>
           </Section>
 
-          {/* HIDE ELEMENTS */}
+          {/* ── SHOW / HIDE ─────────────────────────────────────────────────── */}
           <Section title="Show / Hide">
             <div style={{ borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', padding: '0 16px', overflow: 'hidden' }}>
               {HIDEABLE.map(item => (
@@ -410,6 +523,7 @@ export default function YourUI({ onClose }) {
                   desc={item.desc}
                   active={!hidden.includes(item.key)}
                   onToggle={() => store.toggleHidden(item.key)}
+                  accent={accent}
                 />
               ))}
             </div>
@@ -427,7 +541,7 @@ export default function YourUI({ onClose }) {
           overflowY: 'auto',
         }}>
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)', marginBottom: 20 }}>LIVE PREVIEW</div>
-          <MiniPreview theme={{ bgFrom, bgTo, bgAngle, accent, font, radius, hidden }} />
+          <MiniPreview theme={{ bgFrom, bgTo, bgAngle, accent, font, radius, hidden, surfaceOpacity }} />
           <div style={{ marginTop: 20, textAlign: 'center' }}>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', lineHeight: 1.6 }}>
               Changes apply to the whole app instantly.<br />Close this panel to see the full effect.

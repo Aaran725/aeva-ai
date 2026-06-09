@@ -42,20 +42,21 @@ export const HIDEABLE = [
 
 /* ── Defaults ──────────────────────────────────────────────────────────────── */
 export const DEFAULT_UI = {
-  bgFrom:  '#08091a',
-  bgTo:    '#0f0f2e',
-  bgAngle: 145,
-  accent:  '#818CF8',
-  font:    'inter',
-  radius:  16,          // 0 = sharp, 99 = pill
-  motion:  true,        // true = animations on, false = off
-  density: 1,           // 0.85 = compact, 1 = normal, 1.15 = spacious
-  hidden:  [],
+  bgFrom:         '#08091a',
+  bgTo:           '#0f0f2e',
+  bgAngle:        145,
+  accent:         '#818CF8',
+  font:           'inter',
+  radius:         16,          // 0 = sharp, 99 = pill
+  motion:         true,        // true = animations on, false = off
+  density:        1,           // 0.85 = compact, 1 = normal, 1.15 = spacious
+  surfaceOpacity: 0.96,        // 0.20 = frosted glass, 0.97 = near-solid
+  hidden:         [],
 }
 
 function persist(s) {
-  const { bgFrom, bgTo, bgAngle, accent, font, radius, motion, density, hidden } = s
-  return { bgFrom, bgTo, bgAngle, accent, font, radius, motion, density, hidden }
+  const { bgFrom, bgTo, bgAngle, accent, font, radius, motion, density, surfaceOpacity, hidden } = s
+  return { bgFrom, bgTo, bgAngle, accent, font, radius, motion, density, surfaceOpacity, hidden }
 }
 
 /* ── Store ─────────────────────────────────────────────────────────────────── */
@@ -88,7 +89,7 @@ export const useUITheme = create((set) => ({
 
 /* ── Apply CSS variables to :root ──────────────────────────────────────────── */
 export function applyCSS(theme) {
-  const { bgFrom, bgTo, bgAngle, accent, font, radius, motion, density } = {
+  const { bgFrom, bgTo, bgAngle, accent, font, radius, motion, density, surfaceOpacity } = {
     ...DEFAULT_UI,
     ...theme,
   }
@@ -104,6 +105,13 @@ export function applyCSS(theme) {
   const fam = FONT_OPTIONS.find(f => f.id === font)?.family || FONT_OPTIONS[0].family
   r.style.setProperty('--ui-font', fam)
   r.style.fontFamily = fam
+
+  /* ── Layer 2 derived: surface opacity (overrides :root default) ── */
+  const op = Math.max(0.10, Math.min(0.97, surfaceOpacity))
+  r.style.setProperty('--aeva-surface-1', `rgba(8,9,26,${op})`)
+  // Secondary and tertiary surfaces scale proportionally
+  r.style.setProperty('--aeva-surface-2', `rgba(255,255,255,${(op * 0.031).toFixed(3)})`)
+  r.style.setProperty('--aeva-surface-3', `rgba(255,255,255,${(op * 0.062).toFixed(3)})`)
 
   /* ── Layer 2 derived: radius scale ── */
   r.style.setProperty('--aeva-radius-sm',   `${Math.round(radius * 0.5)}px`)
