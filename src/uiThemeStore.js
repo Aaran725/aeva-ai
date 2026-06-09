@@ -93,7 +93,8 @@ export function applyCSS(theme) {
     ...theme,
   }
   const r = document.documentElement
-  r.style.setProperty('--ui-bg',      `linear-gradient(${bgAngle}deg, ${bgFrom} 0%, ${bgTo} 100%)`)
+  const bg = `linear-gradient(${bgAngle}deg, ${bgFrom} 0%, ${bgTo} 100%)`
+  r.style.setProperty('--ui-bg',      bg)
   r.style.setProperty('--ui-accent',  accent)
   r.style.setProperty('--ui-radius',  `${radius}px`)
   r.style.setProperty('--ui-motion',  motion ? '1' : '0')
@@ -101,8 +102,22 @@ export function applyCSS(theme) {
   const fam = FONT_OPTIONS.find(f => f.id === font)?.family || FONT_OPTIONS[0].family
   r.style.setProperty('--ui-font', fam)
   r.style.fontFamily = fam
-  // Clear any previously-set body background so the dark html fallback shows at edges
-  document.body.style.background = ''
+
+  // Apply background to body (the mesh overlay sits on top via body::before z-index:0,
+  // so this tints the whole app shell without leaking — nav overflow is now fixed)
+  document.body.style.background = bg
+
+  // Inject a tiny dynamic stylesheet so accent + radius actually propagate to
+  // visible elements that can't easily read CSS vars from inline JS
+  let s = document.getElementById('_ui_theme')
+  if (!s) { s = document.createElement('style'); s.id = '_ui_theme'; document.head.appendChild(s) }
+  s.textContent = `
+    ::-webkit-scrollbar-thumb          { background: ${accent}35 !important; }
+    ::-webkit-scrollbar-thumb:hover    { background: ${accent}60 !important; }
+    ::selection                        { background: ${accent}44; color: #fff; }
+    .xp-bar-fill                       { background: linear-gradient(90deg, ${accent}, ${accent}cc) !important; }
+    .lv-pill                           { background: ${accent}22 !important; border-color: ${accent}55 !important; color: ${accent} !important; }
+  `
 }
 
 /* ── Convenience selector ──────────────────────────────────────────────────── */

@@ -1419,14 +1419,14 @@ function MissionCard({ onChatOpen, onOrbClick }) {
                 <span style={{ fontSize: 11.5, fontWeight: 700, color: '#FCD34D' }}>{streak}</span>
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(139,143,255,0.12)', border: '1px solid rgba(139,143,255,0.25)', borderRadius: 10, padding: '4px 9px' }}>
+            <div className="lv-pill" style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(139,143,255,0.12)', border: '1px solid rgba(139,143,255,0.25)', borderRadius: 10, padding: '4px 9px' }}>
               <Zap size={10} color="#8B8FFF" fill="#8B8FFF" />
               <span style={{ fontSize: 11.5, fontWeight: 700, color: '#A5B4FC' }}>Lv {currentLevel}</span>
             </div>
           </div>
           {/* XP bar */}
           <div style={{ width: 80, height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
-            <div style={{ width: `${xpProgress}%`, height: '100%', background: 'linear-gradient(90deg, #6366F1, #8B8FFF)', borderRadius: 2, transition: 'width 0.5s ease' }} />
+            <div className="xp-bar-fill" style={{ width: `${xpProgress}%`, height: '100%', background: 'linear-gradient(90deg, #6366F1, #8B8FFF)', borderRadius: 2, transition: 'width 0.5s ease' }} />
           </div>
         </div>
         {/* Clickable orb */}
