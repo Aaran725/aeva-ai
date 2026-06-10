@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, createContext, useContext, lazy, Suspense } from 'react'
+import { useState, useRef, useEffect, useMemo, createContext, useContext, lazy, Suspense } from 'react'
 import { GROQ_KEYS, GROQ_URL, nextGroqKey } from './groqClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import katex from 'katex'
@@ -3906,6 +3906,62 @@ function SessionBadge({ sessionState, criticism }) {
 }
 
 /* ═══ CHAT VIEW / COCKPIT ═════════════════════════ */
+/* ── Context-aware chip suggestions ──────────────────────────────────────────
+   Returns up to 4 chips that update as the conversation evolves.
+   Priority: criticism signal → session phase → exchange milestones → topic.
+────────────────────────────────────────────────────────────────────────────── */
+function useContextChips({ sessionState, exchangeCount, subject, masteryMap, criticism, chipTick }) { // eslint-disable-line no-unused-vars
+  return useMemo(() => {
+    if (exchangeCount < 1) return []
+
+    const topic = subject || null
+    const chips = []
+
+    // ── Highest priority: live adaptation signal ──────────────────────────
+    if (criticism === 'redirect') {
+      chips.push({ id: 'angle',   label: 'Try a different angle',  icon: '🔄' })
+      chips.push({ id: 'analogy', label: 'Give me an analogy',     icon: '🧩' })
+    } else if (criticism === 'hype') {
+      chips.push({ id: 'harder',  label: 'Make it harder',         icon: '⚡' })
+      chips.push({ id: 'extend',  label: 'Take it further',        icon: '🚀' })
+    } else if (criticism === 'challenge') {
+      chips.push({ id: 'gap',     label: 'Show me what I\'m missing', icon: '🎯' })
+    } else if (criticism === 'coach') {
+      chips.push({ id: 'hint',    label: 'Give me a hint',         icon: '💡' })
+    }
+
+    // ── Session phase chips ───────────────────────────────────────────────
+    if (sessionState === 'STRESS_TEST') {
+      if (!chips.find(c => c.id === 'harder'))
+        chips.push({ id: 'harder',  label: 'Give me a harder one', icon: '🔥' })
+      chips.push({ id: 'mistake',   label: 'Explain my mistake',   icon: '🔍' })
+    } else if (sessionState === 'CONSOLIDATION') {
+      chips.push({ id: 'recap',     label: 'What have I learned?', icon: '⭐' })
+      chips.push({ id: 'next',      label: 'What should I study next?', icon: '🗺️' })
+    } else if (sessionState === 'SCAFFOLDING' && exchangeCount >= 3) {
+      chips.push({ id: 'practice',  label: topic ? `Practice ${topic} problem` : 'Practice problem', icon: '✏️' })
+    }
+
+    // ── Milestone chips (fill gaps) ───────────────────────────────────────
+    if (chips.length < 3 && exchangeCount >= 2) {
+      chips.push({ id: 'example', label: 'Give me an example',       icon: '💡' })
+    }
+    if (chips.length < 3 && exchangeCount >= 4) {
+      chips.push({ id: 'test',    label: 'Test my understanding',     icon: '🎯' })
+    }
+    if (chips.length < 4 && exchangeCount >= 7) {
+      chips.push({ id: 'summary', label: 'Summarise what we covered', icon: '📋' })
+    }
+    if (chips.length < 4 && exchangeCount >= 2) {
+      chips.push({ id: 'simpler', label: 'Explain it more simply',    icon: '🔬' })
+    }
+
+    // Deduplicate by id, cap at 4
+    const seen = new Set()
+    return chips.filter(c => seen.has(c.id) ? false : seen.add(c.id)).slice(0, 4)
+  }, [sessionState, exchangeCount, subject, criticism])
+}
+
 function ChatView({ onBack }) {
   const T = useT()
   const { name } = useUser()
@@ -4452,10 +4508,12 @@ STRICT RULES:
         const isCasualMessage = userText.length < 18
           || /^(ok|okay|yes|no|sure|fine|got it|thanks?|thank you|bye|goodbye|hi|hey|hello|cool|nice|great|lol|haha|lmao|yep|nope|wow|what|really|hm+|ah+|oh+|alright|sounds good|makes sense|i see|got it|interesting|go on|continue|and\??|also\??|next\??)\b[.!?]?\s*$/i.test(userText.trim())
         criticResult = isCasualMessage ? CRITIC_FALLBACK : await runCritic(messages, userText)
-        setCriticism(criticResult)
+        setCriticism(prev => { if (prev?.mode !== criticResult?.mode) setChipTick(t => t + 1); return criticResult })
         updateMastery(criticResult)
         exchangeCountRef.current += 1
         advanceSessionState(exchangeCountRef.current, criticResult)
+        // Refresh context chips at key milestones so suggestions stay relevant
+        if ([2, 4, 7, 10].includes(exchangeCountRef.current)) setChipTick(t => t + 1)
 
         // Background summarisation: first save at exchange 6 (enough context to be useful),
         // then every 6 thereafter. Non-blocking, silent.
@@ -5046,6 +5104,17 @@ If no clear changes: {"changes":[]}`
   const isEmpty = messages.length === 0
   const isLight = !isMission && (chatSettings.chatBg || 'default') === 'white'
   const isMobile = useIsMobile()
+
+  // chipTick increments at exchange milestones (2,4,7) so contextChips re-memos
+  const [chipTick, setChipTick] = useState(0)
+  const contextChips = useContextChips({
+    sessionState,
+    exchangeCount: exchangeCountRef.current,
+    subject: sessionSubjectRef.current,
+    masteryMap,
+    criticism,
+    chipTick, // included so memo recalcs when tick changes
+  })
   const xpHiddenChat     = useIsHidden('xp')
   const streakHiddenChat = useIsHidden('streak')
   const statsHiddenChat  = useIsHidden('stats')
@@ -6224,6 +6293,62 @@ If no clear changes: {"changes":[]}`
                       }}
                     >
                       {action}
+                    </motion.button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* ── Context-aware chips — visible during active non-mission chat ── */}
+            <AnimatePresence>
+              {!isEmpty && !isMission && !isThinking && contextChips.length > 0 && (
+                <motion.div
+                  key={contextChips.map(c => c.id).join(',')}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 4 }}
+                  transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                  style={{
+                    flexShrink: 0,
+                    display: 'flex', gap: 7, padding: '0 20px 10px',
+                    overflowX: 'auto', scrollbarWidth: 'none',
+                    WebkitOverflowScrolling: 'touch',
+                  }}
+                >
+                  {contextChips.map((chip, i) => (
+                    <motion.button
+                      key={chip.id}
+                      initial={{ opacity: 0, scale: 0.88 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: i * 0.05, type: 'spring', stiffness: 420, damping: 28 }}
+                      whileHover={{ scale: 1.04, y: -1 }}
+                      whileTap={{ scale: 0.94 }}
+                      onClick={() => { setInput(chip.label); setTimeout(() => inputRef.current?.focus(), 0) }}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                        padding: '6px 13px', borderRadius: 99, flexShrink: 0,
+                        background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,255,255,0.11)',
+                        color: 'rgba(255,255,255,0.62)',
+                        fontSize: 12, fontWeight: 600,
+                        cursor: 'pointer',
+                        fontFamily: "'Inter', system-ui, sans-serif",
+                        backdropFilter: 'blur(12px)',
+                        WebkitBackdropFilter: 'blur(12px)',
+                        transition: 'border-color 0.15s, color 0.15s',
+                        whiteSpace: 'nowrap',
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.borderColor = `${activeTheme.accent}55`
+                        e.currentTarget.style.color = 'rgba(255,255,255,0.88)'
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.11)'
+                        e.currentTarget.style.color = 'rgba(255,255,255,0.62)'
+                      }}
+                    >
+                      <span style={{ fontSize: 13 }}>{chip.icon}</span>
+                      {chip.label}
                     </motion.button>
                   ))}
                 </motion.div>
