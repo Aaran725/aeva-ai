@@ -3,7 +3,7 @@ import { GROQ_KEYS, GROQ_URL, nextGroqKey } from './groqClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import { ArrowUp, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, ChevronRight, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Users, FileText, LayoutGrid, Palette } from 'lucide-react'
+import { ArrowUp, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, ChevronRight, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Users, FileText, LayoutGrid, Palette, Home, Map } from 'lucide-react'
 import { useAppSettings, SECTION_BG_PRESETS, CARD_STYLES, FONT_STYLES } from './appSettings'
 import { useLanguageStore } from './languageStore'
 import { useT } from './translations'
@@ -2160,18 +2160,20 @@ function PersonalProgressCard() {
 
 /* ═══ DASHBOARD VIEW ══════════════════════════════ */
 /* ═══ MOBILE DRAWER ══════════════════════════════ */
-function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings, onProfile, onShowEm, onDocs, onRoadmap, onYourUI, onSignOut }) {
+function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings, onProfile, onShowEm, onDocs, onRoadmap, onYourUI, onMaps, onSignOut }) {
   const T = useT()
+  const accent = useUITheme(s => s.accent)
   const items = [
-    { label: 'Roadmaps',     icon: <span style={{ fontSize: 17 }}>🗺️</span>,   color: '#A78BFA', bg: 'rgba(124,58,237,0.10)', border: 'rgba(124,58,237,0.22)', action: onRoadmap },
-    { label: T.library,      icon: <BookOpen size={17} />,  color: '#A78BFA', bg: 'rgba(167,139,250,0.10)', border: 'rgba(167,139,250,0.22)', action: onLibrary },
-    { label: T.secondBrain,  icon: <Brain size={17} />,     color: '#8B8FFF', bg: 'rgba(139,143,255,0.10)', border: 'rgba(139,143,255,0.22)', action: onBrain },
-    { label: T.mirror,       icon: <span style={{ fontSize: 17 }}>🪞</span>, color: '#D8B4FE', bg: 'rgba(139,92,246,0.10)', border: 'rgba(139,92,246,0.22)', action: onMirror },
-    { label: 'Parents',      icon: <Users size={17} />,                        color: '#34D399', bg: 'rgba(52,211,153,0.10)', border: 'rgba(52,211,153,0.22)', action: onShowEm },
-    { label: 'Docs',         icon: <FileText size={17} />,                     color: '#60A5FA', bg: 'rgba(96,165,250,0.10)', border: 'rgba(96,165,250,0.22)', action: onDocs },
-    { label: 'YOUR UI',      icon: <span style={{ fontSize: 17 }}>🎨</span>,   color: '#A5B4FC', bg: 'rgba(129,140,248,0.10)', border: 'rgba(129,140,248,0.25)', action: onYourUI },
-    { label: T.myProfile,    icon: <Star size={17} />,      color: '#E9A364', bg: 'rgba(233,163,100,0.10)', border: 'rgba(233,163,100,0.22)', action: onProfile },
-    { label: T.appearance,   icon: <Settings size={17} />,  color: 'rgba(255,255,255,0.55)', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.10)', action: onSettings },
+    { label: 'Roadmaps',     icon: <span style={{ fontSize: 17 }}>🗺️</span>,   color: '#A78BFA', action: onRoadmap },
+    { label: T.library,      icon: <BookOpen size={17} />,  color: '#A78BFA', action: onLibrary },
+    { label: T.secondBrain,  icon: <Brain size={17} />,     color: '#8B8FFF', action: onBrain },
+    { label: T.mirror,       icon: <span style={{ fontSize: 17 }}>🪞</span>,   color: '#D8B4FE', action: onMirror },
+    { label: 'Maps',         icon: <Map size={17} />,        color: '#34D399', action: onMaps },
+    { label: 'Parents',      icon: <Users size={17} />,      color: '#34D399', action: onShowEm },
+    { label: 'Docs',         icon: <FileText size={17} />,   color: '#60A5FA', action: onDocs },
+    { label: 'YOUR UI',      icon: <span style={{ fontSize: 17 }}>🎨</span>,   color: accent,   action: onYourUI },
+    { label: T.myProfile,    icon: <Star size={17} />,       color: '#E9A364', action: onProfile },
+    { label: T.appearance,   icon: <Settings size={17} />,   color: 'rgba(255,255,255,0.55)', action: onSettings },
   ]
   return (
     <AnimatePresence>
@@ -2189,7 +2191,9 @@ function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings,
             transition={{ type: 'spring', stiffness: 340, damping: 32 }}
             style={{
               position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 299,
-              width: 270, background: 'rgba(6,7,22,0.99)',
+              width: 280,
+              background: 'var(--aeva-surface-1)',
+              backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
               borderLeft: '1px solid rgba(255,255,255,0.10)',
               display: 'flex', flexDirection: 'column',
               fontFamily: "'Inter', system-ui, sans-serif",
@@ -2198,29 +2202,30 @@ function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings,
             {/* Drawer header */}
             <div style={{ padding: '20px 18px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 24, height: 24, borderRadius: 7, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Star size={10} color="white" fill="white" />
+                <div style={{ width: 28, height: 28, borderRadius: 9, background: `linear-gradient(135deg, ${accent}cc, ${accent}66)`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 2px 12px ${accent}44` }}>
+                  <Star size={12} color="white" fill="white" />
                 </div>
-                <span style={{ fontSize: 15, fontWeight: 800, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.02em' }}>aeva</span>
-
+                <span style={{ fontSize: 16, fontWeight: 800, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.03em' }}>aeva</span>
               </div>
-              <motion.button whileHover={{ scale: 1.08, rotate: 90 }} whileTap={{ scale: 0.94 }} onClick={onClose}
-                style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.50)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <X size={13} />
+              <motion.button whileTap={{ scale: 0.90 }} onClick={onClose}
+                style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.50)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={14} />
               </motion.button>
             </div>
 
             {/* Nav items */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '10px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
               {items.map(item => (
-                <motion.button key={item.label} whileTap={{ scale: 0.97 }}
+                <motion.button key={item.label} whileTap={{ scale: 0.96 }}
                   onClick={() => { item.action?.(); onClose() }}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 13,
-                    padding: '13px 16px', borderRadius: 14,
-                    background: item.bg, border: `1px solid ${item.border}`,
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '12px 14px', borderRadius: 12,
+                    background: `${item.color}10`,
+                    border: `1px solid ${item.color}22`,
                     color: item.color, fontSize: 14, fontWeight: 600,
                     cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', width: '100%',
+                    transition: 'background 0.15s',
                   }}>
                   {item.icon}
                   {item.label}
@@ -2251,48 +2256,74 @@ function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings,
 }
 
 /* ═══ MOBILE BOTTOM BAR ══════════════════════════ */
-function MobileBottomBar({ onChat, onLab, onArcade, onDrillCount }) {
+function MobileBottomBar({ onChat, onLab, onArcade, onDrillCount, activeTab = 'home', onHome }) {
   const T = useT()
+  const accent = useUITheme(s => s.accent)
   const tabs = [
-    { label: T.chat,   icon: <MessageCircle size={21} />, action: onChat,   color: '#8B8FFF' },
-    { label: T.lab,    icon: <FlaskConical size={21} />,  action: onLab,    color: '#3B82F6', badge: onDrillCount > 0 ? onDrillCount : null },
-    { label: T.arcade, icon: <Gamepad2 size={21} />,      action: onArcade, color: '#6366F1' },
+    { id: 'home',   label: 'Home',    icon: <Home size={20} />,          action: onHome  },
+    { id: 'chat',   label: T.chat,    icon: <MessageCircle size={20} />, action: onChat  },
+    { id: 'lab',    label: T.lab,     icon: <FlaskConical size={20} />,  action: onLab,  badge: onDrillCount > 0 ? onDrillCount : null },
+    { id: 'arcade', label: T.arcade,  icon: <Gamepad2 size={20} />,      action: onArcade },
   ]
   return (
     <div style={{
       position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 90,
-      background: 'rgba(5,6,18,0.97)', backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
+      background: 'var(--aeva-surface-1)',
+      backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
       borderTop: '1px solid rgba(255,255,255,0.08)',
       display: 'flex', alignItems: 'stretch',
       fontFamily: "'Inter', system-ui, sans-serif",
-      height: 'calc(60px + env(safe-area-inset-bottom))',
+      height: 'calc(62px + env(safe-area-inset-bottom))',
       paddingBottom: 'env(safe-area-inset-bottom)',
     }}>
-      {tabs.map(tab => (
-        <motion.button key={tab.label} whileTap={{ scale: 0.92 }}
-          onClick={tab.action}
-          style={{
-            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-            justifyContent: 'center', gap: 4, background: 'none', border: 'none',
-            cursor: 'pointer', color: 'rgba(255,255,255,0.40)',
-            fontFamily: 'inherit', position: 'relative',
-          }}>
-          <div style={{ color: 'rgba(255,255,255,0.42)', position: 'relative' }}>
-            {tab.icon}
-            {tab.badge && (
-              <div style={{
-                position: 'absolute', top: -5, right: -7,
-                minWidth: 16, height: 16, borderRadius: 99,
-                background: '#4ADE80', color: '#0a160a',
-                fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center',
-                justifyContent: 'center', padding: '0 3px',
-                boxShadow: '0 0 8px rgba(74,222,128,0.60)',
-              }}>{tab.badge}</div>
+      {tabs.map(tab => {
+        const isActive = tab.id === activeTab
+        return (
+          <motion.button key={tab.id} whileTap={{ scale: 0.88 }}
+            onClick={tab.action}
+            style={{
+              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+              justifyContent: 'center', gap: 3, background: 'none', border: 'none',
+              cursor: 'pointer', position: 'relative',
+              fontFamily: 'inherit',
+            }}>
+            {/* Active indicator bar at top */}
+            {isActive && (
+              <motion.div
+                layoutId="tab-indicator"
+                style={{
+                  position: 'absolute', top: 0, left: '25%', right: '25%',
+                  height: 2, borderRadius: 99,
+                  background: accent,
+                  boxShadow: `0 0 8px ${accent}88`,
+                }}
+              />
             )}
-          </div>
-          <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.38)' }}>{tab.label}</span>
-        </motion.button>
-      ))}
+            <div style={{
+              color: isActive ? accent : 'rgba(255,255,255,0.35)',
+              position: 'relative',
+              transition: 'color 0.18s',
+            }}>
+              {tab.icon}
+              {tab.badge && (
+                <div style={{
+                  position: 'absolute', top: -5, right: -7,
+                  minWidth: 16, height: 16, borderRadius: 99,
+                  background: '#4ADE80', color: '#0a160a',
+                  fontSize: 9, fontWeight: 800, display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', padding: '0 3px',
+                  boxShadow: '0 0 8px rgba(74,222,128,0.60)',
+                }}>{tab.badge}</div>
+              )}
+            </div>
+            <span style={{
+              fontSize: 10, fontWeight: isActive ? 700 : 500,
+              color: isActive ? accent : 'rgba(255,255,255,0.30)',
+              transition: 'color 0.18s',
+            }}>{tab.label}</span>
+          </motion.button>
+        )
+      })}
     </div>
   )
 }
@@ -2569,6 +2600,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
           onRoadmap={() => { setDrawerOpen(false); openRoadmapHub() }}
           onShowEm={() => { setDrawerOpen(false); setShowEmOpen(true) }}
           onDocs={() => { setDrawerOpen(false); setDocOpen(true) }}
+          onMaps={() => { setDrawerOpen(false); /* Maps opens as a section */ }}
           onSignOut={onSignOut}
         />
       )}
@@ -2579,6 +2611,8 @@ function DashboardView({ onChatOpen, onSignOut }) {
           onChat={onChatOpen}
           onLab={openLab}
           onArcade={openArcade}
+          onHome={() => {}}
+          activeTab="home"
           onDrillCount={labBadgeCount}
         />
       )}

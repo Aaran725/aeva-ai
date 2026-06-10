@@ -222,16 +222,23 @@ body {
 
   /* ── Chat header ── */
   .chat-header {
-    padding: 10px 12px !important;
+    padding: 10px 14px !important;
     gap: 8px !important;
   }
-  /* Hide Analogy/Coaching pills on mobile — too cluttered */
-  .chat-session-badges { display: none !important; }
-  /* Hide adaptation pill on mobile */
+  /* Session badge: compact pill on mobile — visible but smaller */
+  .chat-session-badges {
+    position: static !important;
+    transform: none !important;
+  }
+  .chat-session-badges > * {
+    font-size: 10px !important;
+    padding: 3px 8px !important;
+  }
+  /* Hide adaptation pill on mobile — too technical for small screens */
   .chat-adapt-pill { display: none !important; }
-  /* Smaller back button */
-  .chat-back-btn { padding: 5px 10px !important; font-size: 12px !important; }
-  /* Hide Library and Study Guide on mobile, show only Socratic */
+  /* Back button — compact */
+  .chat-back-btn { padding: 6px 10px !important; font-size: 12px !important; }
+  /* Hide Library and Study Guide text labels on mobile (icon only via class) */
   .chat-btn-library { display: none !important; }
   .chat-btn-studyguide { display: none !important; }
   .chat-btn-socratic { font-size: 11px !important; padding: 5px 10px !important; }
