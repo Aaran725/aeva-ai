@@ -5125,11 +5125,12 @@ If no clear changes: {"changes":[]}`
   return (
     <motion.div
       key="chat"
+      className="chat-dvh"
       initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 40 }}
       transition={{ duration: 0.35, ease: 'easeInOut' }}
       style={{
         position: 'relative', display: 'flex', flexDirection: 'column',
-        width: '100%', height: '100vh', overflow: 'hidden',
+        width: '100%', overflow: 'hidden',
         background: isWidget
           ? activeTheme.bg
           : isMission ? missionBg : 'var(--ui-bg)',
@@ -5191,9 +5192,13 @@ If no clear changes: {"changes":[]}`
         {/* Header */}
         <div className="chat-header" style={{ flexShrink: 0, padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <motion.button className="chat-back-btn" whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={onBack}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 99, backdropFilter: 'blur(20px)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 13, fontWeight: 600, cursor: 'pointer', ...backBtnStyle }}>
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: isMobile ? '7px 10px' : '8px 16px', borderRadius: 99, backdropFilter: 'blur(20px)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 13, fontWeight: 600, cursor: 'pointer', ...backBtnStyle }}>
             <ChevronLeft size={14} strokeWidth={2.5} />
-            {isMission ? T.exitMission : T.backToDashboard}
+            {/* On mobile show compact label; desktop shows full text */}
+            {isMobile
+              ? (isMission ? <span style={{ fontSize: 12 }}>{T.exitMission}</span> : null)
+              : (isMission ? T.exitMission : T.backToDashboard)
+            }
           </motion.button>
 
           {/* Center: mission badge or session badges */}
@@ -5524,7 +5529,7 @@ If no clear changes: {"changes":[]}`
                   transition={{ duration: 0.4 }}
                   style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 12 }}
                 >
-                  <AevaOrb size={218} active={isActive} scanMode={labOpen} personality={orbPersonality} orbGradient={ORBS.find(o => o.id === useXPStore.getState().activeOrb)?.gradient} orbAccent={ORBS.find(o => o.id === useXPStore.getState().activeOrb)?.accent} />
+                  <AevaOrb size={isMobile ? 140 : 218} active={isActive} scanMode={labOpen} personality={orbPersonality} orbGradient={ORBS.find(o => o.id === useXPStore.getState().activeOrb)?.gradient} orbAccent={ORBS.find(o => o.id === useXPStore.getState().activeOrb)?.accent} />
                   <div style={{ textAlign: 'center', padding: '0 28px', marginTop: 4 }}>
                     <p style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 24, fontWeight: 400, color: isLight ? 'rgba(0,0,0,0.42)' : 'rgba(255,255,255,0.45)', lineHeight: 1.3, letterSpacing: '0.01em', marginBottom: 4 }}>
                       Hey {name},
@@ -6226,7 +6231,7 @@ If no clear changes: {"changes":[]}`
             </AnimatePresence>
 
             {/* Input bar */}
-            <div style={{ flexShrink: 0, padding: '0 20px', paddingBottom: 36 }}>
+            <div className="chat-input-wrapper" style={{ flexShrink: 0, padding: '0 20px', paddingBottom: isMobile ? 0 : 36 }}>
               {/* Hidden file input for Aeva Lens */}
               <input
                 ref={lensInputRef}
@@ -6465,6 +6470,33 @@ If no clear changes: {"changes":[]}`
           />
         )}
       </AnimatePresence>
+
+      {/* Mobile floating Home button — bottom-left, above input bar */}
+      {isMobile && !isMission && (
+        <motion.button
+          initial={{ opacity: 0, scale: 0.80 }}
+          animate={{ opacity: 1, scale: 1 }}
+          whileTap={{ scale: 0.88 }}
+          onClick={onBack}
+          style={{
+            position: 'fixed',
+            bottom: 'calc(20px + env(safe-area-inset-bottom))',
+            left: 16,
+            zIndex: 30,
+            width: 38, height: 38,
+            borderRadius: '50%',
+            background: 'var(--aeva-surface-1)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            color: 'rgba(255,255,255,0.60)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+            backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
+          }}
+        >
+          <Home size={16} />
+        </motion.button>
+      )}
     </motion.div>
   )
 }

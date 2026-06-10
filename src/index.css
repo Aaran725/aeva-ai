@@ -252,8 +252,8 @@ body {
     padding: 10px 12px !important;
   }
 
-  /* ── Chat orb area ── */
-  .chat-orb-area { padding: 16px 12px 8px !important; }
+  /* ── Chat orb area — hidden on mobile; saves ~100px so messages show immediately ── */
+  .chat-orb-area { display: none !important; }
 
   /* ── Modals full-screen on mobile ── */
   .modal-panel {
@@ -289,6 +289,19 @@ body {
 html, body, #root {
   overflow-x: hidden;
   max-width: 100vw;
+}
+
+/* ── iOS keyboard fix: dvh shrinks when soft keyboard appears ── */
+.chat-dvh {
+  height: 100vh;          /* fallback for old browsers */
+  height: 100dvh;         /* dynamic viewport — adjusts for iOS keyboard */
+}
+
+/* ── Chat input bottom safe area ── */
+@media (max-width: 767px) {
+  .chat-input-wrapper {
+    padding-bottom: max(20px, env(safe-area-inset-bottom)) !important;
+  }
 }
 
 /* ── Safe area for notched phones ── */
