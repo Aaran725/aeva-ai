@@ -3,7 +3,7 @@ import { GROQ_KEYS, GROQ_URL, nextGroqKey } from './groqClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import { ArrowUp, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, ChevronRight, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Users, FileText, LayoutGrid, Palette, Home, Map } from 'lucide-react'
+import { ArrowUp, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, ChevronRight, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Users, FileText, LayoutGrid, Palette, Home, Map, Clock, Trash2 } from 'lucide-react'
 import { useAppSettings, SECTION_BG_PRESETS, CARD_STYLES, FONT_STYLES } from './appSettings'
 import { useLanguageStore } from './languageStore'
 import { useT } from './translations'
@@ -57,6 +57,7 @@ const YourUI             = lazy(() => import('./YourUI'))
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
 import { useMemoryStore } from './memoryStore'
 import { useUITheme, applyCSS, useIsHidden } from './uiThemeStore'
+import { saveSession, loadSessions, deleteSession, clearAllHistory, formatSessionDate, groupSessions } from './chatHistoryStore'
 import './index.css'
 
 /* ─── Groq API (keys + URL imported at top of file) ─── */
@@ -4049,6 +4050,11 @@ function ChatView({ onBack }) {
   const lastCanvasExchangeRef = useRef(-99) // Fix 6: canvas cooldown tracker
   const topicStreakRef = useRef({ topic: null, count: 0, strongCount: 0 }) // per-topic progression tracker
 
+  // ── Chat history ──────────────────────────────────────────────────────────
+  const sessionIdRef    = useRef(`s_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`)
+  const sessionStartRef = useRef(Date.now())
+  const [historyOpen, setHistoryOpen] = useState(false)
+
   // ── Aeva Power CMDs state ──────────────────────────────────────────────────
   const [pinnedNote, setPinnedNote] = useState(null)   // { title, content } | null
   const [challengeTimer, setChallengeTimer] = useState(null)  // { label, total, remaining } | null
@@ -4060,6 +4066,23 @@ function ChatView({ onBack }) {
 
   // Keep masteryMapRef in sync for session-end save
   useEffect(() => { masteryMapRef.current = masteryMap }, [masteryMap])
+
+  // Auto-save chat history whenever messages change (debounced to avoid thrash)
+  useEffect(() => {
+    if (messages.length < 2) return
+    const tid = setTimeout(() => {
+      saveSession({
+        id:            sessionIdRef.current,
+        startedAt:     sessionStartRef.current,
+        subject:       sessionSubjectRef.current,
+        title:         null,  // auto-generated from subject/first message in store
+        exchangeCount: exchangeCountRef.current,
+        finalState:    sessionState,
+        messages,
+      })
+    }, 800)
+    return () => clearTimeout(tid)
+  }, [messages, sessionState])
 
   // Save session summary when ChatView unmounts or tab is hidden
   useEffect(() => {
@@ -5407,6 +5430,24 @@ If no clear changes: {"changes":[]}`
                 </motion.button>
               </>
             )}
+            {/* History button */}
+            {!isMission && (
+              <motion.button
+                whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }}
+                onClick={() => setHistoryOpen(true)}
+                title="Chat history"
+                style={{
+                  width: 30, height: 30, borderRadius: 10,
+                  background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
+                  border: isLight ? '1px solid rgba(0,0,0,0.12)' : '1px solid rgba(255,255,255,0.14)',
+                  color: isLight ? 'rgba(0,0,0,0.50)' : 'rgba(255,255,255,0.50)',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <Clock size={13} />
+              </motion.button>
+            )}
+
             {/* Widget layout toggle */}
             {!isMission && (
               <WidgetToggle active={isWidget} onToggle={toggleChatLayout} />
@@ -6596,6 +6637,26 @@ If no clear changes: {"changes":[]}`
         )}
       </AnimatePresence>
 
+      {/* Chat History panel */}
+      <AnimatePresence>
+        {historyOpen && (
+          <ChatHistoryPanel
+            onClose={() => setHistoryOpen(false)}
+            onResume={(s) => {
+              // Load the saved session's messages back into chat
+              setMessages(s.messages || [])
+              setSessionState(s.finalState || 'DIAGNOSTIC')
+              exchangeCountRef.current = s.exchangeCount || 0
+              sessionSubjectRef.current = s.subject || null
+              // Re-use same session id so continued saves update the same entry
+              sessionIdRef.current = s.id
+              sessionStartRef.current = s.startedAt || Date.now()
+              setHistoryOpen(false)
+            }}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Mobile floating Home button — bottom-left, above input bar */}
       {isMobile && !isMission && (
         <motion.button
@@ -6622,6 +6683,184 @@ If no clear changes: {"changes":[]}`
           <Home size={16} />
         </motion.button>
       )}
+    </motion.div>
+  )
+}
+
+/* ═══ CHAT HISTORY PANEL ═════════════════════════ */
+const STATE_BADGE_STYLE = {
+  DIAGNOSTIC:    { bg: 'rgba(139,143,255,0.15)', border: 'rgba(139,143,255,0.35)', color: '#A5B4FC', label: 'Diagnosing'    },
+  SCAFFOLDING:   { bg: 'rgba(126,200,227,0.15)', border: 'rgba(126,200,227,0.35)', color: '#7EC8E3', label: 'Building'      },
+  STRESS_TEST:   { bg: 'rgba(233,163,100,0.15)', border: 'rgba(233,163,100,0.35)', color: '#E9A364', label: 'Stress Testing' },
+  CONSOLIDATION: { bg: 'rgba(168,230,207,0.15)', border: 'rgba(168,230,207,0.35)', color: '#A8E6CF', label: 'Consolidating'  },
+}
+
+function ChatHistoryPanel({ onClose, onResume }) {
+  const [sessions, setSessions] = useState(() => loadSessions())
+  const [confirmClear, setConfirmClear] = useState(false)
+  const accent = useUITheme(s => s.accent)
+
+  const { today, thisWeek, older } = groupSessions(sessions)
+
+  const handleDelete = (id, e) => {
+    e.stopPropagation()
+    deleteSession(id)
+    setSessions(loadSessions())
+  }
+
+  const handleClearAll = () => {
+    if (confirmClear) {
+      clearAllHistory()
+      setSessions([])
+      setConfirmClear(false)
+    } else {
+      setConfirmClear(true)
+      setTimeout(() => setConfirmClear(false), 3000)
+    }
+  }
+
+  const SessionCard = ({ s }) => {
+    const badge = STATE_BADGE_STYLE[s.finalState] || STATE_BADGE_STYLE.DIAGNOSTIC
+    const preview = s.messages?.find(m => m.role === 'user')?.text?.slice(0, 80) || ''
+    return (
+      <motion.div
+        whileHover={{ backgroundColor: 'rgba(255,255,255,0.04)' }}
+        whileTap={{ scale: 0.98 }}
+        onClick={() => onResume(s)}
+        style={{
+          padding: '12px 14px', borderRadius: 14, cursor: 'pointer',
+          border: '1px solid rgba(255,255,255,0.07)',
+          background: 'rgba(255,255,255,0.02)',
+          display: 'flex', flexDirection: 'column', gap: 6,
+          position: 'relative', overflow: 'hidden',
+          transition: 'background 0.15s',
+        }}
+      >
+        {/* Title row */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.88)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {s.title || 'Session'}
+          </span>
+          <motion.button
+            whileHover={{ scale: 1.12 }} whileTap={{ scale: 0.90 }}
+            onClick={(e) => handleDelete(s.id, e)}
+            style={{ width: 22, height: 22, borderRadius: 6, background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.18)', color: 'rgba(248,113,113,0.55)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+          >
+            <Trash2 size={10} />
+          </motion.button>
+        </div>
+
+        {/* Preview text */}
+        {preview && (
+          <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            "{preview}"
+          </div>
+        )}
+
+        {/* Meta row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+          {/* State badge */}
+          <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: badge.bg, border: `1px solid ${badge.border}`, color: badge.color, letterSpacing: '0.03em' }}>
+            {badge.label}
+          </span>
+          {/* Exchange count */}
+          <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.28)', display: 'flex', alignItems: 'center', gap: 3 }}>
+            <MessageCircle size={9} /> {s.exchangeCount || 0} exchanges
+          </span>
+          {/* Timestamp */}
+          <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.22)', marginLeft: 'auto' }}>
+            {formatSessionDate(s.endedAt)}
+          </span>
+        </div>
+      </motion.div>
+    )
+  }
+
+  const Group = ({ label, items }) => {
+    if (!items.length) return null
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.10em', color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase', padding: '0 2px' }}>{label}</div>
+        {items.map(s => <SessionCard key={s.id} s={s} />)}
+      </div>
+    )
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(4,5,18,0.60)', backdropFilter: 'blur(10px)', display: 'flex', justifyContent: 'flex-end' }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <motion.div
+        initial={{ x: '100%' }}
+        animate={{ x: 0 }}
+        exit={{ x: '100%' }}
+        transition={{ type: 'spring', stiffness: 360, damping: 32 }}
+        style={{
+          width: '100%', maxWidth: 360,
+          height: '100%', display: 'flex', flexDirection: 'column',
+          background: 'rgba(8,10,26,0.99)',
+          borderLeft: '1px solid rgba(255,255,255,0.09)',
+          fontFamily: "'Inter', system-ui, sans-serif",
+        }}
+      >
+        {/* Header */}
+        <div style={{ padding: '18px 18px 14px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 9, background: `${accent}18`, border: `1px solid ${accent}33`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Clock size={13} color={accent} />
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: 'rgba(255,255,255,0.90)', letterSpacing: '-0.02em' }}>Chat History</div>
+              <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.30)' }}>{sessions.length} session{sessions.length !== 1 ? 's' : ''}</div>
+            </div>
+          </div>
+          <motion.button whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }} onClick={onClose}
+            style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.50)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <X size={13} />
+          </motion.button>
+        </div>
+
+        {/* Session list */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '14px 14px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {sessions.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: 'rgba(255,255,255,0.28)', fontSize: 13, lineHeight: 1.7 }}>
+              <Clock size={32} color="rgba(255,255,255,0.12)" style={{ display: 'block', margin: '0 auto 14px' }} />
+              No sessions yet.<br />
+              <span style={{ fontSize: 12 }}>Your chats will appear here automatically.</span>
+            </div>
+          ) : (
+            <>
+              <Group label="Today" items={today} />
+              <Group label="This week" items={thisWeek} />
+              <Group label="Older" items={older} />
+            </>
+          )}
+        </div>
+
+        {/* Footer — clear all */}
+        {sessions.length > 0 && (
+          <div style={{ padding: '10px 14px', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+            <motion.button
+              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+              onClick={handleClearAll}
+              style={{
+                width: '100%', padding: '9px', borderRadius: 11,
+                background: confirmClear ? 'rgba(248,113,113,0.12)' : 'rgba(255,255,255,0.04)',
+                border: confirmClear ? '1px solid rgba(248,113,113,0.35)' : '1px solid rgba(255,255,255,0.08)',
+                color: confirmClear ? '#F87171' : 'rgba(255,255,255,0.35)',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                transition: 'all 0.2s',
+              }}
+            >
+              {confirmClear ? 'Tap again to clear all history' : 'Clear all history'}
+            </motion.button>
+          </div>
+        )}
+      </motion.div>
     </motion.div>
   )
 }
