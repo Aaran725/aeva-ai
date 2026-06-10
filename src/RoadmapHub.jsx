@@ -1313,9 +1313,12 @@ function PathView() {
     startNodeSession(roadmap.id, node)
 
     if (node.type === 'learn') {
-      // Close hub → Aeva chat fires a curated teaching session
+      const subtopicLine = node.subtopics?.length
+        ? ` Specifically cover: ${node.subtopics.join(', ')}.`
+        : ''
+      const phaseLine = node.phase ? ` (Phase: ${node.phase}, Difficulty: ${node.difficulty || 2}/5)` : ''
       setPendingChatPrompt(
-        `Teach me "${node.topic}" for my ${roadmap.title}. ${node.description ? node.description + ' ' : ''}I have ${daysLeft} days until the exam. Start from the core concepts, use examples, and check my understanding as we go.`
+        `Teach me "${node.topic}" for my ${roadmap.title}.${phaseLine}${node.description ? ' ' + node.description : ''}${subtopicLine} I have ${daysLeft} days until the exam. Start from the core concepts, use examples, and check my understanding as we go.`
       )
       closeRoadmapHub()
     } else if (node.type === 'drill') {

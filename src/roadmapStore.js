@@ -135,7 +135,18 @@ export const useRoadmapStore = create((set, get) => {
     setActive: (id) => { set(s => { const u = { ...s, activeRoadmapId: id }; save(u); return u }) },
 
     startNodeSession: (roadmapId, node) => set({
-      activeNodeSession: { roadmapId, nodeId: node.id, topic: node.topic, type: node.type, xp: node.xp || 50 }
+      activeNodeSession: {
+        roadmapId,
+        nodeId:           node.id,
+        topic:            node.topic,
+        type:             node.type,
+        xp:               node.xp || 50,
+        subtopics:        node.subtopics        || [],
+        phase:            node.phase            || 'Core Topics',
+        difficulty:       node.difficulty       || 2,
+        estimatedMinutes: node.estimatedMinutes || 20,
+        description:      node.description      || '',
+      }
     }),
     endNodeSession: () => set({ activeNodeSession: null }),
 

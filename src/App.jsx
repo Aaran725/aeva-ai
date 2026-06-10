@@ -200,6 +200,23 @@ Rules:
   }
 }
 
+/* ─── Node session context — injected when user is studying a specific node ─── */
+function buildNodeContext(node) {
+  if (!node) return ''
+  const TYPE_LABEL = { learn: 'Teaching session', drill: 'Drill practice', check: 'Knowledge check', mock: 'Mock test' }
+  const subtopicBlock = node.subtopics?.length
+    ? `\nSubtopics to cover: ${node.subtopics.join(' · ')}`
+    : ''
+  return `
+━━━ ACTIVE NODE SESSION ━━━
+Type: ${TYPE_LABEL[node.type] || node.type}
+Topic: "${node.topic}"
+Phase: ${node.phase || 'Core Topics'} | Difficulty: ${node.difficulty || 2}/5 | Est. ${node.estimatedMinutes || 20} min${subtopicBlock}
+${node.description ? `Goal: ${node.description}` : ''}
+INSTRUCTION: This is a structured node session. Cover all subtopics above before ending. Once the student demonstrates solid understanding (CONSOLIDATION phase, ≥5 exchanges), signal readiness with: [NODE_READY]
+━━━━━━━━━━━━━━━━━━━━━━━━━━`
+}
+
 /* ─── Roadmap context builder — gives Aeva full visibility ─── */
 function buildRoadmapContext(roadmap) {
   if (!roadmap || !roadmap.nodes?.length) return ''
@@ -2868,6 +2885,7 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
     .replace(/⚡CMD:\{[^}]*\}/g, '')
     .replace(/⚡ROADMAP:[\s\S]*$/, '')
     .replace(/⚡FUNCGRAPH:[\s\S]*$/, '')
+    .replace(/\[NODE_READY\]/g, '')
     .replace(/⚡CANVAS:[\s\S]*$/, '')
     .replace(/\[TERM:[^\]]*\]/g, '')
     .replace(/\[SUMMARY:[^\]]*\]/g, '')
@@ -4055,6 +4073,9 @@ function ChatView({ onBack }) {
   const sessionStartRef = useRef(Date.now())
   const [historyOpen, setHistoryOpen] = useState(false)
 
+  // ── Node session nudge — shown when Aeva signals [NODE_READY] ─────────────
+  const [nodeReadyNudge, setNodeReadyNudge] = useState(false)
+
   // ── Aeva Power CMDs state ──────────────────────────────────────────────────
   const [pinnedNote, setPinnedNote] = useState(null)   // { title, content } | null
   const [challengeTimer, setChallengeTimer] = useState(null)  // { label, total, remaining } | null
@@ -4627,11 +4648,12 @@ STRICT RULES:
         const recallBlock = buildRecallBlock(name)
         const fullMemory  = recallBlock + buildMemoryBlock(name)
         const roadmapCtx  = buildRoadmapContext(useRoadmapStore.getState().getActive())
+        const nodeCtx     = buildNodeContext(useRoadmapStore.getState().activeNodeSession)
         // Fix 3: persist subject across the whole session — only update when newly detected
         const newlyDetected = detectSubject(criticResult?.topic, messages)
         if (newlyDetected) sessionSubjectRef.current = newlyDetected
         const detectedSubject = sessionSubjectRef.current
-        systemPrompt = feedbackPrefix + orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, fullMemory + roadmapCtx, extras, T.aevaLanguageDirective, detectedSubject)
+        systemPrompt = feedbackPrefix + orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, fullMemory + roadmapCtx + nodeCtx, extras, T.aevaLanguageDirective, detectedSubject)
 
         if (socraticActive) {
           systemPrompt += '\n\nSOCRATIC MODE: You must NEVER state facts, answers, or explanations directly. Respond ONLY with 1-3 targeted questions that guide the student to discover the answer themselves. If they arrive at the correct answer, confirm warmly and deepen with another question. If wrong, ask a question that exposes the specific gap without revealing the answer. Never say "the answer is", never explain anything outright. Make them think every time.'
@@ -4759,6 +4781,12 @@ STRICT RULES:
         })
       }
     } finally {
+      // ── NODE_READY signal — Aeva signals the student is ready to complete the node ──
+      if (!isMission && rawResponse.includes('[NODE_READY]')) {
+        const ns = useRoadmapStore.getState().activeNodeSession
+        if (ns) setNodeReadyNudge(true)
+      }
+
       // ── Aeva Platform Commands ───────────────────────────────────────────────
       if (!isMission) {
         const cmdIdx = rawResponse.indexOf('⚡CMD:')
@@ -5234,48 +5262,96 @@ If no clear changes: {"changes":[]}`
 
       {/* Roadmap session pill — floats bottom-right while working on a node */}
       <AnimatePresence>
-        {activeNodeSession && (
-          <motion.div
-            initial={{ opacity: 0, y: 24, scale: 0.92 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 24, scale: 0.92 }}
-            transition={{ type: 'spring', stiffness: 340, damping: 28 }}
-            style={{
-              position: 'absolute', bottom: 100, right: 20, zIndex: 200,
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '10px 14px 10px 12px',
-              borderRadius: 99,
-              background: 'rgba(8,9,24,0.96)',
-              border: '1px solid rgba(99,102,241,0.45)',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.55), 0 0 0 1px rgba(99,102,241,0.15)',
-              backdropFilter: 'blur(20px)',
-              fontFamily: "'Inter', system-ui, sans-serif",
-            }}
-          >
-            {/* Pulsing dot */}
+        {activeNodeSession && (() => {
+          const TYPE_ICON = { learn: '📖', drill: '⚡', check: '✅', mock: '🎯' }
+          const completeWithConf = (conf) => {
+            useRoadmapStore.getState().completeNodeWithConfidence(activeNodeSession.roadmapId, activeNodeSession.nodeId, conf)
+            useXPStore.getState().addXP('DRILL_COMPLETE')
+            endNodeSession()
+            setNodeReadyNudge(false)
+          }
+          return (
             <motion.div
-              animate={{ opacity: [1, 0.3, 1] }}
-              transition={{ duration: 1.6, repeat: Infinity }}
-              style={{ width: 7, height: 7, borderRadius: '50%', background: '#818CF8', flexShrink: 0 }}
-            />
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.75)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {activeNodeSession.topic}
-            </div>
-            <motion.button
-              whileHover={{ scale: 1.05, background: 'rgba(99,102,241,0.85)' }}
-              whileTap={{ scale: 0.97 }}
-              onClick={markRoadmapNodeDone}
+              initial={{ opacity: 0, y: 24, scale: 0.92 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 24, scale: 0.92 }}
+              transition={{ type: 'spring', stiffness: 340, damping: 28 }}
               style={{
-                padding: '5px 12px', borderRadius: 99, border: 'none',
-                background: 'rgba(99,102,241,0.65)',
-                color: '#fff', fontSize: 12, fontWeight: 700,
-                cursor: 'pointer', fontFamily: 'inherit',
+                position: 'absolute', bottom: 100, right: 20, zIndex: 200,
+                display: 'flex', flexDirection: 'column', gap: 8,
+                padding: '12px 14px',
+                borderRadius: 18,
+                background: 'rgba(8,9,24,0.97)',
+                border: nodeReadyNudge ? '1px solid rgba(74,222,128,0.55)' : '1px solid rgba(99,102,241,0.40)',
+                boxShadow: nodeReadyNudge
+                  ? '0 8px 32px rgba(0,0,0,0.55), 0 0 20px rgba(74,222,128,0.18)'
+                  : '0 8px 32px rgba(0,0,0,0.55), 0 0 0 1px rgba(99,102,241,0.12)',
+                backdropFilter: 'blur(20px)',
+                fontFamily: "'Inter', system-ui, sans-serif",
+                maxWidth: 240,
+                transition: 'border 0.3s, box-shadow 0.3s',
               }}
             >
-              Done ✓
-            </motion.button>
-          </motion.div>
-        )}
+              {/* Top row — icon + topic + phase badge */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <motion.div
+                  animate={{ opacity: [1, 0.35, 1] }}
+                  transition={{ duration: 1.8, repeat: Infinity }}
+                  style={{ fontSize: 14, flexShrink: 0 }}
+                >
+                  {TYPE_ICON[activeNodeSession.type] || '📖'}
+                </motion.div>
+                <div style={{ flex: 1, fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.88)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {activeNodeSession.topic}
+                </div>
+                <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 6px', borderRadius: 99, background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.30)', color: '#A5B4FC', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  {activeNodeSession.phase?.split(' ')[0]}
+                </span>
+              </div>
+
+              {/* Subtopics (up to 3) */}
+              {activeNodeSession.subtopics?.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {activeNodeSession.subtopics.slice(0, 3).map((s, i) => (
+                    <span key={i} style={{ fontSize: 9.5, padding: '2px 7px', borderRadius: 99, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.45)' }}>
+                      {s.length > 22 ? s.slice(0, 20) + '…' : s}
+                    </span>
+                  ))}
+                  {activeNodeSession.subtopics.length > 3 && (
+                    <span style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.28)' }}>+{activeNodeSession.subtopics.length - 3} more</span>
+                  )}
+                </div>
+              )}
+
+              {/* NODE_READY nudge */}
+              {nodeReadyNudge && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+                  style={{ fontSize: 11, color: '#4ADE80', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}
+                >
+                  <motion.span animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 0.8, repeat: 2 }}>🎯</motion.span>
+                  Aeva thinks you've got this!
+                </motion.div>
+              )}
+
+              {/* Confidence buttons */}
+              <div style={{ display: 'flex', gap: 6 }}>
+                <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                  onClick={() => completeWithConf('solid')}
+                  style={{ flex: 1, padding: '6px 10px', borderRadius: 10, border: 'none', background: 'rgba(74,222,128,0.18)', color: '#4ADE80', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  Solid ✓
+                </motion.button>
+                <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                  onClick={() => completeWithConf('shaky')}
+                  style={{ flex: 1, padding: '6px 10px', borderRadius: 10, border: 'none', background: 'rgba(251,191,36,0.14)', color: '#FBBF24', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  Shaky ~
+                </motion.button>
+              </div>
+            </motion.div>
+          )
+        })()}
       </AnimatePresence>
 
       {/* Main layout — split for debate mode */}
