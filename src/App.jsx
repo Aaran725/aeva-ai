@@ -2480,6 +2480,12 @@ function DashboardView({ onChatOpen, onSignOut }) {
                       )}
                     </motion.button>
 
+                    <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={openRoadmapHub}
+                      className="nav-btn-feature"
+                      style={{ ...nb, fontWeight: 600 }}>
+                      <span style={{ fontSize: 11 }}>🗺️</span>Roadmap
+                    </motion.button>
+
                     <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={() => setMapsOpen(true)}
                       className="nav-btn-feature"
                       style={{ ...nb, fontWeight: 600 }}>
