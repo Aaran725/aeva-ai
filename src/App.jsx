@@ -3,7 +3,7 @@ import { GROQ_KEYS, GROQ_URL, nextGroqKey } from './groqClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import { ArrowUp, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, ChevronRight, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Users, FileText, LayoutGrid, Palette, Home, Map, Clock, Trash2 } from 'lucide-react'
+import { ArrowUp, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, ChevronRight, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Users, FileText, LayoutGrid, Palette, Home, Map, Clock, Trash2, Calendar } from 'lucide-react'
 import { useAppSettings, SECTION_BG_PRESETS, CARD_STYLES, FONT_STYLES } from './appSettings'
 import { useLanguageStore } from './languageStore'
 import { useT } from './translations'
@@ -54,10 +54,12 @@ const WidgetDashboard    = lazy(() => import('./WidgetDashboard'))
 const WorksheetModal     = lazy(() => import('./WorksheetModal'))
 const SharedRoadmapView  = lazy(() => import('./SharedRoadmapView'))
 const YourUI             = lazy(() => import('./YourUI'))
+const RevisionCalendar   = lazy(() => import('./RevisionCalendar'))
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
 import { useMemoryStore } from './memoryStore'
 import { useUITheme, applyCSS, useIsHidden } from './uiThemeStore'
 import { saveSession, loadSessions, deleteSession, clearAllHistory, syncHistoryToCloud, formatSessionDate, groupSessions } from './chatHistoryStore'
+import { TodayPlanCard } from './RevisionCalendar'
 import './index.css'
 
 /* ─── Groq API (keys + URL imported at top of file) ─── */
@@ -2365,6 +2367,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
   const [brainOpen, setBrainOpen] = useState(false)
   const [mirrorOpen, setMirrorOpen] = useState(false)
   const [orbSelectorOpen, setOrbSelectorOpen] = useState(false)
+  const [mapsOpen, setMapsOpen] = useState(false)
   const [showEmOpen, setShowEmOpen] = useState(false)
   const [docOpen, setDocOpen]         = useState(false)
   const [yourUIOpen, setYourUIOpen]   = useState(false)
@@ -2477,10 +2480,10 @@ function DashboardView({ onChatOpen, onSignOut }) {
                       )}
                     </motion.button>
 
-                    <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={openRoadmapHub}
+                    <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={() => setMapsOpen(true)}
                       className="nav-btn-feature"
                       style={{ ...nb, fontWeight: 600 }}>
-                      <span style={{ fontSize: 11 }}>🗺️</span>Maps
+                      <Calendar size={12} />Schedule
                     </motion.button>
 
                     <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={openArcade}
@@ -2589,6 +2592,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
               style={{ padding: isMobile ? '16px 14px' : '0 24px', maxWidth: 1280, margin: '0 auto', paddingBottom: isMobile ? 'calc(80px + env(safe-area-inset-bottom))' : undefined }}
             >
               <MissionCard onChatOpen={onChatOpen} onOrbClick={() => setOrbSelectorOpen(true)} />
+              <TodayPlanCard onOpenCalendar={() => setMapsOpen(true)} onNavigateToChat={onChatOpen} />
               <ConstellationCard />
               <MoodCard />
               <SkillDecayCard />
@@ -2618,7 +2622,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
           onRoadmap={() => { setDrawerOpen(false); openRoadmapHub() }}
           onShowEm={() => { setDrawerOpen(false); setShowEmOpen(true) }}
           onDocs={() => { setDrawerOpen(false); setDocOpen(true) }}
-          onMaps={() => { setDrawerOpen(false); /* Maps opens as a section */ }}
+          onMaps={() => { setDrawerOpen(false); setMapsOpen(true) }}
           onSignOut={onSignOut}
         />
       )}
@@ -2708,6 +2712,14 @@ function DashboardView({ onChatOpen, onSignOut }) {
         {yourUIOpen && (
           <Suspense fallback={null}>
             <YourUI onClose={() => setYourUIOpen(false)} />
+          </Suspense>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {mapsOpen && (
+          <Suspense fallback={null}>
+            <RevisionCalendar onClose={() => setMapsOpen(false)} onNavigateToChat={onChatOpen} />
           </Suspense>
         )}
       </AnimatePresence>
