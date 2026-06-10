@@ -137,6 +137,9 @@ export function applyCSS(theme) {
   document.documentElement.style.background = bgFrom
   document.body.style.background = `linear-gradient(${bgAngle}deg, ${bgFrom} 0%, ${bgTo} 100%)`
 
+  // Motion off → data-reduce-motion="true" on <html>; CSS zeroes all durations.
+  document.documentElement.dataset.reduceMotion = motion ? 'false' : 'true'
+
   /* ── Atmosphere CSS variables → body::before reads these in index.css ──────
      Accent blobs at higher opacity so colour is clearly visible.
      bgTo/bgFrom shadow blobs kept very low so the gradient base shows through.

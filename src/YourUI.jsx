@@ -156,8 +156,24 @@ function MiniPreview({ theme }) {
       width: '100%', maxWidth: 480,
       userSelect: 'none',
     }}>
+      {/* ── Gradient swatch strip — shows background + accent prominently ── */}
+      <div style={{ padding: '14px 16px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        {/* bg from→to swatches */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 22, height: 22, borderRadius: 7, background: bgFrom, border: '1.5px solid rgba(255,255,255,0.22)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.15)' }} />
+          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)' }}>→</span>
+          <div style={{ width: 22, height: 22, borderRadius: 7, background: bgTo, border: '1.5px solid rgba(255,255,255,0.22)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.15)' }} />
+          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.22)', marginLeft: 2 }}>{bgAngle}°</span>
+        </div>
+        {/* accent swatch */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 22, height: 22, borderRadius: 7, background: accent, boxShadow: `0 0 10px ${accent}66, inset 0 1px 0 rgba(255,255,255,0.25)` }} />
+          <span style={{ fontSize: 9, fontWeight: 700, color: accent, letterSpacing: '0.04em' }}>ACCENT</span>
+        </div>
+      </div>
+
       {/* Header */}
-      <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(16px)' }}>
+      <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(0,0,0,0.22)', backdropFilter: 'blur(16px)' }}>
         <div style={{ width: 20, height: 20, borderRadius: 6, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <span style={{ fontSize: 9, color: '#fff' }}>★</span>
         </div>
@@ -541,7 +557,7 @@ export default function YourUI({ onClose }) {
           borderLeft: '1px solid rgba(255,255,255,0.07)',
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           position: 'sticky', top: 0, height: '100%',
-          background: 'rgba(0,0,0,0.20)',
+          background: `linear-gradient(160deg, ${bgFrom}88 0%, ${bgTo}44 100%)`,
           overflowY: 'auto',
         }}>
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)', marginBottom: 20 }}>LIVE PREVIEW</div>

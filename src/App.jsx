@@ -5804,7 +5804,7 @@ If no clear changes: {"changes":[]}`
             <div
               ref={messagesScrollRef}
               className="chat-messages"
-              style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', justifyContent: isEmpty ? 'flex-end' : 'flex-start' }}
+              style={{ flex: 1, overflowY: 'auto', padding: 'var(--aeva-space-md, 16px) var(--aeva-space-lg, 20px)', display: 'flex', flexDirection: 'column', justifyContent: isEmpty ? 'flex-end' : 'flex-start' }}
             >
               <div style={{ width: '100%', maxWidth: isMission ? 720 : 640, margin: '0 auto' }}>
 

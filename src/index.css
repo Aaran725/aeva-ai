@@ -130,11 +130,11 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: rgba(139,143,255,0.32); }
 .chat-messages::-webkit-scrollbar { width: 0; }
 
-/* ── Bento grid ── */
+/* ── Bento grid — gap responds to density slider ── */
 .bento-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 16px;
+  gap: var(--aeva-space-md, 16px);
 }
 @media (min-width: 768px) {
   .bento-grid { grid-template-columns: repeat(4, 1fr); }
@@ -243,13 +243,13 @@ body {
   .chat-btn-studyguide { display: none !important; }
   .chat-btn-socratic { font-size: 11px !important; padding: 5px 10px !important; }
 
-  /* ── Chat messages ── */
-  .chat-messages { padding: 12px 12px !important; }
+  /* ── Chat messages — padding responds to density ── */
+  .chat-messages { padding: var(--aeva-space-sm, 12px) var(--aeva-space-sm, 12px) !important; }
 
   /* ── Chat input ── */
   .chat-input-bar {
-    margin: 0 10px 12px !important;
-    padding: 10px 12px !important;
+    margin: 0 var(--aeva-space-sm, 10px) var(--aeva-space-sm, 12px) !important;
+    padding: var(--aeva-space-sm, 10px) var(--aeva-space-sm, 12px) !important;
   }
 
   /* ── Chat orb area — hidden on mobile; saves ~100px so messages show immediately ── */
@@ -289,6 +289,16 @@ body {
 html, body, #root {
   overflow-x: hidden;
   max-width: 100vw;
+}
+
+/* ── Motion off: collapse every animation and transition ── */
+[data-reduce-motion="true"] *,
+[data-reduce-motion="true"] *::before,
+[data-reduce-motion="true"] *::after {
+  animation-duration:        0.01ms !important;
+  animation-iteration-count: 1      !important;
+  transition-duration:       0.01ms !important;
+  scroll-behavior:           auto   !important;
 }
 
 /* ── iOS keyboard fix: dvh shrinks when soft keyboard appears ── */
