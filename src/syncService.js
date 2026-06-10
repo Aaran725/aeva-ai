@@ -54,6 +54,18 @@ export async function loadAndHydrateUser(userId) {
         localStorage.setItem('aeva_lab_orders_v1', JSON.stringify(data.lab_orders))
       if (data.xp_state && typeof data.xp_state === 'object' && Object.keys(data.xp_state).length)
         localStorage.setItem('aeva_xp_v1', JSON.stringify(data.xp_state))
+
+      // Chat history — merge: cloud wins on conflicts, keep local-only sessions
+      if (Array.isArray(data.chat_history) && data.chat_history.length) {
+        const local = safeGet('aeva_chat_history_v1', [])
+        const remoteIds = new Set(data.chat_history.map(s => s.id))
+        const localOnly = local.filter(s => !remoteIds.has(s.id))
+        const merged = [...data.chat_history, ...localOnly]
+          .sort((a, b) => (b.endedAt || 0) - (a.endedAt || 0))
+          .slice(0, 50)
+        localStorage.setItem('aeva_chat_history_v1', JSON.stringify(merged))
+      }
+
       return data
     }
 
@@ -63,6 +75,7 @@ export async function loadAndHydrateUser(userId) {
     const history    = safeGet('aeva_drill_history_v1', [])
     const orders     = safeGet('aeva_lab_orders_v1', [])
     const xpState    = safeGet('aeva_xp_v1', {})
+    const chatHistory = safeGet('aeva_chat_history_v1', [])
 
     await supabase.from('user_data').upsert({
       user_id: userId,
@@ -72,6 +85,7 @@ export async function loadAndHydrateUser(userId) {
       drill_history: history,
       lab_orders: orders,
       xp_state: xpState,
+      chat_history: chatHistory,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id' })
 

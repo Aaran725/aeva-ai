@@ -57,7 +57,7 @@ const YourUI             = lazy(() => import('./YourUI'))
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
 import { useMemoryStore } from './memoryStore'
 import { useUITheme, applyCSS, useIsHidden } from './uiThemeStore'
-import { saveSession, loadSessions, deleteSession, clearAllHistory, formatSessionDate, groupSessions } from './chatHistoryStore'
+import { saveSession, loadSessions, deleteSession, clearAllHistory, syncHistoryToCloud, formatSessionDate, groupSessions } from './chatHistoryStore'
 import './index.css'
 
 /* ─── Groq API (keys + URL imported at top of file) ─── */
@@ -4101,6 +4101,8 @@ function ChatView({ onBack }) {
         finalState:    sessionState,
         messages,
       })
+      // Background cloud sync — no-op if not logged in
+      syncHistoryToCloud()
     }, 800)
     return () => clearTimeout(tid)
   }, [messages, sessionState])

@@ -1,5 +1,9 @@
 /**
- * chatHistoryStore — persists chat sessions to localStorage.
+ * chatHistoryStore — persists chat sessions to localStorage,
+ * with background Supabase sync for logged-in users.
+ *
+ * Cloud sync requires this column on the user_data table:
+ *   ALTER TABLE user_data ADD COLUMN IF NOT EXISTS chat_history jsonb DEFAULT '[]'::jsonb;
  *
  * Each session:
  *   id           string   — unique id
@@ -15,6 +19,8 @@
  *   MAX_SESSIONS 50  — oldest trimmed first
  *   MAX_BYTES    2MB — safety cap before trimming
  */
+
+import { scheduleSave } from './syncService'
 
 const KEY          = 'aeva_chat_history_v1'
 const MAX_SESSIONS = 50
@@ -85,12 +91,26 @@ export function loadSessions() {
 
 /** Delete a single session by id. */
 export function deleteSession(id) {
-  persist(load().filter(s => s.id !== id))
+  const updated = load().filter(s => s.id !== id)
+  persist(updated)
+  syncHistoryToCloud(updated)
 }
 
 /** Clear all history. */
 export function clearAllHistory() {
   try { localStorage.removeItem(KEY) } catch {}
+  syncHistoryToCloud([])
+}
+
+/**
+ * Push current history to Supabase in the background.
+ * No-op if not logged in (scheduleSave checks _userId internally).
+ * Debounced to 3s so rapid saves don't hammer the API.
+ */
+export function syncHistoryToCloud(sessions) {
+  try {
+    scheduleSave('chat_history', sessions ?? load(), 3000)
+  } catch { /* never surface */ }
 }
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
