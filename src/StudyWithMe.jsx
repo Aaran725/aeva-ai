@@ -7,7 +7,7 @@
  */
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Play, Pause, Square, Music, MusicOff, ChevronUp, ChevronDown, Settings } from 'lucide-react'
+import { X, Play, Pause, Square, Music, Music2, ChevronUp, ChevronDown, Settings } from 'lucide-react'
 import { useStudyModeStore } from './useStudyModeStore'
 import { useRoadmapStore } from './roadmapStore'
 import { useUITheme } from './uiThemeStore'
@@ -329,7 +329,7 @@ function FloatingWidget({ accent, onOpenSetup }) {
             <motion.button whileTap={{ scale: 0.93 }}
               onClick={() => setMusicOn(!isMusicOn)}
               style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 10px', borderRadius: 10, background: isMusicOn ? `${accent}18` : 'rgba(255,255,255,0.05)', border: `1px solid ${isMusicOn ? accent + '44' : 'rgba(255,255,255,0.08)'}`, color: isMusicOn ? accent : 'rgba(255,255,255,0.50)', cursor: 'pointer', marginBottom: 8, fontSize: 12.5, fontWeight: 600 }}>
-              {isMusicOn ? <Music size={13} /> : <MusicOff size={13} />}
+              {isMusicOn ? <Music size={13} /> : <Music2 size={13} />}
               {isMusicOn ? 'Lofi music on' : 'Lofi music off'}
             </motion.button>
 
