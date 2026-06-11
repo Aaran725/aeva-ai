@@ -2356,35 +2356,45 @@ function MobileBottomBar({ onChat, onLab, onArcade, onDrillCount, activeTab = 'h
 
 /* ═══ LEFT SIDEBAR ════════════════════════════════ */
 
-function SidebarItem({ icon, label, action, badge, accent, collapsed }) {
+function SidebarNavItem({ Icon, label, action, badge, accent, collapsed }) {
+  const [hovered, setHovered] = useState(false)
   return (
     <motion.button
-      whileHover={{ background: 'rgba(255,255,255,0.07)', color: '#fff' }}
-      whileTap={{ scale: 0.96 }}
+      onHoverStart={() => setHovered(true)}
+      onHoverEnd={() => setHovered(false)}
+      whileTap={{ scale: 0.97 }}
       onClick={action}
       title={collapsed ? label : undefined}
       style={{
         width: '100%', boxSizing: 'border-box',
         display: 'flex', alignItems: 'center', gap: 10,
-        padding: collapsed ? '9px 0' : '8px 12px',
+        padding: collapsed ? '10px 0' : '8px 11px',
         justifyContent: collapsed ? 'center' : 'flex-start',
-        background: accent ? 'rgba(99,102,241,0.13)' : 'transparent',
-        border: accent ? '1px solid rgba(99,102,241,0.22)' : '1px solid transparent',
-        borderRadius: 9,
-        color: accent ? '#A5B4FC' : 'rgba(255,255,255,0.52)',
+        background: accent
+          ? 'linear-gradient(135deg, rgba(99,102,241,0.22), rgba(139,92,246,0.16))'
+          : hovered ? 'rgba(255,255,255,0.06)' : 'transparent',
+        border: accent ? '1px solid rgba(99,102,241,0.28)' : '1px solid transparent',
+        borderRadius: 10,
+        color: accent ? '#c4b5fd' : hovered ? '#fff' : 'rgba(255,255,255,0.50)',
         cursor: 'pointer', fontSize: 13, fontWeight: accent ? 600 : 500,
-        position: 'relative', transition: 'color 0.15s',
+        position: 'relative',
+        transition: 'all 0.15s ease',
+        textAlign: 'left',
       }}
     >
-      <span style={{ fontSize: 15, flexShrink: 0, lineHeight: 1 }}>{icon}</span>
+      {/* left accent line on hover */}
+      {!accent && hovered && !collapsed && (
+        <div style={{ position: 'absolute', left: 0, top: '20%', height: '60%', width: 2, borderRadius: 99, background: 'rgba(165,180,252,0.6)' }} />
+      )}
+      <Icon size={15} style={{ flexShrink: 0, opacity: accent ? 1 : hovered ? 1 : 0.7 }} />
       {!collapsed && (
-        <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>{label}</span>
       )}
       {badge && !collapsed && (
-        <span style={{ fontSize: 9, fontWeight: 800, background: 'rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.42)', padding: '1px 5px', borderRadius: 99, flexShrink: 0 }}>{badge}</span>
+        <span style={{ fontSize: 9, fontWeight: 800, background: 'rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.4)', padding: '2px 6px', borderRadius: 99, flexShrink: 0 }}>{badge}</span>
       )}
       {badge && collapsed && (
-        <div style={{ position: 'absolute', top: 4, right: 6, minWidth: 14, height: 14, borderRadius: 99, background: '#4ADE80', fontSize: 8, fontWeight: 800, color: '#050a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
+        <div style={{ position: 'absolute', top: 5, right: 8, minWidth: 14, height: 14, borderRadius: 99, background: '#4ADE80', fontSize: 8, fontWeight: 800, color: '#050a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
           {badge > 9 ? '9+' : badge}
         </div>
       )}
@@ -2394,112 +2404,152 @@ function SidebarItem({ icon, label, action, badge, accent, collapsed }) {
 
 function LeftSidebar({ collapsed, onToggle, onChatOpen, onLibrary, onBrain, onMirror, onLab, onRoadmap, onSchedule, onArcade, onDocs, onParents, onProfile, onYourUI, onSettings, onSignOut, labBadge, brainTotal, sessionCount }) {
   const { name } = useUser()
-  const W = collapsed ? 60 : 216
+  const W = collapsed ? 62 : 224
 
   const GROUPS = [
-    { items: [{ icon: '💬', label: 'Chat', action: onChatOpen, accent: true }] },
     { label: 'LEARN', items: [
-      { icon: '📚', label: 'Library', action: onLibrary, badge: sessionCount > 0 ? sessionCount : null },
-      { icon: '🧠', label: 'Brain', action: onBrain, badge: brainTotal > 0 ? brainTotal : null },
-      { icon: '🪞', label: 'Mirror', action: onMirror },
+      { Icon: BookOpen,    label: 'Library',  action: onLibrary,  badge: sessionCount > 0 ? sessionCount : null },
+      { Icon: Brain,       label: 'Brain',    action: onBrain,    badge: brainTotal > 0 ? brainTotal : null },
+      { Icon: Layers,      label: 'Mirror',   action: onMirror },
     ]},
     { label: 'TRACK', items: [
-      { icon: '🗺️', label: 'Roadmap', action: onRoadmap },
-      { icon: '📅', label: 'Schedule', action: onSchedule },
+      { Icon: Map,         label: 'Roadmap',  action: onRoadmap },
+      { Icon: Calendar,    label: 'Schedule', action: onSchedule },
     ]},
     { label: 'PLAY', items: [
-      { icon: '🕹️', label: 'Arcade', action: onArcade },
-      { icon: '🧪', label: 'Lab', action: onLab, badge: labBadge > 0 ? labBadge : null },
+      { Icon: Gamepad2,    label: 'Arcade',   action: onArcade },
+      { Icon: FlaskConical,label: 'Lab',      action: onLab,      badge: labBadge > 0 ? labBadge : null },
     ]},
     { label: 'TOOLS', items: [
-      { icon: '📄', label: 'Docs', action: onDocs },
-      { icon: '👥', label: 'Parents', action: onParents },
+      { Icon: FileText,    label: 'Docs',     action: onDocs },
+      { Icon: Users,       label: 'Parents',  action: onParents },
     ]},
   ]
 
   return (
     <motion.div
       animate={{ width: W, minWidth: W }}
-      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
       style={{
         width: W, minWidth: W, height: '100vh',
         position: 'sticky', top: 0,
         display: 'flex', flexDirection: 'column',
-        background: 'rgba(0,0,0,0.22)',
+        background: 'linear-gradient(180deg, rgba(8,6,30,0.96) 0%, rgba(6,5,22,0.98) 100%)',
         borderRight: '1px solid rgba(255,255,255,0.07)',
         overflowX: 'hidden', overflowY: 'auto',
         zIndex: 40, flexShrink: 0,
       }}
     >
-      {/* Logo row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', padding: collapsed ? '16px 0' : '15px 14px 15px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 26, height: 26, borderRadius: 8, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(45,48,142,0.45)', flexShrink: 0 }}>
-            <Star size={11} color="white" fill="white" />
+      {/* ── Brand header ── */}
+      <div style={{
+        padding: collapsed ? '20px 0 16px' : '22px 16px 18px',
+        borderBottom: '1px solid rgba(255,255,255,0.07)',
+        flexShrink: 0,
+        display: 'flex', flexDirection: 'column',
+        alignItems: collapsed ? 'center' : 'flex-start',
+        position: 'relative',
+        background: 'linear-gradient(135deg, rgba(45,48,142,0.3) 0%, rgba(139,92,246,0.1) 100%)',
+      }}>
+        {/* logo mark */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: collapsed ? 0 : 6 }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: 11,
+            background: 'linear-gradient(135deg, #2D308E 0%, #7C3AED 50%, #E9A364 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 0 20px rgba(99,102,241,0.5), 0 2px 8px rgba(0,0,0,0.4)',
+            flexShrink: 0,
+          }}>
+            <Star size={14} color="white" fill="white" />
           </div>
           <AnimatePresence>
             {!collapsed && (
-              <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}
-                style={{ fontSize: 16, fontWeight: 900, letterSpacing: '-0.04em', background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(233,163,100,0.80) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', whiteSpace: 'nowrap' }}>
-                aeva
-              </motion.span>
+              <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} transition={{ duration: 0.18 }}>
+                <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: '-0.05em', background: 'linear-gradient(135deg, #fff 0%, rgba(233,163,100,0.9) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', lineHeight: 1 }}>aeva</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 2, fontWeight: 500 }}>AI Study Platform</div>
+              </motion.div>
             )}
           </AnimatePresence>
         </div>
+        {/* collapse toggle */}
         {!collapsed && (
-          <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={onToggle}
-            style={{ width: 22, height: 22, borderRadius: 7, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.35)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <ChevronLeft size={12} />
+          <motion.button whileHover={{ scale: 1.1, background: 'rgba(255,255,255,0.1)' }} whileTap={{ scale: 0.9 }} onClick={onToggle}
+            style={{ position: 'absolute', top: 14, right: 12, width: 24, height: 24, borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}>
+            <ChevronLeft size={13} />
+          </motion.button>
+        )}
+        {collapsed && (
+          <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={onToggle} title="Expand sidebar"
+            style={{ marginTop: 10, width: 28, height: 28, borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ChevronRight size={13} />
           </motion.button>
         )}
       </div>
 
-      {/* Nav groups */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: collapsed ? '6px 0' : '8px 8px', display: 'flex', flexDirection: 'column' }}>
-        {collapsed && (
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-            <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={onToggle} title="Expand"
-              style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ChevronRight size={12} />
-            </motion.button>
-          </div>
-        )}
+      {/* ── Chat CTA ── */}
+      <div style={{ padding: collapsed ? '10px 8px' : '10px 10px 4px', flexShrink: 0 }}>
+        <motion.button
+          whileHover={{ scale: 1.02, boxShadow: '0 4px 20px rgba(99,102,241,0.4)' }}
+          whileTap={{ scale: 0.98 }}
+          onClick={onChatOpen}
+          title={collapsed ? 'Chat with Aeva' : undefined}
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start',
+            gap: 9, padding: collapsed ? '11px 0' : '10px 14px',
+            background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
+            border: 'none', borderRadius: 12,
+            color: '#fff', fontSize: 13, fontWeight: 700,
+            cursor: 'pointer', letterSpacing: '-0.01em',
+            boxShadow: '0 2px 12px rgba(99,102,241,0.35)',
+            transition: 'box-shadow 0.2s',
+          }}
+        >
+          <MessageCircle size={15} style={{ flexShrink: 0 }} />
+          {!collapsed && <span style={{ flex: 1, textAlign: 'left' }}>Chat with Aeva</span>}
+          {!collapsed && <ArrowUp size={13} style={{ opacity: 0.6, transform: 'rotate(45deg)', flexShrink: 0 }} />}
+        </motion.button>
+      </div>
+
+      {/* ── Nav groups ── */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: collapsed ? '4px 8px' : '4px 10px', display: 'flex', flexDirection: 'column' }}>
         {GROUPS.map((group, gi) => (
-          <div key={gi}>
-            {!collapsed && group.label && (
-              <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.18)', letterSpacing: 1.2, textTransform: 'uppercase', padding: '10px 12px 4px', userSelect: 'none' }}>
+          <div key={gi} style={{ marginBottom: 2 }}>
+            {!collapsed && (
+              <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.2)', letterSpacing: 1.4, textTransform: 'uppercase', padding: '12px 11px 5px', userSelect: 'none' }}>
                 {group.label}
               </div>
             )}
             {collapsed && gi > 0 && (
-              <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '5px 10px' }} />
+              <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '6px 4px' }} />
             )}
             {group.items.map((item, ii) => (
-              <SidebarItem key={ii} {...item} collapsed={collapsed} />
+              <SidebarNavItem key={ii} {...item} collapsed={collapsed} />
             ))}
           </div>
         ))}
       </div>
 
-      {/* Bottom */}
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: collapsed ? '6px 0' : '6px 8px', flexShrink: 0 }}>
-        <SidebarItem icon="🎨" label="YOUR UI" action={onYourUI} collapsed={collapsed} />
-        <SidebarItem icon="⚙️" label="Settings" action={onSettings} collapsed={collapsed} />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', padding: collapsed ? '8px 0' : '8px 10px', gap: 8 }}>
+      {/* ── Bottom ── */}
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: collapsed ? '8px 8px' : '8px 10px', flexShrink: 0 }}>
+        <SidebarNavItem Icon={Palette} label="YOUR UI" action={onYourUI} collapsed={collapsed} />
+        <SidebarNavItem Icon={Settings} label="Settings" action={onSettings} collapsed={collapsed} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', padding: collapsed ? '8px 0' : '8px 4px 4px', gap: 8, marginTop: 2 }}>
           <motion.button whileTap={{ scale: 0.95 }} onClick={onProfile} title={collapsed ? name : undefined}
             style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0, minWidth: 0, flex: collapsed ? 'none' : 1 }}>
-            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+            <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#fff', flexShrink: 0, boxShadow: '0 0 8px rgba(99,102,241,0.4)' }}>
               {name?.[0]?.toUpperCase() || 'A'}
             </div>
             {!collapsed && (
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.75)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>{name}</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>Student</div>
+              </div>
             )}
           </motion.button>
           {!collapsed && (
-            <motion.button whileHover={{ scale: 1.1, color: '#F43F5E' }} whileTap={{ scale: 0.9 }} onClick={onSignOut}
-              title="Sign out"
-              style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', cursor: 'pointer', display: 'flex', padding: 4, borderRadius: 6, flexShrink: 0 }}>
-              <LogOut size={13} />
+            <motion.button whileHover={{ scale: 1.1, color: '#F87171' }} whileTap={{ scale: 0.9 }} onClick={onSignOut} title="Sign out"
+              style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.18)', cursor: 'pointer', display: 'flex', padding: 5, borderRadius: 7, flexShrink: 0, transition: 'color 0.15s' }}>
+              <LogOut size={14} />
             </motion.button>
           )}
         </div>
@@ -2637,6 +2687,33 @@ function DashboardView({ onChatOpen, onSignOut }) {
               </motion.button>
             </div>
           </header>
+        )}
+
+        {/* ── Desktop top bar ── */}
+        {!isMobile && (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '14px 28px 0',
+            gap: 12,
+          }}>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1 }}>
+                {(() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening' })()}, {name} 👋
+              </div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 3 }}>
+                {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 99, fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+                <span>🔥</span><span style={{ fontWeight: 600, color: '#FB923C' }}>{useXPStore.getState().streak}</span><span>day streak</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 99, fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+                <Zap size={12} style={{ color: '#A5B4FC' }} /><span style={{ fontWeight: 600, color: '#A5B4FC' }}>Lv {currentLevel}</span>
+              </div>
+              <WidgetToggle active={dashLayout === 'widget'} onToggle={toggleDashLayout} style={{ height: 32, fontSize: 11, padding: '0 10px' }} />
+            </div>
+          </div>
         )}
 
         <FeatureSpotlight
