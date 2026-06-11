@@ -87,32 +87,37 @@ function buildSchedule(roadmaps) {
       const slots = []
       let slotsLeft = MAX_NODES_PER_DAY
 
-      // Sort by urgency each day so the most at-risk subject gets the first slot
-      const available = queues
-        .filter(q => q.queue.length > 0 && dateKey(new Date(q.examDate)) > key)
-        .sort((a, b) => b.urgency - a.urgency)
+      // Round-robin: one pass per subject, repeat until slots are full or all queues empty.
+      // This ensures we fill up to MAX_NODES_PER_DAY even with only 1 subject.
+      while (slotsLeft > 0) {
+        const available = queues
+          .filter(q => q.queue.length > 0 && dateKey(new Date(q.examDate)) > key)
+          .sort((a, b) => b.urgency - a.urgency)
 
-      for (const q of available) {
-        if (slotsLeft <= 0) break
-        const node = q.queue.shift()
-        const mins = node.estimatedMinutes ||
-          (node.type === 'mock' ? 60 : node.type === 'learn' ? 20 : 12)
+        if (!available.length) break
 
-        slots.push({
-          roadmapId:        q.id,
-          nodeId:           node.id,
-          topic:            node.topic,
-          subject:          q.title,
-          type:             node.type,
-          estimatedMinutes: mins,
-          color:            q.color,
-          phase:            node.phase        || 'Core Topics',
-          subtopics:        node.subtopics    || [],
-          description:      node.description  || '',
-          difficulty:       node.difficulty   || 2,
-          done:             false,
-        })
-        slotsLeft--
+        for (const q of available) {
+          if (slotsLeft <= 0) break
+          const node = q.queue.shift()
+          const mins = node.estimatedMinutes ||
+            (node.type === 'mock' ? 60 : node.type === 'learn' ? 20 : 12)
+
+          slots.push({
+            roadmapId:        q.id,
+            nodeId:           node.id,
+            topic:            node.topic,
+            subject:          q.title,
+            type:             node.type,
+            estimatedMinutes: mins,
+            color:            q.color,
+            phase:            node.phase        || 'Core Topics',
+            subtopics:        node.subtopics    || [],
+            description:      node.description  || '',
+            difficulty:       node.difficulty   || 2,
+            done:             false,
+          })
+          slotsLeft--
+        }
       }
 
       if (slots.length) schedule[key] = slots
