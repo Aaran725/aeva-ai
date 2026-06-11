@@ -2189,18 +2189,31 @@ function PersonalProgressCard() {
 function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings, onProfile, onShowEm, onDocs, onRoadmap, onYourUI, onMaps, onSignOut }) {
   const T = useT()
   const accent = useUITheme(s => s.accent)
-  const items = [
-    { label: 'Roadmaps',     icon: <span style={{ fontSize: 17 }}>🗺️</span>,   color: '#A78BFA', action: onRoadmap },
-    { label: T.library,      icon: <BookOpen size={17} />,  color: '#A78BFA', action: onLibrary },
-    { label: T.secondBrain,  icon: <Brain size={17} />,     color: '#8B8FFF', action: onBrain },
-    { label: T.mirror,       icon: <span style={{ fontSize: 17 }}>🪞</span>,   color: '#D8B4FE', action: onMirror },
-    { label: 'Maps',         icon: <Map size={17} />,        color: '#34D399', action: onMaps },
-    { label: 'Parents',      icon: <Users size={17} />,      color: '#34D399', action: onShowEm },
-    { label: 'Docs',         icon: <FileText size={17} />,   color: '#60A5FA', action: onDocs },
-    { label: 'YOUR UI',      icon: <span style={{ fontSize: 17 }}>🎨</span>,   color: accent,   action: onYourUI },
-    { label: T.myProfile,    icon: <Star size={17} />,       color: '#E9A364', action: onProfile },
-    { label: T.appearance,   icon: <Settings size={17} />,   color: 'rgba(255,255,255,0.55)', action: onSettings },
+  const { name } = useUser()
+  const { xp } = useXPStore()
+  const currentLevel = levelFromXP(xp)
+
+  const GROUPS = [
+    { label: 'LEARN', items: [
+      { label: T.library,     icon: <BookOpen size={16} />,  action: onLibrary },
+      { label: T.secondBrain, icon: <Brain size={16} />,     action: onBrain },
+      { label: T.mirror,      icon: <Layers size={16} />,    action: onMirror },
+    ]},
+    { label: 'TRACK', items: [
+      { label: 'Roadmap',     icon: <Map size={16} />,       action: onRoadmap },
+      { label: 'Schedule',    icon: <Calendar size={16} />,  action: onMaps },
+    ]},
+    { label: 'TOOLS', items: [
+      { label: 'Docs',        icon: <FileText size={16} />,  action: onDocs },
+      { label: 'Parents',     icon: <Users size={16} />,     action: onShowEm },
+    ]},
+    { label: 'YOU', items: [
+      { label: 'YOUR UI',     icon: <Palette size={16} />,   action: onYourUI },
+      { label: T.myProfile,   icon: <Star size={16} />,      action: onProfile },
+      { label: T.appearance,  icon: <Settings size={16} />,  action: onSettings },
+    ]},
   ]
+
   return (
     <AnimatePresence>
       {open && (
@@ -2217,60 +2230,79 @@ function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings,
             transition={{ type: 'spring', stiffness: 340, damping: 32 }}
             style={{
               position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 299,
-              width: 280,
-              background: 'var(--aeva-surface-1)',
+              width: 272,
+              background: 'linear-gradient(180deg, rgba(8,6,30,0.98) 0%, rgba(6,5,22,0.99) 100%)',
               backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
-              borderLeft: '1px solid rgba(255,255,255,0.10)',
+              borderLeft: '1px solid rgba(255,255,255,0.09)',
               display: 'flex', flexDirection: 'column',
               fontFamily: "'Inter', system-ui, sans-serif",
             }}
           >
-            {/* Drawer header */}
-            <div style={{ padding: '20px 18px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 28, height: 28, borderRadius: 9, background: `linear-gradient(135deg, ${accent}cc, ${accent}66)`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 2px 12px ${accent}44` }}>
-                  <Star size={12} color="white" fill="white" />
+            {/* User identity header */}
+            <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0, background: 'linear-gradient(135deg, rgba(45,48,142,0.25) 0%, rgba(139,92,246,0.08) 100%)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 12, background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 800, color: '#fff', boxShadow: '0 0 14px rgba(99,102,241,0.45)' }}>
+                    {name?.[0]?.toUpperCase() || 'A'}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.90)', letterSpacing: '-0.02em' }}>{name}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.30)', marginTop: 1 }}>Level {currentLevel} · Student</div>
+                  </div>
                 </div>
-                <span style={{ fontSize: 16, fontWeight: 800, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.03em' }}>aeva</span>
+                <motion.button whileTap={{ scale: 0.90 }} onClick={onClose}
+                  style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.40)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <X size={13} />
+                </motion.button>
               </div>
-              <motion.button whileTap={{ scale: 0.90 }} onClick={onClose}
-                style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.50)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <X size={14} />
-              </motion.button>
+              {/* XP bar */}
+              <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 99, height: 4, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${xpIntoLevel(xp)}%`, background: 'linear-gradient(90deg, #6366F1, #8B5CF6)', borderRadius: 99, transition: 'width 0.6s ease' }} />
+              </div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)', marginTop: 4 }}>{xp} XP · {xpIntoLevel(xp).toFixed(0)}% to next level</div>
             </div>
 
-            {/* Nav items */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '10px 10px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {items.map(item => (
-                <motion.button key={item.label} whileTap={{ scale: 0.96 }}
-                  onClick={() => { item.action?.(); onClose() }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '12px 14px', borderRadius: 12,
-                    background: `${item.color}10`,
-                    border: `1px solid ${item.color}22`,
-                    color: item.color, fontSize: 14, fontWeight: 600,
-                    cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', width: '100%',
-                    transition: 'background 0.15s',
-                  }}>
-                  {item.icon}
-                  {item.label}
-                </motion.button>
+            {/* Grouped nav */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
+              {GROUPS.map((group, gi) => (
+                <div key={gi} style={{ marginBottom: 4 }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.18)', letterSpacing: 1.4, textTransform: 'uppercase', padding: '10px 6px 5px', userSelect: 'none' }}>
+                    {group.label}
+                  </div>
+                  {group.items.map(item => (
+                    <motion.button key={item.label} whileTap={{ scale: 0.97 }}
+                      onClick={() => { item.action?.(); onClose() }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 11,
+                        padding: '10px 12px', borderRadius: 10, width: '100%',
+                        background: 'transparent', border: '1px solid transparent',
+                        color: 'rgba(255,255,255,0.68)', fontSize: 13.5, fontWeight: 500,
+                        cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                        transition: 'background 0.12s, color 0.12s',
+                      }}
+                      onTouchStart={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+                      onTouchEnd={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <span style={{ opacity: 0.75, flexShrink: 0 }}>{item.icon}</span>
+                      {item.label}
+                    </motion.button>
+                  ))}
+                </div>
               ))}
             </div>
 
             {/* Sign out */}
-            <div style={{ padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,0.07)', flexShrink: 0, paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+            <div style={{ padding: '8px 10px', borderTop: '1px solid rgba(255,255,255,0.07)', flexShrink: 0, paddingBottom: 'max(10px, env(safe-area-inset-bottom))' }}>
               <motion.button whileTap={{ scale: 0.97 }}
                 onClick={() => { onSignOut?.(); onClose() }}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '12px 16px', borderRadius: 14, width: '100%',
-                  background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.20)',
-                  color: 'rgba(248,113,113,0.80)', fontSize: 14, fontWeight: 600,
+                  display: 'flex', alignItems: 'center', gap: 11,
+                  padding: '11px 14px', borderRadius: 12, width: '100%',
+                  background: 'rgba(248,113,113,0.07)', border: '1px solid rgba(248,113,113,0.18)',
+                  color: 'rgba(248,113,113,0.75)', fontSize: 13.5, fontWeight: 600,
                   cursor: 'pointer', fontFamily: 'inherit',
                 }}>
-                <LogOut size={16} />
+                <LogOut size={15} />
                 {T.signOut}
               </motion.button>
             </div>
@@ -2282,7 +2314,7 @@ function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings,
 }
 
 /* ═══ MOBILE BOTTOM BAR ══════════════════════════ */
-function MobileBottomBar({ onChat, onLab, onArcade, onDrillCount, activeTab = 'home', onHome }) {
+function MobileBottomBar({ onChat, onLab, onArcade, onDrillCount, activeTab = 'home', onHome, onMore }) {
   const T = useT()
   const accent = useUITheme(s => s.accent)
   const tabs = [
@@ -2290,6 +2322,7 @@ function MobileBottomBar({ onChat, onLab, onArcade, onDrillCount, activeTab = 'h
     { id: 'chat',   label: T.chat,    icon: <MessageCircle size={20} />, action: onChat  },
     { id: 'lab',    label: T.lab,     icon: <FlaskConical size={20} />,  action: onLab,  badge: onDrillCount > 0 ? onDrillCount : null },
     { id: 'arcade', label: T.arcade,  icon: <Gamepad2 size={20} />,      action: onArcade },
+    { id: 'more',   label: 'More',    icon: <Menu size={20} />,          action: onMore },
   ]
   return (
     <div style={{
@@ -2662,29 +2695,48 @@ function DashboardView({ onChatOpen, onSignOut }) {
       <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', overflowX: 'hidden', position: 'relative' }}>
       <div style={{ position: 'relative' }}>
 
-        {/* ── Mobile header (logo + hamburger only) ── */}
+        {/* ── Mobile header ── */}
         {isMobile && (
           <header style={{
             position: 'sticky', top: 0, zIndex: 50,
-            padding: '14px 18px',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '12px 16px',
             backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
             borderBottom: '1px solid rgba(255,255,255,0.06)',
+            background: 'rgba(5,6,20,0.72)',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 9, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(45,48,142,0.50)' }}>
-                <Star size={11} color="white" fill="white" />
+            {/* Row 1: logo + actions */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 9, background: 'linear-gradient(135deg, #2D308E 0%, #7C3AED 50%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(99,102,241,0.45)', flexShrink: 0 }}>
+                  <Star size={11} color="white" fill="white" />
+                </div>
+                <div>
+                  <span style={{ fontSize: 17, fontWeight: 900, letterSpacing: '-0.04em', background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(233,163,100,0.80) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>aeva</span>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.05em', marginTop: -1 }}>AI Study Platform</div>
+                </div>
               </div>
-              <span style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.04em', background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(233,163,100,0.80) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>aeva</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <WidgetToggle active={dashLayout === 'widget'} onToggle={toggleDashLayout} />
+              </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {/* Layout toggle — mobile */}
-              <WidgetToggle active={dashLayout === 'widget'} onToggle={toggleDashLayout} />
-              <motion.button whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.92 }}
-                onClick={() => setDrawerOpen(true)}
-                style={{ width: 38, height: 38, borderRadius: 12, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.70)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Menu size={18} />
-              </motion.button>
+            {/* Row 2: greeting + stats chips */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.88)', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                  {(() => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening' })()}, {name} 👋
+                </div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.30)', marginTop: 2 }}>
+                  {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', background: 'rgba(251,146,60,0.12)', border: '1px solid rgba(251,146,60,0.25)', borderRadius: 99, fontSize: 11 }}>
+                  <span>🔥</span><span style={{ fontWeight: 700, color: '#FB923C' }}>{streak}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(129,140,248,0.25)', borderRadius: 99, fontSize: 11 }}>
+                  <Zap size={10} style={{ color: '#A5B4FC' }} /><span style={{ fontWeight: 700, color: '#A5B4FC' }}>Lv {currentLevel}</span>
+                </div>
+              </div>
             </div>
           </header>
         )}
@@ -2791,6 +2843,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
           onLab={openLab}
           onArcade={openArcade}
           onHome={() => {}}
+          onMore={() => setDrawerOpen(true)}
           activeTab="home"
           onDrillCount={labBadgeCount}
         />
