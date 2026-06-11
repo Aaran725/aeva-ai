@@ -2354,6 +2354,160 @@ function MobileBottomBar({ onChat, onLab, onArcade, onDrillCount, activeTab = 'h
   )
 }
 
+/* ═══ LEFT SIDEBAR ════════════════════════════════ */
+
+function SidebarItem({ icon, label, action, badge, accent, collapsed }) {
+  return (
+    <motion.button
+      whileHover={{ background: 'rgba(255,255,255,0.07)', color: '#fff' }}
+      whileTap={{ scale: 0.96 }}
+      onClick={action}
+      title={collapsed ? label : undefined}
+      style={{
+        width: '100%', boxSizing: 'border-box',
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: collapsed ? '9px 0' : '8px 12px',
+        justifyContent: collapsed ? 'center' : 'flex-start',
+        background: accent ? 'rgba(99,102,241,0.13)' : 'transparent',
+        border: accent ? '1px solid rgba(99,102,241,0.22)' : '1px solid transparent',
+        borderRadius: 9,
+        color: accent ? '#A5B4FC' : 'rgba(255,255,255,0.52)',
+        cursor: 'pointer', fontSize: 13, fontWeight: accent ? 600 : 500,
+        position: 'relative', transition: 'color 0.15s',
+      }}
+    >
+      <span style={{ fontSize: 15, flexShrink: 0, lineHeight: 1 }}>{icon}</span>
+      {!collapsed && (
+        <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+      )}
+      {badge && !collapsed && (
+        <span style={{ fontSize: 9, fontWeight: 800, background: 'rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.42)', padding: '1px 5px', borderRadius: 99, flexShrink: 0 }}>{badge}</span>
+      )}
+      {badge && collapsed && (
+        <div style={{ position: 'absolute', top: 4, right: 6, minWidth: 14, height: 14, borderRadius: 99, background: '#4ADE80', fontSize: 8, fontWeight: 800, color: '#050a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
+          {badge > 9 ? '9+' : badge}
+        </div>
+      )}
+    </motion.button>
+  )
+}
+
+function LeftSidebar({ collapsed, onToggle, onChatOpen, onLibrary, onBrain, onMirror, onLab, onRoadmap, onSchedule, onArcade, onDocs, onParents, onProfile, onYourUI, onSettings, onSignOut, labBadge, brainTotal, sessionCount }) {
+  const { name } = useUser()
+  const W = collapsed ? 60 : 216
+
+  const GROUPS = [
+    { items: [{ icon: '💬', label: 'Chat', action: onChatOpen, accent: true }] },
+    { label: 'LEARN', items: [
+      { icon: '📚', label: 'Library', action: onLibrary, badge: sessionCount > 0 ? sessionCount : null },
+      { icon: '🧠', label: 'Brain', action: onBrain, badge: brainTotal > 0 ? brainTotal : null },
+      { icon: '🪞', label: 'Mirror', action: onMirror },
+    ]},
+    { label: 'TRACK', items: [
+      { icon: '🗺️', label: 'Roadmap', action: onRoadmap },
+      { icon: '📅', label: 'Schedule', action: onSchedule },
+    ]},
+    { label: 'PLAY', items: [
+      { icon: '🕹️', label: 'Arcade', action: onArcade },
+      { icon: '🧪', label: 'Lab', action: onLab, badge: labBadge > 0 ? labBadge : null },
+    ]},
+    { label: 'TOOLS', items: [
+      { icon: '📄', label: 'Docs', action: onDocs },
+      { icon: '👥', label: 'Parents', action: onParents },
+    ]},
+  ]
+
+  return (
+    <motion.div
+      animate={{ width: W, minWidth: W }}
+      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+      style={{
+        width: W, minWidth: W, height: '100vh',
+        position: 'sticky', top: 0,
+        display: 'flex', flexDirection: 'column',
+        background: 'rgba(0,0,0,0.22)',
+        borderRight: '1px solid rgba(255,255,255,0.07)',
+        overflowX: 'hidden', overflowY: 'auto',
+        zIndex: 40, flexShrink: 0,
+      }}
+    >
+      {/* Logo row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', padding: collapsed ? '16px 0' : '15px 14px 15px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 26, height: 26, borderRadius: 8, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(45,48,142,0.45)', flexShrink: 0 }}>
+            <Star size={11} color="white" fill="white" />
+          </div>
+          <AnimatePresence>
+            {!collapsed && (
+              <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}
+                style={{ fontSize: 16, fontWeight: 900, letterSpacing: '-0.04em', background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(233,163,100,0.80) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', whiteSpace: 'nowrap' }}>
+                aeva
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </div>
+        {!collapsed && (
+          <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={onToggle}
+            style={{ width: 22, height: 22, borderRadius: 7, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.35)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <ChevronLeft size={12} />
+          </motion.button>
+        )}
+      </div>
+
+      {/* Nav groups */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: collapsed ? '6px 0' : '8px 8px', display: 'flex', flexDirection: 'column' }}>
+        {collapsed && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+            <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={onToggle} title="Expand"
+              style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ChevronRight size={12} />
+            </motion.button>
+          </div>
+        )}
+        {GROUPS.map((group, gi) => (
+          <div key={gi}>
+            {!collapsed && group.label && (
+              <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.18)', letterSpacing: 1.2, textTransform: 'uppercase', padding: '10px 12px 4px', userSelect: 'none' }}>
+                {group.label}
+              </div>
+            )}
+            {collapsed && gi > 0 && (
+              <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '5px 10px' }} />
+            )}
+            {group.items.map((item, ii) => (
+              <SidebarItem key={ii} {...item} collapsed={collapsed} />
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {/* Bottom */}
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: collapsed ? '6px 0' : '6px 8px', flexShrink: 0 }}>
+        <SidebarItem icon="🎨" label="YOUR UI" action={onYourUI} collapsed={collapsed} />
+        <SidebarItem icon="⚙️" label="Settings" action={onSettings} collapsed={collapsed} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', padding: collapsed ? '8px 0' : '8px 10px', gap: 8 }}>
+          <motion.button whileTap={{ scale: 0.95 }} onClick={onProfile} title={collapsed ? name : undefined}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0, minWidth: 0, flex: collapsed ? 'none' : 1 }}>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+              {name?.[0]?.toUpperCase() || 'A'}
+            </div>
+            {!collapsed && (
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+            )}
+          </motion.button>
+          {!collapsed && (
+            <motion.button whileHover={{ scale: 1.1, color: '#F43F5E' }} whileTap={{ scale: 0.9 }} onClick={onSignOut}
+              title="Sign out"
+              style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', cursor: 'pointer', display: 'flex', padding: 4, borderRadius: 6, flexShrink: 0 }}>
+              <LogOut size={13} />
+            </motion.button>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
 /* ═══ DASHBOARD VIEW ══════════════════════════════ */
 function DashboardView({ onChatOpen, onSignOut }) {
   const { openArcade } = useArcadeStore()
@@ -2392,6 +2546,12 @@ function DashboardView({ onChatOpen, onSignOut }) {
   const [docOpen, setDocOpen]         = useState(false)
   const [yourUIOpen, setYourUIOpen]   = useState(false)
   const [drawerOpen, setDrawerOpen]   = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('aeva_sidebar_collapsed') === 'true' } catch { return false }
+  })
+  const toggleSidebar = () => setSidebarCollapsed(v => {
+    const next = !v; try { localStorage.setItem('aeva_sidebar_collapsed', next) } catch {}; return next
+  })
   const [dashLayout, setDashLayout] = useState(() => {
     try { return localStorage.getItem('aeva_dash_layout') || 'classic' } catch { return 'classic' }
   })
@@ -2417,147 +2577,40 @@ function DashboardView({ onChatOpen, onSignOut }) {
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       transition={{ duration: 0.3, ease: 'easeInOut' }}
       style={{
-        position: 'relative', minHeight: '100vh', width: '100%',
-        overflowX: 'hidden', overflowY: 'auto',
+        display: 'flex', minHeight: '100vh', width: '100%',
+        overflowX: 'hidden',
         background: 'var(--ui-bg)',
         fontFamily,
       }}
     >
+      {/* ── Left sidebar (desktop only) ── */}
+      {!isMobile && (
+        <LeftSidebar
+          collapsed={sidebarCollapsed}
+          onToggle={toggleSidebar}
+          onChatOpen={onChatOpen}
+          onLibrary={() => setLibraryOpen(true)}
+          onBrain={() => setBrainOpen(true)}
+          onMirror={() => setMirrorOpen(true)}
+          onLab={openLab}
+          onRoadmap={openRoadmapHub}
+          onSchedule={() => setMapsOpen(true)}
+          onArcade={openArcade}
+          onDocs={() => setDocOpen(true)}
+          onParents={() => setShowEmOpen(true)}
+          onProfile={() => setProfileOpen(true)}
+          onYourUI={() => setYourUIOpen(true)}
+          onSettings={() => setAppSettingsOpen(true)}
+          onSignOut={onSignOut}
+          labBadge={labBadgeCount}
+          brainTotal={brainStats.total}
+          sessionCount={sessions.length}
+        />
+      )}
 
+      {/* ── Main content ── */}
+      <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', overflowX: 'hidden', position: 'relative' }}>
       <div style={{ position: 'relative' }}>
-        {/* ── Desktop header (hidden on mobile) ── */}
-        {!isMobile && (
-          <header className="dash-header" style={{
-            position: 'sticky', top: 0, zIndex: 50,
-            width: '100%',
-            borderBottom: '1px solid rgba(255,255,255,0.07)',
-            backdropFilter: 'blur(32px)',
-            WebkitBackdropFilter: 'blur(32px)',
-          }}>
-            {/* 3-column grid: logo | centred nav | right actions */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr auto 1fr',
-              alignItems: 'center',
-              maxWidth: 1440, margin: '0 auto',
-              padding: '0 20px',
-              height: 48,
-              overflow: 'hidden',
-            }}>
-
-              {/* ── Left: logo — right-aligned so it sits right next to the nav ── */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, paddingRight: 20 }}>
-                <div style={{ width: 26, height: 26, borderRadius: 8, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(45,48,142,0.45)', flexShrink: 0 }}>
-                  <Star size={11} color="white" fill="white" />
-                </div>
-                <span style={{ fontSize: 16, fontWeight: 900, letterSpacing: '-0.04em', background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(233,163,100,0.80) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>aeva</span>
-              </div>
-
-              {/* ── Centre: nav items ── */}
-              {(() => {
-                const nb = {
-                  display: 'inline-flex', alignItems: 'center', gap: 5,
-                  height: 30, padding: '0 10px', borderRadius: 8,
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  color: 'rgba(255,255,255,0.58)',
-                  fontFamily: "'Inter', system-ui, sans-serif",
-                  fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                  whiteSpace: 'nowrap', letterSpacing: '-0.01em', flexShrink: 0,
-                }
-                const badge = {
-                  padding: '1px 4px', borderRadius: 99,
-                  background: 'rgba(255,255,255,0.13)',
-                  fontSize: 9, fontWeight: 800,
-                  color: 'rgba(255,255,255,0.55)',
-                }
-                const div = <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.10)' }} />
-                return (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <motion.button whileHover={{ scale: 1.04, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.96 }} onClick={() => setLibraryOpen(true)} style={nb}>
-                      <BookOpen size={12} />Library
-                      {sessions.length > 0 && <span style={badge}>{sessions.length}</span>}
-                    </motion.button>
-
-                    <motion.button whileHover={{ scale: 1.04, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.96 }} onClick={() => setBrainOpen(true)} style={nb}>
-                      <Brain size={12} />Brain
-                      {brainStats.total > 0 && <span style={badge}>{brainStats.total}</span>}
-                    </motion.button>
-
-                    <motion.button whileHover={{ scale: 1.04, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.96 }} onClick={() => setMirrorOpen(true)} style={nb}>
-                      <span style={{ fontSize: 11 }}>🪞</span>Mirror
-                    </motion.button>
-
-                    {div}
-
-                    <motion.button whileHover={{ scale: 1.04, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.96 }} onClick={openLab} style={{ ...nb, position: 'relative' }}>
-                      <FlaskConical size={12} />Lab
-                      {labBadgeCount > 0 && (
-                        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400 }}
-                          style={{ position: 'absolute', top: -4, right: -4, minWidth: 14, height: 14, borderRadius: 99, background: pendingOrderCount > 0 ? '#60A5FA' : '#4ADE80', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 800, color: '#050a1a', padding: '0 3px', boxShadow: pendingOrderCount > 0 ? '0 0 6px rgba(96,165,250,0.60)' : '0 0 6px rgba(74,222,128,0.60)' }}>
-                          {labBadgeCount}
-                        </motion.div>
-                      )}
-                    </motion.button>
-
-                    <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={openRoadmapHub}
-                      className="nav-btn-feature"
-                      style={{ ...nb, fontWeight: 600 }}>
-                      <span style={{ fontSize: 11 }}>🗺️</span>Roadmap
-                    </motion.button>
-
-                    <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={() => setMapsOpen(true)}
-                      className="nav-btn-feature"
-                      style={{ ...nb, fontWeight: 600 }}>
-                      <Calendar size={12} />Schedule
-                    </motion.button>
-
-                    <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={openArcade}
-                      className="nav-btn-feature"
-                      style={{ ...nb, fontWeight: 600 }}>
-                      <Gamepad2 size={12} />Arcade
-                    </motion.button>
-
-                    {div}
-
-                    <motion.button whileHover={{ scale: 1.04, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.96 }} onClick={onChatOpen} style={nb}>
-                      <MessageCircle size={12} />Chat
-                    </motion.button>
-
-                    <motion.button whileHover={{ scale: 1.04, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.96 }} onClick={() => setDocOpen(true)} style={nb}>
-                      <FileText size={12} />Docs
-                    </motion.button>
-
-                    <motion.button whileHover={{ scale: 1.04, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.96 }} onClick={() => setShowEmOpen(true)} style={nb}>
-                      <Users size={12} />Parents
-                    </motion.button>
-
-                    <motion.button whileHover={{ scale: 1.04, background: 'rgba(255,255,255,0.10)' }} whileTap={{ scale: 0.96 }} onClick={() => setProfileOpen(true)} style={nb}>
-                      <Star size={12} />Profile
-                    </motion.button>
-                  </div>
-                )
-              })()}
-
-              {/* ── Right: actions — left-aligned so it sits right next to the nav ── */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'flex-start', paddingLeft: 20 }}>
-                <motion.button whileHover={{ scale: 1.06, rotate: 45 }} whileTap={{ scale: 0.94 }} onClick={() => setAppSettingsOpen(true)}
-                  style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.40)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Settings size={13} />
-                </motion.button>
-
-                <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={() => setYourUIOpen(true)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 30, padding: '0 10px', borderRadius: 8, background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.28)', color: '#A5B4FC', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  🎨 YOUR UI
-                </motion.button>
-
-                <WidgetToggle active={dashLayout === 'widget'} onToggle={toggleDashLayout} style={{ height: 30, fontSize: 11, padding: '0 9px' }} />
-
-                <UserAvatar onSignOut={onSignOut} />
-              </div>
-            </div>
-          </header>
-        )}
 
         {/* ── Mobile header (logo + hamburger only) ── */}
         {isMobile && (
@@ -2616,7 +2669,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
               exit={{ opacity: 0, scale: 0.97 }}
               transition={{ duration: 0.30, ease: [0.22, 1, 0.36, 1] }}
               className="bento-grid"
-              style={{ padding: isMobile ? '16px 14px' : '0 24px', maxWidth: 1280, margin: '0 auto', paddingBottom: isMobile ? 'calc(80px + env(safe-area-inset-bottom))' : undefined }}
+              style={{ padding: isMobile ? '16px 14px' : '24px 28px', maxWidth: 1440, margin: '0 auto', paddingBottom: isMobile ? 'calc(80px + env(safe-area-inset-bottom))' : undefined }}
             >
               <MissionCard onChatOpen={onChatOpen} onOrbClick={() => setOrbSelectorOpen(true)} />
               <TodayPlanCard onOpenCalendar={() => setMapsOpen(true)} onNavigateToChat={onChatOpen} />
@@ -2665,6 +2718,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
           onDrillCount={labBadgeCount}
         />
       )}
+      </div>{/* end flex-1 main content */}
 
       {/* Modals */}
       <AnimatePresence>
