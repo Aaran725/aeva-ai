@@ -3,7 +3,7 @@ import { GROQ_KEYS, GROQ_URL, nextGroqKey } from './groqClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import { ArrowUp, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, ChevronRight, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Users, FileText, LayoutGrid, Palette, Home, Map, Clock, Trash2, Calendar } from 'lucide-react'
+import { ArrowUp, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, ChevronRight, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Users, FileText, LayoutGrid, Palette, Home, Map, Clock, Trash2, Calendar, ScanSearch } from 'lucide-react'
 import { useAppSettings, SECTION_BG_PRESETS, CARD_STYLES, FONT_STYLES } from './appSettings'
 import { useLanguageStore } from './languageStore'
 import { useT } from './translations'
@@ -4068,7 +4068,9 @@ function ChatView({ onBack }) {
   const [chatDocOpen, setChatDocOpen] = useState(false)
   const lensInputRef = useRef(null)
   const photoInputRef = useRef(null)
+  const workingInputRef = useRef(null) // dedicated "Aeva Watches You Solve" input
   const [photoAttachment, setPhotoAttachment] = useState(null) // { file, dataUrl, base64, mimeType }
+  const [workingAttachment, setWorkingAttachment] = useState(null) // same shape, separate slot
   const [orderToast, setOrderToast] = useState(null)
   const [drillOpen, setDrillOpen] = useState(false)
   const [sessionSummary, setSessionSummary] = useState(null)
@@ -4415,13 +4417,10 @@ function ChatView({ onBack }) {
     }
   }
 
-  // ── Photo-in-chat send ────────────────────────────────────────────────────
+  // ── Photo-in-chat send (teach me from image) ─────────────────────────────
   const sendPhoto = async () => {
     if (!photoAttachment || isThinking) return
-    const nodeSession = useRoadmapStore.getState().activeNodeSession
-    const isWorkingCheck = !!nodeSession
-
-    const userText = input.trim() || (isWorkingCheck ? 'Check my working' : 'Can you teach me about this? Explain everything I need to know.')
+    const userText = input.trim() || 'Can you teach me about this? Explain everything I need to know.'
     setInput('')
     const snap = photoAttachment
     setPhotoAttachment(null)
@@ -4434,33 +4433,7 @@ function ChatView({ onBack }) {
     abortRef.current = controller
     let rawResponse = ''
 
-    // ── System prompt switches based on whether we're mid-session ────────────
-    const systemPrompt = isWorkingCheck
-      ? `You are Aeva, checking a student's handwritten working mid-problem.
-Context: they are studying "${nodeSession.topic}" (${nodeSession.phase}, Difficulty ${nodeSession.difficulty}/5).${nodeSession.subtopics?.length ? ` Subtopics: ${nodeSession.subtopics.join(', ')}.` : ''}
-
-TASK: Look at their working in the photo. Find where they went wrong — or confirm they're on track.
-
-RESPONSE FORMAT:
-Start with a one-line verdict:
-- ✅ "You're on track — keep going." (if correct so far)
-- ⚠️ "Found an issue." (if there's an error)
-
-Then be SPECIFIC about which line/step has the problem and exactly what went wrong:
-"Line 2 is correct. In line 3 you dropped the negative when expanding the bracket — it should be $-2x$, not $+2x$."
-
-If they're on track, confirm it briefly and give a hint for the next step only.
-
-RULES:
-- Keep it SHORT — they're mid-problem, not starting fresh
-- Reference specific lines or steps by number if you can
-- Use inline math $...$ for any expressions
-- DO NOT re-explain the whole topic from scratch
-- DO NOT say "I can see that you have..." — just give the verdict and fix
-- If the handwriting is unclear, say which part you couldn't read
-- Tone: direct, like a teacher leaning over their shoulder`
-
-      : `You are Aeva, a world-class tutor. A student sent you a photo of something they're studying. Your job is to TEACH THE CONCEPT — not describe what's in the image. Use the photo only to identify the topic.
+    const systemPrompt = `You are Aeva, a world-class tutor. A student sent you a photo of something they're studying. Your job is to TEACH THE CONCEPT — not describe what's in the image. Use the photo only to identify the topic.
 
 ## [Name the concept in 3–5 words]
 
@@ -4535,9 +4508,78 @@ STRICT RULES:
     }
   }
 
+  // ── Aeva Watches You Solve — dedicated working-check send ────────────────
+  const sendWorkingCheck = async () => {
+    if (!workingAttachment || isThinking) return
+    const nodeSession = useRoadmapStore.getState().activeNodeSession
+    const topic = nodeSession?.topic || input.trim() || 'the problem in the photo'
+    const userText = input.trim() || 'Check my working'
+    setInput('')
+    const snap = workingAttachment
+    setWorkingAttachment(null)
+
+    const userMsg = { role: 'user', text: userText, image: snap.dataUrl }
+    setMessages(prev => [...prev, userMsg, { role: 'model', text: '', streaming: true }])
+    setIsThinking(true)
+
+    const controller = new AbortController()
+    abortRef.current = controller
+    let rawResponse = ''
+
+    const systemPrompt = `You are Aeva, checking a student's handwritten working mid-problem.
+${nodeSession ? `Context: they are studying "${nodeSession.topic}" (${nodeSession.phase}, Difficulty ${nodeSession.difficulty}/5).${nodeSession.subtopics?.length ? ` Subtopics: ${nodeSession.subtopics.join(', ')}.` : ''}` : `Topic: ${topic}.`}
+
+TASK: Look at their working in the photo. Find where they went wrong — or confirm they're on track.
+
+RESPONSE FORMAT:
+Start with a one-line verdict:
+- ✅ "You're on track — keep going." (if correct so far)
+- ⚠️ "Found an issue." (if there's an error)
+
+Then be SPECIFIC about which line/step has the problem and exactly what went wrong:
+"Line 2 is correct. In line 3 you dropped the negative when expanding the bracket — it should be $-2x$, not $+2x$."
+
+RULES:
+- Keep it SHORT — they're mid-problem, not starting fresh
+- Reference specific lines or steps by number if you can
+- Use inline math $...$ for any expressions
+- DO NOT re-explain the whole topic from scratch
+- DO NOT say "I can see that you have..." — just give the verdict and the fix
+- If the handwriting is unclear, say which part you couldn't read
+- Tone: direct, like a teacher leaning over their shoulder`
+
+    try {
+      await streamGroqVision(
+        snap.base64, snap.mimeType, userText, systemPrompt,
+        chunk => {
+          rawResponse += chunk
+          const visible = cleanText(rawResponse)
+          setMessages(prev => {
+            const copy = [...prev]
+            copy[copy.length - 1] = { ...copy[copy.length - 1], text: visible }
+            return copy
+          })
+        },
+        controller.signal,
+      )
+    } catch (err) {
+      if (!controller.signal.aborted) {
+        setMessages(prev => {
+          const copy = [...prev]
+          copy[copy.length - 1] = { ...copy[copy.length - 1], text: "Sorry, I couldn't read the image. Make sure it's clear and try again.", streaming: false }
+          return copy
+        })
+      }
+    } finally {
+      setIsThinking(false)
+      setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, streaming: false } : m))
+    }
+  }
+
   const sendWithText = async (overrideText) => {
     // If a photo is attached, route to vision send instead
     if (photoAttachment && !overrideText) { sendPhoto(); return }
+    if (workingAttachment && !overrideText) { sendWorkingCheck(); return }
 
     const userText = overrideText || input.trim()
     if (!userText || isThinking) return
@@ -6570,6 +6612,49 @@ If no clear changes: {"changes":[]}`
                   } catch {}
                 }}
               />
+              {/* Hidden file input for Aeva Watches You Solve */}
+              <input
+                ref={workingInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                style={{ display: 'none' }}
+                onChange={async e => {
+                  const f = e.target.files?.[0]
+                  if (!f) return
+                  e.target.value = ''
+                  try {
+                    const result = await readFileAsBase64(f)
+                    setWorkingAttachment({ file: f, ...result })
+                  } catch {}
+                }}
+              />
+
+              {/* Working check preview strip */}
+              <AnimatePresence>
+                {workingAttachment && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: 8, height: 0 }}
+                    style={{ width: '100%', maxWidth: isMission ? 720 : 640, margin: '0 auto 10px', overflow: 'hidden' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, padding: '10px 14px', borderRadius: 20, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.20)' }}>
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                        <img src={workingAttachment.dataUrl} alt="Working" style={{ width: 72, height: 72, borderRadius: 12, objectFit: 'cover', display: 'block', border: '1px solid rgba(251,191,36,0.25)' }} />
+                        <motion.button whileTap={{ scale: 0.88 }} onClick={() => setWorkingAttachment(null)}
+                          style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'rgba(30,30,50,0.95)', border: '1px solid rgba(255,255,255,0.25)', color: 'rgba(255,255,255,0.70)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <X size={10} strokeWidth={2.5} />
+                        </motion.button>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: 'rgba(251,191,36,0.90)', marginBottom: 3 }}>🔍 Aeva Watches You Solve</div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', lineHeight: 1.5 }}>
+                          {activeNodeSession ? `Checking your ${activeNodeSession.topic} working line by line.` : 'Aeva will check your working and tell you exactly where you went wrong.'}
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Photo preview strip — shown when a photo is attached */}
               <AnimatePresence>
@@ -6596,15 +6681,11 @@ If no clear changes: {"changes":[]}`
                           <X size={10} strokeWidth={2.5} />
                         </motion.button>
                       </div>
-                      {/* Label — context-aware */}
+                      {/* Label */}
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 12.5, fontWeight: 700, color: 'rgba(255,255,255,0.80)', marginBottom: 3 }}>
-                          {activeNodeSession ? '📸 Check my working' : 'Photo attached'}
-                        </div>
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: 'rgba(255,255,255,0.80)', marginBottom: 3 }}>Photo attached</div>
                         <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', lineHeight: 1.5 }}>
-                          {activeNodeSession
-                            ? `Aeva will check your ${activeNodeSession.topic} working line by line and tell you exactly where you went wrong.`
-                            : 'Add a message below or just press send — Aeva will tutor you on what\'s in the image.'}
+                          Add a message or just press send — Aeva will teach you the concept.
                         </div>
                       </div>
                     </div>
@@ -6629,7 +6710,7 @@ If no clear changes: {"changes":[]}`
                       whileHover={{ scale: 1.08, background: photoAttachment ? 'rgba(167,139,250,0.30)' : 'rgba(167,139,250,0.18)' }}
                       whileTap={{ scale: 0.90 }}
                       onClick={() => photoInputRef.current?.click()}
-                      title={activeNodeSession ? `Check my ${activeNodeSession.topic} working` : 'Send a photo — Aeva reads your textbook/notes/past paper'}
+                      title="Send a photo — Aeva teaches you the concept in the image"
                       style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: photoAttachment ? 'rgba(167,139,250,0.28)' : 'rgba(167,139,250,0.10)', border: photoAttachment ? '1.5px solid rgba(167,139,250,0.70)' : '1.5px solid rgba(167,139,250,0.30)', cursor: 'pointer', color: photoAttachment ? '#C4B5FD' : 'rgba(167,139,250,0.75)', transition: 'all 0.15s' }}
                     >
                       <BookOpen size={14} strokeWidth={2} />
@@ -6651,6 +6732,15 @@ If no clear changes: {"changes":[]}`
                       <PenLine size={14} strokeWidth={2} />
                     </motion.button>
                     <StudyWithMeButton />
+                    {/* Aeva Watches You Solve */}
+                    <motion.button
+                      whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.90 }}
+                      onClick={() => workingInputRef.current?.click()}
+                      title="Aeva Watches You Solve — upload your working, Aeva checks it line by line"
+                      style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: workingAttachment ? 'rgba(251,191,36,0.28)' : 'rgba(251,191,36,0.10)', border: workingAttachment ? '1.5px solid rgba(251,191,36,0.70)' : '1.5px solid rgba(251,191,36,0.30)', cursor: 'pointer', color: workingAttachment ? '#FCD34D' : 'rgba(251,191,36,0.75)', transition: 'all 0.15s' }}
+                    >
+                      <ScanSearch size={14} strokeWidth={2} />
+                    </motion.button>
 
                   </>
                 )}
