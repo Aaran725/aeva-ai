@@ -62,8 +62,10 @@ import { saveSession, loadSessions, deleteSession, clearAllHistory, syncHistoryT
 import { TodayPlanCard } from './RevisionCalendar'
 import { useScheduleStore, dateKey } from './scheduleStore'
 import StudyWithMe, { StudyWithMeButton } from './StudyWithMe'
+import { useStudyModeStore } from './useStudyModeStore'
 import ExamSimulator from './ExamSimulator'
 import StudyRoom, { StudyRoomButton } from './StudyRoom'
+import { useStudyRoomStore } from './studyRoomStore'
 import './index.css'
 
 /* ─── Groq API (keys + URL imported at top of file) ─── */
@@ -4018,6 +4020,179 @@ function useContextChips({ sessionState, exchangeCount, subject, masteryMap, cri
   }, [sessionState, exchangeCount, subject, criticism])
 }
 
+// ─── Chat Tools Dropdown ──────────────────────────────────────────────────────
+function ChatToolsMenu({ onLens, onPhoto, onDoc, onDrill, onWorking, photoAttachment, workingAttachment }) {
+  const [open, setOpen] = React.useState(false)
+  const ref = React.useRef(null)
+  const studyRoomOpen = useStudyRoomStore(s => s.open)
+  const studyRoomPhase = useStudyRoomStore(s => s.phase)
+  const studyRoomLive  = useStudyRoomStore(s => s.isOpen) && studyRoomPhase !== 'idle'
+  const studyMeActive  = useStudyModeStore(s => s.phase !== 'idle')
+
+  React.useEffect(() => {
+    if (!open) return
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const close = () => setOpen(false)
+
+  const tools = [
+    {
+      icon: <Camera size={13} strokeWidth={2} />,
+      label: 'Aeva Lens',
+      sub: 'Deep solve & analyse',
+      bg: 'rgba(0,200,255,0.10)', border: 'rgba(0,200,255,0.28)', color: 'rgba(0,200,255,0.80)',
+      onClick: () => { onLens(); close() },
+    },
+    {
+      icon: <BookOpen size={13} strokeWidth={2} />,
+      label: 'Photo',
+      sub: 'Send image to Aeva',
+      bg: photoAttachment ? 'rgba(167,139,250,0.28)' : 'rgba(167,139,250,0.10)',
+      border: photoAttachment ? 'rgba(167,139,250,0.70)' : 'rgba(167,139,250,0.30)',
+      color: photoAttachment ? '#C4B5FD' : 'rgba(167,139,250,0.80)',
+      dot: !!photoAttachment,
+      onClick: () => { onPhoto(); close() },
+    },
+    {
+      icon: <FileText size={13} strokeWidth={2} />,
+      label: 'Docs',
+      sub: 'Upload homework or notes',
+      bg: 'rgba(96,165,250,0.10)', border: 'rgba(96,165,250,0.28)', color: 'rgba(96,165,250,0.80)',
+      onClick: () => { onDoc(); close() },
+    },
+    {
+      icon: <PenLine size={13} strokeWidth={2} />,
+      label: 'Custom Drill',
+      sub: 'Paste notes to build a HUD',
+      bg: 'rgba(167,139,250,0.10)', border: 'rgba(167,139,250,0.28)', color: 'rgba(167,139,250,0.80)',
+      onClick: () => { onDrill(); close() },
+    },
+    {
+      icon: <span style={{ fontSize: 13, lineHeight: 1 }}>🍅</span>,
+      label: 'Study With Me',
+      sub: studyMeActive ? 'Session active' : 'Pomodoro + lofi',
+      bg: studyMeActive ? 'rgba(251,191,36,0.18)' : 'rgba(251,191,36,0.10)',
+      border: studyMeActive ? 'rgba(251,191,36,0.55)' : 'rgba(251,191,36,0.30)',
+      color: 'rgba(251,191,36,0.90)',
+      dot: studyMeActive,
+      dotColor: '#10B981',
+      onClick: () => { window.dispatchEvent(new CustomEvent('aeva:open-study-mode')); close() },
+    },
+    {
+      icon: <Users size={13} strokeWidth={2} />,
+      label: 'Study Room',
+      sub: studyRoomLive ? 'Room active' : 'Real-time with friends',
+      bg: studyRoomLive ? 'rgba(99,102,241,0.22)' : 'rgba(99,102,241,0.10)',
+      border: studyRoomLive ? 'rgba(99,102,241,0.55)' : 'rgba(99,102,241,0.28)',
+      color: studyRoomLive ? '#a5b4fc' : 'rgba(99,102,241,0.80)',
+      dot: studyRoomLive,
+      dotColor: '#10B981',
+      onClick: () => { studyRoomOpen(); close() },
+    },
+    {
+      icon: <ScanSearch size={13} strokeWidth={2} />,
+      label: 'Check My Working',
+      sub: 'Upload working, Aeva checks it',
+      bg: workingAttachment ? 'rgba(251,191,36,0.28)' : 'rgba(251,191,36,0.10)',
+      border: workingAttachment ? 'rgba(251,191,36,0.70)' : 'rgba(251,191,36,0.30)',
+      color: workingAttachment ? '#FCD34D' : 'rgba(251,191,36,0.80)',
+      dot: !!workingAttachment,
+      onClick: () => { onWorking(); close() },
+    },
+  ]
+
+  return (
+    <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
+      {/* Trigger */}
+      <motion.button
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.88 }}
+        onClick={() => setOpen(v => !v)}
+        title="Tools"
+        style={{
+          flexShrink: 0, width: 32, height: 32, borderRadius: '50%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: open ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.07)',
+          border: `1.5px solid ${open ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.15)'}`,
+          cursor: 'pointer', color: open ? '#fff' : 'rgba(255,255,255,0.60)',
+          transition: 'all 0.15s',
+        }}
+      >
+        <motion.div animate={{ rotate: open ? 45 : 0 }} transition={{ duration: 0.18 }}>
+          <Plus size={15} strokeWidth={2.5} />
+        </motion.div>
+      </motion.button>
+
+      {/* Vertical popup — grows upward */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 6, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.96 }}
+            transition={{ duration: 0.14, ease: 'easeOut' }}
+            style={{
+              position: 'absolute',
+              bottom: 'calc(100% + 10px)',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: 'rgba(8,8,22,0.96)',
+              backdropFilter: 'blur(24px)',
+              WebkitBackdropFilter: 'blur(24px)',
+              border: '1px solid rgba(255,255,255,0.10)',
+              borderRadius: 16,
+              padding: '6px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2,
+              minWidth: 210,
+              zIndex: 9990,
+              boxShadow: '0 8px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04)',
+            }}
+          >
+            {tools.map((tool, i) => (
+              <motion.button
+                key={i}
+                whileHover={{ background: 'rgba(255,255,255,0.07)' }}
+                whileTap={{ scale: 0.97 }}
+                onClick={tool.onClick}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '8px 10px', borderRadius: 10,
+                  background: 'transparent', border: 'none',
+                  cursor: 'pointer', textAlign: 'left', width: '100%',
+                }}
+              >
+                {/* Icon bubble */}
+                <div style={{
+                  width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                  background: tool.bg, border: `1.5px solid ${tool.border}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: tool.color,
+                }}>
+                  {tool.icon}
+                </div>
+                {/* Labels */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.88)', lineHeight: 1.3 }}>{tool.label}</div>
+                  <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.35)', lineHeight: 1.3 }}>{tool.sub}</div>
+                </div>
+                {/* Active dot */}
+                {tool.dot && (
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: tool.dotColor || '#a5b4fc', flexShrink: 0 }} />
+                )}
+              </motion.button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 function ChatView({ onBack }) {
   const T = useT()
   const { name } = useUser()
@@ -6676,56 +6851,17 @@ If no clear changes: {"changes":[]}`
               </AnimatePresence>
 
               <div className="chat-input-bar" style={{ width: '100%', maxWidth: isMission ? 720 : 640, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 10px 10px 16px', backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)', borderRadius: 999, transition: 'border 0.3s, box-shadow 0.3s', ...inputBarStyle }}>
-                {/* Lens camera button + photo-in-chat button + Custom Drill button */}
+                {/* All chat tools collapsed into one dropdown */}
                 {!isMission && (
-                  <>
-                    <motion.button
-                      whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.90 }}
-                      onClick={() => lensInputRef.current?.click()}
-                      title="Aeva Lens — deep solve & analyse"
-                      style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,200,255,0.10)', border: '1.5px solid rgba(0,200,255,0.28)', cursor: 'pointer', color: 'rgba(0,200,255,0.70)' }}
-                    >
-                      <Camera size={14} strokeWidth={2} />
-                    </motion.button>
-                    {/* Photo-in-chat button — sends photo directly to Aeva in chat */}
-                    <motion.button
-                      whileHover={{ scale: 1.08, background: photoAttachment ? 'rgba(167,139,250,0.30)' : 'rgba(167,139,250,0.18)' }}
-                      whileTap={{ scale: 0.90 }}
-                      onClick={() => photoInputRef.current?.click()}
-                      title="Upload an image — type your question then send (teach me, what concept is this?, help me, etc.)"
-                      style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: photoAttachment ? 'rgba(167,139,250,0.28)' : 'rgba(167,139,250,0.10)', border: photoAttachment ? '1.5px solid rgba(167,139,250,0.70)' : '1.5px solid rgba(167,139,250,0.30)', cursor: 'pointer', color: photoAttachment ? '#C4B5FD' : 'rgba(167,139,250,0.75)', transition: 'all 0.15s' }}
-                    >
-                      <BookOpen size={14} strokeWidth={2} />
-                    </motion.button>
-                    <motion.button
-                      whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.90 }}
-                      onClick={() => setChatDocOpen(true)}
-                      title="Aeva Docs — upload a document or homework"
-                      style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(96,165,250,0.10)', border: '1.5px solid rgba(96,165,250,0.28)', cursor: 'pointer', color: 'rgba(96,165,250,0.75)' }}
-                    >
-                      <FileText size={14} strokeWidth={2} />
-                    </motion.button>
-                    <motion.button
-                      whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.90 }}
-                      onClick={() => setDrillOpen(true)}
-                      title="Custom Drill — paste notes to build a HUD"
-                      style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(167,139,250,0.10)', border: '1.5px solid rgba(167,139,250,0.28)', cursor: 'pointer', color: 'rgba(167,139,250,0.75)' }}
-                    >
-                      <PenLine size={14} strokeWidth={2} />
-                    </motion.button>
-                    <StudyWithMeButton />
-                    <StudyRoomButton />
-                    {/* Aeva Watches You Solve */}
-                    <motion.button
-                      whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.90 }}
-                      onClick={() => workingInputRef.current?.click()}
-                      title="Aeva Watches You Solve — upload your working, Aeva checks it line by line"
-                      style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: workingAttachment ? 'rgba(251,191,36,0.28)' : 'rgba(251,191,36,0.10)', border: workingAttachment ? '1.5px solid rgba(251,191,36,0.70)' : '1.5px solid rgba(251,191,36,0.30)', cursor: 'pointer', color: workingAttachment ? '#FCD34D' : 'rgba(251,191,36,0.75)', transition: 'all 0.15s' }}
-                    >
-                      <ScanSearch size={14} strokeWidth={2} />
-                    </motion.button>
-
-                  </>
+                  <ChatToolsMenu
+                    onLens={()    => lensInputRef.current?.click()}
+                    onPhoto={()   => photoInputRef.current?.click()}
+                    onDoc={()     => setChatDocOpen(true)}
+                    onDrill={()   => setDrillOpen(true)}
+                    onWorking={()  => workingInputRef.current?.click()}
+                    photoAttachment={photoAttachment}
+                    workingAttachment={workingAttachment}
+                  />
                 )}
                 <input
                   ref={inputRef}
