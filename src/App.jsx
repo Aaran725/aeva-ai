@@ -5423,19 +5423,19 @@ If no clear changes: {"changes":[]}`
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', position: 'relative', zIndex: 1 }}>
 
         {/* Header */}
-        <div className="chat-header" style={{ flexShrink: 0, padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="chat-header" style={{ flexShrink: 0, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Left: back button */}
           <motion.button className="chat-back-btn" whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={onBack}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: isMobile ? '7px 10px' : '8px 16px', borderRadius: 99, backdropFilter: 'blur(20px)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 13, fontWeight: 600, cursor: 'pointer', ...backBtnStyle }}>
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: isMobile ? '7px 10px' : '8px 16px', borderRadius: 99, backdropFilter: 'blur(20px)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0, ...backBtnStyle }}>
             <ChevronLeft size={14} strokeWidth={2.5} />
-            {/* On mobile show compact label; desktop shows full text */}
             {isMobile
               ? (isMission ? <span style={{ fontSize: 12 }}>{T.exitMission}</span> : null)
               : (isMission ? T.exitMission : T.backToDashboard)
             }
           </motion.button>
 
-          {/* Center: mission badge or session badges */}
-          <div className="chat-session-badges" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+          {/* Center: mission badge or session badges — flex grows to push right side */}
+          <div className="chat-session-badges" style={{ flex: 1, display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
             {isMission && activeMission
               ? <MissionBadge mission={activeMission} />
               : (!isEmpty && <SessionBadge sessionState={sessionState} criticism={criticism} />)
@@ -5482,7 +5482,7 @@ If no clear changes: {"changes":[]}`
             </motion.div>
           )}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, overflow: 'hidden', maxWidth: isMobile ? '60%' : 'none' }}>
             {/* Live adaptation pill (tutor mode) */}
             {!isMission && (() => {
               const DIMS = ['analogical', 'visual', 'structural', 'exampleFirst', 'conceptual']
@@ -5530,8 +5530,8 @@ If no clear changes: {"changes":[]}`
                   Socratic
                 </motion.button>
 
-                {/* Library */}
-                <motion.button className="chat-btn-library"
+                {/* Library — hidden on mobile */}
+                {!isMobile && <motion.button className="chat-btn-library"
                   whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
                   onClick={() => setLibraryOpen(true)}
                   style={{
@@ -5542,9 +5542,10 @@ If no clear changes: {"changes":[]}`
                   }}
                 >
                   <BookOpen size={11} /> {T.library}
-                </motion.button>
+                </motion.button>}
 
-                <motion.button className="chat-btn-studyguide"
+                {/* Study Guide — hidden on mobile */}
+                {!isMobile && <motion.button className="chat-btn-studyguide"
                   onClick={() => setStudyGuideOpen(true)}
                   style={{
                     padding: '5px 12px', borderRadius: 99, cursor: 'pointer',
@@ -5554,9 +5555,10 @@ If no clear changes: {"changes":[]}`
                   }}
                 >
                   {T.studyGuide}
-                </motion.button>
+                </motion.button>}
 
-                <motion.button
+                {/* Feynman — hidden on mobile */}
+                {!isMobile && <motion.button
                   whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
                   onClick={() => setFeynmanOpen(true)}
                   style={{
@@ -5568,7 +5570,7 @@ If no clear changes: {"changes":[]}`
                   }}
                 >
                   {T.feynmanMode}
-                </motion.button>
+                </motion.button>}
               </>
             )}
             {/* History button */}
