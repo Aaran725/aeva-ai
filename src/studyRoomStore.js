@@ -322,7 +322,8 @@ export const useStudyRoomStore = create((set, get) => ({
     // Presence — member list
     ch.on('presence', { event: 'sync' }, () => {
       const state   = ch.presenceState()
-      const members = Object.values(state).flat()
+      // Each key maps to an array of metas — take only the most recent per user
+      const members = Object.values(state).map(arr => arr[arr.length - 1]).filter(Boolean)
       set({ members })
     })
 
