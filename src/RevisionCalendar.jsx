@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ChevronLeft, ChevronRight, Calendar, RefreshCw, BookOpen, Zap, CheckSquare, FileText, Clock, ArrowRight } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, Calendar, RefreshCw, BookOpen, Zap, CheckSquare, FileText, Clock, ArrowRight, Check } from 'lucide-react'
 import { useScheduleStore, dateKey, SUBJECT_COLORS } from './scheduleStore'
 import { useRoadmapStore } from './roadmapStore'
 import { useUITheme } from './uiThemeStore'
@@ -60,7 +60,7 @@ function useLaunchNode() {
 }
 
 /* ── Day Panel ──────────────────────────────────────────────────────────────── */
-function DayPanel({ dateStr, items, examInfo, onClose, onStudy }) {
+function DayPanel({ dateStr, items, examInfo, onClose, onStudy, onToggleDone }) {
   const isExam = !!examInfo
   const today  = isToday(dateStr)
 
@@ -150,17 +150,31 @@ function DayPanel({ dateStr, items, examInfo, onClose, onStudy }) {
                   </div>
                 </div>
 
-                {/* Study button */}
-                {!item.done && !isPast(dateStr) && (
-                  <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                    onClick={() => onStudy(item)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', borderRadius: 99, background: item.color + '22', border: `1px solid ${item.color}44`, color: item.color, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}>
-                    Study <ArrowRight size={10} />
+                {/* Right actions */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                  {/* Study button — only when not done and not past */}
+                  {!item.done && !isPast(dateStr) && (
+                    <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                      onClick={() => onStudy(item)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 11px', borderRadius: 99, background: item.color + '22', border: `1px solid ${item.color}44`, color: item.color, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                      Study <ArrowRight size={10} />
+                    </motion.button>
+                  )}
+                  {/* ✓ toggle — always visible so user can manually mark done/undone */}
+                  <motion.button whileTap={{ scale: 0.85 }}
+                    onClick={() => onToggleDone(item.nodeId)}
+                    title={item.done ? 'Mark as not done' : 'Mark as done'}
+                    style={{
+                      width: 26, height: 26, borderRadius: '50%', cursor: 'pointer', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: item.done ? '#4ADE8022' : 'rgba(255,255,255,0.06)',
+                      border: `1.5px solid ${item.done ? '#4ADE80' : 'rgba(255,255,255,0.15)'}`,
+                      color: item.done ? '#4ADE80' : 'rgba(255,255,255,0.30)',
+                      transition: 'all 0.2s',
+                    }}>
+                    <Check size={12} strokeWidth={3} />
                   </motion.button>
-                )}
-                {item.done && (
-                  <span style={{ fontSize: 16 }}>✅</span>
-                )}
+                </div>
               </motion.div>
             ))}
 
@@ -291,7 +305,7 @@ function CalendarGrid({ year, month, schedule, examDays, onDayClick, selectedDat
 export default function RevisionCalendar({ onClose, onNavigateToChat }) {
   const accent    = useUITheme(s => s.accent)
   const roadmaps  = useRoadmapStore(s => s.roadmaps)
-  const { schedule, generatedAt, generate, markDone, getDayItems, getExamDays } = useScheduleStore()
+  const { schedule, generatedAt, generate, markDone, toggleDone, getDayItems, getExamDays } = useScheduleStore()
 
   const today     = new Date()
   const [year,  setYear]  = useState(today.getFullYear())
@@ -331,7 +345,8 @@ export default function RevisionCalendar({ onClose, onNavigateToChat }) {
   const selectedExam  = examMap[selected]
 
   const handleStudy = (item) => {
-    markDone(selected, item.nodeId)
+    // Don't mark done here — done is set when the session is completed
+    // (completeNodeWithConfidence auto-marks, or user taps ✓ manually)
     launchNode(item, () => onNavigateToChat?.())
   }
 
@@ -469,6 +484,7 @@ export default function RevisionCalendar({ onClose, onNavigateToChat }) {
               examInfo={examMap[selected] || null}
               onClose={() => setSelected(null)}
               onStudy={handleStudy}
+              onToggleDone={(nodeId) => toggleDone(selected, nodeId)}
             />
           )}
         </AnimatePresence>
@@ -481,7 +497,7 @@ export default function RevisionCalendar({ onClose, onNavigateToChat }) {
 export function TodayPlanCard({ onOpenCalendar, onNavigateToChat }) {
   const accent    = useUITheme(s => s.accent)
   const roadmaps  = useRoadmapStore(s => s.roadmaps)
-  const { getTodayItems, getTodayProgress, markDone, generatedAt, generate } = useScheduleStore()
+  const { getTodayItems, getTodayProgress, markDone, toggleDone, generatedAt, generate } = useScheduleStore()
 
   const items    = getTodayItems()
   const { done, total } = getTodayProgress()
@@ -584,19 +600,31 @@ export function TodayPlanCard({ onOpenCalendar, onNavigateToChat }) {
                 </div>
               </div>
 
-              {/* Study button */}
-              {!item.done ? (
-                <motion.button whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}
-                  onClick={() => {
-                    markDone(dateKey(new Date()), item.nodeId)
-                    launchNode(item, () => onNavigateToChat?.())
-                  }}
-                  style={{ width: 28, height: 28, borderRadius: '50%', background: item.color + '22', border: `1px solid ${item.color}44`, color: item.color, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <ArrowRight size={12} />
+              {/* Right actions */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+                {/* Launch button — only when not done */}
+                {!item.done && (
+                  <motion.button whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}
+                    onClick={() => launchNode(item, () => onNavigateToChat?.())}
+                    style={{ width: 28, height: 28, borderRadius: '50%', background: item.color + '22', border: `1px solid ${item.color}44`, color: item.color, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <ArrowRight size={12} />
+                  </motion.button>
+                )}
+                {/* ✓ toggle */}
+                <motion.button whileTap={{ scale: 0.85 }}
+                  onClick={() => toggleDone(dateKey(new Date()), item.nodeId)}
+                  title={item.done ? 'Mark as not done' : 'Mark as done'}
+                  style={{
+                    width: 26, height: 26, borderRadius: '50%', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: item.done ? '#4ADE8022' : 'rgba(255,255,255,0.06)',
+                    border: `1.5px solid ${item.done ? '#4ADE80' : 'rgba(255,255,255,0.15)'}`,
+                    color: item.done ? '#4ADE80' : 'rgba(255,255,255,0.28)',
+                    transition: 'all 0.2s',
+                  }}>
+                  <Check size={11} strokeWidth={3} />
                 </motion.button>
-              ) : (
-                <span style={{ fontSize: 14, flexShrink: 0 }}>✅</span>
-              )}
+              </div>
             </motion.div>
           ))}
         </div>

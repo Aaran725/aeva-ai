@@ -155,7 +155,7 @@ export const useScheduleStore = create((set, get) => {
       set(next)
     },
 
-    /** Mark a scheduled item done (also call roadmapStore.completeNode separately). */
+    /** Mark a scheduled item done. */
     markDone: (dateStr, nodeId) => {
       set(s => {
         const day = s.schedule[dateStr]
@@ -164,6 +164,23 @@ export const useScheduleStore = create((set, get) => {
           ...s.schedule,
           [dateStr]: day.map(item =>
             item.nodeId === nodeId ? { ...item, done: true } : item
+          ),
+        }
+        const next = { ...s, schedule }
+        save(next)
+        return next
+      })
+    },
+
+    /** Toggle a scheduled item's done state (for manual check/uncheck). */
+    toggleDone: (dateStr, nodeId) => {
+      set(s => {
+        const day = s.schedule[dateStr]
+        if (!day) return s
+        const schedule = {
+          ...s.schedule,
+          [dateStr]: day.map(item =>
+            item.nodeId === nodeId ? { ...item, done: !item.done } : item
           ),
         }
         const next = { ...s, schedule }

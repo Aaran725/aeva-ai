@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { scheduleSave } from './syncService'
+import { useScheduleStore, dateKey } from './scheduleStore'
 
 const KEY = 'aeva_roadmaps_v1'
 const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) } catch { return null } }
@@ -130,6 +131,8 @@ export const useRoadmapStore = create((set, get) => {
         })
         const u = { ...s, roadmaps }; save(u); return u
       })
+      // Auto-mark the matching schedule item done for today
+      useScheduleStore.getState().markDone(dateKey(new Date()), nodeId)
     },
 
     setActive: (id) => { set(s => { const u = { ...s, activeRoadmapId: id }; save(u); return u }) },
