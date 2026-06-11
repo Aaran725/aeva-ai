@@ -8,7 +8,7 @@
 export const CHAT_THEMES = {
   purple: {
     // Balance card — soft PASTEL lavender, gentle diffuse glow upper area, stays light/muted (never dark)
-    swatch: '#9B72BC', label: 'Lavender',
+    swatch: '#9B72BC', label: 'Lavender', lightBg: true,
     bg: 'radial-gradient(ellipse 110% 85% at 42% 28%, #C9ABDC 0%, #B492CE 42%, rgba(180,146,206,0) 78%), linear-gradient(160deg, #B69ECC 0%, #A082BE 38%, #8A6CA8 68%, #6E5290 100%)',
     inputBg: 'radial-gradient(ellipse at 50% 0%, #6840A8 0%, #321470 70%, #1E0850 100%)',
     inputBorder: 'rgba(200,168,216,0.45)',
@@ -32,7 +32,7 @@ export const CHAT_THEMES = {
   },
   teal: {
     // Sleep card — bright cyan CIRCLE glow in the centre, deepening to teal-green at edges
-    swatch: '#1EC4AA', label: 'Teal',
+    swatch: '#1EC4AA', label: 'Teal', lightBg: true,
     bg: 'radial-gradient(circle at 50% 44%, #3DE8D0 0%, #1FC8B2 30%, #14A092 52%, rgba(20,160,146,0) 72%), linear-gradient(165deg, #18B0A0 0%, #0E8A80 38%, #0A6A66 68%, #084E50 100%)',
     inputBg: 'radial-gradient(ellipse at 50% 0%, #0E9880 0%, #065858 70%, #044848 100%)',
     inputBorder: 'rgba(30,196,170,0.50)',

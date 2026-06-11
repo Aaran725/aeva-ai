@@ -5548,7 +5548,7 @@ If no clear changes: {"changes":[]}`
   const send = () => sendWithText()
 
   const isEmpty = messages.length === 0
-  const isLight = !isMission && (chatSettings.chatBg || 'default') === 'white'
+  const isLight = !isMission && ((chatSettings.chatBg || 'default') === 'white' || (isWidget && !!activeTheme.lightBg))
   const isMobile = useIsMobile()
 
   // chipTick increments at exchange milestones (2,4,7) so contextChips re-memos
