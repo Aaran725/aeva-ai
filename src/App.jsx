@@ -60,6 +60,7 @@ import { useMemoryStore } from './memoryStore'
 import { useUITheme, applyCSS, useIsHidden } from './uiThemeStore'
 import { saveSession, loadSessions, deleteSession, clearAllHistory, syncHistoryToCloud, formatSessionDate, groupSessions } from './chatHistoryStore'
 import { TodayPlanCard } from './RevisionCalendar'
+import { useScheduleStore, dateKey } from './scheduleStore'
 import './index.css'
 
 /* ─── Groq API (keys + URL imported at top of file) ─── */
@@ -2357,6 +2358,20 @@ function DashboardView({ onChatOpen, onSignOut }) {
   const { sessions } = useLibraryStore()
   const { name } = useUser()
   const srDueCount = getDueCount()
+
+  // Auto-regenerate schedule if it was last built on a previous day.
+  // Missed nodes are still "remaining" in the roadmap, so they get
+  // redistributed across the remaining days automatically.
+  useEffect(() => {
+    const { generatedAt, generate } = useScheduleStore.getState()
+    if (!generatedAt) return
+    const genDay = dateKey(new Date(generatedAt))
+    const today  = dateKey(new Date())
+    if (genDay < today) {
+      const roadmaps = useRoadmapStore.getState().roadmaps
+      generate(roadmaps)
+    }
+  }, []) // runs once on mount
   const pendingOrderCount = labOrders.filter(o => !o.completedAt).length
   const labBadgeCount = srDueCount + pendingOrderCount
   const [fingerprintOpen, setFingerprintOpen] = useState(false)
