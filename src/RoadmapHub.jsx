@@ -365,6 +365,18 @@ function WidgetRoadmapCard({ r, onOpen, onDelete, confirmDelete, setConfirmDelet
         </div>
       </motion.div>
 
+      {/* Simulate Exam button — below the gradient card */}
+      {r.nodes?.length > 0 && (
+        <div style={{ padding: '8px 0 0' }}>
+          <ExamSimulatorButton
+            roadmapId={r.id}
+            style={{ width: '100%', padding: '10px 0', borderRadius: 14, background: 'rgba(167,139,250,0.14)', border: '1.5px solid rgba(167,139,250,0.35)', color: '#C4B5FD', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontFamily: 'inherit', boxShadow: '0 4px 16px rgba(124,58,237,0.15)' }}
+          >
+            <span style={{ fontSize: 15 }}>📝</span> Simulate Exam
+          </ExamSimulatorButton>
+        </div>
+      )}
+
       {/* Confirm delete */}
       <AnimatePresence>
         {confirmDelete === r.id && (
