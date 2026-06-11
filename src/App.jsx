@@ -6127,11 +6127,11 @@ If no clear changes: {"changes":[]}`
                       <motion.div
                         initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.35, duration: 0.4 }}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 99, marginBottom: 16, background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.22)', cursor: 'default' }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 99, marginBottom: 16, background: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(99,102,241,0.10)', border: isLight ? '1px solid rgba(0,0,0,0.15)' : '1px solid rgba(99,102,241,0.22)', cursor: 'default' }}
                       >
                         <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 2.4, repeat: Infinity }}
-                          style={{ width: 5, height: 5, borderRadius: '50%', background: '#818CF8', flexShrink: 0 }} />
-                        <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(165,180,252,0.80)', letterSpacing: '0.01em' }}>
+                          style={{ width: 5, height: 5, borderRadius: '50%', background: isLight ? 'rgba(0,0,0,0.45)' : '#818CF8', flexShrink: 0 }} />
+                        <span style={{ fontSize: 11, fontWeight: 600, color: isLight ? 'rgba(0,0,0,0.55)' : 'rgba(165,180,252,0.80)', letterSpacing: '0.01em' }}>
                           Aeva remembers {sessionMemories.length} {sessionMemories.length === 1 ? 'session' : 'sessions'}
                         </span>
                       </motion.div>
