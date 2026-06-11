@@ -2366,16 +2366,16 @@ function SidebarNavItem({ Icon, label, action, badge, accent, collapsed }) {
       onClick={action}
       title={collapsed ? label : undefined}
       style={{
-        width: '100%', boxSizing: 'border-box',
+        width: collapsed ? 42 : '100%', boxSizing: 'border-box',
         display: 'flex', alignItems: 'center', gap: 10,
         padding: collapsed ? '10px 0' : '8px 11px',
-        justifyContent: collapsed ? 'center' : 'flex-start',
+        justifyContent: 'center',
         background: accent
           ? 'linear-gradient(135deg, rgba(99,102,241,0.22), rgba(139,92,246,0.16))'
           : hovered ? 'rgba(255,255,255,0.06)' : 'transparent',
         border: accent ? '1px solid rgba(99,102,241,0.28)' : '1px solid transparent',
         borderRadius: 10,
-        color: accent ? '#c4b5fd' : hovered ? '#fff' : 'rgba(255,255,255,0.50)',
+        color: accent ? '#c4b5fd' : hovered ? '#fff' : 'rgba(255,255,255,0.68)',
         cursor: 'pointer', fontSize: 13, fontWeight: accent ? 600 : 500,
         position: 'relative',
         transition: 'all 0.15s ease',
@@ -2386,7 +2386,7 @@ function SidebarNavItem({ Icon, label, action, badge, accent, collapsed }) {
       {!accent && hovered && !collapsed && (
         <div style={{ position: 'absolute', left: 0, top: '20%', height: '60%', width: 2, borderRadius: 99, background: 'rgba(165,180,252,0.6)' }} />
       )}
-      <Icon size={15} style={{ flexShrink: 0, opacity: accent ? 1 : hovered ? 1 : 0.7 }} />
+      <Icon size={15} style={{ flexShrink: 0, opacity: accent ? 1 : hovered ? 1 : 0.85 }} />
       {!collapsed && (
         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>{label}</span>
       )}
@@ -2488,19 +2488,19 @@ function LeftSidebar({ collapsed, onToggle, onChatOpen, onLibrary, onBrain, onMi
       {/* ── Chat CTA ── */}
       <div style={{ padding: collapsed ? '10px 8px' : '10px 10px 4px', flexShrink: 0 }}>
         <motion.button
-          whileHover={{ scale: 1.02, boxShadow: '0 4px 20px rgba(99,102,241,0.4)' }}
+          whileHover={{ scale: 1.02, boxShadow: '0 4px 20px rgba(99,102,241,0.45)' }}
           whileTap={{ scale: 0.98 }}
           onClick={onChatOpen}
           title={collapsed ? 'Chat with Aeva' : undefined}
           style={{
             width: '100%', boxSizing: 'border-box',
-            display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start',
-            gap: 9, padding: collapsed ? '11px 0' : '10px 14px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: 9, padding: collapsed ? '11px 0' : '11px 14px',
             background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
             border: 'none', borderRadius: 12,
             color: '#fff', fontSize: 13, fontWeight: 700,
             cursor: 'pointer', letterSpacing: '-0.01em',
-            boxShadow: '0 2px 12px rgba(99,102,241,0.35)',
+            boxShadow: '0 2px 14px rgba(99,102,241,0.4)',
             transition: 'box-shadow 0.2s',
           }}
         >
@@ -2511,7 +2511,7 @@ function LeftSidebar({ collapsed, onToggle, onChatOpen, onLibrary, onBrain, onMi
       </div>
 
       {/* ── Nav groups ── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: collapsed ? '4px 8px' : '4px 10px', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: collapsed ? '4px 4px' : '4px 10px', display: 'flex', flexDirection: 'column', alignItems: collapsed ? 'center' : 'stretch' }}>
         {GROUPS.map((group, gi) => (
           <div key={gi} style={{ marginBottom: 2 }}>
             {!collapsed && (
@@ -2627,8 +2627,8 @@ function DashboardView({ onChatOpen, onSignOut }) {
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       transition={{ duration: 0.3, ease: 'easeInOut' }}
       style={{
-        display: 'flex', minHeight: '100vh', width: '100%',
-        overflowX: 'hidden',
+        display: 'flex', height: '100vh', width: '100%',
+        overflow: 'hidden',
         background: 'var(--ui-bg)',
         fontFamily,
       }}
