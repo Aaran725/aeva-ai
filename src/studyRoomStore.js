@@ -98,7 +98,11 @@ export const useStudyRoomStore = create((set, get) => ({
   // Public actions
   // ─────────────────────────────────────────────────────────────────────────
 
+  prefilledCode: null,
+
   open: () => set({ isOpen: true, isMinimized: false }),
+
+  openWithCode: (code) => set({ isOpen: true, isMinimized: false, prefilledCode: code?.trim().toUpperCase() || null }),
 
   closeRoom: () => {
     const { _channel, _timerRef, _statsRef, _speedTimerRef } = get()
@@ -117,7 +121,7 @@ export const useStudyRoomStore = create((set, get) => ({
       myStats: emptyStats(), _channel: null,
       _timerRef: null, _statsRef: null, _speedTimerRef: null,
       sessionNumber: 0, timerSeconds: 0,
-      speedRound: null, tagRound: null,
+      speedRound: null, tagRound: null, prefilledCode: null,
     })
   },
 

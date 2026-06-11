@@ -7525,6 +7525,16 @@ export default function App() {
   const [adminMode, setAdminMode] = useState(() => sessionStorage.getItem('aeva_admin_session') === '1')
   const [showAdminLogin, setShowAdminLogin] = useState(() => new URLSearchParams(window.location.search).has('admin'))
   const { activeMode, exitMission } = useArcadeStore()
+
+  // Auto-open Study Room join if URL has ?room=CODE (from QR code scan)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const roomCode = params.get('room')
+    if (roomCode) {
+      window.history.replaceState({}, '', window.location.pathname) // clean URL
+      setTimeout(() => import('./studyRoomStore').then(m => m.useStudyRoomStore.getState().openWithCode(roomCode)), 800)
+    }
+  }, [])
   const { checkStreak } = useXPStore()
 
   useEffect(() => {

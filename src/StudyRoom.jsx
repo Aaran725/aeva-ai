@@ -408,10 +408,19 @@ function CreateScreen({ onBack }) {
 // ─── Screen: Join ─────────────────────────────────────────────────────────────
 
 function JoinScreen({ onBack }) {
-  const joinRoom = useStudyRoomStore(s => s.joinRoom)
-  const [code, setCode] = useState('')
+  const joinRoom       = useStudyRoomStore(s => s.joinRoom)
+  const prefilledCode  = useStudyRoomStore(s => s.prefilledCode)
+  const [code, setCode] = useState(prefilledCode || '')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError]     = useState('')
+
+  // Auto-fill from QR scan
+  useEffect(() => {
+    if (prefilledCode) {
+      setCode(prefilledCode)
+      useStudyRoomStore.setState({ prefilledCode: null })
+    }
+  }, [prefilledCode])
 
   const handleJoin = async () => {
     if (code.length < 6) { setError('Enter a valid room code'); return }
@@ -449,22 +458,46 @@ function LobbyScreen() {
   const { code, members, isHost, mode, workMins, breakMins, totalSessions, subject, myUserId } = useStudyRoomStore()
   const startSession = useStudyRoomStore(s => s.startSession)
   const [copied, setCopied] = useState(false)
+  const [showQR, setShowQR] = useState(false)
   const modeInfo = MODES.find(m => m.id === mode)
+
+  const joinUrl = `https://aeva-ai-d8i7.vercel.app/?room=${code}`
+  const qrSrc   = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(joinUrl)}&bgcolor=0a0a1a&color=a5b4fc&margin=10&qzone=1`
 
   const copy = () => { navigator.clipboard.writeText(code).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 2000) }
 
   return (
     <motion.div key="lobby" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
       style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-      <div style={{ textAlign: 'center', marginBottom: 22 }}>
+      <div style={{ textAlign: 'center', marginBottom: 20 }}>
         <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>Room Code — share with friends</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ fontSize: 30, fontWeight: 800, color: '#fff', letterSpacing: 6, background: 'rgba(99,102,241,0.12)', border: '1.5px solid rgba(99,102,241,0.35)', borderRadius: 14, padding: '10px 22px' }}>{code}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
+          <div style={{ fontSize: 28, fontWeight: 800, color: '#fff', letterSpacing: 6, background: 'rgba(99,102,241,0.12)', border: '1.5px solid rgba(99,102,241,0.35)', borderRadius: 14, padding: '10px 20px' }}>{code}</div>
           <motion.button whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.9 }} onClick={copy}
-            style={{ width: 40, height: 40, borderRadius: 12, border: '1px solid rgba(255,255,255,0.12)', background: copied ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: copied ? '#10B981' : 'rgba(255,255,255,0.5)', flexShrink: 0 }}>
-            {copied ? <Check size={15} /> : <Copy size={15} />}
+            title="Copy code" style={{ width: 38, height: 38, borderRadius: 11, border: '1px solid rgba(255,255,255,0.12)', background: copied ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: copied ? '#10B981' : 'rgba(255,255,255,0.5)', flexShrink: 0 }}>
+            {copied ? <Check size={14} /> : <Copy size={14} />}
+          </motion.button>
+          <motion.button whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.9 }} onClick={() => setShowQR(v => !v)}
+            title="Show QR code" style={{ width: 38, height: 38, borderRadius: 11, border: `1px solid ${showQR ? 'rgba(165,180,252,0.5)' : 'rgba(255,255,255,0.12)'}`, background: showQR ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: showQR ? '#a5b4fc' : 'rgba(255,255,255,0.5)', flexShrink: 0, fontSize: 16 }}>
+            □
           </motion.button>
         </div>
+
+        {/* QR code panel */}
+        <AnimatePresence>
+          {showQR && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+              style={{ overflow: 'hidden', marginTop: 14 }}>
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(165,180,252,0.2)', borderRadius: 16, padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                <img src={qrSrc} alt={`QR code for ${code}`} width={160} height={160}
+                  style={{ borderRadius: 12, display: 'block', imageRendering: 'pixelated' }} />
+                <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', margin: 0, textAlign: 'center', lineHeight: 1.5 }}>
+                  Scan to join instantly — opens Aeva with this room pre-loaded
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Mode + structure pill */}
@@ -1226,13 +1259,15 @@ function FloatingPill() {
 // ─── Main StudyRoom modal ─────────────────────────────────────────────────────
 
 export default function StudyRoom() {
-  const { isOpen, isMinimized, phase } = useStudyRoomStore()
+  const { isOpen, isMinimized, phase, prefilledCode } = useStudyRoomStore()
   const closeRoom = useStudyRoomStore(s => s.closeRoom)
   const [localScreen, setLocalScreen] = useState('entry')
 
   useEffect(() => {
-    if (isOpen && phase === 'idle') setLocalScreen('entry')
-  }, [isOpen])
+    if (isOpen && phase === 'idle') {
+      setLocalScreen(prefilledCode ? 'join' : 'entry')
+    }
+  }, [isOpen, prefilledCode])
 
   if (!isOpen) return null
 
