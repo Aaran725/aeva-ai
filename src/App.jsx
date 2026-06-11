@@ -5929,22 +5929,24 @@ If no clear changes: {"changes":[]}`
             {isWidget && (
               <div style={{ position: 'relative' }}>
                 <motion.button
-                  whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }}
+                  whileHover={{ scale: 1.06, boxShadow: `0 0 18px ${activeTheme.swatch}80` }}
+                  whileTap={{ scale: 0.94 }}
                   onClick={() => setShowThemePicker(v => !v)}
                   title={`Theme: ${activeTheme.label}`}
                   style={{
-                    height: 30, borderRadius: 99, cursor: 'pointer', padding: '0 10px',
+                    height: 30, borderRadius: 99, cursor: 'pointer', padding: '0 12px',
                     background: showThemePicker
-                      ? `linear-gradient(135deg, ${activeTheme.swatch}50, ${activeTheme.swatch}28)`
-                      : 'rgba(255,255,255,0.09)',
+                      ? `linear-gradient(135deg, ${activeTheme.swatch}55, ${activeTheme.swatch}35)`
+                      : `linear-gradient(135deg, ${activeTheme.swatch}30, ${activeTheme.swatch}18)`,
                     border: `1.5px solid ${activeTheme.swatch}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    boxShadow: `0 0 12px ${activeTheme.swatch}55`,
-                    transition: 'background 0.2s, box-shadow 0.2s',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                    boxShadow: `0 0 10px ${activeTheme.swatch}45`,
+                    transition: 'all 0.2s',
                   }}
                 >
-                  <Palette size={11} color={activeTheme.swatch} />
-                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: activeTheme.swatch, boxShadow: `0 0 6px ${activeTheme.swatch}` }} />
+                  <Palette size={12} color={activeTheme.swatch} />
+                  <div style={{ width: 11, height: 11, borderRadius: '50%', background: activeTheme.swatch, boxShadow: `0 0 8px ${activeTheme.swatch}` }} />
+                  <span style={{ fontSize: 11, fontWeight: 600, color: activeTheme.swatch, letterSpacing: '0.01em' }}>{activeTheme.label}</span>
                 </motion.button>
                 {showThemePicker && (
                   <div onClick={() => setShowThemePicker(false)}
@@ -5974,11 +5976,11 @@ If no clear changes: {"changes":[]}`
                         onClick={() => applyChatTheme(id)}
                         title={t.label}
                         style={{
-                          width: 22, height: 22, borderRadius: '50%', cursor: 'pointer', padding: 0,
+                          width: 28, height: 28, borderRadius: '50%', cursor: 'pointer', padding: 0,
                           background: t.swatch,
-                          border: chatTheme === id ? '2.5px solid rgba(255,255,255,0.90)' : '2px solid transparent',
-                          boxShadow: chatTheme === id ? `0 0 10px ${t.swatch}` : `0 0 4px ${t.swatch}60`,
-                          transition: 'border 0.15s, box-shadow 0.15s',
+                          border: chatTheme === id ? '3px solid rgba(255,255,255,0.95)' : '2px solid rgba(255,255,255,0.15)',
+                          boxShadow: chatTheme === id ? `0 0 14px ${t.swatch}, 0 0 4px rgba(255,255,255,0.3)` : `0 0 6px ${t.swatch}70`,
+                          transition: 'all 0.15s',
                         }}
                       />
                     ))}
