@@ -63,6 +63,7 @@ import { TodayPlanCard } from './RevisionCalendar'
 import { useScheduleStore, dateKey } from './scheduleStore'
 import StudyWithMe, { StudyWithMeButton } from './StudyWithMe'
 import ExamSimulator from './ExamSimulator'
+import StudyRoom, { StudyRoomButton } from './StudyRoom'
 import './index.css'
 
 /* ─── Groq API (keys + URL imported at top of file) ─── */
@@ -6713,6 +6714,7 @@ If no clear changes: {"changes":[]}`
                       <PenLine size={14} strokeWidth={2} />
                     </motion.button>
                     <StudyWithMeButton />
+                    <StudyRoomButton />
                     {/* Aeva Watches You Solve */}
                     <motion.button
                       whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.90 }}
@@ -7674,6 +7676,8 @@ export default function App() {
       <StudyWithMe />
       {/* Exam Simulator — always mounted so it can intercept aeva:open-exam events */}
       <ExamSimulator />
+      {/* Study Room — always mounted so live session survives navigation */}
+      <StudyRoom />
       <AnimatePresence mode="wait" initial={false}>
         {view === 'dashboard'
           ? <DashboardView key="dashboard" onChatOpen={() => setView('chat')} onSignOut={() => supabase.auth.signOut()} />

@@ -158,6 +158,15 @@ export const useRoadmapStore = create((set, get) => {
       })
       // Auto-mark the matching schedule item done for today
       useScheduleStore.getState().markDone(dateKey(new Date()), nodeId)
+      // Notify study room if a session is active
+      try {
+        const { useStudyRoomStore } = require('./studyRoomStore')
+        const { phase, onNodeCompleted } = useStudyRoomStore.getState()
+        if (phase === 'session' || phase === 'battle') {
+          const node = get().roadmaps.flatMap(r => r.nodes).find(n => n.id === nodeId)
+          if (node) onNodeCompleted(node.topic || node.title || nodeId)
+        }
+      } catch (_) {}
     },
 
     setActive: (id) => { set(s => { const u = { ...s, activeRoadmapId: id }; save(u); return u }) },
