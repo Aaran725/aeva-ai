@@ -4,6 +4,7 @@ import { ArrowRight, Calendar, Trophy } from 'lucide-react'
 import AevaOrb from './AevaOrb'
 import { useXPStore, ORBS } from './xpStore'
 import { useRoadmapStore } from './roadmapStore'
+import { generateRoadmapNodes, generateDailyMission } from './RoadmapHub'
 
 // ─── Teaching style → orb mapping ────────────────────────────────────────────
 const STYLES = [
@@ -508,58 +509,78 @@ function StepYourExam({ name, onNext }) {
   )
 }
 
-// ─── Step 4: Generating (animated build) ─────────────────────────────────────
+// ─── Step 4: Generating (real AI build) ──────────────────────────────────────
+// Phases: 0=init  1=nodes(AI)  2=mission(AI)  3=done
+const GEN_PHASES = [
+  { key: 'init',    label: 'Initialising your roadmap…',      progress: 5  },
+  { key: 'nodes',   label: null,                               progress: 55 }, // label set dynamically
+  { key: 'mission', label: 'Writing your first daily mission…', progress: 88 },
+  { key: 'done',    label: 'Your path is ready ✓',             progress: 100 },
+]
+
 function StepGenerating({ examData, styleId, onDone }) {
-  const [progress, setProgress]   = useState(0)
-  const [msgIdx,   setMsgIdx]     = useState(0)
-  const createdRef                = useRef(false)
+  const [phase,   setPhase]   = useState(0)
+  const [error,   setError]   = useState('')
+  const createdRef            = useRef(false)
 
   const daysLeft = examData.examDate
     ? Math.max(1, Math.ceil((new Date(examData.examDate) - Date.now()) / 86400000))
     : 30
-  const weeksStr = daysLeft > 14
-    ? `${Math.ceil(daysLeft / 7)} weeks`
-    : `${daysLeft} days`
+  const weeksStr = daysLeft > 14 ? `${Math.ceil(daysLeft / 7)} weeks` : `${daysLeft} days`
 
-  const msgs = [
-    `Mapping ${examData.subject || 'your subject'} syllabus…`,
-    'Building your node learning path…',
-    `Scheduling mock tests across ${weeksStr}…`,
-    `Calibrating for grade ${examData.targetGrade}…`,
-    'Finalising your roadmap…',
-  ]
+  const phaseLabel = phase === 1
+    ? `Building ${examData.subject || 'your'} nodes across ${weeksStr}…`
+    : GEN_PHASES[phase]?.label
 
   useEffect(() => {
-    // Create the roadmap immediately (sync)
-    if (!createdRef.current) {
-      createdRef.current = true
-      useRoadmapStore.getState().createRoadmap({
+    if (createdRef.current) return
+    createdRef.current = true
+    let cancelled = false
+
+    const run = async () => {
+      // 1 — create empty shell
+      const id = useRoadmapStore.getState().createRoadmap({
         title:       examData.examName,
         subject:     examData.subject,
         examDate:    examData.examDate,
         targetGrade: examData.targetGrade,
       })
+
+      // 2 — generate nodes via Groq
+      if (cancelled) return
+      setPhase(1)
+      const { overview, nodes } = await generateRoadmapNodes(
+        examData.examName,
+        examData.examDate,
+        null,
+        {}
+      )
+      if (cancelled) return
+      useRoadmapStore.getState().updateRoadmap(id, { overview, nodes })
+
+      // 3 — generate daily mission
+      setPhase(2)
+      const roadmapSnap = { title: examData.examName, examDate: examData.examDate, nodes, learningProfile: {} }
+      const mission = await generateDailyMission(roadmapSnap)
+      if (cancelled) return
+      useRoadmapStore.getState().setDailyMission(id, mission)
+
+      // 4 — done
+      setPhase(3)
+      setTimeout(onDone, 600)
     }
 
-    // Animate progress over ~2.6 s then call onDone
-    const DURATION = 2600
-    const start = Date.now()
-    const tick = setInterval(() => {
-      const elapsed = Date.now() - start
-      const pct = Math.min(100, Math.round((elapsed / DURATION) * 100))
-      setProgress(pct)
-      setMsgIdx(Math.min(msgs.length - 1, Math.floor((elapsed / DURATION) * msgs.length)))
-      if (pct >= 100) {
-        clearInterval(tick)
-        setTimeout(onDone, 300)
-      }
-    }, 30)
-    return () => clearInterval(tick)
+    run().catch(err => {
+      if (!cancelled) setError('Generation failed — check your connection and try again.')
+    })
+
+    return () => { cancelled = true }
   }, [])
 
   const examDateFmt = examData.examDate
     ? new Date(examData.examDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     : ''
+  const progress = GEN_PHASES[phase]?.progress ?? 5
 
   return (
     <motion.div
@@ -568,26 +589,26 @@ function StepGenerating({ examData, styleId, onDone }) {
       transition={{ duration: 0.4 }}
       style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 28, padding: '12px 0 8px', textAlign: 'center' }}
     >
-      {/* Pulsing orb */}
+      {/* Pulsing orb — stops pulsing when done */}
       <motion.div
-        animate={{ scale: [1, 1.06, 1] }}
-        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+        animate={phase < 3 ? { scale: [1, 1.06, 1] } : { scale: 1 }}
+        transition={{ duration: 2, repeat: phase < 3 ? Infinity : 0, ease: 'easeInOut' }}
       >
         <AevaOrb size={90} active personality={STYLES.find(s => s.id === styleId)?.orbId || 'balanced'} />
       </motion.div>
 
       <div>
         <h2 style={{ fontSize: 22, fontWeight: 900, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.04em', margin: '0 0 6px' }}>
-          Building your roadmap…
+          {phase < 3 ? 'Building your roadmap…' : 'Roadmap ready ✓'}
         </h2>
         <AnimatePresence mode="wait">
           <motion.p
-            key={msgIdx}
+            key={phase}
             initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.25 }}
-            style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.42)', margin: 0 }}
+            style={{ fontSize: 13.5, color: error ? '#F87171' : 'rgba(255,255,255,0.42)', margin: 0 }}
           >
-            {msgs[msgIdx]}
+            {error || phaseLabel}
           </motion.p>
         </AnimatePresence>
       </div>
@@ -597,7 +618,7 @@ function StepGenerating({ examData, styleId, onDone }) {
         <motion.div
           style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #6366F1, #8B5CF6, #A78BFA)' }}
           animate={{ width: `${progress}%` }}
-          transition={{ duration: 0.08, ease: 'linear' }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
         />
       </div>
 
@@ -615,6 +636,15 @@ function StepGenerating({ examData, styleId, onDone }) {
           🎯 Target {examData.targetGrade}
         </div>
       </div>
+
+      {/* Retry button on error */}
+      {error && (
+        <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          onClick={() => { setError(''); setPhase(0); createdRef.current = false }}
+          style={{ padding: '10px 22px', borderRadius: 10, background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.35)', color: '#F87171', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+          Try again
+        </motion.button>
+      )}
     </motion.div>
   )
 }

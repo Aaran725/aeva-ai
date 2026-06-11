@@ -13,7 +13,7 @@ import { useXPStore } from './xpStore'
 import { useAevaControlStore } from './aevaControlStore'
 import { nextGroqKey as gKey, GROQ_URL } from './groqClient'
 
-async function generateRoadmapNodes(title, examDate, assessmentInfo, options = {}) {
+export async function generateRoadmapNodes(title, examDate, assessmentInfo, options = {}) {
   const daysLeft = Math.max(1, Math.ceil((new Date(examDate) - Date.now()) / 86400000))
 
   const learnCount   = options.learnCount   ?? 8
@@ -888,7 +888,7 @@ function GeneratingView({ formData, onDone }) {
   )
 }
 
-async function generateDailyMission(roadmap) {
+export async function generateDailyMission(roadmap) {
   const daysLeft   = Math.max(1, Math.ceil((new Date(roadmap.examDate) - Date.now()) / 86400000))
   const available  = roadmap.nodes?.find(n => n.status === 'available')
   const weak       = roadmap.learningProfile?.weak || []
