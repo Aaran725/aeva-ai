@@ -31,6 +31,12 @@ const emptyStats = () => ({
   peakStreak:         0,
   battlesEntered:     0,
   battlesStarsTotal:  0,
+  speedCorrect:       0,
+  speedTotal:         0,
+  speedStreak:        0,
+  speedPeakStreak:    0,
+  tagPartsSubmitted:  0,
+  tagGroupScores:     [],
   nodesCompleted:     [],
   xp: { focus: 0, battles: 0, nodes: 0, bonus: 0 },
 })
@@ -43,10 +49,10 @@ export const useStudyRoomStore = create((set, get) => ({
   isMinimized: false,
 
   // ── Room config
-  phase:         'idle',   // idle|lobby|session|break|battle|results|stats
+  phase:         'idle',   // idle|lobby|session|break|battle|speed|tagteam|stats
   code:          null,
   isHost:        false,
-  mode:          'battle', // silent|battle|weakspot
+  mode:          'battle', // silent|battle|weakspot|speed|tagteam
   workMins:      25,
   breakMins:     5,
   totalSessions: 4,
@@ -78,6 +84,13 @@ export const useStudyRoomStore = create((set, get) => ({
   // ── Feed
   feed: [],               // [{ id, emoji, text, isAeva, time }]
 
+  // ── Speed Round
+  speedRound: null,     // { questions, currentIdx, qTimer, scores, answers, phase:'loading'|'question'|'reveal'|'done' }
+  _speedTimerRef: null,
+
+  // ── Tag Team
+  tagRound: null,       // { question, parts, contributions, groupScore, groupFeedback, phase:'loading'|'writing'|'scoring'|'done' }
+
   // ── Channel ref
   _channel: null,
 
@@ -88,9 +101,10 @@ export const useStudyRoomStore = create((set, get) => ({
   open: () => set({ isOpen: true, isMinimized: false }),
 
   closeRoom: () => {
-    const { _channel, _timerRef, _statsRef } = get()
-    if (_timerRef)  clearInterval(_timerRef)
-    if (_statsRef)  clearInterval(_statsRef)
+    const { _channel, _timerRef, _statsRef, _speedTimerRef } = get()
+    if (_timerRef)       clearInterval(_timerRef)
+    if (_statsRef)       clearInterval(_statsRef)
+    if (_speedTimerRef)  clearInterval(_speedTimerRef)
     if (_channel) {
       _channel.untrack()
       _channel.unsubscribe()
@@ -101,8 +115,9 @@ export const useStudyRoomStore = create((set, get) => ({
       code: null, isHost: false, members: [],
       answers: {}, currentQuestion: null, feed: [],
       myStats: emptyStats(), _channel: null,
-      _timerRef: null, _statsRef: null,
+      _timerRef: null, _statsRef: null, _speedTimerRef: null,
       sessionNumber: 0, timerSeconds: 0,
+      speedRound: null, tagRound: null,
     })
   },
 
@@ -216,6 +231,76 @@ export const useStudyRoomStore = create((set, get) => ({
     set({ phase: 'session', answers: {}, currentQuestion: null })
   },
 
+  // ── Speed Round ──────────────────────────────────────────────────────────────
+
+  submitSpeedAnswer: (qIdx, optionIdx) => {
+    const { speedRound, myUserId, myDisplayName, myColor, _channel, myStats } = get()
+    if (!speedRound || speedRound.phase !== 'question') return
+    if (speedRound.currentIdx !== qIdx) return
+    if (speedRound.answers?.[qIdx]?.[myUserId]) return // already answered
+
+    const q = speedRound.questions[qIdx]
+    const correct = optionIdx === q.ans
+    const isFirst = Object.keys(speedRound.answers?.[qIdx] || {}).length === 0
+    const points = correct ? (isFirst ? 2 : 1) : 0
+    const newStreak = correct ? (myStats.speedStreak || 0) + 1 : 0
+    const payload = { userId: myUserId, displayName: myDisplayName, color: myColor, optionIdx, correct, isFirst, points, qIdx }
+
+    const updatedStats = {
+      ...myStats,
+      speedCorrect: myStats.speedCorrect + (correct ? 1 : 0),
+      speedTotal: myStats.speedTotal + 1,
+      speedStreak: newStreak,
+      speedPeakStreak: Math.max(myStats.speedPeakStreak, newStreak),
+      xp: { ...myStats.xp, battles: myStats.xp.battles + points * 5 },
+    }
+
+    set(s => {
+      const sr = s.speedRound
+      const qAnswers = { ...(sr.answers?.[qIdx] || {}), [myUserId]: payload }
+      const newScore = (sr.scores?.[myUserId] || 0) + points
+      return {
+        speedRound: { ...sr, answers: { ...sr.answers, [qIdx]: qAnswers }, scores: { ...sr.scores, [myUserId]: newScore } },
+        myStats: updatedStats,
+      }
+    })
+    _channel?.send({ type: 'broadcast', event: 'speed_answer', payload })
+  },
+
+  // ── Tag Team ─────────────────────────────────────────────────────────────────
+
+  submitTagPart: async (text) => {
+    const { tagRound, myUserId, myDisplayName, myColor, _channel, myStats, isHost } = get()
+    if (!tagRound || tagRound.phase !== 'writing') return
+    const myPart = tagRound.parts?.find(p => p.assignedUserId === myUserId)
+    if (!myPart) return
+    if (tagRound.contributions?.[myUserId]) return // already submitted
+
+    const payload = { userId: myUserId, displayName: myDisplayName, color: myColor, text, partNumber: myPart.num }
+
+    const updatedStats = {
+      ...myStats,
+      tagPartsSubmitted: myStats.tagPartsSubmitted + 1,
+      xp: { ...myStats.xp, battles: myStats.xp.battles + 15 },
+    }
+
+    set(s => ({
+      tagRound: { ...s.tagRound, contributions: { ...s.tagRound.contributions, [myUserId]: payload } },
+      myStats: updatedStats,
+    }))
+    _channel?.send({ type: 'broadcast', event: 'tag_part', payload })
+
+    // Host checks if all parts are in → score
+    if (isHost) {
+      setTimeout(() => {
+        const { tagRound: tr } = get()
+        if (tr && Object.keys(tr.contributions).length >= tr.parts.length) {
+          get()._scoreTagTeam()
+        }
+      }, 300)
+    }
+  },
+
   getCollectiveEnergy: () => {
     const { members } = get()
     if (!members.length) return 0
@@ -260,7 +345,13 @@ export const useStudyRoomStore = create((set, get) => ({
       get()._clearTimer()
       set({ timerPhase: payload.timerPhase, timerSeconds: payload.seconds, sessionNumber: payload.sessionNumber })
       if (payload.timerPhase === 'work') {
-        set({ phase: 'session', answers: {}, currentQuestion: null })
+        set({ phase: 'session', answers: {}, currentQuestion: null, speedRound: null, tagRound: null })
+      }
+      if (payload.timerPhase === 'break') {
+        const { mode } = get()
+        const breakPhase = mode === 'silent' ? 'break' : mode === 'speed' ? 'speed' : mode === 'tagteam' ? 'tagteam' : 'battle'
+        if (mode === 'silent') set({ phase: breakPhase })
+        // For speed/tagteam/battle, guest waits for the start broadcast from host
       }
       get()._startTimer()
     })
@@ -288,6 +379,56 @@ export const useStudyRoomStore = create((set, get) => ({
     // Broadcast — session end
     ch.on('broadcast', { event: 'session_end' }, () => {
       if (!get().isHost) get()._endSession()
+    })
+
+    // Broadcast — Speed Round
+    ch.on('broadcast', { event: 'speed_start' }, ({ payload }) => {
+      if (get().isHost) return
+      set({ speedRound: payload.speedRound, phase: 'speed' })
+      get()._startSpeedQTimer()
+    })
+    ch.on('broadcast', { event: 'speed_answer' }, ({ payload }) => {
+      set(s => {
+        const sr = s.speedRound
+        if (!sr) return {}
+        const qAnswers = { ...(sr.answers?.[payload.qIdx] || {}), [payload.userId]: payload }
+        const newScore = (sr.scores?.[payload.userId] || 0) + payload.points
+        return { speedRound: { ...sr, answers: { ...sr.answers, [payload.qIdx]: qAnswers }, scores: { ...sr.scores, [payload.userId]: newScore } } }
+      })
+    })
+    ch.on('broadcast', { event: 'speed_next' }, ({ payload }) => {
+      if (get().isHost) return
+      get()._clearSpeedQTimer()
+      set(s => ({ speedRound: { ...s.speedRound, currentIdx: payload.idx, phase: 'question', qTimer: 15 } }))
+      get()._startSpeedQTimer()
+    })
+    ch.on('broadcast', { event: 'speed_reveal' }, ({ payload }) => {
+      if (get().isHost) return
+      get()._clearSpeedQTimer()
+      set(s => ({ speedRound: { ...s.speedRound, phase: 'reveal' } }))
+    })
+    ch.on('broadcast', { event: 'speed_done' }, () => {
+      if (get().isHost) return
+      get()._clearSpeedQTimer()
+      set(s => ({ speedRound: { ...s.speedRound, phase: 'done' } }))
+    })
+
+    // Broadcast — Tag Team
+    ch.on('broadcast', { event: 'tag_start' }, ({ payload }) => {
+      if (get().isHost) return
+      set({ tagRound: payload.tagRound, phase: 'tagteam' })
+    })
+    ch.on('broadcast', { event: 'tag_part' }, ({ payload }) => {
+      set(s => {
+        if (!s.tagRound) return {}
+        return { tagRound: { ...s.tagRound, contributions: { ...s.tagRound.contributions, [payload.userId]: payload } } }
+      })
+    })
+    ch.on('broadcast', { event: 'tag_scored' }, ({ payload }) => {
+      if (get().isHost) return
+      set(s => ({
+        tagRound: { ...s.tagRound, groupScore: payload.groupScore, groupFeedback: payload.groupFeedback, memberFeedback: payload.memberFeedback, phase: 'done' },
+      }))
     })
 
     set({ _channel: ch })
@@ -326,14 +467,21 @@ export const useStudyRoomStore = create((set, get) => ({
     const { timerPhase, sessionNumber, totalSessions, isHost, mode, breakMins, workMins, _channel, subject } = get()
 
     if (timerPhase === 'work') {
-      // Transition to break
-      set({ timerPhase: 'break', timerSeconds: breakMins * 60, phase: mode === 'silent' ? 'break' : 'battle' })
+      // Determine break screen per mode
+      const breakPhase = mode === 'silent' ? 'break'
+        : mode === 'speed'   ? 'speed'
+        : mode === 'tagteam' ? 'tagteam'
+        : 'battle'  // battle + weakspot
+
+      set({ timerPhase: 'break', timerSeconds: breakMins * 60, phase: breakPhase })
       get()._startTimer()
       get()._pushFeed({ emoji: '☕', text: `Round ${sessionNumber} done — break time` })
 
       if (isHost) {
         _channel?.send({ type: 'broadcast', event: 'phase_change', payload: { timerPhase: 'break', seconds: breakMins * 60, sessionNumber } })
-        if (mode !== 'silent') setTimeout(() => get()._generateQuestion(subject), 800)
+        if (mode === 'battle' || mode === 'weakspot') setTimeout(() => get()._generateQuestion(subject), 800)
+        if (mode === 'speed')   setTimeout(() => get()._generateSpeedQuestions(subject), 600)
+        if (mode === 'tagteam') setTimeout(() => get()._generateTagQuestion(subject), 600)
         setTimeout(() => get()._aevaObservation(), 3000)
       }
     } else {
@@ -442,5 +590,142 @@ Round: ${sessionNumber}. Subject: ${subject || 'mixed'}. Avg focus: ${avgFocus}%
 
   _pushFeed: (item) => {
     set(s => ({ feed: [{ ...item, id: item.id || Date.now() + Math.random(), time: Date.now() }, ...s.feed].slice(0, 20) }))
+  },
+
+  // ── Speed Round helpers ───────────────────────────────────────────────────────
+
+  _generateSpeedQuestions: async (subject) => {
+    const { _channel } = get()
+    set({ speedRound: { questions: [], currentIdx: 0, qTimer: 15, scores: {}, answers: {}, phase: 'loading' } })
+    try {
+      const res = await fetch(GROQ_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          messages: [{ role: 'user', content:
+            `Generate exactly 10 multiple choice questions about "${subject || 'general knowledge'}". Test specific facts, definitions, formulas. Keep each question under 20 words.
+Return ONLY valid JSON: {"questions":[{"q":"...","opts":["A)...","B)...","C)...","D)..."],"ans":0,"exp":"one sentence"}]}
+ans is the 0-indexed correct option. No partial sentences.` }],
+          response_format: { type: 'json_object' },
+          temperature: 0.7, max_tokens: 2000,
+        }),
+      })
+      const d = await res.json()
+      const parsed = JSON.parse(d.choices[0].message.content)
+      const questions = (parsed.questions || parsed).slice(0, 10)
+      const speedState = { questions, currentIdx: 0, qTimer: 15, scores: {}, answers: {}, phase: 'question' }
+      set({ speedRound: speedState, phase: 'speed' })
+      _channel?.send({ type: 'broadcast', event: 'speed_start', payload: { speedRound: speedState } })
+      get()._startSpeedQTimer()
+    } catch (e) { console.error('Speed gen failed', e) }
+  },
+
+  _startSpeedQTimer: () => {
+    get()._clearSpeedQTimer()
+    const ref = setInterval(() => {
+      const s = get()
+      const sr = s.speedRound
+      if (!sr || sr.phase !== 'question') return
+      const next = sr.qTimer - 1
+      if (next <= 0) {
+        // Time's up — reveal answer then advance
+        set(ss => ({ speedRound: { ...ss.speedRound, qTimer: 0, phase: 'reveal' } }))
+        if (s._channel) s._channel.send({ type: 'broadcast', event: 'speed_reveal', payload: {} })
+        setTimeout(() => {
+          const { speedRound: sr2, isHost, _channel } = get()
+          if (!sr2) return
+          const nextIdx = sr2.currentIdx + 1
+          if (nextIdx >= sr2.questions.length) {
+            get()._clearSpeedQTimer()
+            set(ss => ({ speedRound: { ...ss.speedRound, phase: 'done' } }))
+            if (isHost) _channel?.send({ type: 'broadcast', event: 'speed_done' })
+          } else {
+            set(ss => ({ speedRound: { ...ss.speedRound, currentIdx: nextIdx, phase: 'question', qTimer: 15 } }))
+            if (isHost) _channel?.send({ type: 'broadcast', event: 'speed_next', payload: { idx: nextIdx } })
+          }
+        }, 2200)
+      } else {
+        set(ss => ({ speedRound: { ...ss.speedRound, qTimer: next } }))
+      }
+    }, 1000)
+    set({ _speedTimerRef: ref })
+  },
+
+  _clearSpeedQTimer: () => {
+    const { _speedTimerRef } = get()
+    if (_speedTimerRef) clearInterval(_speedTimerRef)
+    set({ _speedTimerRef: null })
+  },
+
+  // ── Tag Team helpers ──────────────────────────────────────────────────────────
+
+  _generateTagQuestion: async (subject) => {
+    const { _channel, members } = get()
+    const numParts = Math.min(members.length, 4)
+    set({ tagRound: { question: null, parts: [], contributions: {}, groupScore: null, groupFeedback: null, memberFeedback: {}, phase: 'loading' } })
+    try {
+      const res = await fetch(GROQ_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          messages: [{ role: 'user', content:
+            `Create ONE essay/explanation question about "${subject || 'general knowledge'}" that requires ${numParts} distinct parts to answer fully.
+Return ONLY valid JSON: {"question":"...","parts":[{"num":1,"task":"one focused sub-task","hint":"short hint"}]}
+Generate exactly ${numParts} parts. Each part should be independently answerable but together form a complete answer.` }],
+          response_format: { type: 'json_object' },
+          temperature: 0.7, max_tokens: 600,
+        }),
+      })
+      const d = await res.json()
+      const parsed = JSON.parse(d.choices[0].message.content)
+      // Assign parts to members
+      const parts = parsed.parts.map((p, i) => ({
+        ...p, assignedUserId: members[i % members.length]?.userId, assignedName: members[i % members.length]?.displayName,
+      }))
+      const tagState = { question: parsed.question, parts, contributions: {}, groupScore: null, groupFeedback: null, memberFeedback: {}, phase: 'writing' }
+      set({ tagRound: tagState, phase: 'tagteam' })
+      _channel?.send({ type: 'broadcast', event: 'tag_start', payload: { tagRound: tagState } })
+    } catch (e) { console.error('Tag team gen failed', e) }
+  },
+
+  _scoreTagTeam: async () => {
+    const { tagRound, _channel, members, myStats } = get()
+    if (!tagRound) return
+    set(s => ({ tagRound: { ...s.tagRound, phase: 'scoring' } }))
+    try {
+      const combined = Object.values(tagRound.contributions)
+        .sort((a, b) => a.partNumber - b.partNumber)
+        .map(c => `Part ${c.partNumber} (${c.displayName}): ${c.text}`)
+        .join('\n\n')
+      const res = await fetch(GROQ_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          messages: [{ role: 'user', content:
+            `Score this collaborative answer to: "${tagRound.question}"\n\n${combined}\n\nRate the overall answer 1-5 stars and give brief individual feedback.
+Return ONLY valid JSON: {"stars":1-5,"feedback":"one sentence overall","perPart":[{"num":1,"stars":1-5,"note":"brief"}]}` }],
+          response_format: { type: 'json_object' },
+          temperature: 0.3, max_tokens: 300,
+        }),
+      })
+      const d = await res.json()
+      const r = JSON.parse(d.choices[0].message.content)
+      const memberFeedback = {}
+      ;(r.perPart || []).forEach(p => {
+        const contrib = Object.values(tagRound.contributions).find(c => c.partNumber === p.num)
+        if (contrib) memberFeedback[contrib.userId] = { stars: p.stars, note: p.note }
+      })
+      const groupXP = r.stars * 15
+      const updatedStats = { ...myStats, tagGroupScores: [...myStats.tagGroupScores, r.stars], xp: { ...myStats.xp, battles: myStats.xp.battles + groupXP } }
+      set(s => ({
+        tagRound: { ...s.tagRound, groupScore: r.stars, groupFeedback: r.feedback, memberFeedback, phase: 'done' },
+        myStats: updatedStats,
+      }))
+      _channel?.send({ type: 'broadcast', event: 'tag_scored', payload: { groupScore: r.stars, groupFeedback: r.feedback, memberFeedback } })
+      get()._pushFeed({ emoji: '🤝', text: `Tag Team: ${r.stars}★ — ${r.feedback}` })
+    } catch (e) { console.error('Tag score failed', e) }
   },
 }))
