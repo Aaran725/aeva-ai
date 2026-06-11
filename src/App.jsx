@@ -5548,7 +5548,6 @@ If no clear changes: {"changes":[]}`
   const send = () => sendWithText()
 
   const isEmpty = messages.length === 0
-  const isLight = !isMission && ((chatSettings.chatBg || 'default') === 'white' || (isWidget && !!activeTheme.lightBg))
   const isMobile = useIsMobile()
 
   // chipTick increments at exchange milestones (2,4,7) so contextChips re-memos
@@ -5585,6 +5584,7 @@ If no clear changes: {"changes":[]}`
   })
   const [showThemePicker, setShowThemePicker] = useState(false)
   const activeTheme = CHAT_THEMES[chatTheme] || CHAT_THEMES.purple
+  const isLight = !isMission && ((chatSettings.chatBg || 'default') === 'white' || (isWidget && !!activeTheme.lightBg))
   const applyChatTheme = (id) => {
     setChatThemeKey(id)
     try { localStorage.setItem('aeva_chat_theme', id) } catch {}
