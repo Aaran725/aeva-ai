@@ -29,12 +29,26 @@ export default defineConfig({
       workbox: {
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/r\//],
+        // Block the HTML fallback for anything that looks like a file (JS chunks, CSS, images).
+        // Without this, the SW returns index.html for un-cached chunks after a new deploy,
+        // causing "Expected a JS module but got text/html" MIME type errors.
+        navigateFallbackDenylist: [/^\/r\//, /^\/assets\//, /\.\w{2,5}(\?.*)?$/],
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
+          // JS/CSS chunks — NetworkFirst so freshly-deployed hashes are always fetched,
+          // only falls back to cache when truly offline.
+          {
+            urlPattern: /\/assets\/.*\.(js|css)(\?.*)?$/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'asset-chunks',
+              networkTimeoutSeconds: 8,
+              expiration: { maxEntries: 80, maxAgeSeconds: 7 * 24 * 60 * 60 },
+            },
+          },
           {
             urlPattern: /^https:\/\/api\.groq\.com\/.*/i,
             handler: 'NetworkOnly',
