@@ -4,6 +4,7 @@ import { X, ChevronLeft, Plus, Map, Calendar, Upload, Sparkles, FileText, BookOp
 import WidgetToggle from './WidgetToggle'
 import FeatureSpotlight from './FeatureSpotlight'
 import { useRoadmapStore, calcGrade, gradeGapMessage, GRADE_THRESHOLDS } from './roadmapStore'
+import { ExamSimulatorButton } from './ExamSimulator'
 import { DotMatrix } from './WidgetDashboard'
 import { useLabStore } from './labStore'
 import { useSRStore } from './srStore'
@@ -512,6 +513,18 @@ function HomeView({ onCreate, onOpen, widgetMode }) {
                     </motion.div>
                   </div>
                 </div>
+
+                {/* Exam Mode entry — shown when roadmap has nodes */}
+                {r.nodes?.length > 0 && (
+                  <div style={{ padding: '0 18px 14px' }}>
+                    <ExamSimulatorButton
+                      roadmapId={r.id}
+                      style={{ width: '100%', padding: '9px 0', borderRadius: 12, background: 'rgba(167,139,250,0.12)', border: '1.5px solid rgba(167,139,250,0.30)', color: '#C4B5FD', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontFamily: 'inherit' }}
+                    >
+                      <span style={{ fontSize: 14 }}>📝</span> Simulate Exam
+                    </ExamSimulatorButton>
+                  </div>
+                )}
 
                 {/* Confirm panel — OUTSIDE the overflow:hidden card so it's never clipped */}
                 <AnimatePresence>

@@ -62,6 +62,7 @@ import { saveSession, loadSessions, deleteSession, clearAllHistory, syncHistoryT
 import { TodayPlanCard } from './RevisionCalendar'
 import { useScheduleStore, dateKey } from './scheduleStore'
 import StudyWithMe, { StudyWithMeButton } from './StudyWithMe'
+import ExamSimulator from './ExamSimulator'
 import './index.css'
 
 /* ─── Groq API (keys + URL imported at top of file) ─── */
@@ -7669,6 +7670,8 @@ export default function App() {
       <RoadmapHub />
       {/* Study With Me — always mounted so timer survives navigation */}
       <StudyWithMe />
+      {/* Exam Simulator — always mounted so it can intercept aeva:open-exam events */}
+      <ExamSimulator />
       <AnimatePresence mode="wait" initial={false}>
         {view === 'dashboard'
           ? <DashboardView key="dashboard" onChatOpen={() => setView('chat')} onSignOut={() => supabase.auth.signOut()} />
