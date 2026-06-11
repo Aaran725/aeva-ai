@@ -4417,10 +4417,10 @@ function ChatView({ onBack }) {
     }
   }
 
-  // ── Photo-in-chat send (teach me from image) ─────────────────────────────
+  // ── Photo-in-chat send (flexible — responds to whatever the user asks) ────
   const sendPhoto = async () => {
     if (!photoAttachment || isThinking) return
-    const userText = input.trim() || 'Can you teach me about this? Explain everything I need to know.'
+    const userText = input.trim() || 'What is this?'
     setInput('')
     const snap = photoAttachment
     setPhotoAttachment(null)
@@ -4433,52 +4433,31 @@ function ChatView({ onBack }) {
     abortRef.current = controller
     let rawResponse = ''
 
-    const systemPrompt = `You are Aeva, a world-class tutor. A student sent you a photo of something they're studying. Your job is to TEACH THE CONCEPT — not describe what's in the image. Use the photo only to identify the topic.
+    const systemPrompt = `You are Aeva, a world-class AI tutor. A student sent you an image and asked: "${userText}". Answer their question directly using the image as context. Adapt your response style to what they asked:
 
-## [Name the concept in 3–5 words]
-
-One warm sentence explaining what this concept is and why it matters. Speak like a brilliant friend, not a textbook.
-
-> **Key Insight:** The single core rule in one plain sentence — the thing that makes it click.
-
-The master formula as a display block (required for every maths or science topic):
-$$\\text{key formula in LaTeX — e.g. } \\sqrt{(x-a)^2} = |x-a|$$
-
-A plain 2–3 sentence explanation of what each part of that formula means.
-
-## How to use it
-
-1. First step — write it simply and clearly
-2. Second step — continue the method
-3. Third step — bring it home
-
-> **Example:** Work ONE fresh example (NOT from the photo — simpler). Show every step with inline math like $x = 3$ or $|x - 2| = 5$ woven into the text naturally.
-
-> **Tip:** Name one specific mistake students always make with this concept.
-
-> **Note:** Ask the student one question they must think through right now.
+- If they ask "what is this?" or "what concept is this?" — identify and name the concept clearly.
+- If they ask "teach me" — give a full structured explanation.
+- If they ask a specific question — answer it precisely, using the image as evidence.
+- If they ask for help or a hint — guide them without just giving the answer.
 
 MARKDOWN RENDERING — these patterns render as BEAUTIFUL visual elements:
-- ## Heading → purple section divider (ALWAYS use for section titles)
+- ## Heading → purple section divider (use for main sections)
 - > **Key Insight:** → blue callout card ✦
 - > **Example:** → yellow callout card ◎
 - > **Tip:** → green callout card →
 - > **Note:** → purple callout card ◇
 - > **Warning:** → red callout card ⚠
-- $$formula$$ → large centred formula block on dark background (use for the main rule)
+- $$formula$$ → large centred formula block on dark background
 - $formula$ → inline rendered math
-- 1. 2. 3. numbered list → beautiful coloured circle numbers
+- 1. 2. 3. numbered list → coloured circle numbers
 - - bullet list → coloured diamond bullets
 
-STRICT RULES:
-- ALWAYS use ## headers — they render as beautiful purple section dividers
-- ALWAYS use numbered lists for steps — renders as coloured circles, not plain text
-- ALWAYS use the > **Label:** callout cards for insight, example, tip, note
-- ALWAYS put the core formula in a $$...$$ display block — it renders as a centred card
-- NEVER copy the exact equations from the photo — use them as context, teach from scratch
-- NEVER use #### or ##### (they're too small)
-- Keep under 380 words total
-- Tone: warm, direct, like a brilliant friend who actually knows this stuff`
+RULES:
+- Use ## headers and > **Label:** callouts wherever they add clarity
+- Use $$...$$ for any key formula
+- NEVER use #### or #####
+- Tone: warm, direct, like a brilliant friend who actually knows this stuff
+- Keep responses focused — don't pad`
 
     try {
       await streamGroqVision(
@@ -6710,7 +6689,7 @@ If no clear changes: {"changes":[]}`
                       whileHover={{ scale: 1.08, background: photoAttachment ? 'rgba(167,139,250,0.30)' : 'rgba(167,139,250,0.18)' }}
                       whileTap={{ scale: 0.90 }}
                       onClick={() => photoInputRef.current?.click()}
-                      title="Send a photo — Aeva teaches you the concept in the image"
+                      title="Upload an image — type your question then send (teach me, what concept is this?, help me, etc.)"
                       style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: photoAttachment ? 'rgba(167,139,250,0.28)' : 'rgba(167,139,250,0.10)', border: photoAttachment ? '1.5px solid rgba(167,139,250,0.70)' : '1.5px solid rgba(167,139,250,0.30)', cursor: 'pointer', color: photoAttachment ? '#C4B5FD' : 'rgba(167,139,250,0.75)', transition: 'all 0.15s' }}
                     >
                       <BookOpen size={14} strokeWidth={2} />
