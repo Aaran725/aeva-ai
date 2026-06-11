@@ -24,9 +24,9 @@ export default function WidgetToggle({ active, onToggle, style = {} }) {
       style={{
         display: 'flex', alignItems: 'center', gap: 5,
         padding: '6px 12px', borderRadius: 99, cursor: 'pointer',
-        background: active ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.06)',
-        border: `1px solid ${active ? 'rgba(129,140,248,0.45)' : 'rgba(255,255,255,0.11)'}`,
-        color: active ? '#A5B4FC' : 'rgba(255,255,255,0.45)',
+        background: active ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.09)',
+        border: `1px solid ${active ? 'rgba(129,140,248,0.50)' : 'rgba(255,255,255,0.18)'}`,
+        color: active ? '#A5B4FC' : 'rgba(255,255,255,0.70)',
         fontSize: 11, fontWeight: 700, letterSpacing: '0.02em',
         fontFamily: "'Inter', system-ui, sans-serif",
         transition: 'background 0.18s, border 0.18s, color 0.18s',

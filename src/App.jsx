@@ -2705,13 +2705,13 @@ function DashboardView({ onChatOpen, onSignOut }) {
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 99, fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
-                <span>🔥</span><span style={{ fontWeight: 600, color: '#FB923C' }}>{useXPStore.getState().streak}</span><span>day streak</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: 'rgba(251,146,60,0.12)', border: '1px solid rgba(251,146,60,0.28)', borderRadius: 99, fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>
+                <span>🔥</span><span style={{ fontWeight: 700, color: '#FB923C' }}>{streak}</span><span style={{ color: 'rgba(255,255,255,0.5)' }}>day streak</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 99, fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
-                <Zap size={12} style={{ color: '#A5B4FC' }} /><span style={{ fontWeight: 600, color: '#A5B4FC' }}>Lv {currentLevel}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(129,140,248,0.28)', borderRadius: 99, fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>
+                <Zap size={12} style={{ color: '#A5B4FC' }} /><span style={{ fontWeight: 700, color: '#A5B4FC' }}>Lv {currentLevel}</span><span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>Sage</span>
               </div>
-              <WidgetToggle active={dashLayout === 'widget'} onToggle={toggleDashLayout} style={{ height: 32, fontSize: 11, padding: '0 10px' }} />
+              <WidgetToggle active={dashLayout === 'widget'} onToggle={toggleDashLayout} style={{ height: 34, fontSize: 12, padding: '0 14px', borderRadius: 99 }} />
             </div>
           </div>
         )}
