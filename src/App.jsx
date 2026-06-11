@@ -62,7 +62,6 @@ import { saveSession, loadSessions, deleteSession, clearAllHistory, syncHistoryT
 import { TodayPlanCard } from './RevisionCalendar'
 import { useScheduleStore, dateKey } from './scheduleStore'
 import StudyWithMe, { StudyWithMeButton } from './StudyWithMe'
-import { useStudyModeStore } from './useStudyModeStore'
 import './index.css'
 
 /* ─── Groq API (keys + URL imported at top of file) ─── */
@@ -7423,21 +7422,6 @@ function useInactivityIntervention() {
 }
 
 /* ── Lazy-load fallback ───────────────────────────────────────────────────── */
-/* ── StudyWithMeRoot — always-mounted wrapper, listens for open trigger ── */
-function StudyWithMeRoot() {
-  const [setupOpen, setSetupOpen] = useState(false)
-  const { startSession, phase } = useStudyModeStore()
-
-  useEffect(() => {
-    const handler = () => setSetupOpen(true)
-    window.addEventListener('aeva:open-study-mode', handler)
-    return () => window.removeEventListener('aeva:open-study-mode', handler)
-  }, [])
-
-  // Pass setupOpen state into StudyWithMe via a slightly modified render
-  // We render StudyWithMe and also pass an override for the setup modal
-  return <StudyWithMe externalSetupOpen={setupOpen} onExternalSetupClose={() => setSetupOpen(false)} />
-}
 
 function AppLoader() {
   return (
@@ -7607,12 +7591,12 @@ export default function App() {
       {/* Global chaos banner */}
       <ChaosEventBanner />
       <ProTipBanner />
-      {/* Study With Me — always mounted so timer survives navigation */}
-      <StudyWithMeRoot />
       {/* Global hubs — rendered at root so they work from both dashboard AND chat */}
       <ArcadeHub />
       <LabHub />
       <RoadmapHub />
+      {/* Study With Me — always mounted so timer survives navigation */}
+      <StudyWithMe />
       <AnimatePresence mode="wait" initial={false}>
         {view === 'dashboard'
           ? <DashboardView key="dashboard" onChatOpen={() => setView('chat')} onSignOut={() => supabase.auth.signOut()} />
