@@ -5950,23 +5950,23 @@ If no clear changes: {"changes":[]}`
                 </motion.button>
                 {showThemePicker && (
                   <div onClick={() => setShowThemePicker(false)}
-                    style={{ position: 'fixed', inset: 0, zIndex: 150 }} />
+                    style={{ position: 'fixed', inset: 0, zIndex: 9998 }} />
                 )}
                 {showThemePicker && (
                   <motion.div
-                    initial={{ opacity: 0, y: -6, scale: 0.92 }}
+                    initial={{ opacity: 0, y: -8, scale: 0.90 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -4, scale: 0.94 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.92 }}
                     transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
                     style={{
-                      position: 'absolute', top: 38, right: 0,
-                      background: 'rgba(8,7,20,0.94)',
-                      border: '1px solid rgba(255,255,255,0.10)',
-                      borderRadius: 16, padding: '10px 12px',
-                      display: 'flex', gap: 8,
-                      backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
-                      boxShadow: '0 16px 48px rgba(0,0,0,0.65)',
-                      zIndex: 200,
+                      position: 'fixed', top: 52, right: 56,
+                      background: 'rgba(8,7,20,0.96)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      borderRadius: 18, padding: '12px 14px',
+                      display: 'flex', gap: 10, alignItems: 'center',
+                      backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
+                      boxShadow: '0 20px 60px rgba(0,0,0,0.70)',
+                      zIndex: 9999,
                     }}
                   >
                     {Object.entries(CHAT_THEMES).map(([id, t]) => (
