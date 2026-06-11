@@ -1,13 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Calendar, Trophy } from 'lucide-react'
 import AevaOrb from './AevaOrb'
 import { useXPStore, ORBS } from './xpStore'
+import { useRoadmapStore } from './roadmapStore'
 
 // ─── Teaching style → orb mapping ────────────────────────────────────────────
-// We show 3 personality archetypes at onboarding (simpler than all 8 orbs)
-// Each maps to an actual orb ID
-
 const STYLES = [
   {
     id: 'supportive',
@@ -35,50 +33,72 @@ const STYLES = [
   },
 ]
 
-// ─── Aeva's opening line — specific to teaching style + subject ───────────────
-function getOpener(styleId, subject) {
-  const sub = subject || 'your subject'
+// ─── Subjects with icons ─────────────────────────────────────────────────────
+const SUBJECTS = [
+  { id: 'Mathematics',      label: 'Maths',   icon: '∑'  },
+  { id: 'Sciences',         label: 'Science', icon: '⚗️' },
+  { id: 'History',          label: 'History', icon: '📜' },
+  { id: 'Languages',        label: 'Languages', icon: '🗣️' },
+  { id: 'Computer Science', label: 'CS',      icon: '💻' },
+  { id: 'Business',         label: 'Business',icon: '📊' },
+  { id: 'Law',              label: 'Law',     icon: '⚖️' },
+  { id: 'Other',            label: 'Other',   icon: '✦'  },
+]
+
+const EXAM_DEFAULTS = {
+  Mathematics:       'A-Level Mathematics',
+  Sciences:          'A-Level Biology',
+  History:           'A-Level History',
+  Languages:         'A-Level French',
+  'Computer Science':'A-Level Computer Science',
+  Business:          'A-Level Business Studies',
+  Law:               'A-Level Law',
+  Other:             '',
+}
+
+const EXAM_PLACEHOLDERS = {
+  Mathematics:       'e.g. A-Level Maths, GCSE Maths…',
+  Sciences:          'e.g. A-Level Biology, GCSE Chemistry…',
+  History:           'e.g. A-Level History, GCSE History…',
+  Languages:         'e.g. A-Level French, GCSE Spanish…',
+  'Computer Science':'e.g. A-Level Computer Science…',
+  Business:          'e.g. A-Level Business Studies…',
+  Law:               'e.g. A-Level Law, SQE…',
+  Other:             'e.g. SAT, IELTS, UCAT, Driving Theory…',
+}
+
+const GRADES = ['A*', 'A', 'B', 'C', 'D', 'E', 'U']
+const GRADE_COLORS = {
+  'A*': ['168,139,250', '#A78BFA'],
+  'A':  ['129,140,248', '#818CF8'],
+  'B':  ['56,189,248',  '#38BDF8'],
+  'C':  ['74,222,128',  '#4ADE80'],
+  'D':  ['250,204,21',  '#FACC15'],
+  'E':  ['251,146,60',  '#FB923C'],
+  'U':  ['248,113,113', '#F87171'],
+}
+
+// ─── Aeva's opening line ──────────────────────────────────────────────────────
+function getOpener(styleId, subject, examName, targetGrade, daysLeft) {
+  const name   = examName || subject || 'your exam'
+  const dStr   = daysLeft <= 7
+    ? `just ${daysLeft} day${daysLeft === 1 ? '' : 's'}`
+    : daysLeft <= 30
+      ? `${daysLeft} days`
+      : `${Math.ceil(daysLeft / 7)} weeks`
 
   const openers = {
-    supportive: {
-      default:           `${sub}. Before we start — tell me one thing you've tried to learn before but it never quite stuck. That's where we'll begin.`,
-      Mathematics:       "Maths is one of those subjects where there's a huge gap between 'sort of getting it' and actually getting it. What's a topic you've passed a test on but still don't feel confident about?",
-      Sciences:          "Science makes so much more sense when you understand the 'why' behind facts. What's a concept that still feels fuzzy, even after studying it?",
-      History:           "History isn't about memorising dates — it's about understanding why things happened. What's a period or event you find genuinely hard to get your head around?",
-      Languages:         "Language learning works best when it's personal. What's the part of learning a language you find most frustrating — grammar, vocabulary, speaking, or something else?",
-      'Computer Science':"Code is easier when you know why it works, not just how. What's a concept in computer science you've used before but couldn't explain to someone else?",
-      Business:          "Business is about decisions. Tell me — what's a business concept that sounds simple but you're not sure you fully understand?",
-      Law:               "Law is about applying principles to situations. What's an area of law you find genuinely confusing — where the rules don't quite make sense to you yet?",
-    },
-    challenging: {
-      default:           `${sub}. Which concept have you been avoiding? Not the hardest one — the one you keep skipping past. We're starting there.`,
-      Mathematics:       "Maths. Good. Pick the concept you keep avoiding. Not the hardest — the one you always skip. We're starting there, right now.",
-      Sciences:          "Science. Which topic are you weakest on? Don't say 'I'm okay at everything' — nobody is. What's yours?",
-      History:           "History. Pick an event you think you understand. I'm going to ask you to explain it from three different perspectives. Go.",
-      Languages:         "Language. What's the one part you keep making the same mistake in? Stop practising the stuff you're already good at.",
-      'Computer Science':"Computer Science. What's the last thing you built? If you haven't built anything yet — that's the first problem we're solving.",
-      Business:          "Business. Most people learn business theory and can't apply any of it. What's a real decision — career, financial, anything — you're currently unsure about?",
-      Law:               "Law. Recite the last legal principle you studied. In plain English. No jargon. If you can't, you don't understand it yet.",
-    },
-    precise: {
-      default:           `Let's establish your foundation. In ${sub}, what's the most recent concept you understood procedurally — you could do the steps — but didn't understand the reason behind it?`,
-      Mathematics:       "Let's be precise. What's the most recent maths concept where you understood the procedure but not the reason behind it? That gap is what we'll close.",
-      Sciences:          "Precision first. In science, a lot of students memorise models without understanding what the model is actually modelling. Which model do you use without fully understanding it?",
-      History:           "Historiography matters. When you study a historical event, do you typically consider primary sources, or do you rely on textbook interpretations? What's the difference, and why does it matter?",
-      Languages:         "Language acquisition has specific mechanisms. Are you aware of the input hypothesis? Do you know what comprehensible input means and how it applies to your learning?",
-      'Computer Science':"Let's establish foundations. What's the difference between a compiled and interpreted language, and how does that affect runtime behaviour? Answer as precisely as you can.",
-      Business:          "Business frameworks only work if you understand their assumptions. Take Porter's Five Forces — what are its limitations, and when does it break down as an analytical tool?",
-      Law:               "Legal reasoning requires precision. What's the difference between the ratio decidendi and obiter dicta of a judgment, and why does that distinction matter in common law systems?",
-    },
+    supportive: `Your roadmap for ${name} is ready — ${dStr} to hit that ${targetGrade}. Before we dive in, tell me one thing: what's the topic in ${subject || 'this subject'} you've always found confusing? That's exactly where we'll start.`,
+    challenging: `${name}. ${dStr} left. ${targetGrade} target. Let's skip the pleasantries — what's your actual weakest topic right now? Not what looks bad on paper. The one you've been quietly avoiding.`,
+    precise: `Roadmap initialised for ${name}. ${dStr} remain until the exam. To calibrate properly: what's the most recent concept in ${subject || 'this subject'} you understood procedurally, but couldn't explain from first principles if asked?`,
   }
 
-  const styleOpeners = openers[styleId] || openers.supportive
-  return styleOpeners[subject] || styleOpeners.default
+  return openers[styleId] || openers.supportive
 }
 
 // ─── Step 0: Cinematic arrival ────────────────────────────────────────────────
 function StepArrival({ onNext }) {
-  const [phase, setPhase] = useState(0) // 0=orb, 1=name, 2=tagline, 3=cta
+  const [phase, setPhase] = useState(0)
 
   useEffect(() => {
     const timers = [
@@ -94,7 +114,6 @@ function StepArrival({ onNext }) {
       initial={{ opacity: 0 }} animate={{ opacity: 1 }}
       style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0, textAlign: 'center', padding: '40px 0 32px' }}
     >
-      {/* Orb */}
       <motion.div
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -104,7 +123,6 @@ function StepArrival({ onNext }) {
         <AevaOrb size={140} active personality="balanced" />
       </motion.div>
 
-      {/* Brand */}
       <AnimatePresence>
         {phase >= 1 && (
           <motion.div
@@ -123,7 +141,6 @@ function StepArrival({ onNext }) {
         )}
       </AnimatePresence>
 
-      {/* Tagline */}
       <AnimatePresence>
         {phase >= 2 && (
           <motion.p
@@ -136,7 +153,6 @@ function StepArrival({ onNext }) {
         )}
       </AnimatePresence>
 
-      {/* CTA */}
       <AnimatePresence>
         {phase >= 3 && (
           <motion.button
@@ -188,7 +204,7 @@ function StepName({ value, onChange, onNext }) {
         value={value}
         onChange={e => onChange(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter' && value.trim()) onNext() }}
-        placeholder="Your name..."
+        placeholder="Your name…"
         style={{
           padding: '16px 18px', borderRadius: 14,
           background: 'rgba(255,255,255,0.07)',
@@ -196,8 +212,7 @@ function StepName({ value, onChange, onNext }) {
           color: 'rgba(255,255,255,0.92)',
           fontSize: 18, fontFamily: 'inherit', outline: 'none',
           width: '100%', boxSizing: 'border-box',
-          letterSpacing: '-0.01em',
-          transition: 'border-color 0.2s',
+          letterSpacing: '-0.01em', transition: 'border-color 0.2s',
         }}
         onFocus={e => e.target.style.borderColor = 'rgba(139,143,255,0.50)'}
         onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.14)'}
@@ -223,7 +238,7 @@ function StepName({ value, onChange, onNext }) {
   )
 }
 
-// ─── Step 2: Teaching style (orb selection) ───────────────────────────────────
+// ─── Step 2: Teaching style ───────────────────────────────────────────────────
 function StepStyle({ name, selected, onSelect, onNext }) {
   const firstName = name?.split(' ')[0] || 'there'
 
@@ -268,14 +283,12 @@ function StepStyle({ name, selected, onSelect, onNext }) {
                 display: 'flex', alignItems: 'center', gap: 14,
               }}
             >
-              {/* Orb swatch */}
               <div style={{
                 width: 42, height: 42, borderRadius: '50%', flexShrink: 0,
                 background: orbDef.gradient,
                 boxShadow: isSelected ? `0 0 16px rgba(${r},${g},${b},0.55)` : `0 0 8px rgba(${r},${g},${b},0.25)`,
                 transition: 'box-shadow 0.3s',
               }} />
-
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
                   <span style={{ fontSize: 14, fontWeight: 800, color: isSelected ? `rgb(${r},${g},${b})` : 'rgba(255,255,255,0.85)', transition: 'color 0.2s' }}>
@@ -286,8 +299,6 @@ function StepStyle({ name, selected, onSelect, onNext }) {
                   {style.desc}
                 </div>
               </div>
-
-              {/* Selected indicator */}
               <div style={{
                 width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
                 background: isSelected ? `rgb(${r},${g},${b})` : 'rgba(255,255,255,0.08)',
@@ -322,320 +333,305 @@ function StepStyle({ name, selected, onSelect, onNext }) {
   )
 }
 
-// ─── Step 3: Demo walkthrough ─────────────────────────────────────────────────
+// ─── Step 3: Your exam setup ──────────────────────────────────────────────────
+function StepYourExam({ name, onNext }) {
+  const firstName  = name?.split(' ')[0] || 'there'
+  const [subject,   setSubject]   = useState('')
+  const [examName,  setExamName]  = useState('')
+  const [examDate,  setExamDate]  = useState('')
+  const [targetGrade, setTargetGrade] = useState('')
 
-function ChatDemo() {
-  const messages = [
-    { role: 'aeva', text: "What part of quadratic equations trips you up most — factoring, or the formula itself?" },
-    { role: 'user', text: "The formula. I always forget it under pressure." },
-    { role: 'aeva', text: "That's the most common gap. Let's fix it right now — not by memorising, but by deriving it once so it actually sticks." },
-  ]
-  const [shown, setShown] = useState(0)
+  // Auto-fill exam name on subject pick (if user hasn't typed one yet)
   useEffect(() => {
-    if (shown >= messages.length) return
-    const t = setTimeout(() => setShown(s => s + 1), shown === 0 ? 400 : 1600)
-    return () => clearTimeout(t)
-  }, [shown])
+    if (subject && EXAM_DEFAULTS[subject]) {
+      setExamName(prev => prev ? prev : EXAM_DEFAULTS[subject])
+    }
+  }, [subject])
+
+  const canContinue = subject && examName.trim() && examDate && targetGrade
+  const today = new Date().toISOString().split('T')[0]
+
+  const inputStyle = {
+    padding: '13px 16px', borderRadius: 12,
+    background: 'rgba(255,255,255,0.06)',
+    border: '1px solid rgba(255,255,255,0.12)',
+    color: 'rgba(255,255,255,0.90)',
+    fontSize: 14.5, fontFamily: 'inherit', outline: 'none',
+    width: '100%', boxSizing: 'border-box',
+    transition: 'border-color 0.2s', colorScheme: 'dark',
+  }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 0' }}>
-      {messages.slice(0, shown).map((m, i) => (
-        <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
-          style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-          <div style={{
-            maxWidth: '82%', padding: '9px 13px', borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-            background: m.role === 'user' ? 'rgba(99,102,241,0.28)' : 'rgba(255,255,255,0.08)',
-            border: m.role === 'user' ? '1px solid rgba(99,102,241,0.35)' : '1px solid rgba(255,255,255,0.10)',
-            fontSize: 12, color: 'rgba(255,255,255,0.85)', lineHeight: 1.55,
-          }}>
-            {m.role === 'aeva' && <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(167,139,250,0.80)', display: 'block', marginBottom: 3 }}>Aeva</span>}
-            {m.text}
-          </div>
-        </motion.div>
-      ))}
-      {shown < messages.length && (
-        <div style={{ display: 'flex', gap: 4, padding: '6px 2px' }}>
-          {[0,1,2].map(i => (
-            <motion.div key={i} animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-              style={{ width: 6, height: 6, borderRadius: '50%', background: 'rgba(167,139,250,0.60)' }} />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function LabDemo() {
-  const [flipped, setFlipped] = useState(false)
-  const [answered, setAnswered] = useState(null)
-  useEffect(() => {
-    const t = setTimeout(() => setFlipped(true), 1200)
-    return () => clearTimeout(t)
-  }, [])
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {/* Mini drill type pills */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {[['⚡','Flashcard','#3B82F6'],['🧪','Feynman','#8B5CF6'],['⏱','Speed Round','#F97316'],['🎯','Mock Test','#06B6D4']].map(([icon, label, col]) => (
-          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 99, background: `rgba(${col === '#3B82F6' ? '59,130,246' : col === '#8B5CF6' ? '139,92,246' : col === '#F97316' ? '249,115,22' : '6,182,212'},0.15)`, border: `1px solid rgba(${col === '#3B82F6' ? '59,130,246' : col === '#8B5CF6' ? '139,92,246' : col === '#F97316' ? '249,115,22' : '6,182,212'},0.30)`, fontSize: 10.5, color: col }}>
-            <span>{icon}</span><span style={{ fontWeight: 600 }}>{label}</span>
-          </div>
-        ))}
+    <motion.div
+      key="yourexam"
+      initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
+      transition={{ duration: 0.35 }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 22 }}
+    >
+      <div style={{ textAlign: 'center' }}>
+        <p style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.30)', margin: '0 0 12px' }}>
+          Set the target
+        </p>
+        <h2 style={{ fontSize: 24, fontWeight: 900, color: 'rgba(255,255,255,0.94)', letterSpacing: '-0.04em', margin: '0 0 5px', lineHeight: 1.15 }}>
+          What are you working towards?
+        </h2>
+        <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.36)', margin: 0 }}>
+          Aeva builds your entire roadmap from this.
+        </p>
       </div>
-      {/* Flashcard */}
-      <AnimatePresence mode="wait">
-        {!flipped ? (
-          <motion.div key="front"
-            initial={{ opacity: 0, scaleX: 0.85 }} animate={{ opacity: 1, scaleX: 1 }} exit={{ opacity: 0, scaleX: 0.85 }}
-            transition={{ duration: 0.25 }}
-            style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', minHeight: 72, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.80)', fontWeight: 600 }}>
-              What does the discriminant b²−4ac tell you?
-            </div>
+
+      {/* Subject chips */}
+      <div>
+        <label style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 10 }}>
+          Subject
+        </label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {SUBJECTS.map(s => {
+            const active = subject === s.id
+            return (
+              <motion.button
+                key={s.id}
+                whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                onClick={() => setSubject(s.id)}
+                style={{
+                  padding: '8px 14px', borderRadius: 99, cursor: 'pointer', fontFamily: 'inherit',
+                  fontSize: 13, fontWeight: 600,
+                  background: active ? 'rgba(139,143,255,0.20)' : 'rgba(255,255,255,0.06)',
+                  border: active ? '1.5px solid rgba(139,143,255,0.50)' : '1.5px solid rgba(255,255,255,0.10)',
+                  color: active ? 'rgba(200,202,255,0.95)' : 'rgba(255,255,255,0.50)',
+                  transition: 'all 0.17s',
+                  display: 'flex', alignItems: 'center', gap: 5,
+                }}
+              >
+                <span style={{ fontSize: 14 }}>{s.icon}</span> {s.label}
+              </motion.button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Exam name */}
+      <AnimatePresence>
+        {subject && (
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
+            <label style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 8 }}>
+              Exam name
+            </label>
+            <input
+              value={examName}
+              onChange={e => setExamName(e.target.value)}
+              placeholder={EXAM_PLACEHOLDERS[subject] || "What's the exam called?"}
+              style={inputStyle}
+              onFocus={e => e.target.style.borderColor = 'rgba(139,143,255,0.45)'}
+              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.12)'}
+            />
           </motion.div>
-        ) : (
-          <motion.div key="back"
-            initial={{ opacity: 0, scaleX: 0.85 }} animate={{ opacity: 1, scaleX: 1 }} exit={{ opacity: 0, scaleX: 0.85 }}
-            transition={{ duration: 0.25 }}
-            style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(139,92,246,0.10)', border: '1px solid rgba(139,92,246,0.30)', minHeight: 72, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-            <div style={{ fontSize: 12.5, color: 'rgba(167,139,250,0.90)', lineHeight: 1.55 }}>
-              It tells you how many real roots exist: &gt;0 means two roots, =0 means one, &lt;0 means none.
+        )}
+      </AnimatePresence>
+
+      {/* Date + Grade row */}
+      <AnimatePresence>
+        {subject && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.07 }}
+            style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}
+          >
+            {/* Date */}
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 8 }}>
+                Exam date
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="date"
+                  min={today}
+                  value={examDate}
+                  onChange={e => setExamDate(e.target.value)}
+                  style={{ ...inputStyle, paddingRight: 36 }}
+                  onFocus={e => e.target.style.borderColor = 'rgba(139,143,255,0.45)'}
+                  onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.12)'}
+                />
+                <Calendar size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.28)', pointerEvents: 'none' }} />
+              </div>
+            </div>
+
+            {/* Target grade */}
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 8 }}>
+                Target grade
+              </label>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {GRADES.map(g => {
+                  const [rgb, hex] = GRADE_COLORS[g]
+                  const active = targetGrade === g
+                  return (
+                    <motion.button
+                      key={g}
+                      whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.93 }}
+                      onClick={() => setTargetGrade(g)}
+                      style={{
+                        padding: '7px 0', width: 36, borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
+                        fontSize: 12.5, fontWeight: 800,
+                        background: active ? `rgba(${rgb},0.22)` : 'rgba(255,255,255,0.05)',
+                        border: active ? `1.5px solid rgba(${rgb},0.55)` : '1.5px solid rgba(255,255,255,0.09)',
+                        color: active ? hex : 'rgba(255,255,255,0.38)',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {g}
+                    </motion.button>
+                  )
+                })}
+              </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-      {flipped && !answered && (
-        <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setAnswered('got')} style={{ flex: 1, padding: '8px', borderRadius: 10, background: 'rgba(74,222,128,0.14)', border: '1px solid rgba(74,222,128,0.35)', color: '#4ADE80', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>✓ Got it</button>
-          <button onClick={() => setAnswered('missed')} style={{ flex: 1, padding: '8px', borderRadius: 10, background: 'rgba(248,113,113,0.14)', border: '1px solid rgba(248,113,113,0.35)', color: '#F87171', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>✗ Missed</button>
-        </motion.div>
-      )}
-      {answered && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          style={{ fontSize: 12, color: answered === 'got' ? '#4ADE80' : '#F87171', textAlign: 'center', fontWeight: 600 }}>
-          {answered === 'got' ? '🔥 Aeva schedules it for review in 3 days' : '📌 Aeva flags it — you\'ll see it again tomorrow'}
-        </motion.div>
-      )}
-    </div>
-  )
-}
-
-function RoadmapDemo() {
-  const nodes = [
-    { label: 'Foundations of Algebra', done: true },
-    { label: 'Quadratic Formula', done: true },
-    { label: 'Discriminant & Roots', active: true },
-    { label: 'Completing the Square', locked: true },
-    { label: 'Mock Exam', locked: true },
-  ]
-  const [lit, setLit] = useState(2)
-  useEffect(() => {
-    const t = setTimeout(() => setLit(3), 1800)
-    return () => clearTimeout(t)
-  }, [])
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {nodes.map((n, i) => (
-        <motion.div key={i}
-          initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 11,
-            background: n.done ? 'rgba(74,222,128,0.07)' : n.active ? 'rgba(139,92,246,0.14)' : 'rgba(255,255,255,0.03)',
-            border: `1px solid ${n.done ? 'rgba(74,222,128,0.25)' : n.active ? 'rgba(139,92,246,0.40)' : 'rgba(255,255,255,0.07)'}`,
-          }}>
-          <div style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11,
-            background: n.done ? 'rgba(74,222,128,0.22)' : n.active ? 'rgba(139,92,246,0.30)' : 'rgba(255,255,255,0.06)',
-            color: n.done ? '#4ADE80' : n.active ? '#A78BFA' : 'rgba(255,255,255,0.25)',
-          }}>
-            {n.done ? '✓' : n.active ? '→' : '○'}
-          </div>
-          <span style={{ fontSize: 12, fontWeight: n.active ? 700 : 500,
-            color: n.done ? 'rgba(255,255,255,0.45)' : n.active ? 'rgba(255,255,255,0.90)' : 'rgba(255,255,255,0.28)',
-          }}>
-            {n.label}
-          </span>
-          {n.active && (
-            <motion.span animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.5, repeat: Infinity }}
-              style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, color: '#A78BFA', background: 'rgba(139,92,246,0.18)', padding: '2px 7px', borderRadius: 99 }}>
-              NOW
-            </motion.span>
-          )}
-        </motion.div>
-      ))}
-    </div>
-  )
-}
-
-const DEMOS = [
-  { id: 'chat',    icon: '💬', label: 'Chat',    color: '#6366F1', rgb: '99,102,241',  tag: 'Understand',  desc: 'Aeva asks questions back and catches gaps in real time.', Component: ChatDemo },
-  { id: 'lab',     icon: '⚡', label: 'Lab',     color: '#F97316', rgb: '249,115,22',  tag: '7 drill modes', desc: 'Flashcards, Feynman test, speed round — AI graded, adaptive.', Component: LabDemo },
-  { id: 'roadmap', icon: '🗺️', label: 'Roadmap', color: '#8B5CF6', rgb: '139,92,246',  tag: 'Track progress', desc: 'A learning path from zero to exam-ready. Aeva updates it as you go.', Component: RoadmapDemo },
-]
-
-function StepHowItWorks({ onNext }) {
-  const [active, setActive] = useState(0)
-
-  // Auto-cycle every 5s
-  useEffect(() => {
-    const t = setInterval(() => setActive(a => (a + 1) % DEMOS.length), 5000)
-    return () => clearInterval(t)
-  }, [])
-
-  const demo = DEMOS[active]
-
-  return (
-    <motion.div
-      key="how"
-      initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
-      transition={{ duration: 0.35 }}
-      style={{ display: 'flex', flexDirection: 'column', gap: 18 }}
-    >
-      <div style={{ textAlign: 'center' }}>
-        <p style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.30)', margin: '0 0 10px' }}>
-          See how it works
-        </p>
-        <h2 style={{ fontSize: 23, fontWeight: 900, color: 'rgba(255,255,255,0.94)', letterSpacing: '-0.04em', margin: 0, lineHeight: 1.2 }}>
-          Three tools, one system
-        </h2>
-      </div>
-
-      {/* Tab switcher */}
-      <div style={{ display: 'flex', gap: 6, background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 4 }}>
-        {DEMOS.map((d, i) => (
-          <button key={d.id} onClick={() => setActive(i)}
-            style={{ flex: 1, padding: '8px 4px', borderRadius: 9, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, transition: 'all 0.2s',
-              background: active === i ? `rgba(${d.rgb},0.22)` : 'transparent',
-              color: active === i ? `rgb(${d.rgb})` : 'rgba(255,255,255,0.38)',
-              boxShadow: active === i ? `0 0 0 1px rgba(${d.rgb},0.35)` : 'none',
-            }}>
-            {d.icon} {d.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Demo area */}
-      <div style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid rgba(${demo.rgb},0.25)`, borderRadius: 18, padding: '16px 16px 14px', minHeight: 180 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <div>
-            <span style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.10em', color: `rgba(${demo.rgb},0.80)`, background: `rgba(${demo.rgb},0.14)`, padding: '2px 8px', borderRadius: 99 }}>
-              {demo.tag}
-            </span>
-          </div>
-        </div>
-        <AnimatePresence mode="wait">
-          <motion.div key={active} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }}>
-            <demo.Component />
-          </motion.div>
-        </AnimatePresence>
-      </div>
-
-      {/* Description */}
-      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', textAlign: 'center', lineHeight: 1.6, minHeight: 40 }}>
-        <AnimatePresence mode="wait">
-          <motion.p key={active} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ margin: 0 }}>
-            {demo.desc}
-          </motion.p>
-        </AnimatePresence>
-      </div>
-
-      {/* Progress dots */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 6 }}>
-        {DEMOS.map((_, i) => (
-          <motion.div key={i} onClick={() => setActive(i)}
-            animate={{ width: active === i ? 20 : 6, background: active === i ? `rgb(${demo.rgb})` : 'rgba(255,255,255,0.18)' }}
-            style={{ height: 6, borderRadius: 3, cursor: 'pointer' }} transition={{ duration: 0.3 }} />
-        ))}
-      </div>
 
       <motion.button
-        whileHover={{ scale: 1.02, boxShadow: '0 8px 28px rgba(99,102,241,0.38)' }}
-        whileTap={{ scale: 0.97 }}
-        onClick={onNext}
-        style={{ padding: '14px', borderRadius: 13, background: 'linear-gradient(135deg, #3D40A8, #5558D4)', border: '1px solid rgba(139,143,255,0.40)', color: 'white', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-      >
-        Let's go <ArrowRight size={16} />
-      </motion.button>
-    </motion.div>
-  )
-}
-
-// ─── Step 4: Subject ──────────────────────────────────────────────────────────
-const SUBJECTS = ['Mathematics', 'Sciences', 'History', 'Languages', 'Computer Science', 'Business', 'Law', 'Other']
-
-function StepSubject({ name, selected, onSelect, onNext }) {
-  const firstName = name?.split(' ')[0] || 'there'
-
-  return (
-    <motion.div
-      key="subject"
-      initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
-      transition={{ duration: 0.35 }}
-      style={{ display: 'flex', flexDirection: 'column', gap: 20 }}
-    >
-      <div style={{ textAlign: 'center' }}>
-        <p style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.30)', margin: '0 0 14px' }}>
-          Almost there
-        </p>
-        <h2 style={{ fontSize: 24, fontWeight: 900, color: 'rgba(255,255,255,0.94)', letterSpacing: '-0.04em', margin: '0 0 6px', lineHeight: 1.15 }}>
-          What do you want to master?
-        </h2>
-        <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.36)', margin: 0 }}>
-          Aeva works for anything — this just helps her calibrate.
-        </p>
-      </div>
-
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        {SUBJECTS.map(s => (
-          <motion.button
-            key={s}
-            whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-            onClick={() => onSelect(s)}
-            style={{
-              padding: '10px 18px', borderRadius: 99,
-              fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
-              background: selected === s ? 'rgba(139,143,255,0.20)' : 'rgba(255,255,255,0.06)',
-              border: selected === s ? '1.5px solid rgba(139,143,255,0.50)' : '1.5px solid rgba(255,255,255,0.10)',
-              color: selected === s ? 'rgba(200,200,255,0.95)' : 'rgba(255,255,255,0.55)',
-              transition: 'all 0.18s',
-            }}
-          >
-            {s}
-          </motion.button>
-        ))}
-      </div>
-
-      <motion.button
-        whileHover={selected ? { scale: 1.02, boxShadow: '0 8px 28px rgba(99,102,241,0.38)' } : {}}
-        whileTap={selected ? { scale: 0.97 } : {}}
-        onClick={() => selected && onNext()}
+        whileHover={canContinue ? { scale: 1.02, boxShadow: '0 8px 28px rgba(99,102,241,0.38)' } : {}}
+        whileTap={canContinue ? { scale: 0.97 } : {}}
+        onClick={() => canContinue && onNext({ subject, examName: examName.trim(), examDate, targetGrade })}
         style={{
-          padding: '14px', borderRadius: 13,
-          background: selected ? 'linear-gradient(135deg, #3D40A8, #5558D4)' : 'rgba(255,255,255,0.06)',
-          border: selected ? '1px solid rgba(139,143,255,0.40)' : '1px solid rgba(255,255,255,0.08)',
-          color: selected ? 'white' : 'rgba(255,255,255,0.25)',
-          fontSize: 15, fontWeight: 700, cursor: selected ? 'pointer' : 'default',
+          padding: '14px', borderRadius: 13, marginTop: 2,
+          background: canContinue ? 'linear-gradient(135deg, #3D40A8, #5558D4)' : 'rgba(255,255,255,0.06)',
+          border: canContinue ? '1px solid rgba(139,143,255,0.40)' : '1px solid rgba(255,255,255,0.08)',
+          color: canContinue ? 'white' : 'rgba(255,255,255,0.25)',
+          fontSize: 15, fontWeight: 700, cursor: canContinue ? 'pointer' : 'default',
           fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           transition: 'all 0.2s',
         }}
       >
-        Continue <ArrowRight size={16} />
+        Build my roadmap <ArrowRight size={16} />
       </motion.button>
     </motion.div>
   )
 }
 
-// ─── Step 4: Aeva speaks ──────────────────────────────────────────────────────
-function StepAevaOpener({ name, styleId, subject, onStart }) {
-  const firstName = name?.split(' ')[0] || 'there'
-  const style = STYLES.find(s => s.id === styleId) || STYLES[0]
+// ─── Step 4: Generating (animated build) ─────────────────────────────────────
+function StepGenerating({ examData, styleId, onDone }) {
+  const [progress, setProgress]   = useState(0)
+  const [msgIdx,   setMsgIdx]     = useState(0)
+  const createdRef                = useRef(false)
+
+  const daysLeft = examData.examDate
+    ? Math.max(1, Math.ceil((new Date(examData.examDate) - Date.now()) / 86400000))
+    : 30
+  const weeksStr = daysLeft > 14
+    ? `${Math.ceil(daysLeft / 7)} weeks`
+    : `${daysLeft} days`
+
+  const msgs = [
+    `Mapping ${examData.subject || 'your subject'} syllabus…`,
+    'Building your node learning path…',
+    `Scheduling mock tests across ${weeksStr}…`,
+    `Calibrating for grade ${examData.targetGrade}…`,
+    'Finalising your roadmap…',
+  ]
+
+  useEffect(() => {
+    // Create the roadmap immediately (sync)
+    if (!createdRef.current) {
+      createdRef.current = true
+      useRoadmapStore.getState().createRoadmap({
+        title:       examData.examName,
+        subject:     examData.subject,
+        examDate:    examData.examDate,
+        targetGrade: examData.targetGrade,
+      })
+    }
+
+    // Animate progress over ~2.6 s then call onDone
+    const DURATION = 2600
+    const start = Date.now()
+    const tick = setInterval(() => {
+      const elapsed = Date.now() - start
+      const pct = Math.min(100, Math.round((elapsed / DURATION) * 100))
+      setProgress(pct)
+      setMsgIdx(Math.min(msgs.length - 1, Math.floor((elapsed / DURATION) * msgs.length)))
+      if (pct >= 100) {
+        clearInterval(tick)
+        setTimeout(onDone, 300)
+      }
+    }, 30)
+    return () => clearInterval(tick)
+  }, [])
+
+  const examDateFmt = examData.examDate
+    ? new Date(examData.examDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    : ''
+
+  return (
+    <motion.div
+      key="generating"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.4 }}
+      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 28, padding: '12px 0 8px', textAlign: 'center' }}
+    >
+      {/* Pulsing orb */}
+      <motion.div
+        animate={{ scale: [1, 1.06, 1] }}
+        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+      >
+        <AevaOrb size={90} active personality={STYLES.find(s => s.id === styleId)?.orbId || 'balanced'} />
+      </motion.div>
+
+      <div>
+        <h2 style={{ fontSize: 22, fontWeight: 900, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.04em', margin: '0 0 6px' }}>
+          Building your roadmap…
+        </h2>
+        <AnimatePresence mode="wait">
+          <motion.p
+            key={msgIdx}
+            initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.25 }}
+            style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.42)', margin: 0 }}
+          >
+            {msgs[msgIdx]}
+          </motion.p>
+        </AnimatePresence>
+      </div>
+
+      {/* Progress bar */}
+      <div style={{ width: '100%', background: 'rgba(255,255,255,0.07)', borderRadius: 99, height: 6, overflow: 'hidden' }}>
+        <motion.div
+          style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #6366F1, #8B5CF6, #A78BFA)' }}
+          animate={{ width: `${progress}%` }}
+          transition={{ duration: 0.08, ease: 'linear' }}
+        />
+      </div>
+
+      {/* Exam summary pills */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <div style={{ padding: '5px 12px', borderRadius: 99, background: 'rgba(139,143,255,0.12)', border: '1px solid rgba(139,143,255,0.25)', fontSize: 12, color: 'rgba(200,202,255,0.80)', fontWeight: 600 }}>
+          📚 {examData.examName}
+        </div>
+        {examDateFmt && (
+          <div style={{ padding: '5px 12px', borderRadius: 99, background: 'rgba(56,189,248,0.10)', border: '1px solid rgba(56,189,248,0.22)', fontSize: 12, color: 'rgba(147,218,252,0.80)', fontWeight: 600 }}>
+            📅 {examDateFmt}
+          </div>
+        )}
+        <div style={{ padding: '5px 12px', borderRadius: 99, background: `rgba(${GRADE_COLORS[examData.targetGrade]?.[0] || '139,143,255'},0.12)`, border: `1px solid rgba(${GRADE_COLORS[examData.targetGrade]?.[0] || '139,143,255'},0.28)`, fontSize: 12, color: GRADE_COLORS[examData.targetGrade]?.[1] || '#A78BFA', fontWeight: 600 }}>
+          🎯 Target {examData.targetGrade}
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+// ─── Step 5: Aeva speaks ──────────────────────────────────────────────────────
+function StepAevaOpener({ name, styleId, examData, onStart }) {
+  const style  = STYLES.find(s => s.id === styleId) || STYLES[0]
   const orbDef = ORBS.find(o => o.id === style.orbId) || ORBS[0]
   const [r, g, b] = orbDef.accent || [139, 143, 255]
-  const opener = getOpener(styleId, subject)
 
-  // Typewriter effect
+  const daysLeft = examData?.examDate
+    ? Math.max(1, Math.ceil((new Date(examData.examDate) - Date.now()) / 86400000))
+    : 30
+  const opener = getOpener(styleId, examData?.subject, examData?.examName, examData?.targetGrade, daysLeft)
+
   const [displayed, setDisplayed] = useState('')
-  const [done, setDone] = useState(false)
+  const [done, setDone]           = useState(false)
 
   useEffect(() => {
     let i = 0
@@ -649,7 +645,7 @@ function StepAevaOpener({ name, styleId, subject, onStart }) {
         setDone(true)
         clearInterval(interval)
       }
-    }, 22)
+    }, 20)
     return () => clearInterval(interval)
   }, [opener])
 
@@ -658,9 +654,8 @@ function StepAevaOpener({ name, styleId, subject, onStart }) {
       key="opener"
       initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
       transition={{ duration: 0.35 }}
-      style={{ display: 'flex', flexDirection: 'column', gap: 24 }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 22 }}
     >
-      {/* Orb — active */}
       <div style={{ display: 'flex', justifyContent: 'center' }}>
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
@@ -668,7 +663,7 @@ function StepAevaOpener({ name, styleId, subject, onStart }) {
           transition={{ type: 'spring', stiffness: 260, damping: 22 }}
         >
           <AevaOrb
-            size={110}
+            size={100}
             active
             personality={style.orbId}
             orbGradient={orbDef.gradient}
@@ -677,25 +672,18 @@ function StepAevaOpener({ name, styleId, subject, onStart }) {
         </motion.div>
       </div>
 
-      {/* Aeva label */}
-      <div style={{ textAlign: 'center', marginBottom: -8 }}>
+      <div style={{ textAlign: 'center', marginBottom: -6 }}>
         <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: `rgba(${r},${g},${b},0.70)` }}>
           Aeva · {style.title} mode
         </span>
       </div>
 
-      {/* Message bubble */}
       <div style={{
         background: 'rgba(255,255,255,0.04)',
         border: '1px solid rgba(255,255,255,0.10)',
         borderRadius: 18, padding: '20px 22px',
-        position: 'relative',
       }}>
-        <p style={{
-          fontSize: 15, color: 'rgba(255,255,255,0.85)',
-          lineHeight: 1.7, margin: 0, minHeight: 80,
-          letterSpacing: '-0.01em',
-        }}>
+        <p style={{ fontSize: 14.5, color: 'rgba(255,255,255,0.85)', lineHeight: 1.75, margin: 0, minHeight: 72, letterSpacing: '-0.01em' }}>
           {displayed}
           {!done && (
             <motion.span
@@ -717,15 +705,15 @@ function StepAevaOpener({ name, styleId, subject, onStart }) {
             onClick={onStart}
             style={{
               padding: '14px', borderRadius: 13,
-              background: `linear-gradient(135deg, rgba(${r},${g},${b},0.85), rgba(${r},${g},${b},0.65))`,
+              background: `linear-gradient(135deg, rgba(${r},${g},${b},0.85), rgba(${r},${g},${b},0.55))`,
               border: `1px solid rgba(${r},${g},${b},0.45)`,
               color: 'white', fontSize: 15, fontWeight: 700,
               cursor: 'pointer', fontFamily: 'inherit',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              boxShadow: `0 4px 20px rgba(${r},${g},${b},0.25)`,
+              boxShadow: `0 4px 20px rgba(${r},${g},${b},0.22)`,
             }}
           >
-            Start learning with Aeva <ArrowRight size={16} />
+            Open my roadmap <ArrowRight size={16} />
           </motion.button>
         )}
       </AnimatePresence>
@@ -739,7 +727,10 @@ function StepDots({ total, current }) {
     <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
       {Array.from({ length: total }).map((_, i) => (
         <motion.div key={i}
-          animate={{ width: i === current ? 20 : 6, background: i === current ? '#8B8FFF' : i < current ? 'rgba(139,143,255,0.45)' : 'rgba(255,255,255,0.15)' }}
+          animate={{
+            width: i === current ? 20 : 6,
+            background: i === current ? '#8B8FFF' : i < current ? 'rgba(139,143,255,0.45)' : 'rgba(255,255,255,0.15)',
+          }}
           transition={{ duration: 0.3 }}
           style={{ height: 6, borderRadius: 3 }}
         />
@@ -749,20 +740,21 @@ function StepDots({ total, current }) {
 }
 
 // ═══ MAIN ONBOARDING ══════════════════════════════════════════════════════════
+// Steps:  0=Arrival  1=Name  2=Style  3=YourExam  4=Generating  5=AevaOpener
+//         dots shown: steps 1–3 only (3 dots)
+
 export default function Onboarding({ name: authName, onComplete }) {
   const { setActiveOrb, unlockOrb } = useXPStore()
 
-  const [step, setStep] = useState(0)
-  const [displayName, setDisplayName] = useState(authName?.split(' ')[0] || '')
-  const [styleId, setStyleId] = useState('')
-  const [subject, setSubject] = useState('')
+  const [step,         setStep]         = useState(0)
+  const [displayName,  setDisplayName]  = useState(authName?.split(' ')[0] || '')
+  const [styleId,      setStyleId]      = useState('')
+  const [examData,     setExamData]     = useState(null) // { subject, examName, examDate, targetGrade }
 
-  // Step 0 is cinematic — no dots
-  const showDots = step > 0
-  const dotStep = step - 1  // dots for steps 1-5 only
+  const showDots = step >= 1 && step <= 3
+  const dotCurrent = step - 1 // maps step 1→dot 0, step 2→dot 1, step 3→dot 2
 
   const handleComplete = () => {
-    // Apply the chosen orb
     const style = STYLES.find(s => s.id === styleId)
     if (style) {
       unlockOrb(style.orbId)
@@ -786,20 +778,22 @@ export default function Onboarding({ name: authName, onComplete }) {
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        style={{ width: '100%', maxWidth: step === 0 ? 400 : 480, padding: '0 20px', position: 'relative', zIndex: 1 }}
+        style={{ width: '100%', maxWidth: step === 0 ? 400 : 460, padding: '0 20px', position: 'relative', zIndex: 1 }}
       >
         <div style={{
-          background: step === 0 ? 'transparent' : 'rgba(255,255,255,0.05)',
-          backdropFilter: step === 0 ? 'none' : 'blur(32px)',
-          border: step === 0 ? 'none' : '1px solid rgba(255,255,255,0.10)',
+          background: step === 0 || step === 4 ? 'transparent' : 'rgba(255,255,255,0.05)',
+          backdropFilter: step === 0 || step === 4 ? 'none' : 'blur(32px)',
+          border: step === 0 || step === 4 ? 'none' : '1px solid rgba(255,255,255,0.10)',
           borderRadius: 28,
-          padding: step === 0 ? '0' : '28px 24px',
+          padding: step === 0 || step === 4 ? '0' : '28px 24px',
           display: 'flex', flexDirection: 'column', gap: 22,
         }}>
-          {showDots && <StepDots total={5} current={dotStep} />}
+          {showDots && <StepDots total={3} current={dotCurrent} />}
 
           <AnimatePresence mode="wait">
-            {step === 0 && <StepArrival key="s0" onNext={() => setStep(1)} />}
+            {step === 0 && (
+              <StepArrival key="s0" onNext={() => setStep(1)} />
+            )}
             {step === 1 && (
               <StepName
                 key="s1"
@@ -818,15 +812,18 @@ export default function Onboarding({ name: authName, onComplete }) {
               />
             )}
             {step === 3 && (
-              <StepHowItWorks key="s3" onNext={() => setStep(4)} />
-            )}
-            {step === 4 && (
-              <StepSubject
-                key="s4"
+              <StepYourExam
+                key="s3"
                 name={displayName}
-                selected={subject}
-                onSelect={setSubject}
-                onNext={() => setStep(5)}
+                onNext={(data) => { setExamData(data); setStep(4) }}
+              />
+            )}
+            {step === 4 && examData && (
+              <StepGenerating
+                key="s4"
+                examData={examData}
+                styleId={styleId}
+                onDone={() => setStep(5)}
               />
             )}
             {step === 5 && (
@@ -834,7 +831,7 @@ export default function Onboarding({ name: authName, onComplete }) {
                 key="s5"
                 name={displayName}
                 styleId={styleId}
-                subject={subject}
+                examData={examData}
                 onStart={handleComplete}
               />
             )}

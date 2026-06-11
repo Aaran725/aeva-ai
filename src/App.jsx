@@ -7633,6 +7633,8 @@ export default function App() {
           onComplete={() => {
             localStorage.setItem('aeva_onboarded', '1')
             setOnboarded(true)
+            // Open the roadmap the user just created so it's the first thing they see
+            setTimeout(() => useRoadmapStore.getState().openRoadmapHub(), 80)
           }}
         />
       </Suspense>
