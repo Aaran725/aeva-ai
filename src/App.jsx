@@ -4417,7 +4417,10 @@ function ChatView({ onBack }) {
   // ── Photo-in-chat send ────────────────────────────────────────────────────
   const sendPhoto = async () => {
     if (!photoAttachment || isThinking) return
-    const userText = input.trim() || 'Can you teach me about this? Explain everything I need to know.'
+    const nodeSession = useRoadmapStore.getState().activeNodeSession
+    const isWorkingCheck = !!nodeSession
+
+    const userText = input.trim() || (isWorkingCheck ? 'Check my working' : 'Can you teach me about this? Explain everything I need to know.')
     setInput('')
     const snap = photoAttachment
     setPhotoAttachment(null)
@@ -4430,7 +4433,33 @@ function ChatView({ onBack }) {
     abortRef.current = controller
     let rawResponse = ''
 
-    const systemPrompt = `You are Aeva, a world-class tutor. A student sent you a photo of something they're studying. Your job is to TEACH THE CONCEPT — not describe what's in the image. Use the photo only to identify the topic.
+    // ── System prompt switches based on whether we're mid-session ────────────
+    const systemPrompt = isWorkingCheck
+      ? `You are Aeva, checking a student's handwritten working mid-problem.
+Context: they are studying "${nodeSession.topic}" (${nodeSession.phase}, Difficulty ${nodeSession.difficulty}/5).${nodeSession.subtopics?.length ? ` Subtopics: ${nodeSession.subtopics.join(', ')}.` : ''}
+
+TASK: Look at their working in the photo. Find where they went wrong — or confirm they're on track.
+
+RESPONSE FORMAT:
+Start with a one-line verdict:
+- ✅ "You're on track — keep going." (if correct so far)
+- ⚠️ "Found an issue." (if there's an error)
+
+Then be SPECIFIC about which line/step has the problem and exactly what went wrong:
+"Line 2 is correct. In line 3 you dropped the negative when expanding the bracket — it should be $-2x$, not $+2x$."
+
+If they're on track, confirm it briefly and give a hint for the next step only.
+
+RULES:
+- Keep it SHORT — they're mid-problem, not starting fresh
+- Reference specific lines or steps by number if you can
+- Use inline math $...$ for any expressions
+- DO NOT re-explain the whole topic from scratch
+- DO NOT say "I can see that you have..." — just give the verdict and fix
+- If the handwriting is unclear, say which part you couldn't read
+- Tone: direct, like a teacher leaning over their shoulder`
+
+      : `You are Aeva, a world-class tutor. A student sent you a photo of something they're studying. Your job is to TEACH THE CONCEPT — not describe what's in the image. Use the photo only to identify the topic.
 
 ## [Name the concept in 3–5 words]
 
@@ -4457,7 +4486,7 @@ A plain 2–3 sentence explanation of what each part of that formula means.
 
 MARKDOWN RENDERING — these patterns render as BEAUTIFUL visual elements:
 - ## Heading → purple section divider (ALWAYS use for section titles)
-- > **Key Insight:** → blue callout card ✦ 
+- > **Key Insight:** → blue callout card ✦
 - > **Example:** → yellow callout card ◎
 - > **Tip:** → green callout card →
 - > **Note:** → purple callout card ◇
@@ -6564,11 +6593,15 @@ If no clear changes: {"changes":[]}`
                           <X size={10} strokeWidth={2.5} />
                         </motion.button>
                       </div>
-                      {/* Label */}
+                      {/* Label — context-aware */}
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 12.5, fontWeight: 700, color: 'rgba(255,255,255,0.80)', marginBottom: 3 }}>Photo attached</div>
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: 'rgba(255,255,255,0.80)', marginBottom: 3 }}>
+                          {activeNodeSession ? '📸 Check my working' : 'Photo attached'}
+                        </div>
                         <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', lineHeight: 1.5 }}>
-                          Add a message below or just press send — Aeva will tutor you on what's in the image.
+                          {activeNodeSession
+                            ? `Aeva will check your ${activeNodeSession.topic} working line by line and tell you exactly where you went wrong.`
+                            : 'Add a message below or just press send — Aeva will tutor you on what\'s in the image.'}
                         </div>
                       </div>
                     </div>
@@ -6593,7 +6626,7 @@ If no clear changes: {"changes":[]}`
                       whileHover={{ scale: 1.08, background: photoAttachment ? 'rgba(167,139,250,0.30)' : 'rgba(167,139,250,0.18)' }}
                       whileTap={{ scale: 0.90 }}
                       onClick={() => photoInputRef.current?.click()}
-                      title="Send a photo — Aeva reads your textbook/notes/past paper"
+                      title={activeNodeSession ? `Check my ${activeNodeSession.topic} working` : 'Send a photo — Aeva reads your textbook/notes/past paper'}
                       style={{ flexShrink: 0, width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: photoAttachment ? 'rgba(167,139,250,0.28)' : 'rgba(167,139,250,0.10)', border: photoAttachment ? '1.5px solid rgba(167,139,250,0.70)' : '1.5px solid rgba(167,139,250,0.30)', cursor: 'pointer', color: photoAttachment ? '#C4B5FD' : 'rgba(167,139,250,0.75)', transition: 'all 0.15s' }}
                     >
                       <BookOpen size={14} strokeWidth={2} />
