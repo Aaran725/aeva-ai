@@ -16,6 +16,7 @@ import { useArcadeStore } from './arcadeStore'
 import { useRoadmapStore } from './roadmapStore'
 import { useScheduleStore, dateKey } from './scheduleStore'
 import { useAevaControlStore } from './aevaControlStore'
+import { useExamStore } from './examStore'
 import AevaOrbComponent from './AevaOrb'
 
 /* ─────────────────────────────────────────────────────
@@ -667,7 +668,15 @@ function TodayPlanWidget({ onOpenCalendar, onNavigateToChat }) {
 
                 {/* actions */}
                 <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
-                  {!item.done && (
+                  {!item.done && item.type === 'mock' && (
+                    <motion.button whileHover={{ scale:1.06 }} whileTap={{ scale:0.93 }}
+                      onClick={() => useExamStore.getState().openSetup(item.roadmapId)}
+                      title="Simulate exam"
+                      style={{ display:'flex', alignItems:'center', gap:3, padding:'3px 8px', borderRadius:99, background:'rgba(251,191,36,0.14)', border:'1px solid rgba(251,191,36,0.38)', color:'#FCD34D', cursor:'pointer', fontSize:9.5, fontWeight:700, whiteSpace:'nowrap', fontFamily:"'Inter',system-ui,sans-serif" }}>
+                      📝 Sim
+                    </motion.button>
+                  )}
+                  {!item.done && item.type !== 'mock' && (
                     <motion.button whileHover={{ scale:1.08 }} whileTap={{ scale:0.92 }}
                       onClick={() => launchNode(item, () => onNavigateToChat?.())}
                       style={{ width:26, height:26, borderRadius:'50%', background: item.color + '22', border:`1px solid ${item.color}44`, color:item.color, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>

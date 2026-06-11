@@ -5,6 +5,7 @@ import { useScheduleStore, dateKey, SUBJECT_COLORS } from './scheduleStore'
 import { useRoadmapStore } from './roadmapStore'
 import { useUITheme } from './uiThemeStore'
 import { useAevaControlStore } from './aevaControlStore'
+import { useExamStore } from './examStore'
 
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
 const TYPE_ICON  = { learn: <BookOpen size={11} />, drill: <Zap size={11} />, check: <CheckSquare size={11} />, mock: <FileText size={11} /> }
@@ -602,8 +603,17 @@ export function TodayPlanCard({ onOpenCalendar, onNavigateToChat }) {
 
               {/* Right actions */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
-                {/* Launch button — only when not done */}
-                {!item.done && (
+                {!item.done && item.type === 'mock' && (
+                  /* Mock node → Simulate Exam shortcut */
+                  <motion.button whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}
+                    onClick={() => useExamStore.getState().openSetup(item.roadmapId)}
+                    title="Simulate exam for this topic"
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 9px', borderRadius: 99, background: 'rgba(251,191,36,0.14)', border: '1px solid rgba(251,191,36,0.38)', color: '#FCD34D', cursor: 'pointer', fontSize: 10.5, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                    📝 Simulate
+                  </motion.button>
+                )}
+                {/* Launch button — non-mock nodes only */}
+                {!item.done && item.type !== 'mock' && (
                   <motion.button whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}
                     onClick={() => launchNode(item, () => onNavigateToChat?.())}
                     style={{ width: 28, height: 28, borderRadius: '50%', background: item.color + '22', border: `1px solid ${item.color}44`, color: item.color, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
