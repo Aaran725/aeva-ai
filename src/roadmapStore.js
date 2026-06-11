@@ -96,6 +96,31 @@ export const useRoadmapStore = create((set, get) => {
       set(s => { const u = { ...s, roadmaps: s.roadmaps.map(r => r.id === id ? { ...r, ...patch } : r) }; save(u); return u })
     },
 
+    /**
+     * Save an exam simulation result into roadmap.examHistory[].
+     * Also updates the blended readiness score so grade prediction improves
+     * with real performance data.
+     * entry: { id, date, pct, earnedMarks, totalMarks, grade, topicScores, ... }
+     */
+    saveExamResult: (roadmapId, entry) => {
+      set(s => {
+        const roadmaps = s.roadmaps.map(r => {
+          if (r.id !== roadmapId) return r
+          const examHistory = [...(r.examHistory || []).slice(-19), entry]  // keep last 20
+
+          // Blend readiness with recent exam average (last 3 exams, 30% weight)
+          const recent    = examHistory.slice(-3)
+          const examAvg   = Math.round(recent.reduce((sum, e) => sum + (e.pct || 0), 0) / recent.length)
+          const blended   = Math.round((r.readiness || 0) * 0.7 + examAvg * 0.3)
+          const gradeObj  = calcGrade(blended)
+          const gradeHistory = snapshotGrade(r.gradeHistory || [], gradeObj.grade)
+
+          return { ...r, examHistory, readiness: blended, gradeHistory }
+        })
+        const u = { ...s, roadmaps }; save(u); return u
+      })
+    },
+
     // Record the student's actual exam result + compare to predicted grade
     setActualGrade: (roadmapId, actualGrade) => {
       set(s => {
