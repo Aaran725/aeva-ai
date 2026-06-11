@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, createContext, useContext, lazy, Suspense } from 'react'
+import React, { useState, useRef, useEffect, useMemo, createContext, useContext, lazy, Suspense } from 'react'
 import { GROQ_KEYS, GROQ_URL, nextGroqKey } from './groqClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import katex from 'katex'
