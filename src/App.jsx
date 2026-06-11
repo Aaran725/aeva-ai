@@ -7241,9 +7241,36 @@ const STATE_BADGE_STYLE = {
 function ChatHistoryPanel({ onClose, onResume }) {
   const [sessions, setSessions] = useState(() => loadSessions())
   const [confirmClear, setConfirmClear] = useState(false)
+  const [query, setQuery] = useState('')
+  const searchRef = useRef(null)
   const accent = useUITheme(s => s.accent)
 
   const { today, thisWeek, older } = groupSessions(sessions)
+
+  // Focus search on open
+  useEffect(() => { setTimeout(() => searchRef.current?.focus(), 120) }, [])
+
+  // Search across title, subject, and every message
+  const q = query.trim().toLowerCase()
+  const searchResults = useMemo(() => {
+    if (!q) return null
+    return sessions.filter(s => {
+      if (s.title?.toLowerCase().includes(q)) return true
+      if (s.subject?.toLowerCase().includes(q)) return true
+      return s.messages?.some(m => m.text?.toLowerCase().includes(q))
+    }).map(s => {
+      // Find best snippet — prefer a message that contains the query
+      const matchMsg = s.messages?.find(m => m.text?.toLowerCase().includes(q))
+      let snippet = null
+      if (matchMsg) {
+        const idx = matchMsg.text.toLowerCase().indexOf(q)
+        const start = Math.max(0, idx - 40)
+        const end = Math.min(matchMsg.text.length, idx + q.length + 60)
+        snippet = (start > 0 ? '…' : '') + matchMsg.text.slice(start, end) + (end < matchMsg.text.length ? '…' : '')
+      }
+      return { ...s, snippet, matchRole: matchMsg?.role }
+    })
+  }, [q, sessions])
 
   const handleDelete = (id, e) => {
     e.stopPropagation()
@@ -7262,9 +7289,24 @@ function ChatHistoryPanel({ onClose, onResume }) {
     }
   }
 
-  const SessionCard = ({ s }) => {
+  // Highlight query matches in a string
+  const Highlight = ({ text }) => {
+    if (!q || !text) return <>{text}</>
+    const lower = text.toLowerCase()
+    const idx = lower.indexOf(q)
+    if (idx === -1) return <>{text}</>
+    return <>
+      {text.slice(0, idx)}
+      <mark style={{ background: `${accent}40`, color: accent, borderRadius: 3, padding: '0 2px' }}>{text.slice(idx, idx + q.length)}</mark>
+      {text.slice(idx + q.length)}
+    </>
+  }
+
+  const SessionCard = ({ s, showSnippet = false }) => {
     const badge = STATE_BADGE_STYLE[s.finalState] || STATE_BADGE_STYLE.DIAGNOSTIC
-    const preview = s.messages?.find(m => m.role === 'user')?.text?.slice(0, 80) || ''
+    const preview = showSnippet && s.snippet
+      ? s.snippet
+      : s.messages?.find(m => m.role === 'user')?.text?.slice(0, 80) || ''
     return (
       <motion.div
         whileHover={{ backgroundColor: 'rgba(255,255,255,0.04)' }}
@@ -7282,7 +7324,7 @@ function ChatHistoryPanel({ onClose, onResume }) {
         {/* Title row */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.88)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {s.title || 'Session'}
+            <Highlight text={s.title || 'Session'} />
           </span>
           <motion.button
             whileHover={{ scale: 1.12 }} whileTap={{ scale: 0.90 }}
@@ -7293,24 +7335,26 @@ function ChatHistoryPanel({ onClose, onResume }) {
           </motion.button>
         </div>
 
-        {/* Preview text */}
+        {/* Preview / snippet */}
         {preview && (
-          <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            "{preview}"
+          <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+            {showSnippet && s.matchRole && (
+              <span style={{ fontSize: 9.5, fontWeight: 700, color: s.matchRole === 'user' ? accent : 'rgba(168,230,207,0.7)', background: s.matchRole === 'user' ? `${accent}18` : 'rgba(168,230,207,0.10)', borderRadius: 4, padding: '1px 5px', marginRight: 5, letterSpacing: '0.04em' }}>
+                {s.matchRole === 'user' ? 'YOU' : 'AEVA'}
+              </span>
+            )}
+            {showSnippet ? <Highlight text={preview} /> : `"${preview}"`}
           </div>
         )}
 
         {/* Meta row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-          {/* State badge */}
           <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: badge.bg, border: `1px solid ${badge.border}`, color: badge.color, letterSpacing: '0.03em' }}>
             {badge.label}
           </span>
-          {/* Exchange count */}
           <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.28)', display: 'flex', alignItems: 'center', gap: 3 }}>
             <MessageCircle size={9} /> {s.exchangeCount || 0} exchanges
           </span>
-          {/* Timestamp */}
           <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.22)', marginLeft: 'auto' }}>
             {formatSessionDate(s.endedAt)}
           </span>
@@ -7351,31 +7395,72 @@ function ChatHistoryPanel({ onClose, onResume }) {
         }}
       >
         {/* Header */}
-        <div style={{ padding: '18px 18px 14px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 9, background: `${accent}18`, border: `1px solid ${accent}33`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Clock size={13} color={accent} />
+        <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 9, background: `${accent}18`, border: `1px solid ${accent}33`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Clock size={13} color={accent} />
+              </div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: 'rgba(255,255,255,0.90)', letterSpacing: '-0.02em' }}>Chat History</div>
+                <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.30)' }}>
+                  {q ? `${searchResults?.length ?? 0} result${searchResults?.length !== 1 ? 's' : ''}` : `${sessions.length} session${sessions.length !== 1 ? 's' : ''}`}
+                </div>
+              </div>
             </div>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: 'rgba(255,255,255,0.90)', letterSpacing: '-0.02em' }}>Chat History</div>
-              <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.30)' }}>{sessions.length} session{sessions.length !== 1 ? 's' : ''}</div>
-            </div>
+            <motion.button whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }} onClick={onClose}
+              style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.50)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <X size={13} />
+            </motion.button>
           </div>
-          <motion.button whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.94 }} onClick={onClose}
-            style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.50)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <X size={13} />
-          </motion.button>
+          {/* Search bar */}
+          <div style={{ position: 'relative' }}>
+            <ScanSearch size={14} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: q ? accent : 'rgba(255,255,255,0.28)', pointerEvents: 'none', transition: 'color 0.15s' }} />
+            <input
+              ref={searchRef}
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search topics, keywords, messages…"
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                padding: '9px 32px 9px 32px',
+                background: 'rgba(255,255,255,0.05)',
+                border: `1px solid ${q ? accent + '55' : 'rgba(255,255,255,0.10)'}`,
+                borderRadius: 11, color: 'rgba(255,255,255,0.88)',
+                fontSize: 12.5, fontFamily: "'Inter', system-ui, sans-serif",
+                outline: 'none', transition: 'border 0.15s',
+              }}
+            />
+            {q && (
+              <motion.button initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }}
+                onClick={() => setQuery('')}
+                style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(255,255,255,0.45)' }}>
+                <X size={10} />
+              </motion.button>
+            )}
+          </div>
         </div>
 
         {/* Session list */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '14px 14px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: q ? 8 : 18 }}>
           {sessions.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 20px', color: 'rgba(255,255,255,0.28)', fontSize: 13, lineHeight: 1.7 }}>
               <Clock size={32} color="rgba(255,255,255,0.12)" style={{ display: 'block', margin: '0 auto 14px' }} />
               No sessions yet.<br />
               <span style={{ fontSize: 12 }}>Your chats will appear here automatically.</span>
             </div>
+          ) : q ? (
+            // ── Search results ──
+            searchResults?.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: 'rgba(255,255,255,0.28)', fontSize: 13, lineHeight: 1.7 }}>
+                <ScanSearch size={28} color="rgba(255,255,255,0.10)" style={{ display: 'block', margin: '0 auto 12px' }} />
+                No matches for "<span style={{ color: 'rgba(255,255,255,0.50)' }}>{query}</span>"
+              </div>
+            ) : (
+              searchResults.map(s => <SessionCard key={s.id} s={s} showSnippet />)
+            )
           ) : (
+            // ── Grouped default view ──
             <>
               <Group label="Today" items={today} />
               <Group label="This week" items={thisWeek} />
