@@ -12,6 +12,9 @@ function genCode() {
   return `${l()}${l()}${l()}-${n()}${n()}${n()}`
 }
 
+// Per-tab suffix so the same account can join from two tabs without presence collision
+const TAB_ID = Math.random().toString(36).slice(2, 7)
+
 export const SLOT_COLORS = [
   { bg: '#6366F1', glow: 'rgba(99,102,241,0.45)',  dim: 'rgba(99,102,241,0.15)'  },
   { bg: '#F43F5E', glow: 'rgba(244,63,94,0.45)',   dim: 'rgba(244,63,94,0.15)'   },
@@ -104,14 +107,15 @@ export const useStudyRoomStore = create((set, get) => ({
   },
 
   createRoom: async ({ mode, workMins, breakMins, totalSessions, subject, userId, displayName, orbPersonality }) => {
-    const code  = genCode()
-    const color = SLOT_COLORS[0]
-    const ch    = get()._buildChannel(code, userId, true)
+    const code    = genCode()
+    const tabUserId = `${userId}-${TAB_ID}`
+    const color   = SLOT_COLORS[0]
+    const ch      = get()._buildChannel(code, tabUserId, true)
     await ch.subscribe()
-    await ch.track({ userId, displayName, color, orbPersonality: orbPersonality || 'balanced', status: 'waiting', stats: emptyStats() })
+    await ch.track({ userId: tabUserId, displayName, color, orbPersonality: orbPersonality || 'balanced', status: 'waiting', stats: emptyStats() })
     set({
       code, isHost: true, mode, workMins, breakMins, totalSessions, subject,
-      myUserId: userId, myDisplayName: displayName, myColor: color,
+      myUserId: tabUserId, myDisplayName: displayName, myColor: color,
       phase: 'lobby', _channel: ch,
       isOpen: true, isMinimized: false,
       timerSeconds: workMins * 60, myStats: emptyStats(),
@@ -119,15 +123,16 @@ export const useStudyRoomStore = create((set, get) => ({
   },
 
   joinRoom: async (code, { userId, displayName, orbPersonality }) => {
-    const trimmed = code.trim().toUpperCase()
-    const slot    = Math.min(SLOT_COLORS.length - 1, Math.floor(Math.random() * (SLOT_COLORS.length - 1)) + 1)
-    const color   = SLOT_COLORS[slot]
-    const ch      = get()._buildChannel(trimmed, userId, false)
+    const trimmed   = code.trim().toUpperCase()
+    const tabUserId = `${userId}-${TAB_ID}`
+    const slot      = Math.min(SLOT_COLORS.length - 1, Math.floor(Math.random() * (SLOT_COLORS.length - 1)) + 1)
+    const color     = SLOT_COLORS[slot]
+    const ch        = get()._buildChannel(trimmed, tabUserId, false)
     await ch.subscribe()
-    await ch.track({ userId, displayName, color, orbPersonality: orbPersonality || 'balanced', status: 'waiting', stats: emptyStats() })
+    await ch.track({ userId: tabUserId, displayName, color, orbPersonality: orbPersonality || 'balanced', status: 'waiting', stats: emptyStats() })
     set({
       code: trimmed, isHost: false,
-      myUserId: userId, myDisplayName: displayName, myColor: color,
+      myUserId: tabUserId, myDisplayName: displayName, myColor: color,
       phase: 'lobby', _channel: ch,
       isOpen: true, isMinimized: false,
       myStats: emptyStats(),
