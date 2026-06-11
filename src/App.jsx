@@ -2600,6 +2600,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
               onShowEm={() => setShowEmOpen(true)}
               onPalace={() => setPalaceOpen(true)}
               onOrbClick={() => setOrbSelectorOpen(true)}
+              onOpenCalendar={() => setMapsOpen(true)}
               userName={name}
               isMobile={isMobile}
             />

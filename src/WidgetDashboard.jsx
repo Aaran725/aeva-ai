@@ -6,7 +6,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import {
   Zap, FlaskConical, Gamepad2, MessageCircle,
-  Brain, Users, FileText, BookOpen,
+  Brain, Users, FileText, BookOpen, ArrowRight, Check, Calendar,
 } from 'lucide-react'
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
 import { useNeuralStore } from './neuralStore'
@@ -14,6 +14,8 @@ import { useSRStore } from './srStore'
 import { useLabStore } from './labStore'
 import { useArcadeStore } from './arcadeStore'
 import { useRoadmapStore } from './roadmapStore'
+import { useScheduleStore, dateKey } from './scheduleStore'
+import { useAevaControlStore } from './aevaControlStore'
 import AevaOrbComponent from './AevaOrb'
 
 /* ─────────────────────────────────────────────────────
@@ -528,6 +530,173 @@ function KnowledgeWidget({ concepts, onPalace }) {
   )
 }
 
+/* ── TODAY'S PLAN  (deep emerald — productivity card) ── */
+const TYPE_LABEL_W = { learn: 'Learn', drill: 'Drill', check: 'Check', mock: 'Mock' }
+
+function useLaunchNodeW() {
+  const { startNodeSession } = useRoadmapStore()
+  const { setPendingChatPrompt, requestChatView } = useAevaControlStore()
+  const roadmaps = useRoadmapStore(s => s.roadmaps)
+  return (item, onDone) => {
+    const roadmap = roadmaps.find(r => r.id === item.roadmapId)
+    if (!roadmap) return
+    const node = roadmap.nodes?.find(n => n.id === item.nodeId)
+    if (!node) return
+    const daysLeft = Math.max(1, Math.ceil((new Date(roadmap.examDate) - Date.now()) / 86400000))
+    startNodeSession(roadmap.id, node)
+    if (node.type === 'learn') {
+      const sub = node.subtopics?.length ? ` Specifically cover: ${node.subtopics.join(', ')}.` : ''
+      const ph  = node.phase ? ` (Phase: ${node.phase}, Difficulty: ${node.difficulty || 2}/5)` : ''
+      setPendingChatPrompt(`Teach me "${node.topic}" for my ${roadmap.title}.${ph}${node.description ? ' ' + node.description : ''}${sub} I have ${daysLeft} days until the exam.`)
+    } else {
+      setPendingChatPrompt(`I need to practice "${node.topic}" for ${roadmap.title}. Give me ${node.type === 'mock' ? 'a full mock test' : node.type === 'check' ? 'a quick knowledge check' : 'a drill'} on this topic.`)
+    }
+    requestChatView()
+    onDone?.()
+  }
+}
+
+function TodayPlanWidget({ onOpenCalendar, onNavigateToChat }) {
+  const roadmaps = useRoadmapStore(s => s.roadmaps)
+  const { getTodayItems, getTodayProgress, toggleDone, generatedAt, generate } = useScheduleStore()
+  const launchNode = useLaunchNodeW()
+
+  const items  = getTodayItems()
+  const { done, total } = getTodayProgress()
+
+  const hasRoadmaps = roadmaps.some(r => r.examDate && r.nodes?.some(n => n.status !== 'complete'))
+  const hasSchedule = !!generatedAt
+
+  const today     = new Date()
+  const dayName   = today.toLocaleDateString('en-GB', { weekday: 'long' })
+  const dateLabel = today.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+
+  if (!hasRoadmaps) return null
+
+  return (
+    <Widget
+      idx={8}
+      style={{
+        background: 'radial-gradient(ellipse 160% 130% at 16% 5%, #1A7848 0%, #0F5832 22%, #0A3E24 45%, #072818 66%, #041808 84%, #020E05 100%)',
+        gridColumn: 'span 2',
+      }}
+    >
+      {/* subtle ambient glow bottom-right */}
+      <div aria-hidden style={{ position:'absolute', bottom:'-10%', right:'-6%', width:180, height:180, borderRadius:'50%', background:'radial-gradient(circle, rgba(74,222,128,0.12) 0%, transparent 65%)', filter:'blur(20px)', pointerEvents:'none' }} />
+
+      {/* header */}
+      <div style={{ position:'relative', zIndex:1, display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:14 }}>
+        <div>
+          <Label color="rgba(134,239,172,0.50)">Today's Plan</Label>
+          <div style={{ fontSize:17, fontWeight:800, color:'rgba(255,255,255,0.92)', letterSpacing:'-0.02em', marginTop:2 }}>
+            {dayName} <span style={{ color:'rgba(255,255,255,0.35)', fontWeight:400, fontSize:14 }}>{dateLabel}</span>
+          </div>
+        </div>
+        <motion.button whileHover={{ scale:1.07 }} whileTap={{ scale:0.93 }}
+          onClick={onOpenCalendar}
+          style={{ display:'flex', alignItems:'center', gap:5, padding:'5px 11px', borderRadius:99, background:'rgba(74,222,128,0.12)', border:'1px solid rgba(74,222,128,0.28)', color:'#86EFAC', fontSize:10.5, fontWeight:700, cursor:'pointer', fontFamily:"'Inter',system-ui,sans-serif" }}>
+          <Calendar size={10} /> Calendar
+        </motion.button>
+      </div>
+
+      {/* body */}
+      <div style={{ position:'relative', zIndex:1 }}>
+        {!hasSchedule ? (
+          <div style={{ textAlign:'center', padding:'6px 0 2px' }}>
+            <div style={{ fontSize:12.5, color:'rgba(255,255,255,0.38)', marginBottom:12, lineHeight:1.6, fontFamily:"'Inter',system-ui,sans-serif" }}>
+              Build your revision schedule and Aeva will tell you what to study each day.
+            </div>
+            <motion.button whileHover={{ scale:1.03 }} whileTap={{ scale:0.97 }}
+              onClick={() => generate(roadmaps)}
+              style={{ display:'inline-flex', alignItems:'center', gap:7, padding:'8px 18px', borderRadius:99, background:'rgba(74,222,128,0.16)', border:'1px solid rgba(74,222,128,0.35)', color:'#86EFAC', fontSize:12.5, fontWeight:700, cursor:'pointer', fontFamily:"'Inter',system-ui,sans-serif" }}>
+              <Calendar size={12} /> Build schedule
+            </motion.button>
+          </div>
+        ) : items.length === 0 ? (
+          <div style={{ textAlign:'center', padding:'6px 0 2px', fontSize:13, color:'rgba(255,255,255,0.35)', lineHeight:1.7, fontFamily:"'Inter',system-ui,sans-serif" }}>
+            🎉 Rest day — nothing scheduled.<br />
+            <span style={{ fontSize:11.5 }}>You've earned it.</span>
+          </div>
+        ) : (
+          <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
+            {/* progress bar */}
+            {total > 0 && (
+              <div style={{ marginBottom:4 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:5 }}>
+                  <span style={{ fontSize:10.5, color:'rgba(255,255,255,0.35)', fontFamily:"'Inter',system-ui,sans-serif" }}>{done}/{total} sessions</span>
+                  <span style={{ fontSize:10.5, fontFamily:"'Inter',system-ui,sans-serif", color: done === total ? '#4ADE80' : 'rgba(255,255,255,0.35)' }}>
+                    {done === total ? 'All done! 🎉' : `${items.reduce((s,i) => s + (!i.done ? i.estimatedMinutes : 0), 0)}m left`}
+                  </span>
+                </div>
+                <div style={{ height:3, borderRadius:99, background:'rgba(255,255,255,0.08)', overflow:'hidden' }}>
+                  <motion.div
+                    initial={{ width:0 }}
+                    animate={{ width: total > 0 ? `${(done/total)*100}%` : '0%' }}
+                    transition={{ duration:0.6, ease:'easeOut' }}
+                    style={{ height:'100%', borderRadius:99, background: done === total ? '#4ADE80' : 'linear-gradient(90deg,#34D399,#4ADE80)' }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* item rows */}
+            {items.map((item, i) => (
+              <motion.div key={item.nodeId}
+                initial={{ opacity:0, y:6 }} animate={{ opacity:1, y:0 }} transition={{ delay: i * 0.05 }}
+                style={{
+                  display:'flex', alignItems:'center', gap:9,
+                  padding:'9px 11px',
+                  borderRadius:11,
+                  background: item.done ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.05)',
+                  border: `1px solid ${item.done ? 'rgba(255,255,255,0.05)' : item.color + '2a'}`,
+                  opacity: item.done ? 0.5 : 1,
+                  transition:'all 0.2s',
+                }}>
+                {/* color bar */}
+                <div style={{ width:3, height:28, borderRadius:99, background:item.color, flexShrink:0 }} />
+
+                {/* info */}
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:12, fontWeight:700, color: item.done ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.88)', textDecoration: item.done ? 'line-through' : 'none', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontFamily:"'Inter',system-ui,sans-serif" }}>
+                    {item.topic}
+                  </div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.28)', marginTop:1, fontFamily:"'Inter',system-ui,sans-serif" }}>
+                    {item.subject} · {item.estimatedMinutes}m · {TYPE_LABEL_W[item.type]}
+                  </div>
+                </div>
+
+                {/* actions */}
+                <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0 }}>
+                  {!item.done && (
+                    <motion.button whileHover={{ scale:1.08 }} whileTap={{ scale:0.92 }}
+                      onClick={() => launchNode(item, () => onNavigateToChat?.())}
+                      style={{ width:26, height:26, borderRadius:'50%', background: item.color + '22', border:`1px solid ${item.color}44`, color:item.color, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      <ArrowRight size={11} />
+                    </motion.button>
+                  )}
+                  <motion.button whileTap={{ scale:0.84 }}
+                    onClick={() => toggleDone(dateKey(new Date()), item.nodeId)}
+                    title={item.done ? 'Mark as not done' : 'Mark as done'}
+                    style={{
+                      width:25, height:25, borderRadius:'50%', cursor:'pointer',
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                      background: item.done ? '#4ADE8022' : 'rgba(255,255,255,0.06)',
+                      border:`1.5px solid ${item.done ? '#4ADE80' : 'rgba(255,255,255,0.15)'}`,
+                      color: item.done ? '#4ADE80' : 'rgba(255,255,255,0.28)',
+                      transition:'all 0.2s',
+                    }}>
+                    <Check size={10} strokeWidth={3} />
+                  </motion.button>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Widget>
+  )
+}
+
 /* ═══════════════════════════════════════════════════
    MAIN EXPORT
 ═══════════════════════════════════════════════════ */
@@ -538,6 +707,7 @@ export default function WidgetDashboard({
   onShowEm,
   onPalace,
   onOrbClick,
+  onOpenCalendar,
   userName,
   isMobile,
 }) {
@@ -621,6 +791,7 @@ export default function WidgetDashboard({
         labBadge={labBadge}
       />
       <KnowledgeWidget concepts={[...conceptMap]} onPalace={onPalace} />
+      <TodayPlanWidget onOpenCalendar={onOpenCalendar} onNavigateToChat={onChatOpen} />
     </motion.div>
   )
 }
