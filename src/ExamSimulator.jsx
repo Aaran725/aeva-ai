@@ -573,7 +573,7 @@ function ScoringScreen() {
 ════════════════════════════════════════════════════════════ */
 
 function ResultsScreen() {
-  const { questions, scores, topicScores, earnedMarks, totalMarks, pct, prediction, markLoss, selectedRoadmapId, saveResult, reset, timeLimit } = useExamStore()
+  const { questions, answers, scores, topicScores, earnedMarks, totalMarks, pct, prediction, markLoss, selectedRoadmapId, saveResult, reset, timeLimit } = useExamStore()
   const roadmaps = useRoadmapStore(s => s.roadmaps)
   const { setPendingChatPrompt, requestChatView } = useAevaControlStore()
   const [saved, setSaved] = useState(false)
