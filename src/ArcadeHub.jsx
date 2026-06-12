@@ -5,6 +5,8 @@ import { MISSIONS, useArcadeStore } from './arcadeStore'
 import BoardroomGame from './BoardroomGame'
 import MeltdownGame from './MeltdownGame'
 import RivalsGame from './RivalsGame'
+import Arena from './Arena'
+import { useArenaStore } from './arenaStore'
 
 /* ─── Mission tile ─── */
 function MissionTile({ mission, onSelect, index }) {
@@ -78,6 +80,7 @@ function MissionTile({ mission, onSelect, index }) {
 /* ═══ ARCADE HUB ═══════════════════════════════════ */
 export default function ArcadeHub() {
   const { arcadeOpen, closeArcade, selectMission } = useArcadeStore()
+  const openArena = useArenaStore(s => s.open)
   const [boardroomOpen, setBoardroomOpen] = useState(false)
   const [meltdownOpen, setMeltdownOpen] = useState(false)
   const [rivalsOpen, setRivalsOpen] = useState(false)
@@ -190,7 +193,7 @@ export default function ArcadeHub() {
                   style={{ width: 5, height: 5, borderRadius: '50%', background: '#6366F1' }}
                 />
                 <span style={{ fontSize: 11, fontWeight: 700, color: '#6366F1', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                  5 Experiences Available
+                  6 Experiences Available
                 </span>
               </div>
             </div>
@@ -201,6 +204,42 @@ export default function ArcadeHub() {
               display: 'flex', flexDirection: 'column', gap: 12,
               position: 'relative', zIndex: 1,
             }}>
+
+              {/* ── Arena: Sabotage ── */}
+              <motion.button
+                initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.03, ease: 'easeOut', duration: 0.35 }}
+                whileHover={{ scale: 1.025, y: -3 }} whileTap={{ scale: 0.97 }}
+                onClick={() => { closeArcade(); openArena() }}
+                style={{
+                  width: '100%', padding: '20px 22px', borderRadius: 22,
+                  background: 'linear-gradient(135deg, rgba(244,63,94,0.14) 0%, rgba(99,102,241,0.10) 100%)',
+                  border: '1px solid rgba(244,63,94,0.32)',
+                  cursor: 'pointer', textAlign: 'left', position: 'relative', overflow: 'hidden',
+                  backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+                  boxShadow: '0 4px 30px rgba(244,63,94,0.15), inset 0 1px 0 rgba(255,255,255,0.08)',
+                }}
+              >
+                <div aria-hidden style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: 'radial-gradient(circle, rgba(244,63,94,0.30) 0%, transparent 70%)', filter: 'blur(20px)', pointerEvents: 'none' }} />
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, position: 'relative', zIndex: 1 }}>
+                  <div style={{ fontSize: 26, width: 46, height: 46, borderRadius: 14, background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(244,63,94,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>⚔️</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 15, fontWeight: 800, color: 'rgba(255,255,255,0.95)', letterSpacing: '-0.02em' }}>Arena</span>
+                      <span style={{ fontSize: 9.5, fontWeight: 800, color: '#FDA4AF', background: 'rgba(244,63,94,0.15)', border: '1px solid rgba(244,63,94,0.35)', borderRadius: 99, padding: '2px 7px', letterSpacing: '0.06em' }}>SABOTAGE</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9.5, fontWeight: 800, color: '#4ADE80', background: 'rgba(74,222,128,0.10)', border: '1px solid rgba(74,222,128,0.28)', borderRadius: 99, padding: '2px 7px', letterSpacing: '0.06em' }}>
+                        <motion.span animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1.2, repeat: Infinity }} style={{ display: 'inline-block', width: 5, height: 5, borderRadius: '50%', background: '#4ADE80' }} />
+                        LIVE
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.55)', lineHeight: 1.45 }}>
+                      AI-generated quiz. Aeva hosts. Use sabotage cards to wreck your friends.
+                    </div>
+                  </div>
+                  <Zap size={14} color="#FDA4AF" style={{ flexShrink: 0, marginTop: 2 }} />
+                </div>
+                <div style={{ position: 'absolute', bottom: 0, left: 22, right: 22, height: 1, background: 'linear-gradient(90deg, transparent, rgba(244,63,94,0.55), transparent)' }} />
+              </motion.button>
 
               {/* ── The Rivals — turn-based strategy game ── */}
               <motion.button
@@ -345,6 +384,9 @@ export default function ArcadeHub() {
     <AnimatePresence>
       {meltdownOpen && <MeltdownGame onClose={() => setMeltdownOpen(false)} />}
     </AnimatePresence>
+
+    {/* Arena — always mounted, manages its own open state */}
+    <Arena />
     </>
   )
 }
