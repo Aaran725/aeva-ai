@@ -84,6 +84,15 @@ export const useStudyRoomStore = create((set, get) => ({
   // ── Feed
   feed: [],               // [{ id, emoji, text, isAeva, time }]
 
+  // ── Live chat (work + break)
+  chatMessages: [],       // [{ id, userId, displayName, color, text, ts }]
+
+  // ── Reactions (ephemeral — auto-cleared after 2.5s)
+  reactions: [],          // [{ id, userId, emoji, ts }]
+
+  // ── Session goals (per-member, resets each work block)
+  sessionGoals: {},       // { userId: string }
+
   // ── Speed Round
   speedRound: null,     // { questions, currentIdx, qTimer, scores, answers, phase:'loading'|'question'|'reveal'|'done' }
   _speedTimerRef: null,
@@ -118,6 +127,7 @@ export const useStudyRoomStore = create((set, get) => ({
       isOpen: false, isMinimized: false, phase: 'idle',
       code: null, isHost: false, members: [],
       answers: {}, currentQuestion: null, feed: [],
+      chatMessages: [], reactions: [], sessionGoals: {},
       myStats: emptyStats(), _channel: null,
       _timerRef: null, _statsRef: null, _speedTimerRef: null,
       sessionNumber: 0, timerSeconds: 0,
@@ -156,6 +166,28 @@ export const useStudyRoomStore = create((set, get) => ({
       isOpen: true, isMinimized: false,
       myStats: emptyStats(),
     })
+  },
+
+  sendChatMessage: (text) => {
+    if (!text?.trim()) return
+    const { _channel, myUserId, myDisplayName, myColor } = get()
+    const msg = { id: `${Date.now()}-${myUserId}`, userId: myUserId, displayName: myDisplayName, color: myColor, text: text.trim(), ts: Date.now() }
+    set(s => ({ chatMessages: [...s.chatMessages.slice(-99), msg] }))
+    _channel?.send({ type: 'broadcast', event: 'chat_message', payload: msg })
+  },
+
+  sendReaction: (emoji) => {
+    const { _channel, myUserId } = get()
+    const reaction = { id: `${Date.now()}-${myUserId}`, userId: myUserId, emoji, ts: Date.now() }
+    set(s => ({ reactions: [...s.reactions, reaction] }))
+    setTimeout(() => set(s => ({ reactions: s.reactions.filter(r => r.id !== reaction.id) })), 2500)
+    _channel?.send({ type: 'broadcast', event: 'reaction', payload: reaction })
+  },
+
+  setGoal: (text) => {
+    const { _channel, myUserId, myDisplayName, myColor, myStats } = get()
+    set(s => ({ sessionGoals: { ...s.sessionGoals, [myUserId]: text } }))
+    _channel?.track({ userId: myUserId, displayName: myDisplayName, color: myColor, status: 'working', stats: myStats, orbPersonality: 'balanced', goal: text })
   },
 
   startSession: () => {
@@ -322,9 +354,11 @@ export const useStudyRoomStore = create((set, get) => ({
     // Presence — member list
     ch.on('presence', { event: 'sync' }, () => {
       const state   = ch.presenceState()
-      // Each key maps to an array of metas — take only the most recent per user
       const members = Object.values(state).map(arr => arr[arr.length - 1]).filter(Boolean)
-      set({ members })
+      // Rebuild sessionGoals from presence (goal field)
+      const sessionGoals = {}
+      members.forEach(m => { if (m.goal) sessionGoals[m.userId] = m.goal })
+      set({ members, sessionGoals })
     })
 
     // Broadcast — session start (guests receive)
@@ -350,7 +384,7 @@ export const useStudyRoomStore = create((set, get) => ({
       get()._clearTimer()
       set({ timerPhase: payload.timerPhase, timerSeconds: payload.seconds, sessionNumber: payload.sessionNumber })
       if (payload.timerPhase === 'work') {
-        set({ phase: 'session', answers: {}, currentQuestion: null, speedRound: null, tagRound: null })
+        set({ phase: 'session', answers: {}, currentQuestion: null, speedRound: null, tagRound: null, sessionGoals: {} })
       }
       if (payload.timerPhase === 'break') {
         const { mode } = get()
@@ -374,6 +408,17 @@ export const useStudyRoomStore = create((set, get) => ({
     // Broadcast — feed
     ch.on('broadcast', { event: 'feed_item' }, ({ payload }) => {
       get()._pushFeed(payload)
+    })
+
+    // Broadcast — live chat message
+    ch.on('broadcast', { event: 'chat_message' }, ({ payload }) => {
+      set(s => ({ chatMessages: [...s.chatMessages.slice(-99), payload] }))
+    })
+
+    // Broadcast — emoji reaction
+    ch.on('broadcast', { event: 'reaction' }, ({ payload }) => {
+      set(s => ({ reactions: [...s.reactions, payload] }))
+      setTimeout(() => set(s => ({ reactions: s.reactions.filter(r => r.id !== payload.id) })), 2500)
     })
 
     // Broadcast — Aeva drop

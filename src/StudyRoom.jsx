@@ -89,18 +89,33 @@ const MODES = [
 
 // ─── Shared sub-components ────────────────────────────────────────────────────
 
-function MemberOrb({ member, size = 52, showName = true, myUserId, badge }) {
+function MemberOrb({ member, size = 52, showName = true, myUserId, badge, goal, reaction }) {
   const col = member.color || SLOT_COLORS[0]
   const isWorking = member.status === 'working'
   const isMe = member.userId === myUserId
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, position: 'relative' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, position: 'relative' }}>
       {isMe && (
         <div style={{ position: 'absolute', top: -6, right: -4, background: col.bg, borderRadius: 6, fontSize: 9, padding: '1px 5px', color: '#fff', fontWeight: 700, zIndex: 1 }}>YOU</div>
       )}
       {badge && (
         <div style={{ position: 'absolute', top: -6, left: -4, background: '#F59E0B', borderRadius: 6, fontSize: 9, padding: '1px 5px', color: '#000', fontWeight: 800, zIndex: 1 }}>{badge}</div>
       )}
+      {/* Reaction float */}
+      <AnimatePresence>
+        {reaction && (
+          <motion.div
+            key={reaction.id}
+            initial={{ opacity: 0, y: 0, scale: 0.5 }}
+            animate={{ opacity: 1, y: -36, scale: 1.3 }}
+            exit={{ opacity: 0, y: -52, scale: 0.8 }}
+            transition={{ duration: 0.4, ease: 'easeOut' }}
+            style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', fontSize: 20, pointerEvents: 'none', zIndex: 10 }}
+          >
+            {reaction.emoji}
+          </motion.div>
+        )}
+      </AnimatePresence>
       <motion.div
         animate={isWorking ? { boxShadow: [`0 0 0px ${col.glow}`, `0 0 20px ${col.glow}`, `0 0 0px ${col.glow}`] } : { boxShadow: `0 0 0px ${col.dim}` }}
         transition={isWorking ? { duration: 2.2, repeat: Infinity, ease: 'easeInOut' } : {}}
@@ -116,8 +131,13 @@ function MemberOrb({ member, size = 52, showName = true, myUserId, badge }) {
         {member.displayName?.[0]?.toUpperCase() || '?'}
       </motion.div>
       {showName && (
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', maxWidth: size + 16, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', maxWidth: size + 24, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>
           {member.displayName}
+        </span>
+      )}
+      {goal && (
+        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)', maxWidth: size + 32, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center', fontStyle: 'italic', lineHeight: 1.2 }}>
+          {goal}
         </span>
       )}
     </div>
@@ -541,19 +561,77 @@ function LobbyScreen() {
 
 // ─── Screen: Session ──────────────────────────────────────────────────────────
 
+const QUICK_REACTIONS = ['🔥', '💡', '😤', '✅', '🤯']
+
+function ChatBubble({ msg, myUserId }) {
+  const isMe = msg.userId === myUserId
+  const col = msg.color || SLOT_COLORS[0]
+  return (
+    <div style={{ display: 'flex', flexDirection: isMe ? 'row-reverse' : 'row', alignItems: 'flex-end', gap: 6, marginBottom: 2 }}>
+      <div style={{ width: 22, height: 22, borderRadius: '50%', background: col.bg || 'rgba(99,102,241,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+        {msg.displayName?.[0]?.toUpperCase() || '?'}
+      </div>
+      <div style={{ maxWidth: '72%' }}>
+        {!isMe && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.30)', marginBottom: 2, paddingLeft: 4 }}>{msg.displayName}</div>}
+        <div style={{
+          padding: '6px 10px', borderRadius: isMe ? '12px 12px 3px 12px' : '12px 12px 12px 3px',
+          background: isMe ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.07)',
+          border: isMe ? '1px solid rgba(99,102,241,0.35)' : '1px solid rgba(255,255,255,0.09)',
+          fontSize: 12, color: 'rgba(255,255,255,0.88)', lineHeight: 1.4, wordBreak: 'break-word',
+        }}>
+          {msg.text}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function SessionScreen({ onMinimize }) {
-  const { members, timerSeconds, timerPhase, sessionNumber, totalSessions, mode, myUserId, feed, subject, answers, currentQuestion, speedRound, tagRound } = useStudyRoomStore()
+  const { members, timerSeconds, timerPhase, sessionNumber, totalSessions, mode, myUserId, feed, subject, answers, currentQuestion, speedRound, tagRound, chatMessages, reactions, sessionGoals } = useStudyRoomStore()
   const setStatus = useStudyRoomStore(s => s.setStatus)
+  const sendChatMessage = useStudyRoomStore(s => s.sendChatMessage)
+  const sendReaction = useStudyRoomStore(s => s.sendReaction)
+  const setGoal = useStudyRoomStore(s => s.setGoal)
+
+  const [chatInput, setChatInput] = useState('')
+  const [goalInput, setGoalInput] = useState('')
+  const [goalSet, setGoalSet] = useState(false)
+  const feedBottomRef = useRef(null)
+  const chatInputRef = useRef(null)
 
   const myMember = members.find(m => m.userId === myUserId)
   const isWorking = myMember?.status === 'working'
+
+  // Auto-scroll feed + chat to bottom
+  useEffect(() => { feedBottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [feed, chatMessages])
+
+  const handleSendChat = () => {
+    if (!chatInput.trim()) return
+    sendChatMessage(chatInput)
+    setChatInput('')
+  }
+
+  const handleGoalSubmit = () => {
+    if (!goalInput.trim()) return
+    setGoal(goalInput.trim())
+    setGoalSet(true)
+  }
+
+  // Reset goal prompt each new work block
+  useEffect(() => { setGoalSet(false); setGoalInput('') }, [sessionNumber])
+
+  // Merge feed + chat into one sorted stream
+  const feedAndChat = [
+    ...feed.map(f => ({ ...f, _type: 'feed' })),
+    ...chatMessages.map(m => ({ ...m, _type: 'chat', id: m.id, time: m.ts })),
+  ].sort((a, b) => (a.time || 0) - (b.time || 0))
 
   return (
     <motion.div key="session" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
       style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', gap: 0 }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <div>
           <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', letterSpacing: 0.5, textTransform: 'uppercase' }}>Round {sessionNumber} of {totalSessions}</div>
           {subject && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{subject}</div>}
@@ -564,18 +642,42 @@ function SessionScreen({ onMinimize }) {
       </div>
 
       {/* Timer */}
-      <div style={{ textAlign: 'center', marginBottom: 16 }}>
-        <div style={{ fontSize: 52, fontWeight: 800, color: '#fff', letterSpacing: -3, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+      <div style={{ textAlign: 'center', marginBottom: 10 }}>
+        <div style={{ fontSize: 48, fontWeight: 800, color: '#fff', letterSpacing: -3, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
           {fmtTime(timerSeconds)}
         </div>
-        <div style={{ fontSize: 10, color: timerPhase === 'work' ? 'rgba(99,102,241,0.8)' : 'rgba(16,185,129,0.8)', letterSpacing: 1.5, textTransform: 'uppercase', marginTop: 5, fontWeight: 600 }}>
+        <div style={{ fontSize: 10, color: timerPhase === 'work' ? 'rgba(99,102,241,0.8)' : 'rgba(16,185,129,0.8)', letterSpacing: 1.5, textTransform: 'uppercase', marginTop: 4, fontWeight: 600 }}>
           {timerPhase === 'work' ? '● Work' : '● Break'}
         </div>
       </div>
 
-      {/* Member orbs */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginBottom: 12, padding: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14 }}>
-        {members.map(m => <MemberOrb key={m.userId} member={m} size={40} showName myUserId={myUserId} />)}
+      {/* Member orbs + goal prompt */}
+      <div style={{ marginBottom: 10, padding: '10px 10px 6px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'center', marginBottom: goalSet ? 0 : 8 }}>
+          {members.map(m => (
+            <MemberOrb
+              key={m.userId} member={m} size={38} showName myUserId={myUserId}
+              goal={sessionGoals[m.userId]}
+              reaction={reactions.find(r => r.userId === m.userId)}
+            />
+          ))}
+        </div>
+        {/* Goal input for current user (shows once per work block) */}
+        {!goalSet && (
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            <input
+              value={goalInput}
+              onChange={e => setGoalInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleGoalSubmit()}
+              placeholder="What are you working on? (optional)"
+              style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 8, padding: '6px 10px', color: 'rgba(255,255,255,0.75)', fontSize: 11, fontFamily: 'inherit', outline: 'none' }}
+            />
+            <motion.button whileTap={{ scale: 0.92 }} onClick={handleGoalSubmit}
+              style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(99,102,241,0.20)', border: '1px solid rgba(99,102,241,0.35)', color: '#A5B4FC', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+              Set
+            </motion.button>
+          </div>
+        )}
       </div>
 
       {/* Mode-specific stats bar */}
@@ -586,25 +688,57 @@ function SessionScreen({ onMinimize }) {
       {mode === 'tagteam'  && <TagTeamStatsBar tagRound={tagRound} members={members} />}
 
       {/* Status toggle */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
         {['working', 'away'].map(s => {
           const active = (s === 'working' && isWorking) || (s === 'away' && !isWorking)
           return (
             <motion.button key={s} whileTap={{ scale: 0.95 }} onClick={() => setStatus(s)}
-              style={{ flex: 1, padding: '8px 0', borderRadius: 10, fontWeight: 600, fontSize: 12, background: active ? (s === 'working' ? 'rgba(99,102,241,0.22)' : 'rgba(244,63,94,0.15)') : 'rgba(255,255,255,0.03)', border: `1.5px solid ${active ? (s === 'working' ? 'rgba(99,102,241,0.5)' : 'rgba(244,63,94,0.4)') : 'rgba(255,255,255,0.07)'}`, color: active ? '#fff' : 'rgba(255,255,255,0.35)', cursor: 'pointer', transition: 'all 0.15s' }}>
+              style={{ flex: 1, padding: '7px 0', borderRadius: 10, fontWeight: 600, fontSize: 11, background: active ? (s === 'working' ? 'rgba(99,102,241,0.22)' : 'rgba(244,63,94,0.15)') : 'rgba(255,255,255,0.03)', border: `1.5px solid ${active ? (s === 'working' ? 'rgba(99,102,241,0.5)' : 'rgba(244,63,94,0.4)') : 'rgba(255,255,255,0.07)'}`, color: active ? '#fff' : 'rgba(255,255,255,0.35)', cursor: 'pointer', transition: 'all 0.15s' }}>
               {s === 'working' ? '🔥 Working' : '😴 Away'}
             </motion.button>
           )
         })}
       </div>
 
-      {/* Feed */}
+      {/* Quick reactions */}
+      <div style={{ display: 'flex', gap: 5, marginBottom: 8, justifyContent: 'center' }}>
+        {QUICK_REACTIONS.map(emoji => (
+          <motion.button key={emoji} whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.85 }}
+            onClick={() => sendReaction(emoji)}
+            style={{ width: 34, height: 30, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {emoji}
+          </motion.button>
+        ))}
+      </div>
+
+      {/* Combined feed + chat */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', letterSpacing: 0.7, textTransform: 'uppercase', marginBottom: 6 }}>Room Feed</div>
-        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-          {feed.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.18)', fontStyle: 'italic', padding: '6px 0' }}>Activity will appear here…</div>}
-          {feed.map(item => <FeedItem key={item.id} item={item} />)}
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', letterSpacing: 0.7, textTransform: 'uppercase', marginBottom: 5 }}>Room</div>
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {feedAndChat.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.18)', fontStyle: 'italic', padding: '4px 0' }}>Activity will appear here…</div>}
+          {feedAndChat.map(item =>
+            item._type === 'chat'
+              ? <ChatBubble key={item.id} msg={item} myUserId={myUserId} />
+              : <FeedItem key={item.id} item={item} />
+          )}
+          <div ref={feedBottomRef} />
         </div>
+      </div>
+
+      {/* Chat input */}
+      <div style={{ display: 'flex', gap: 6, marginTop: 8, flexShrink: 0 }}>
+        <input
+          ref={chatInputRef}
+          value={chatInput}
+          onChange={e => setChatInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSendChat()}
+          placeholder="Message the room…"
+          style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, padding: '8px 12px', color: 'rgba(255,255,255,0.85)', fontSize: 12, fontFamily: 'inherit', outline: 'none' }}
+        />
+        <motion.button whileTap={{ scale: 0.90 }} onClick={handleSendChat}
+          style={{ width: 36, height: 36, borderRadius: 10, background: chatInput.trim() ? 'rgba(99,102,241,0.28)' : 'rgba(255,255,255,0.04)', border: `1px solid ${chatInput.trim() ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.08)'}`, color: chatInput.trim() ? '#A5B4FC' : 'rgba(255,255,255,0.25)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
+          <Send size={13} />
+        </motion.button>
       </div>
     </motion.div>
   )
@@ -613,18 +747,50 @@ function SessionScreen({ onMinimize }) {
 // ─── Screen: Break (Silent mode) ─────────────────────────────────────────────
 
 function BreakScreen() {
-  const { timerSeconds, sessionNumber, feed } = useStudyRoomStore()
+  const { timerSeconds, sessionNumber, feed, chatMessages, myUserId } = useStudyRoomStore()
+  const sendChatMessage = useStudyRoomStore(s => s.sendChatMessage)
+  const [chatInput, setChatInput] = useState('')
+  const feedBottomRef = useRef(null)
+
+  useEffect(() => { feedBottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chatMessages])
+
+  const handleSend = () => {
+    if (!chatInput.trim()) return
+    sendChatMessage(chatInput)
+    setChatInput('')
+  }
+
+  const combined = [
+    ...feed.map(f => ({ ...f, _type: 'feed' })),
+    ...chatMessages.map(m => ({ ...m, _type: 'chat', time: m.ts })),
+  ].sort((a, b) => (a.time || 0) - (b.time || 0))
+
   return (
     <motion.div key="break" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-      <div style={{ textAlign: 'center', marginBottom: 20 }}>
-        <div style={{ fontSize: 28, marginBottom: 8 }}>☕</div>
-        <h3 style={{ fontSize: 17, fontWeight: 700, color: '#fff', margin: '0 0 4px' }}>Break Time</h3>
-        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)', margin: 0 }}>Round {sessionNumber} done. Breathe.</p>
+      style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
+      <div style={{ textAlign: 'center', marginBottom: 12 }}>
+        <div style={{ fontSize: 24, marginBottom: 6 }}>☕</div>
+        <h3 style={{ fontSize: 16, fontWeight: 700, color: '#fff', margin: '0 0 3px' }}>Break Time</h3>
+        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', margin: 0 }}>Round {sessionNumber} done. Breathe.</p>
       </div>
-      <div style={{ fontSize: 44, fontWeight: 800, color: '#10B981', letterSpacing: -2, fontVariantNumeric: 'tabular-nums', marginBottom: 24 }}>{fmtTime(timerSeconds)}</div>
-      <div style={{ width: '100%', maxHeight: 200, overflowY: 'auto' }}>
-        {feed.slice(0, 6).map(item => <FeedItem key={item.id} item={item} />)}
+      <div style={{ fontSize: 38, fontWeight: 800, color: '#10B981', letterSpacing: -2, fontVariantNumeric: 'tabular-nums', marginBottom: 10, textAlign: 'center' }}>{fmtTime(timerSeconds)}</div>
+      {/* Chat */}
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 8 }}>
+        {combined.map(item =>
+          item._type === 'chat'
+            ? <ChatBubble key={item.id} msg={item} myUserId={myUserId} />
+            : <FeedItem key={item.id} item={item} />
+        )}
+        <div ref={feedBottomRef} />
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+        <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()}
+          placeholder="Chat during break…"
+          style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, padding: '8px 12px', color: 'rgba(255,255,255,0.85)', fontSize: 12, fontFamily: 'inherit', outline: 'none' }} />
+        <motion.button whileTap={{ scale: 0.90 }} onClick={handleSend}
+          style={{ width: 36, height: 36, borderRadius: 10, background: chatInput.trim() ? 'rgba(16,185,129,0.22)' : 'rgba(255,255,255,0.04)', border: `1px solid ${chatInput.trim() ? 'rgba(16,185,129,0.45)' : 'rgba(255,255,255,0.08)'}`, color: chatInput.trim() ? '#6EE7B7' : 'rgba(255,255,255,0.25)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
+          <Send size={13} />
+        </motion.button>
       </div>
     </motion.div>
   )
