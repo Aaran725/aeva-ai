@@ -63,11 +63,28 @@ export const useMemoryStore = create((set, get) => ({
       return line
     }).join('\n')
 
+    // Build specific cross-session behavioral directives from most recent session
+    const recent = memories[0]
+    const directives = []
+    if (recent?.mastered?.length) {
+      directives.push(`▸ Last session ${userName} mastered: ${recent.mastered.join(', ')} — treat these as established knowledge this session, no re-explaining.`)
+    }
+    if (recent?.struggled?.length) {
+      directives.push(`▸ Last session ${userName} struggled with: ${recent.struggled.join(', ')} — if these topics resurface, try a completely different explanation angle than before.`)
+    }
+    if (recent?.keyMistake) {
+      directives.push(`▸ Key mistake from last session: "${recent.keyMistake}" — watch for this pattern repeating. Address it proactively if the topic comes up.`)
+    }
+    const directiveBlock = directives.length > 0
+      ? `\nACTION DIRECTIVES FROM LAST SESSION:\n${directives.join('\n')}\n`
+      : ''
+
     return `
 ┌── CROSS-SESSION MEMORY — what ${userName} has worked on before ─────────────┐
 ${lines}
 └─────────────────────────────────────────────────────────────────────────────┘
-IMPORTANT: Use this memory actively. If ${userName} is revisiting a struggle zone, go deeper and try a different approach this time. If they've mastered something before, build on it — don't re-explain it from scratch. Never say "I remember" — just act like a tutor who was there.
+${directiveBlock}
+HOW TO USE THIS: You are a tutor who was at every one of these sessions. You know ${userName}'s history. Never say "I remember" — just behave like someone who was there. Reference past work naturally: "last time you were getting the hang of X" or "you struggled with Y before — let's try this angle instead." Build on mastered topics without re-teaching them. Go deeper on struggle zones with a fresh approach.
 
 `
   },

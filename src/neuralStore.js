@@ -303,14 +303,31 @@ export const useNeuralStore = create((set, get) => ({
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 ` : ''
 
+    // ── MEMORY DIRECTIVE — mastered topics (2c: skip basics) ──────────────────
+    const mastered = s.masteredTopics.slice(-4)
+    const struggles = s.struggleZones.slice(-3)
+
+    const masteredDirective = mastered.length > 0 ? `
+▸ MASTERED TOPICS — skip the basics entirely:
+${mastered.map(t => `  - ${t}: ${userName} has already demonstrated solid understanding. DO NOT re-explain from scratch. Skip definitions, skip introductory framing. Reference it as established knowledge: "you already know ${t} — this is the same pattern" or "building on ${t}…". Jump straight to depth, edge cases, or application.`).join('\n')}` : ''
+
+    const struggleDirective = struggles.length > 0 ? `
+▸ STRUGGLE ZONES — handle with extra care:
+${struggles.map(t => `  - ${t}: ${userName} has shown confusion here before. Watch for the same misconception resurfacing. Try a different angle than last time. Probe actively: ask a targeted question about ${t} if it comes up.`).join('\n')}` : ''
+
+    const memoryDirective = (masteredDirective || struggleDirective) ? `
+━━━ MEMORY DIRECTIVE — act on this, don't just read it ━━━${masteredDirective}${struggleDirective}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+` : ''
+
     return `${styleBlock}
 ┌── ${userName.toUpperCase()}'S NEURAL PROFILE ──────────────────────────────────────────┐
 │ Personality: ${s.orbPersonality} | Humor: ${s.humorPreference}/10 | Competitiveness: ${s.competitiveness}/100 | Depth: ${s.depth}/100
 │ Frustration: ${s.frustrationScore}/100${s.frustrationScore > 60 ? ' ← impatient: be direct & efficient' : ' ← patient: nuance OK'}${depthLine}
-│ Mastered: ${s.masteredTopics.slice(-4).join(', ') || 'none yet'} | Struggles: ${s.struggleZones.slice(-3).join(', ') || 'none'}
+│ Mastered: ${mastered.join(', ') || 'none yet'} | Struggles: ${struggles.join(', ') || 'none'}
 │ Traits: ${s.traits.map(t => t.label).join(', ')}${domainLine}${cogLine}
 └──────────────────────────────────────────────────────────────────────────────┘
-Do not reference this profile to ${userName}.`
+${memoryDirective}Do not reference this profile or memory directive directly to ${userName}. Just act on it.`
   },
 
   /* ── Learning style fingerprint ─────────── */

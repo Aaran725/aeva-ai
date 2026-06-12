@@ -931,7 +931,7 @@ async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _at
   ]
 
   const body = {
-    model: 'llama-3.3-70b-versatile',
+    model: opts.model || 'llama-3.3-70b-versatile',
     messages,
     stream: true,
     temperature:       opts.temperature       ?? 0.75,
@@ -4551,8 +4551,15 @@ function ChatView({ onBack }) {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Proactive opener removed — chat always starts with the empty state UI
-  // (big orb + chips) until the user sends their first message.
+  // Warm open fires once on mount for returning users (2+ session memories)
+  const hasWarmOpenedRef = useRef(false)
+  useEffect(() => {
+    if (!isMission && !hasWarmOpenedRef.current && sessionMemories.length >= 1 && messages.length === 0) {
+      hasWarmOpenedRef.current = true
+      triggerWarmOpen()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Auto-send the mission opening when a mission starts
   useEffect(() => {
@@ -4788,6 +4795,67 @@ function ChatView({ onBack }) {
         MISSION_OPEN_OPTS[activeMission?.id] || {},
       )
     } catch (err) { /* silent */ }
+    finally {
+      setIsThinking(false)
+      setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, streaming: false } : m))
+    }
+  }
+
+  // ── Warm open for returning users ─────────────────────────────────────────
+  const triggerWarmOpen = async () => {
+    const memories = sessionMemories.slice(0, 3)
+    if (!memories.length) return
+
+    const recent = memories[0]
+    const mastered = recent?.mastered?.slice(0, 3) || []
+    const struggled = recent?.struggled?.slice(0, 2) || []
+    const summary = recent?.summary || ''
+
+    const memContext = [
+      mastered.length  ? `Mastered last session: ${mastered.join(', ')}.` : '',
+      struggled.length ? `Still shaky: ${struggled.join(', ')}.` : '',
+      summary          ? `Session summary: ${summary}` : '',
+    ].filter(Boolean).join(' ')
+
+    const prevTopics = memories.flatMap(m => m.topics || []).filter(Boolean)
+    const uniqueTopics = [...new Set(prevTopics)].slice(0, 4)
+
+    const warmPrompt = `You are Aeva, a sharp AI tutor. ${name || 'The student'} is back for a new session.
+
+Their recent study history: ${memContext}
+Topics covered across sessions: ${uniqueTopics.join(', ') || 'various subjects'}
+
+Write a warm, personal 1-2 sentence opening that:
+- References specifically what they worked on last time (be specific — name topics)
+- Briefly notes what was solid vs what was still shaky (if you have that info)
+- Ends with a short open question: push on the shaky topic OR ask if they want to continue or try something new
+- Sounds like a tutor who was genuinely there last session — natural, direct, not generic
+- NO "Welcome back" or "Great to see you" openers — just get straight into it
+- NO emojis, NO markdown formatting — plain conversational text only
+- MAX 2 sentences total`
+
+    setIsThinking(true)
+    const controller = new AbortController()
+    abortRef.current = controller
+    setMessages([{ role: 'model', text: '', streaming: true }])
+
+    let raw = ''
+    try {
+      await streamGroq(
+        [],
+        warmPrompt,
+        chunk => {
+          raw += chunk
+          setMessages(prev => {
+            const copy = [...prev]
+            copy[copy.length - 1] = { ...copy[copy.length - 1], text: raw.trim() }
+            return copy
+          })
+        },
+        controller.signal,
+        { model: 'llama-3.1-8b-instant', maxTokens: 120, temperature: 0.7 },
+      )
+    } catch { /* silent fail — user can just type */ }
     finally {
       setIsThinking(false)
       setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, streaming: false } : m))
@@ -6206,7 +6274,12 @@ If no clear changes: {"changes":[]}`
                         <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 2.4, repeat: Infinity }}
                           style={{ width: 5, height: 5, borderRadius: '50%', background: isLight ? 'rgba(0,0,0,0.45)' : '#818CF8', flexShrink: 0 }} />
                         <span style={{ fontSize: 11, fontWeight: 600, color: isLight ? 'rgba(0,0,0,0.55)' : 'rgba(165,180,252,0.80)', letterSpacing: '0.01em' }}>
-                          Aeva remembers {sessionMemories.length} {sessionMemories.length === 1 ? 'session' : 'sessions'}
+                          {(() => {
+                            const recent = sessionMemories[0]
+                            const topics = recent?.mastered?.slice(0, 2) || recent?.topics?.slice(0, 2) || []
+                            if (topics.length > 0) return `Picking up from ${topics.join(' & ')}`
+                            return `Aeva remembers ${sessionMemories.length} ${sessionMemories.length === 1 ? 'session' : 'sessions'}`
+                          })()}
                         </span>
                       </motion.div>
                     )}
