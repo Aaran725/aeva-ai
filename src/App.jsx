@@ -484,7 +484,7 @@ Use the EXACT topic name as it appears in the roadmap. You can make multiple cha
 Use ⚡CANVAS whenever a visual would make the explanation significantly clearer, faster to understand, or more engaging. Canvas is a strength — lean into it.
 
 FIRE CANVAS by default for any of these:
-• A mathematical function, equation, or relationship that has a graph shape (linear, quadratic, trig, exponential, etc.)
+• A mathematical function, equation, or relationship that has a graph shape (linear, quadratic, trig, exponential, etc.) — ALWAYS ⚡CANVAS, never ⚡FUNCGRAPH
 • A multi-step process, cycle, or system (photosynthesis, digestive system, water cycle, algorithm steps)
 • A timeline of events (historical, scientific, narrative)
 • A comparison between two or more concepts, formulas, or options → use table block
@@ -538,9 +538,7 @@ table — sortable comparison
 diagram — flowchart (node positions as % of 100×100 grid)
 {"type":"diagram","title":"Process","nodes":[{"id":"a","label":"Start","x":50,"y":15},{"id":"b","label":"Middle","x":50,"y":50},{"id":"c","label":"End","x":50,"y":85}],"edges":[{"from":"a","to":"b","label":"leads to"},{"from":"b","to":"c","label":"produces"}]}
 
-⚡FUNCGRAPH (use for a quick single function plot when you don't need sliders or extra blocks — faster than a full canvas):
-⚡FUNCGRAPH:{"type":"function","expr":"x**2","xMin":-4,"xMax":4,"title":"Parabola"}
-Never use both ⚡FUNCGRAPH and ⚡CANVAS in the same response.`
+IMPORTANT: Do NOT use ⚡FUNCGRAPH. It is disabled. Always use ⚡CANVAS for any function, graph, or equation — it provides sliders, formula sync, and an explanation block. A graph block alone is enough if you want it lightweight: {"type":"graph","title":"...","expr":"...","xMin":...,"xMax":...,"params":{}}`
 }
 
 /* ─── Trend / scaffold / difficulty helpers ─── */
