@@ -2979,10 +2979,16 @@ function parseInline(text, isLight = false) {
   let key = 0
 
   while (remaining.length > 0) {
+    // Helper: push a prefix string through parseInline so bold/italic/code inside it renders correctly
+    const pushPrefix = (prefix) => {
+      if (!prefix) return
+      parts.push(<span key={key++} style={{ display: 'contents' }}>{parseInline(prefix, isLight)}</span>)
+    }
+
     // Display math $$...$$ inside inline context — strip delimiters, render inline
     const dblMatch = remaining.match(/^(.*?)\$\$([^$]+?)\$\$/)
     if (dblMatch) {
-      if (dblMatch[1]) parts.push(<span key={key++}>{dblMatch[1]}</span>)
+      pushPrefix(dblMatch[1])
       try {
         const html = katex.renderToString(dblMatch[2].trim(), { throwOnError: false, displayMode: false })
         parts.push(
@@ -3005,7 +3011,7 @@ function parseInline(text, isLight = false) {
         (mathContent.length > 25 && !/[\\^_=+\-/<>{}]/.test(mathContent) && (mathContent.match(/\s/g) || []).length > 3)
       )
       if (isMath) {
-        if (mathMatch[1]) parts.push(<span key={key++}>{mathMatch[1]}</span>)
+        pushPrefix(mathMatch[1])
         try {
           const html = katex.renderToString(mathContent, { throwOnError: false, displayMode: false })
           parts.push(
@@ -3019,7 +3025,7 @@ function parseInline(text, isLight = false) {
         continue
       } else {
         // False positive ($20, prose) — render prefix + $content$ as plain text, advance past it
-        if (mathMatch[1]) parts.push(<span key={key++}>{mathMatch[1]}</span>)
+        pushPrefix(mathMatch[1])
         parts.push(<span key={key++}>${mathContent}$</span>)
         remaining = remaining.slice(mathMatch[0].length)
         continue
@@ -3028,7 +3034,7 @@ function parseInline(text, isLight = false) {
     // Bold **text** — colored, not just heavier
     const boldMatch = remaining.match(/^(.*?)\*\*(.+?)\*\*/)
     if (boldMatch) {
-      if (boldMatch[1]) parts.push(<span key={key++}>{boldMatch[1]}</span>)
+      pushPrefix(boldMatch[1])
       parts.push(
         <strong key={key++} style={{
           fontWeight: 700,
@@ -3044,7 +3050,7 @@ function parseInline(text, isLight = false) {
     // Italic *text* (not **)
     const italicMatch = remaining.match(/^(.*?)(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/)
     if (italicMatch) {
-      if (italicMatch[1]) parts.push(<span key={key++}>{italicMatch[1]}</span>)
+      pushPrefix(italicMatch[1])
       parts.push(<em key={key++} style={{ color: isLight ? 'rgba(0,0,0,0.72)' : 'rgba(220,215,255,0.82)', fontStyle: 'italic' }}>{parseInline(italicMatch[2], isLight)}</em>)
       remaining = remaining.slice(italicMatch[0].length)
       continue
@@ -3052,7 +3058,7 @@ function parseInline(text, isLight = false) {
     // Inline code `code`
     const codeMatch = remaining.match(/^(.*?)`([^`]+)`/)
     if (codeMatch) {
-      if (codeMatch[1]) parts.push(<span key={key++}>{codeMatch[1]}</span>)
+      pushPrefix(codeMatch[1])
       parts.push(
         <code key={key++} style={{
           fontFamily: '"JetBrains Mono", "Fira Code", monospace',
@@ -3217,18 +3223,21 @@ function StepCard({ stepNum, stepTitle, fullText, isLight }) {
 
     setLoading(true)
     const context = fullText.slice(0, 800)
-    const prompt = `You are a focused tutor. A student is reading a worked explanation and needs more detail on one specific step.
+    const prompt = `You are a focused tutor. A student tapped to get more detail on one step of an explanation.
 
-Context (what the full explanation covered):
+Context (what was covered):
 ${context}
 
-The step they need more detail on: Step ${stepNum}: ${stepTitle}
+They want more detail on: Step ${stepNum}: ${stepTitle}
 
-Write a focused 3–5 sentence explanation of this specific step only.
-- Plain flowing prose — no bullet points, no numbered lists, no headers
-- Wrap any equation or expression in $$...$$ on its own line
-- Bold key terms with **term** when first introduced
-- End with one concrete example using real numbers`
+Write a clear, focused explanation of this specific step. Format it exactly like a high-quality tutor chat response:
+- Use **bold** for key terms and important values (e.g. **slope**, **m = 2**)
+- Wrap any equation or expression in $$...$$ on its own line (e.g. $$ y = mx + b $$)
+- Use inline math with $...$ for symbols within sentences (e.g. "the slope $m$ is")
+- You may use short bullet points if listing multiple things
+- End with one concrete worked example with real numbers
+- Do NOT use step headings like "Step 1:" — just write the explanation directly
+- Keep it focused: 4–7 sentences maximum`
 
     const controller = new AbortController()
     abortRef.current = controller
@@ -3305,14 +3314,13 @@ Write a focused 3–5 sentence explanation of this specific step only.
           >
             <div style={{
               marginLeft: 43,
-              marginTop: 8, marginBottom: 8,
-              padding: '12px 16px',
-              background: isLight ? 'rgba(99,102,241,0.07)' : 'rgba(99,102,241,0.10)',
-              borderLeft: `3px solid ${isLight ? 'rgba(99,102,241,0.40)' : 'rgba(139,143,255,0.40)'}`,
-              borderRadius: '0 12px 12px 0',
+              marginTop: 10,
+              paddingTop: 2,
+              borderLeft: `2px solid ${isLight ? 'rgba(99,102,241,0.22)' : 'rgba(139,143,255,0.20)'}`,
+              paddingLeft: 16,
             }}>
               {loading && !drillText ? (
-                <div style={{ display: 'flex', gap: 5, alignItems: 'center', padding: '4px 0' }}>
+                <div style={{ display: 'flex', gap: 5, alignItems: 'center', padding: '6px 0' }}>
                   {[0, 1, 2].map(n => (
                     <motion.div
                       key={n}
