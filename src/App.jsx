@@ -3158,7 +3158,13 @@ ${context}
 
 The step they need more detail on: Step ${stepNum}: ${stepTitle}
 
-Give a focused 3–5 sentence explanation of this specific step. Use a concrete example with numbers if applicable. Write in plain flowing prose — no headers, no bullet points. Be direct and clear.`
+Give a focused explanation of this specific step. Rules:
+- 3–5 sentences of clear prose
+- Use $$...$$ on its own line for any equations or expressions (mandatory for maths)
+- Bold key terms with **term**
+- You may use a short numbered sub-list (1. / 2.) if breaking down a mini-process helps
+- No section headers
+- End with a one-line concrete example using real numbers if applicable`
 
     const controller = new AbortController()
     abortRef.current = controller
@@ -3167,7 +3173,7 @@ Give a focused 3–5 sentence explanation of this specific step. Use a concrete 
       await streamGroq([], prompt, chunk => {
         raw += chunk
         setDrillText(raw)
-      }, controller.signal, { model: 'llama-3.1-8b-instant', maxTokens: 180, temperature: 0.6 })
+      }, controller.signal, { model: 'llama-3.1-8b-instant', maxTokens: 280, temperature: 0.6 })
     } catch { /* silent fail */ }
     finally { setLoading(false) }
   }
@@ -3256,13 +3262,9 @@ Give a focused 3–5 sentence explanation of this specific step. Use a concrete 
                   ))}
                 </div>
               ) : (
-                <p style={{
-                  margin: 0, fontSize: 14, lineHeight: 1.78,
-                  color: isLight ? 'rgba(0,0,0,0.80)' : 'rgba(255,255,255,0.82)',
-                  fontWeight: 400,
-                }}>
-                  {drillText}
-                </p>
+                <div style={{ fontSize: 14 }}>
+                  <MarkdownRenderer text={drillText} streaming={loading} isLight={isLight} />
+                </div>
               )}
             </div>
           </motion.div>
@@ -6750,7 +6752,7 @@ If no clear changes: {"changes":[]}`
                 {messages.map((msg, i) =>
                   isMission
                     ? <ThemedChatBubble key={i} msg={msg} mission={activeMission} />
-                    : <ChatBubble key={i} msg={msg} deepDiveCards={deepDiveMap[i] || []} onDismissCard={(cardId) => setDeepDiveMap(prev => ({ ...prev, [i]: (prev[i] || []).filter(c => c.id !== cardId) }))} isLight={isLight} isWidget={isWidget} widgetTheme={isWidget ? activeTheme : null} onTryThis={(q) => { setInput(q); setTimeout(() => inputRef.current?.focus(), 50) }} />
+                    : <ChatBubble key={i} msg={msg} deepDiveCards={deepDiveMap[i] || []} onDismissCard={(cardId) => setDeepDiveMap(prev => ({ ...prev, [i]: (prev[i] || []).filter(c => c.id !== cardId) }))} isLight={isLight} isWidget={isWidget} widgetTheme={isWidget ? activeTheme : null} onTryThis={() => { setTimeout(() => inputRef.current?.focus(), 50) }} />
                 )}
 
                 {/* Worksheet generating indicator */}
