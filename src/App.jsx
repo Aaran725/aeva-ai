@@ -3114,6 +3114,29 @@ function MarkdownTable({ lines, isLight = false }) {
   )
 }
 
+// ── scanMessageBlocks — zero-cost text scan for summary pills ────────────────
+function scanMessageBlocks(text) {
+  const lines = text.split('\n').map(l => l.trim())
+  let steps = 0, formulaMarkers = 0, practiceQs = 0
+  const calloutTypes = new Set()
+  for (const line of lines) {
+    if (!line) continue
+    // Steps: "1: Title" / "Step 1: Title"
+    if (/^(?:\*\*)?(?:Step\s+)?\d+:\s+.{1,90}(?:\*\*)?$/.test(line) && line.replace(/\*\*/g, '').length < 100) steps++
+    // Formulas: standalone $$ markers (each pair = 1 formula)
+    if (line === '$$') formulaMarkers++
+    // Callout cards: > **Definition:** etc.
+    const cm = line.match(/^>\s*\*\*(Definition|Example|Key Insight|Key|Note|Warning|Tip|Recall):\*\*/i)
+    if (cm) {
+      const raw = cm[1]
+      calloutTypes.add(raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase())
+    }
+    // Practice Q: standalone italic line
+    if (line.startsWith('*') && line.endsWith('*') && !line.startsWith('**') && line.length > 2) practiceQs++
+  }
+  return { steps, formulas: Math.floor(formulaMarkers / 2), calloutTypes: [...calloutTypes], practiceQs }
+}
+
 // ── StepCard — expandable step with tap-to-drill deeper explanation ──────────
 function StepCard({ stepNum, stepTitle, fullText, isLight }) {
   const [open, setOpen] = useState(false)
@@ -3710,8 +3733,39 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false, onTry
 
   flushList()
 
+  // ── Summary pills — scan once, render above body ─────────────────────────
+  const PILL_COLORS = {
+    definition: '#60A5FA', example: '#FBBF24', 'key insight': '#A5B4FC',
+    key: '#A5B4FC', note: '#818CF8', warning: '#F87171', tip: '#34D399', recall: '#FCD34D',
+  }
+  const scan = !streaming ? scanMessageBlocks(clean) : null
+  const pills = []
+  if (scan) {
+    if (scan.steps   >= 2) pills.push({ label: `${scan.steps} steps`,                              color: '#818CF8' })
+    if (scan.formulas >= 1) pills.push({ label: `${scan.formulas} formula${scan.formulas > 1 ? 's' : ''}`, color: '#60A5FA' })
+    for (const t of scan.calloutTypes) pills.push({ label: t, color: PILL_COLORS[t.toLowerCase()] || '#818CF8' })
+    if (scan.practiceQs > 0) pills.push({ label: 'Practice Q', color: '#FBBF24' })
+  }
+  const showPills = pills.length >= 3
+
   return (
     <div style={{ minWidth: 0, fontSize: 15, lineHeight: 1.80, color: txtBody, fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: '-0.005em' }}>
+      {showPills && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14, marginTop: 2 }}>
+          {pills.map((p, idx) => (
+            <span key={idx} style={{
+              fontSize: 11, fontWeight: 700, letterSpacing: '0.03em',
+              color: p.color,
+              background: `${p.color}18`,
+              border: `1px solid ${p.color}35`,
+              borderRadius: 20, padding: '3px 9px',
+              opacity: 0.80,
+            }}>
+              {p.label}
+            </span>
+          ))}
+        </div>
+      )}
       {elements}
       {streaming && (
         <motion.span
