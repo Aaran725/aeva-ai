@@ -3,12 +3,197 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Brain, FlaskConical, Camera, BookOpen, Zap, Trophy,
   ArrowRight, Star, Check, ChevronDown, ChevronUp,
-  BarChart2, Map, Clock, Target,
+  BarChart2, Map, Clock, Target, GraduationCap, Dumbbell, Lock,
 } from 'lucide-react'
 import AevaOrb from './AevaOrb'
 
 /* ─── helpers ─── */
 const clamp = (min, vw, max) => `clamp(${min}, ${vw}, ${max})`
+
+/* ══════════════════════════════════════════════════════
+   ROADMAP PREVIEW (hero right panel)
+══════════════════════════════════════════════════════ */
+const RM_LANES = [
+  {
+    phase: 'Foundation', color: '#818CF8',
+    nodes: [
+      { topic: 'Algebra Basics',  status: 'complete',  type: 'learn' },
+      { topic: 'Functions',       status: 'complete',  type: 'learn' },
+    ],
+  },
+  {
+    phase: 'Core Topics', color: '#60A5FA',
+    nodes: [
+      { topic: 'Differentiation', status: 'complete',  type: 'learn' },
+      { topic: 'Chain Rule',      status: 'available', type: 'learn' },
+      { topic: 'Integration',     status: 'locked',    type: 'drill' },
+    ],
+  },
+  {
+    phase: 'Practice', color: '#34D399',
+    nodes: [
+      { topic: 'Mixed Drills',    status: 'locked',    type: 'drill' },
+      { topic: 'Past Papers',     status: 'locked',    type: 'check' },
+    ],
+  },
+  {
+    phase: 'Exam Prep', color: '#F59E0B',
+    nodes: [
+      { topic: 'Exam Technique',  status: 'locked',    type: 'learn' },
+      { topic: 'Mock Test 1',     status: 'locked',    type: 'mock'  },
+    ],
+  },
+]
+
+function RmNode({ node, laneColor }) {
+  const isComplete  = node.status === 'complete'
+  const isAvailable = node.status === 'available'
+  const isMock      = node.type === 'mock'
+  const r = isAvailable ? 22 : isComplete ? 17 : 13
+
+  const bg = isComplete  ? 'linear-gradient(180deg,#86EFAC 0%,#22C55E 55%,#15803D 100%)'
+           : isAvailable ? `linear-gradient(180deg,${laneColor}dd 0%,${laneColor} 55%,${laneColor}99 100%)`
+           :               'linear-gradient(180deg,#4B5563 0%,#374151 55%,#1F2937 100%)'
+
+  const shadow = isComplete  ? '0 4px 0 #166534, 0 6px 16px rgba(34,197,94,0.30)'
+               : isAvailable ? `0 4px 0 ${laneColor}88, 0 6px 18px ${laneColor}44`
+               :               '0 2px 0 #111827'
+
+  const NodeIcon = node.type === 'drill' ? Dumbbell : node.type === 'mock' ? FlaskConical : GraduationCap
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+      <div style={{ position: 'relative', width: r * 2, height: r * 2 }}>
+        {/* available glow ring */}
+        {isAvailable && (
+          <motion.div
+            animate={{ opacity: [0.3, 0.65, 0.3], scale: [1, 1.22, 1] }}
+            transition={{ duration: 2.1, repeat: Infinity }}
+            style={{ position: 'absolute', inset: -10, borderRadius: isMock ? 8 : '50%', background: `radial-gradient(circle, ${laneColor}55 0%, transparent 70%)`, pointerEvents: 'none' }}
+          />
+        )}
+        <div style={{
+          width: r * 2, height: r * 2,
+          borderRadius: isMock ? Math.max(4, r * 0.25) : '50%',
+          transform: isMock ? 'rotate(45deg)' : undefined,
+          background: bg, boxShadow: shadow,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          opacity: (!isComplete && !isAvailable) ? 0.40 : 1,
+        }}>
+          <div style={{ transform: isMock ? 'rotate(-45deg)' : undefined, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {isComplete  ? <Check size={Math.round(r * 0.84)} color="#fff" strokeWidth={3} />
+           : isAvailable ? <NodeIcon size={Math.round(r * 0.74)} color="#fff" strokeWidth={2.2} />
+           :               <Lock size={Math.round(r * 0.68)} color="rgba(255,255,255,0.38)" strokeWidth={2} />}
+          </div>
+        </div>
+        {/* YOU ARE HERE */}
+        {isAvailable && (
+          <motion.div
+            animate={{ opacity: [0.7, 1, 0.7] }}
+            transition={{ duration: 1.8, repeat: Infinity }}
+            style={{ position: 'absolute', top: r * 2 + 4, left: '50%', transform: 'translateX(-50%)', whiteSpace: 'nowrap', padding: '1px 5px', borderRadius: 99, background: `${laneColor}22`, border: `1px solid ${laneColor}55`, fontSize: 6.5, fontWeight: 800, color: laneColor, letterSpacing: '0.08em' }}
+          >
+            NOW
+          </motion.div>
+        )}
+      </div>
+      <span style={{ fontSize: 9, fontWeight: isAvailable ? 700 : 500, color: isComplete ? '#4ADE80' : isAvailable ? '#fff' : 'rgba(255,255,255,0.22)', whiteSpace: 'nowrap', letterSpacing: '-0.01em', marginTop: isAvailable ? 10 : 2 }}>
+        {node.topic}
+      </span>
+    </div>
+  )
+}
+
+function RoadmapPreview() {
+  const totalNodes    = RM_LANES.reduce((s, l) => s + l.nodes.length, 0)
+  const completeNodes = RM_LANES.reduce((s, l) => s + l.nodes.filter(n => n.status === 'complete').length, 0)
+  const pct           = Math.round((completeNodes / totalNodes) * 100)
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.65, delay: 0.15 }}
+      style={{ flexShrink: 0, width: '100%', maxWidth: 430 }}
+    >
+      {/* App-window chrome */}
+      <div style={{
+        background: 'rgba(8,9,24,0.92)',
+        border: '1px solid rgba(255,255,255,0.10)',
+        borderRadius: 20,
+        overflow: 'hidden',
+        boxShadow: '0 28px 72px rgba(0,0,0,0.60), 0 0 0 1px rgba(255,255,255,0.05)',
+        backdropFilter: 'blur(20px)',
+      }}>
+        {/* Title bar */}
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.03)' }}>
+          <div style={{ display: 'flex', gap: 5 }}>
+            {['#F87171','#FBBF24','#4ADE80'].map(c => (
+              <div key={c} style={{ width: 9, height: 9, borderRadius: '50%', background: c, opacity: 0.7 }} />
+            ))}
+          </div>
+          <div style={{ flex: 1, textAlign: 'center', fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.02em' }}>
+            📚 A-Level Mathematics · 47 days left
+          </div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.20)', fontWeight: 600 }}>{pct}%</div>
+        </div>
+
+        {/* Progress bar */}
+        <div style={{ height: 3, background: 'rgba(255,255,255,0.06)' }}>
+          <motion.div
+            initial={{ width: 0 }} animate={{ width: `${pct}%` }}
+            transition={{ duration: 1.1, delay: 0.4, ease: 'easeOut' }}
+            style={{ height: '100%', background: 'linear-gradient(90deg,#6366F1,#8B5CF6,#A78BFA)' }}
+          />
+        </div>
+
+        {/* Lanes */}
+        <div style={{ padding: '10px 6px 14px' }}>
+          {RM_LANES.map((lane, li) => (
+            <div key={lane.phase} style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: li < RM_LANES.length - 1 ? 2 : 0 }}>
+              {/* Lane label */}
+              <div style={{ width: 72, flexShrink: 0, padding: '18px 8px 18px 12px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3 }}>
+                <div style={{ width: 4, height: 4, borderRadius: '50%', background: lane.color }} />
+                <span style={{ fontSize: 7.5, fontWeight: 800, color: lane.color, letterSpacing: '0.10em', textTransform: 'uppercase', lineHeight: 1.3 }}>
+                  {lane.phase}
+                </span>
+              </div>
+              {/* Divider */}
+              <div style={{ width: 1, height: 56, background: 'rgba(255,255,255,0.07)', flexShrink: 0, marginRight: 14 }} />
+              {/* Nodes row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 18, flex: 1, padding: '8px 0' }}>
+                {lane.nodes.map((node, ni) => (
+                  <>
+                    <RmNode key={node.topic} node={node} laneColor={lane.color} />
+                    {ni < lane.nodes.length - 1 && (
+                      <div key={`line-${ni}`} style={{ height: 1.5, flex: 1, maxWidth: 24, background: node.status === 'complete' ? 'rgba(74,222,128,0.45)' : 'rgba(255,255,255,0.10)', borderRadius: 1, flexShrink: 0 }} />
+                    )}
+                  </>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.02)' }}>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', fontWeight: 500 }}>
+            {completeNodes}/{totalNodes} nodes complete
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, color: '#60A5FA' }}>
+            <motion.div style={{ width: 5, height: 5, borderRadius: '50%', background: '#60A5FA' }} animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1.5, repeat: Infinity }} />
+            Chain Rule — up next
+          </div>
+        </div>
+      </div>
+
+      {/* Caption */}
+      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }}
+        style={{ textAlign: 'center', marginTop: 12, fontSize: 12, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.02em' }}>
+        Your personalised roadmap — built in seconds after sign-up
+      </motion.p>
+    </motion.div>
+  )
+}
 
 /* ══════════════════════════════════════════════════════
    CHAT DEMO
@@ -705,14 +890,8 @@ export default function LandingPage({ onGetStarted }) {
             </motion.div>
           </div>
 
-          {/* Right — Orb */}
-          <motion.div initial={{ opacity: 0, scale: 0.88 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.7, delay: 0.1 }}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, margin: '0 auto' }}>
-            <div style={{ position: 'relative' }}>
-              <div aria-hidden style={{ position: 'absolute', inset: -60, background: 'radial-gradient(circle, rgba(99,102,241,0.18) 0%, transparent 65%)', filter: 'blur(20px)', pointerEvents: 'none' }} />
-              <AevaOrb size={260} />
-            </div>
-          </motion.div>
+          {/* Right — Roadmap preview */}
+          <RoadmapPreview />
         </section>
 
         {/* ── Stats bar ── */}

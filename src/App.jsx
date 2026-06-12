@@ -2403,7 +2403,7 @@ function MobileBottomBar({ onChat, onLab, onArcade, onDrillCount, activeTab = 'h
 
 /* ═══ LEFT SIDEBAR ════════════════════════════════ */
 
-function SidebarNavItem({ Icon, label, action, badge, accent, collapsed }) {
+function SidebarNavItem({ Icon, label, tooltip, action, badge, accent, collapsed }) {
   const [hovered, setHovered] = useState(false)
   return (
     <motion.button
@@ -2411,7 +2411,7 @@ function SidebarNavItem({ Icon, label, action, badge, accent, collapsed }) {
       onHoverEnd={() => setHovered(false)}
       whileTap={{ scale: 0.97 }}
       onClick={action}
-      title={collapsed ? label : undefined}
+      title={collapsed ? `${label}${tooltip ? ` — ${tooltip}` : ''}` : (tooltip || undefined)}
       style={{
         width: collapsed ? 42 : '100%', boxSizing: 'border-box',
         display: 'flex', alignItems: 'center', gap: 10,
@@ -2455,21 +2455,21 @@ function LeftSidebar({ collapsed, onToggle, onChatOpen, onLibrary, onBrain, onMi
 
   const GROUPS = [
     { label: 'LEARN', items: [
-      { Icon: BookOpen,    label: 'Library',  action: onLibrary,  badge: sessionCount > 0 ? sessionCount : null },
-      { Icon: Brain,       label: 'Brain',    action: onBrain,    badge: brainTotal > 0 ? brainTotal : null },
-      { Icon: Layers,      label: 'Mirror',   action: onMirror },
+      { Icon: BookOpen,    label: 'Library',  tooltip: 'Your saved study sessions & notes',       action: onLibrary,  badge: sessionCount > 0 ? sessionCount : null },
+      { Icon: Brain,       label: 'Brain',    tooltip: 'Flashcards & spaced repetition drills',   action: onBrain,    badge: brainTotal > 0 ? brainTotal : null },
+      { Icon: Layers,      label: 'Mirror',   tooltip: 'Your study analytics & progress',         action: onMirror },
     ]},
     { label: 'TRACK', items: [
-      { Icon: Map,         label: 'Roadmap',  action: onRoadmap },
-      { Icon: Calendar,    label: 'Schedule', action: onSchedule },
+      { Icon: Map,         label: 'Roadmap',  tooltip: 'Your personalised exam study path',       action: onRoadmap },
+      { Icon: Calendar,    label: 'Schedule', tooltip: 'Daily study plan & upcoming sessions',    action: onSchedule },
     ]},
     { label: 'PLAY', items: [
-      { Icon: Gamepad2,    label: 'Arcade',   action: onArcade },
-      { Icon: FlaskConical,label: 'Lab',      action: onLab,      badge: labBadge > 0 ? labBadge : null },
+      { Icon: Gamepad2,    label: 'Arcade',   tooltip: 'Drill challenges & timed practice arena', action: onArcade },
+      { Icon: FlaskConical,label: 'Lab',      tooltip: 'Focus modes & specialised study tools',  action: onLab,      badge: labBadge > 0 ? labBadge : null },
     ]},
     { label: 'TOOLS', items: [
-      { Icon: FileText,    label: 'Docs',     action: onDocs },
-      { Icon: Users,       label: 'Parents',  action: onParents },
+      { Icon: FileText,    label: 'Docs',     tooltip: 'Upload worksheets & documents to study',  action: onDocs },
+      { Icon: Users,       label: 'Parents',  tooltip: 'Parent dashboard & progress sharing',     action: onParents },
     ]},
   ]
 
@@ -8244,6 +8244,73 @@ function AppLoader() {
   )
 }
 
+// ─── First-time orientation card ─────────────────────────────────────────────
+function OrientationCard({ onDismiss }) {
+  const ROWS = [
+    { icon: '🗺️', label: 'Roadmap',  desc: 'Your personalised study path — tap a node to start a session' },
+    { icon: '💬', label: 'Chat',     desc: 'Ask Aeva anything, get step-by-step explanations instantly'   },
+    { icon: '🏆', label: 'Arcade',   desc: 'Drill what you\'ve studied and test yourself under pressure'   },
+  ]
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0,  scale: 1    }}
+      exit={{    opacity: 0, y: 16, scale: 0.97  }}
+      transition={{ type: 'spring', stiffness: 340, damping: 28 }}
+      style={{
+        position: 'fixed', bottom: 28, right: 24, zIndex: 180,
+        width: 310,
+        background: 'linear-gradient(135deg, rgba(18,16,50,0.97) 0%, rgba(12,10,38,0.99) 100%)',
+        border: '1px solid rgba(139,143,255,0.22)',
+        borderRadius: 20,
+        padding: '20px 20px 16px',
+        boxShadow: '0 12px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(139,143,255,0.08)',
+        backdropFilter: 'blur(24px)',
+      }}
+    >
+      {/* Header */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'rgba(139,143,255,0.65)', marginBottom: 4 }}>
+          Getting started
+        </div>
+        <div style={{ fontSize: 15, fontWeight: 800, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.02em' }}>
+          Here's how Aeva works
+        </div>
+      </div>
+
+      {/* Rows */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+        {ROWS.map(({ icon, label, desc }) => (
+          <div key={label} style={{ display: 'flex', alignItems: 'flex-start', gap: 11 }}>
+            <span style={{ fontSize: 17, lineHeight: 1, marginTop: 1, flexShrink: 0 }}>{icon}</span>
+            <div>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.82)', marginRight: 5 }}>{label}</span>
+              <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.38)', lineHeight: 1.5 }}>{desc}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Dismiss */}
+      <motion.button
+        whileHover={{ scale: 1.02, boxShadow: '0 4px 18px rgba(99,102,241,0.38)' }}
+        whileTap={{ scale: 0.97 }}
+        onClick={onDismiss}
+        style={{
+          width: '100%', padding: '11px', borderRadius: 12,
+          background: 'linear-gradient(135deg, #3D40A8, #5558D4)',
+          border: '1px solid rgba(139,143,255,0.35)',
+          color: 'white', fontSize: 13.5, fontWeight: 700,
+          cursor: 'pointer', fontFamily: 'inherit',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        }}
+      >
+        Got it <ArrowRight size={14} />
+      </motion.button>
+    </motion.div>
+  )
+}
+
 export default function App() {
   // ── Shared roadmap route: /r/:code ──────────────────────────────────────────
   const _pathMatch = window.location.pathname.match(/^\/r\/([a-z0-9]+)$/i)
@@ -8258,6 +8325,7 @@ export default function App() {
   const [authUser, setAuthUser] = useState(undefined)
   const [showLogin, setShowLogin] = useState(false)
   const [onboarded, setOnboarded] = useState(() => !!localStorage.getItem('aeva_onboarded'))
+  const [oriented,  setOriented]  = useState(() => !!localStorage.getItem('aeva_oriented'))
   const [adminMode, setAdminMode] = useState(() => sessionStorage.getItem('aeva_admin_session') === '1')
   const [showAdminLogin, setShowAdminLogin] = useState(() => new URLSearchParams(window.location.search).has('admin'))
   const { activeMode, exitMission } = useArcadeStore()
@@ -8380,7 +8448,10 @@ export default function App() {
           name={authUser.user_metadata?.full_name || firstName}
           onComplete={() => {
             localStorage.setItem('aeva_onboarded', '1')
+            localStorage.removeItem('aeva_oriented')        // ensure orientation card shows
+            localStorage.removeItem('aeva_first_node_seen') // ensure node tip shows
             setOnboarded(true)
+            setOriented(false)
             // Open the roadmap the user just created so it's the first thing they see
             setTimeout(() => useRoadmapStore.getState().openRoadmapHub(), 80)
           }}
@@ -8433,6 +8504,18 @@ export default function App() {
             ? <DebateArena key="arena" onBack={handleBack} />
             : <ChatView key="chat" onBack={handleBack} />
         }
+      </AnimatePresence>
+      {/* First-time orientation card — shown once after onboarding on the dashboard */}
+      <AnimatePresence>
+        {view === 'dashboard' && !oriented && (
+          <OrientationCard
+            key="orientation"
+            onDismiss={() => {
+              localStorage.setItem('aeva_oriented', '1')
+              setOriented(true)
+            }}
+          />
+        )}
       </AnimatePresence>
       </Suspense>
     </UserContext.Provider>

@@ -954,7 +954,7 @@ function swimNodePos(node, laneNodes) {
 }
 
 /* ── MapNode ─────────────────────────────────────────────────────────────── */
-function MapNode({ node, laneNodes, isSelected, onSelect, drillHistory }) {
+function MapNode({ node, laneNodes, isSelected, onSelect, drillHistory, showTip, onTipSeen }) {
   const cfg = NODE_CFG[node.type] || NODE_CFG.learn
   const { Icon } = cfg
   const { x, y } = swimNodePos(node, laneNodes)
@@ -1003,7 +1003,7 @@ function MapNode({ node, laneNodes, isSelected, onSelect, drillHistory }) {
       <motion.button
         whileHover={clickable ? { translateY: -2 } : {}}
         whileTap={clickable ? { translateY: 2 } : {}}
-        onClick={() => clickable ? onSelect(isSelected ? null : node) : null}
+        onClick={() => { if (!clickable) return; if (showTip && onTipSeen) onTipSeen(); onSelect(isSelected ? null : node) }}
         style={{
           width: r * 2, height: r * 2,
           borderRadius: isMock ? Math.max(4, r * 0.22) : '50%',
@@ -1058,6 +1058,44 @@ function MapNode({ node, laneNodes, isSelected, onSelect, drillHistory }) {
           <span style={{ fontSize: 7.5, fontWeight: 800, color: cfg.color, letterSpacing: '0.10em' }}>YOU ARE HERE</span>
         </motion.div>
       )}
+
+      {/* First-session tip — floats above the first available node, dismisses on tap */}
+      <AnimatePresence>
+        {showTip && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.3 }}
+            style={{ position: 'absolute', bottom: r * 2 + 12, left: '50%', transform: 'translateX(-50%)', zIndex: 20, pointerEvents: 'none', whiteSpace: 'nowrap' }}
+          >
+            <motion.div
+              animate={{ y: [0, -4, 0] }}
+              transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              {/* Bubble */}
+              <div style={{
+                background: 'rgba(255,255,255,0.96)',
+                borderRadius: 10, padding: '7px 12px',
+                fontSize: 11.5, fontWeight: 700, color: '#12103a',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.45)',
+                display: 'flex', alignItems: 'center', gap: 5,
+              }}>
+                Tap to start your first session
+                <span style={{ fontSize: 13 }}>→</span>
+              </div>
+              {/* Downward arrow */}
+              <div style={{
+                position: 'absolute', bottom: -5, left: '50%',
+                transform: 'translateX(-50%) rotate(45deg)',
+                width: 10, height: 10,
+                background: 'rgba(255,255,255,0.96)',
+                boxShadow: '2px 2px 4px rgba(0,0,0,0.15)',
+              }} />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -1065,6 +1103,9 @@ function MapNode({ node, laneNodes, isSelected, onSelect, drillHistory }) {
 /* ── SwimlaneMap ─────────────────────────────────────────────────────────── */
 function SwimlaneMap({ nodes, roadmap, selected, onSelect, drillHistory }) {
   const [zoom, setZoom] = useState(1.0)
+  const [tipSeen, setTipSeen] = useState(() => !!localStorage.getItem('aeva_first_node_seen'))
+  const firstAvailNode = !tipSeen ? nodes.find(n => n.status === 'available') : null
+  const handleTipSeen = () => { localStorage.setItem('aeva_first_node_seen', '1'); setTipSeen(true) }
 
   const laneNodes    = SWIM_PHASES.map(phase => nodes.filter(n => n.phase === phase))
   const maxLaneCount = Math.max(...laneNodes.map(l => l.length), 1)
@@ -1163,7 +1204,9 @@ function SwimlaneMap({ nodes, roadmap, selected, onSelect, drillHistory }) {
               <MapNode key={node.id} node={node} laneNodes={laneNodes}
                 isSelected={selected?.id === node.id}
                 onSelect={onSelect}
-                drillHistory={drillHistory} />
+                drillHistory={drillHistory}
+                showTip={!tipSeen && node.id === firstAvailNode?.id}
+                onTipSeen={handleTipSeen} />
             ))}
           </div>
         </div>

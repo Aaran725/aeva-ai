@@ -80,7 +80,16 @@ const GRADE_COLORS = {
 }
 
 // ─── Aeva's opening line ──────────────────────────────────────────────────────
-function getOpener(styleId, subject, examName, targetGrade, daysLeft) {
+function getOpener(styleId, subject, examName, targetGrade, daysLeft, skipped) {
+  if (skipped) {
+    const skipOpeners = {
+      supportive: `I've set up a general study path for you — we can shape it properly once I know what you're working towards. No rush. So tell me: what subject or topic are you studying right now? Even a rough answer is fine.`,
+      challenging: `No exam set yet — that's fine, but I'll need a target to work with. What are you actually studying? Give me the subject, the level, and the exam if you know it. The sooner I know, the sooner your roadmap means something.`,
+      precise: `Roadmap initialised with placeholder parameters. To generate a properly calibrated study path, I'll need your subject area, examination board, and target qualification. What are you working towards?`,
+    }
+    return skipOpeners[styleId] || skipOpeners.supportive
+  }
+
   const name   = examName || subject || 'your exam'
   const dStr   = daysLeft <= 7
     ? `just ${daysLeft} day${daysLeft === 1 ? '' : 's'}`
@@ -492,7 +501,7 @@ function StepYourExam({ name, onNext }) {
       <motion.button
         whileHover={canContinue ? { scale: 1.02, boxShadow: '0 8px 28px rgba(99,102,241,0.38)' } : {}}
         whileTap={canContinue ? { scale: 0.97 } : {}}
-        onClick={() => canContinue && onNext({ subject, examName: examName.trim(), examDate, targetGrade })}
+        onClick={() => canContinue && onNext({ subject, examName: examName.trim(), examDate, targetGrade, skipped: false })}
         style={{
           padding: '14px', borderRadius: 13, marginTop: 2,
           background: canContinue ? 'linear-gradient(135deg, #3D40A8, #5558D4)' : 'rgba(255,255,255,0.06)',
@@ -504,6 +513,20 @@ function StepYourExam({ name, onNext }) {
         }}
       >
         Build my roadmap <ArrowRight size={16} />
+      </motion.button>
+
+      {/* Skip path — for explorers without a fixed exam */}
+      <motion.button
+        whileHover={{ opacity: 1 }}
+        onClick={() => onNext({ subject: 'Other', examName: 'General Studies', examDate: '', targetGrade: 'A', skipped: true })}
+        style={{
+          background: 'none', border: 'none', cursor: 'pointer',
+          fontSize: 13, color: 'rgba(255,255,255,0.28)', fontFamily: 'inherit',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+          padding: '4px 0', opacity: 0.8, transition: 'opacity 0.15s', marginTop: -6,
+        }}
+      >
+        Skip for now — I'll set this up later
       </motion.button>
     </motion.div>
   )
@@ -529,7 +552,9 @@ function StepGenerating({ examData, styleId, onDone }) {
   const weeksStr = daysLeft > 14 ? `${Math.ceil(daysLeft / 7)} weeks` : `${daysLeft} days`
 
   const phaseLabel = phase === 1
-    ? `Building ${examData.subject || 'your'} nodes across ${weeksStr}…`
+    ? examData.skipped
+      ? 'Building your general study path…'
+      : `Building ${examData.subject || 'your'} nodes across ${weeksStr}…`
     : GEN_PHASES[phase]?.label
 
   useEffect(() => {
@@ -622,20 +647,22 @@ function StepGenerating({ examData, styleId, onDone }) {
         />
       </div>
 
-      {/* Exam summary pills */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-        <div style={{ padding: '5px 12px', borderRadius: 99, background: 'rgba(139,143,255,0.12)', border: '1px solid rgba(139,143,255,0.25)', fontSize: 12, color: 'rgba(200,202,255,0.80)', fontWeight: 600 }}>
-          📚 {examData.examName}
-        </div>
-        {examDateFmt && (
-          <div style={{ padding: '5px 12px', borderRadius: 99, background: 'rgba(56,189,248,0.10)', border: '1px solid rgba(56,189,248,0.22)', fontSize: 12, color: 'rgba(147,218,252,0.80)', fontWeight: 600 }}>
-            📅 {examDateFmt}
+      {/* Exam summary pills — hidden when user skipped exam setup */}
+      {!examData.skipped && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <div style={{ padding: '5px 12px', borderRadius: 99, background: 'rgba(139,143,255,0.12)', border: '1px solid rgba(139,143,255,0.25)', fontSize: 12, color: 'rgba(200,202,255,0.80)', fontWeight: 600 }}>
+            📚 {examData.examName}
           </div>
-        )}
-        <div style={{ padding: '5px 12px', borderRadius: 99, background: `rgba(${GRADE_COLORS[examData.targetGrade]?.[0] || '139,143,255'},0.12)`, border: `1px solid rgba(${GRADE_COLORS[examData.targetGrade]?.[0] || '139,143,255'},0.28)`, fontSize: 12, color: GRADE_COLORS[examData.targetGrade]?.[1] || '#A78BFA', fontWeight: 600 }}>
-          🎯 Target {examData.targetGrade}
+          {examDateFmt && (
+            <div style={{ padding: '5px 12px', borderRadius: 99, background: 'rgba(56,189,248,0.10)', border: '1px solid rgba(56,189,248,0.22)', fontSize: 12, color: 'rgba(147,218,252,0.80)', fontWeight: 600 }}>
+              📅 {examDateFmt}
+            </div>
+          )}
+          <div style={{ padding: '5px 12px', borderRadius: 99, background: `rgba(${GRADE_COLORS[examData.targetGrade]?.[0] || '139,143,255'},0.12)`, border: `1px solid rgba(${GRADE_COLORS[examData.targetGrade]?.[0] || '139,143,255'},0.28)`, fontSize: 12, color: GRADE_COLORS[examData.targetGrade]?.[1] || '#A78BFA', fontWeight: 600 }}>
+            🎯 Target {examData.targetGrade}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Retry button on error */}
       {error && (
@@ -658,7 +685,7 @@ function StepAevaOpener({ name, styleId, examData, onStart }) {
   const daysLeft = examData?.examDate
     ? Math.max(1, Math.ceil((new Date(examData.examDate) - Date.now()) / 86400000))
     : 30
-  const opener = getOpener(styleId, examData?.subject, examData?.examName, examData?.targetGrade, daysLeft)
+  const opener = getOpener(styleId, examData?.subject, examData?.examName, examData?.targetGrade, daysLeft, examData?.skipped)
 
   const [displayed, setDisplayed] = useState('')
   const [done, setDone]           = useState(false)
