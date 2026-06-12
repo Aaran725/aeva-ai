@@ -928,6 +928,361 @@ Rules: 2-4 tasks. Focus on current topic. If weak areas exist, add a review task
   return JSON.parse(data.choices[0].message.content)
 }
 
+/* ── Swimlane map constants ──────────────────────────────────────────────── */
+const SWIM_PHASES = ['Foundation', 'Core Topics', 'Practice', 'Exam Prep']
+const LANE_H      = 175   // px height per phase lane
+const LABEL_W     = 68    // px for the phase label column
+const NODE_GAP    = 132   // px between node centres horizontally
+const R_AVAIL     = 27    // radius: current/available node
+const R_DONE      = 19    // radius: completed node
+const R_LOCK      = 15    // radius: locked node
+
+function swimNodeR(node) {
+  if (node.status === 'complete') return R_DONE
+  if (node.status === 'available') return R_AVAIL
+  return R_LOCK
+}
+function swimNodePos(node, laneNodes) {
+  const laneIdx = Math.max(0, SWIM_PHASES.indexOf(node.phase))
+  const lane    = laneNodes[laneIdx] || []
+  const ni      = lane.indexOf(node)
+  return {
+    x: LABEL_W + ni * NODE_GAP + NODE_GAP / 2,
+    y: laneIdx * LANE_H + LANE_H / 2,
+    laneIdx,
+  }
+}
+
+/* ── MapNode ─────────────────────────────────────────────────────────────── */
+function MapNode({ node, laneNodes, isSelected, onSelect, drillHistory }) {
+  const cfg = NODE_CFG[node.type] || NODE_CFG.learn
+  const { Icon } = cfg
+  const { x, y } = swimNodePos(node, laneNodes)
+  const isComplete  = node.status === 'complete'
+  const isShaky     = isComplete && node.confidence === 'shaky'
+  const isAvailable = node.status === 'available'
+  const isUrgent    = !!node.urgent && !isComplete
+  const isMock      = node.type === 'mock'
+  const r           = swimNodeR(node)
+  const clickable   = isAvailable || isComplete
+
+  const nodeBg = isShaky   ? 'linear-gradient(180deg,#FCD34D 0%,#F59E0B 60%,#B45309 100%)'
+    : isComplete  ? 'linear-gradient(180deg,#86EFAC 0%,#22C55E 60%,#15803D 100%)'
+    : isAvailable ? `linear-gradient(180deg,${cfg.light} 0%,${cfg.color} 60%,${cfg.shadow} 100%)`
+    :               'linear-gradient(180deg,#4B5563 0%,#374151 60%,#1F2937 100%)'
+
+  const nodeShadow = isShaky   ? '0 5px 0 #92400E, 0 10px 20px rgba(245,158,11,0.28)'
+    : isComplete  ? '0 5px 0 #166534, 0 10px 20px rgba(34,197,94,0.26)'
+    : isAvailable ? `0 5px 0 ${cfg.shadow}, 0 10px 20px ${cfg.color}40`
+    :               '0 3px 0 #111827'
+
+  // drill score badge
+  const drillBadge = isComplete ? (() => {
+    const scores = (drillHistory || []).filter(h => h.topic.toLowerCase() === node.topic.toLowerCase())
+    if (!scores.length) return null
+    const best = Math.max(...scores.map(h => h.pct))
+    const col  = best >= 80 ? '#4ADE80' : best >= 60 ? '#FBBF24' : '#F87171'
+    const bg   = best >= 80 ? 'rgba(22,101,52,0.95)' : best >= 60 ? 'rgba(92,64,5,0.95)' : 'rgba(127,29,29,0.95)'
+    return { best, col, bg }
+  })() : null
+
+  return (
+    <div style={{ position: 'absolute', left: x, top: y, transform: 'translate(-50%,-50%)', zIndex: isSelected ? 10 : 3 }}>
+      {/* Pulsing glow — available */}
+      {isAvailable && (
+        <motion.div animate={{ opacity: [0.3, 0.6, 0.3], scale: [1, 1.18, 1] }} transition={{ duration: 2.2, repeat: Infinity }}
+          style={{ position: 'absolute', inset: -14, borderRadius: isMock ? 10 : '50%', background: `radial-gradient(circle, ${cfg.color}50 0%, transparent 70%)`, pointerEvents: 'none' }} />
+      )}
+      {/* Urgent pulsing ring */}
+      {isUrgent && (
+        <motion.div animate={{ opacity: [0.45, 1, 0.45] }} transition={{ duration: 1.3, repeat: Infinity }}
+          style={{ position: 'absolute', inset: -5, borderRadius: isMock ? 8 : '50%', border: '2px solid #F59E0B', pointerEvents: 'none', zIndex: 2 }} />
+      )}
+
+      {/* Node body */}
+      <motion.button
+        whileHover={clickable ? { translateY: -2 } : {}}
+        whileTap={clickable ? { translateY: 2 } : {}}
+        onClick={() => clickable ? onSelect(isSelected ? null : node) : null}
+        style={{
+          width: r * 2, height: r * 2,
+          borderRadius: isMock ? Math.max(4, r * 0.22) : '50%',
+          transform: isMock ? 'rotate(45deg)' : undefined,
+          background: nodeBg,
+          border: isSelected ? `2px solid ${cfg.light}` : 'none',
+          boxShadow: nodeShadow,
+          cursor: clickable ? 'pointer' : 'default',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          opacity: (!isComplete && !isAvailable) ? 0.42 : 1,
+          transition: 'opacity 0.2s', flexShrink: 0,
+        }}>
+        <div style={{ transform: isMock ? 'rotate(-45deg)' : undefined, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {isShaky    ? <span style={{ fontSize: r * 0.72, lineHeight: 1 }}>◐</span>
+          : isComplete ? <Check size={Math.round(r * 0.85)} color="#fff" strokeWidth={3} />
+          : isAvailable ? <Icon size={Math.round(r * 0.78)} color="#fff" strokeWidth={2.2} />
+          : <Lock size={Math.round(r * 0.68)} color="rgba(255,255,255,0.42)" strokeWidth={2} />}
+        </div>
+      </motion.button>
+
+      {/* Urgent badge */}
+      {isUrgent && (
+        <div style={{ position: 'absolute', top: -4, right: -4, width: 15, height: 15, borderRadius: '50%', background: '#F59E0B', border: '2px solid rgba(8,9,24,1)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5, fontSize: 8, fontWeight: 900, color: '#000' }}>!</div>
+      )}
+      {/* Injected-by-Aeva badge */}
+      {node.injectedByAeva && !isComplete && (
+        <div style={{ position: 'absolute', top: -4, left: -4, width: 15, height: 15, borderRadius: '50%', background: '#818CF8', border: '2px solid rgba(8,9,24,1)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 5, fontSize: 7 }}>✦</div>
+      )}
+      {/* Drill score badge */}
+      {drillBadge && (
+        <div style={{ position: 'absolute', bottom: -3, right: r * -0.70, background: drillBadge.bg, color: drillBadge.col, fontSize: 8.5, fontWeight: 900, padding: '2px 4px', borderRadius: 5, border: `1.5px solid ${drillBadge.col}60`, zIndex: 5, whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+          {drillBadge.best}%
+        </div>
+      )}
+
+      {/* Topic label */}
+      <div style={{
+        position: 'absolute', top: r * 2 + 7, left: '50%', transform: 'translateX(-50%)',
+        whiteSpace: 'nowrap', textAlign: 'center', pointerEvents: 'none',
+        fontSize: 10, fontWeight: isAvailable ? 700 : 500,
+        color: isShaky ? '#FCD34D' : isComplete ? '#4ADE80' : isUrgent ? '#FCD34D' : isAvailable ? '#fff' : 'rgba(255,255,255,0.25)',
+        maxWidth: NODE_GAP - 10, overflow: 'hidden', textOverflow: 'ellipsis',
+      }}>
+        {node.topic}
+      </div>
+
+      {/* YOU ARE HERE badge */}
+      {isAvailable && (
+        <motion.div animate={{ opacity: [0.65, 1, 0.65] }} transition={{ duration: 1.8, repeat: Infinity }}
+          style={{ position: 'absolute', top: r * 2 + 22, left: '50%', transform: 'translateX(-50%)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 3, padding: '2px 6px', borderRadius: 99, background: `${cfg.color}20`, border: `1px solid ${cfg.color}50`, pointerEvents: 'none' }}>
+          <div style={{ width: 4, height: 4, borderRadius: '50%', background: cfg.color, flexShrink: 0 }} />
+          <span style={{ fontSize: 7.5, fontWeight: 800, color: cfg.color, letterSpacing: '0.10em' }}>YOU ARE HERE</span>
+        </motion.div>
+      )}
+    </div>
+  )
+}
+
+/* ── SwimlaneMap ─────────────────────────────────────────────────────────── */
+function SwimlaneMap({ nodes, roadmap, selected, onSelect, drillHistory }) {
+  const [zoom, setZoom] = useState(1.0)
+
+  const laneNodes    = SWIM_PHASES.map(phase => nodes.filter(n => n.phase === phase))
+  const maxLaneCount = Math.max(...laneNodes.map(l => l.length), 1)
+  const canvasW      = LABEL_W + maxLaneCount * NODE_GAP + 64
+  const canvasH      = SWIM_PHASES.length * LANE_H
+
+  // SVG progress trail: iterate roadmap order, draw path between each consecutive pair
+  const pathSegs = nodes.slice(0, -1).map((node, i) => {
+    const p1 = swimNodePos(node, laneNodes)
+    const p2 = swimNodePos(nodes[i + 1], laneNodes)
+    const isDone  = node.status === 'complete'
+    const isShaky = isDone && node.confidence === 'shaky'
+    let d
+    if (p1.laneIdx === p2.laneIdx) {
+      // Same lane — horizontal S-curve
+      const mx = (p1.x + p2.x) / 2
+      d = `M ${p1.x} ${p1.y} C ${mx} ${p1.y} ${mx} ${p2.y} ${p2.x} ${p2.y}`
+    } else {
+      // Cross-lane — vertical S-curve
+      const my = (p1.y + p2.y) / 2
+      d = `M ${p1.x} ${p1.y} C ${p1.x} ${my} ${p2.x} ${my} ${p2.x} ${p2.y}`
+    }
+    return { d, isDone, isShaky }
+  })
+
+  const lastNode = nodes[nodes.length - 1]
+  const lastPos  = lastNode ? swimNodePos(lastNode, laneNodes) : null
+
+  return (
+    <div style={{ position: 'relative', margin: '12px 0 4px', background: 'rgba(255,255,255,0.02)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+      {/* Zoom controls */}
+      <div style={{ position: 'absolute', bottom: 10, right: 10, zIndex: 20, display: 'flex', gap: 4 }}>
+        {[{label:'+', fn: z => Math.min(1.3, +(z+0.15).toFixed(2))}, {label:'−', fn: z => Math.max(0.55, +(z-0.15).toFixed(2))}].map(btn => (
+          <motion.button key={btn.label} whileTap={{ scale: 0.88 }} onClick={() => setZoom(btn.fn)}
+            style={{ width: 26, height: 26, borderRadius: 8, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.13)', color: 'rgba(255,255,255,0.60)', fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit', lineHeight: 1 }}>
+            {btn.label}
+          </motion.button>
+        ))}
+      </div>
+
+      {/* Scroll frame */}
+      <div style={{ overflowX: 'auto', overflowY: 'hidden' }}>
+        {/* Spacer div drives scroll area dimensions */}
+        <div style={{ width: canvasW * zoom, height: canvasH * zoom, position: 'relative', flexShrink: 0, minWidth: '100%' }}>
+          {/* Scaled canvas */}
+          <div style={{ position: 'absolute', top: 0, left: 0, width: canvasW, height: canvasH, transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
+
+            {/* SVG layer */}
+            <svg style={{ position: 'absolute', inset: 0, width: canvasW, height: canvasH, pointerEvents: 'none', overflow: 'visible' }}>
+              {/* Lane dividers */}
+              {SWIM_PHASES.map((_, i) => i > 0 && (
+                <line key={i} x1={LABEL_W} y1={i * LANE_H} x2={canvasW} y2={i * LANE_H} stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
+              ))}
+              {/* Label column divider */}
+              <line x1={LABEL_W - 1} y1={0} x2={LABEL_W - 1} y2={canvasH} stroke="rgba(255,255,255,0.07)" strokeWidth={1} />
+
+              {/* Progress trail */}
+              {pathSegs.map((seg, i) => (
+                <g key={i}>
+                  <path d={seg.d} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={6} strokeLinecap="round" />
+                  <path d={seg.d} fill="none"
+                    stroke={seg.isShaky ? 'rgba(245,158,11,0.58)' : seg.isDone ? 'rgba(74,222,128,0.65)' : 'rgba(99,102,241,0.24)'}
+                    strokeWidth={4}
+                    strokeDasharray={seg.isDone ? undefined : '7 5'}
+                    strokeLinecap="round" />
+                </g>
+              ))}
+
+              {/* 🏁 after last node */}
+              {lastPos && (
+                <text x={lastPos.x + R_AVAIL + 8} y={lastPos.y + 7} fontSize={18} style={{ userSelect: 'none' }}>🏁</text>
+              )}
+            </svg>
+
+            {/* Phase labels */}
+            {SWIM_PHASES.map((phase, laneIdx) => {
+              const pc   = PHASE_CFG[phase] || PHASE_CFG['Core Topics']
+              const laneY = laneIdx * LANE_H
+              const hasNodes = laneNodes[laneIdx]?.length > 0
+              return (
+                <div key={phase} style={{
+                  position: 'absolute', left: 0, top: laneY, width: LABEL_W - 2, height: LANE_H,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5,
+                  opacity: hasNodes ? 1 : 0.3,
+                }}>
+                  <div style={{ width: 5, height: 5, borderRadius: '50%', background: pc.color }} />
+                  <div style={{ fontSize: 7.5, fontWeight: 800, color: pc.color, letterSpacing: '0.10em', textTransform: 'uppercase', textAlign: 'center', lineHeight: 1.4, maxWidth: 54, wordBreak: 'break-word' }}>
+                    {phase}
+                  </div>
+                </div>
+              )
+            })}
+
+            {/* Nodes */}
+            {nodes.map(node => (
+              <MapNode key={node.id} node={node} laneNodes={laneNodes}
+                isSelected={selected?.id === node.id}
+                onSelect={onSelect}
+                drillHistory={drillHistory} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── NodeDetailSheet — slides in below the map when a node is selected ───── */
+function NodeDetailSheet({ node, roadmap, isStarted, onLaunch, onGotIt, onShaky, onGoAgain, onFlagNode, onClose }) {
+  if (!node) return null
+  const cfg = NODE_CFG[node.type] || NODE_CFG.learn
+  const { Icon } = cfg
+  const isUrgent = !!node.urgent
+  const pc = node.phase ? (PHASE_CFG[node.phase] || null) : null
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }}
+      transition={{ type: 'spring', stiffness: 360, damping: 28 }}
+      style={{ margin: '6px 16px 4px', borderRadius: 18, padding: '16px 18px 18px', background: 'rgba(8,9,24,0.98)', border: `1px solid ${cfg.color}42`, boxShadow: `0 12px 36px rgba(0,0,0,0.55), 0 0 0 1px ${cfg.color}15`, position: 'relative' }}>
+
+      {/* Close */}
+      <button onClick={onClose} style={{ position: 'absolute', top: 12, right: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 8, width: 28, height: 28, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.38)' }}>
+        <X size={13} />
+      </button>
+
+      {/* Phase badge */}
+      {pc && (
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 99, background: `${pc.color}18`, border: `1px solid ${pc.color}35`, marginBottom: 8 }}>
+          <div style={{ width: 4, height: 4, borderRadius: '50%', background: pc.color }} />
+          <span style={{ fontSize: 9.5, fontWeight: 800, color: pc.color, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{node.phase}</span>
+        </div>
+      )}
+
+      {/* Title + un-flag */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 2, paddingRight: 32 }}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', flex: 1 }}>{node.topic}</div>
+        {isUrgent && (
+          <button onClick={() => onFlagNode(false)} style={{ padding: '2px 7px', borderRadius: 6, border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.08)', color: '#FCD34D', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+            🚩 Un-flag
+          </button>
+        )}
+      </div>
+      <div style={{ fontSize: 10.5, color: cfg.light, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>{cfg.label}</div>
+
+      {/* Difficulty + time + XP */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <div style={{ display: 'flex', gap: 3 }}>
+          {[1,2,3,4,5].map(d => <div key={d} style={{ width: 7, height: 7, borderRadius: '50%', background: d <= (node.difficulty || 1) ? cfg.color : 'rgba(255,255,255,0.10)' }} />)}
+        </div>
+        {node.estimatedMinutes && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'rgba(255,255,255,0.38)', fontWeight: 600 }}>
+            <Clock size={10} />{node.estimatedMinutes}m
+          </div>
+        )}
+        <div style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 800, color: cfg.color }}>+{node.xp || 50} XP</div>
+      </div>
+
+      {/* Description */}
+      {node.description && (
+        <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.42)', marginBottom: node.subtopics?.length ? 10 : 14, lineHeight: 1.55 }}>{node.description}</div>
+      )}
+
+      {/* Subtopics */}
+      {node.subtopics?.length > 0 && (
+        <div style={{ marginBottom: 14, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.30)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>Covers</div>
+          {node.subtopics.map((s, si) => (
+            <div key={si} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: si < node.subtopics.length - 1 ? 4 : 0 }}>
+              <span style={{ color: cfg.color, fontSize: 10, marginTop: 3, flexShrink: 0 }}>▸</span>
+              <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.58)', lineHeight: 1.45 }}>{s}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Action area */}
+      {isStarted ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 700, color: 'rgba(255,255,255,0.30)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>How did it go?</div>
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} onClick={onGotIt}
+            style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#16a34a,#22C55E)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 7 }}>
+            <Check size={13} strokeWidth={3} /> Got it — fully understood
+            <span style={{ marginLeft: 'auto', opacity: 0.8, fontSize: 11 }}>+{node.xp || 50} XP</span>
+          </motion.button>
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} onClick={onShaky}
+            style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.08)', color: '#FCD34D', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 7 }}>
+            <span style={{ fontSize: 14 }}>◐</span> Shaky — needs more practice
+            <span style={{ marginLeft: 'auto', opacity: 0.7, fontSize: 11 }}>+{Math.round((node.xp || 50) * 0.6)} XP</span>
+          </motion.button>
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} onClick={onGoAgain}
+            style={{ width: '100%', padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.09)', background: 'transparent', color: 'rgba(255,255,255,0.38)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <RotateCcw size={11} /> Not done yet — go again
+          </motion.button>
+        </div>
+      ) : node.type === 'mock' && roadmap.readiness < 60 ? (
+        <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.22)' }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: '#F87171', marginBottom: 4 }}>🔒 Not ready yet</div>
+          <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.40)', lineHeight: 1.55 }}>
+            Complete more steps to reach <span style={{ color: '#F87171', fontWeight: 700 }}>60% readiness</span> before the mock. You're at {roadmap.readiness}% now.
+          </div>
+          <div style={{ marginTop: 10, height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+            <div style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg,#F97316,#EF4444)', width: `${(roadmap.readiness / 60) * 100}%`, transition: 'width 0.5s ease' }} />
+          </div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginTop: 4, textAlign: 'right' }}>{roadmap.readiness}/60% needed</div>
+        </div>
+      ) : (
+        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} onClick={onLaunch}
+          style={{ width: '100%', padding: '11px 0', borderRadius: 11, border: 'none', background: `linear-gradient(135deg,${cfg.color},${cfg.shadow})`, boxShadow: `0 4px 14px ${cfg.color}50`, color: '#fff', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+          <Icon size={15} strokeWidth={2.5} />
+          {node.type === 'learn' ? 'Ask Aeva' : node.type === 'drill' ? 'Start Drill' : node.type === 'check' ? 'Take Quiz' : 'Start Mock Test'}
+          <span style={{ opacity: 0.75, fontSize: 11 }}>+{node.xp || 50} XP</span>
+        </motion.button>
+      )}
+    </motion.div>
+  )
+}
+
 /* ── Node config ─────────────────────────────────────────────────────────── */
 const NODE_CFG = {
   learn: { label: 'Learn with Aeva', color: '#6366F1', light: '#818CF8', shadow: '#3730A3', Icon: BookOpen },
@@ -1449,25 +1804,7 @@ function PathView() {
   const [startedIds, setStartedIds] = useState(new Set())
   const [shakyPrompt, setShakyPrompt] = useState(null) // { topic } — shown after marking shaky
   const [gateNode, setGateNode]     = useState(null)   // node awaiting completion gate
-  const containerRef = useRef(null)
-  const scrollRef    = useRef(null)
-  const [cw, setCw]  = useState(360)
-
-  useLayoutEffect(() => {
-    if (!containerRef.current) return
-    const ro = new ResizeObserver(([e]) => setCw(e.contentRect.width))
-    ro.observe(containerRef.current)
-    return () => ro.disconnect()
-  }, [])
-
-  // Scroll to current available node on mount
-  useEffect(() => {
-    if (!scrollRef.current || !roadmap?.nodes) return
-    const idx = roadmap.nodes.findIndex(n => n.status === 'available')
-    if (idx < 0) return
-    const y = idx * NODE_SPACING + TOP_PAD + NODE_R
-    setTimeout(() => scrollRef.current?.scrollTo({ top: Math.max(0, y - 240), behavior: 'smooth' }), 300)
-  }, [roadmap?.id])
+  const scrollRef = useRef(null)
 
   if (!roadmap?.nodes?.length) return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>
@@ -1475,18 +1812,14 @@ function PathView() {
     </div>
   )
 
-  const nodes      = roadmap.nodes
-  const daysLeft   = Math.max(0, Math.ceil((new Date(roadmap.examDate) - Date.now()) / 86400000))
-  const available  = nodes.find(n => n.status === 'available')
-  const containerH = nodes.length * NODE_SPACING + TOP_PAD + 120
+  const nodes    = roadmap.nodes
+  const daysLeft = Math.max(0, Math.ceil((new Date(roadmap.examDate) - Date.now()) / 86400000))
+  const available = nodes.find(n => n.status === 'available')
 
   // All nodes done → trophy screen
   if (nodes.every(n => n.status === 'complete')) {
     return <CompletionView roadmap={roadmap} daysLeft={daysLeft} />
   }
-
-  const getX = (i) => (X_PATTERN[i % X_PATTERN.length] / 100) * cw
-  const getY = (i) => i * NODE_SPACING + TOP_PAD + NODE_R
 
   const launchNode = (node) => {
     setSelected(null)
@@ -1878,288 +2211,37 @@ function PathView() {
         )
       })()}
 
-      {/* ── Path ─────────────────────────────────────────────────────────── */}
-      <div ref={containerRef} style={{ flex: 1, position: 'relative', minHeight: containerH, margin: '24px 0 40px' }}>
-        {/* SVG connecting curves */}
-        <svg style={{ position: 'absolute', inset: 0, width: '100%', height: containerH, pointerEvents: 'none' }}>
-          {nodes.slice(0, -1).map((node, i) => {
-            const x1 = getX(i),     y1 = getY(i)
-            const x2 = getX(i + 1), y2 = getY(i + 1)
-            const cy = (y1 + y2) / 2
-            const d  = `M ${x1} ${y1} C ${x1} ${cy} ${x2} ${cy} ${x2} ${y2}`
-            const done  = node.status === 'complete'
-            const shaky = done && node.confidence === 'shaky'
-            const pc    = PHASE_CFG[node.phase] || null
-            const lineColor = shaky ? 'rgba(245,158,11,0.65)' : done ? 'rgba(74,222,128,0.65)' : pc ? `${pc.color}55` : 'rgba(99,102,241,0.35)'
-            return (
-              <g key={i}>
-                <path d={d} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={5} strokeLinecap="round" />
-                <path d={d} fill="none" stroke={lineColor}
-                  strokeWidth={4} strokeDasharray={done ? undefined : '8 6'} strokeLinecap="round" />
-              </g>
-            )
-          })}
-        </svg>
-
-        {/* Phase banners — float in the gap at each phase transition */}
-        {nodes.map((node, i) => {
-          if (!node.phase || i === 0) return null
-          if (node.phase === nodes[i - 1]?.phase) return null
-          const bannerY = Math.round((getY(i - 1) + getY(i)) / 2) - 11  // centred in gap between the two nodes
-          const pc = PHASE_CFG[node.phase] || PHASE_CFG['Core Topics']
-          return (
-            <div key={`pb_${i}`} style={{
-              position: 'absolute', top: bannerY, left: '50%', transform: 'translateX(-50%)',
-              display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px',
-              borderRadius: 99, background: `${pc.color}14`, border: `1px solid ${pc.color}38`,
-              zIndex: 2, whiteSpace: 'nowrap', pointerEvents: 'none',
-            }}>
-              <div style={{ width: 5, height: 5, borderRadius: '50%', background: pc.color, flexShrink: 0 }} />
-              <span style={{ fontSize: 9.5, fontWeight: 800, color: pc.color, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{node.phase}</span>
-            </div>
-          )
-        })}
-
-        {/* Nodes */}
-        {nodes.map((node, i) => {
-          const x = getX(i), y = getY(i)
-          const cfg = NODE_CFG[node.type] || NODE_CFG.learn
-          const { Icon } = cfg
-          const isComplete  = node.status === 'complete'
-          const isShaky     = isComplete && node.confidence === 'shaky'
-          const isAvailable = node.status === 'available'
-          const isSelected  = selected?.id === node.id
-          const isUrgent    = !!node.urgent
-          const isInjected  = !!node.injectedByAeva
-
-          // 3D gradient + bottom shadow colours
-          const nodeBg     = isShaky    ? 'linear-gradient(180deg,#FCD34D 0%,#F59E0B 55%,#B45309 100%)'
-            : isComplete   ? 'linear-gradient(180deg,#86EFAC 0%,#22C55E 55%,#15803D 100%)'
-            : isAvailable  ? `linear-gradient(180deg,${cfg.light} 0%,${cfg.color} 55%,${cfg.shadow} 100%)`
-            :                'linear-gradient(180deg,#4B5563 0%,#374151 55%,#1F2937 100%)'
-          const nodeShadow = isShaky    ? '0 7px 0 #92400E, 0 14px 28px rgba(245,158,11,0.30)'
-            : isComplete   ? '0 7px 0 #166534, 0 14px 28px rgba(34,197,94,0.30)'
-            : isAvailable  ? `0 7px 0 ${cfg.shadow}, 0 14px 28px ${cfg.color}44`
-            :                '0 5px 0 #111827'
-
-          return (
-            <div key={node.id} style={{ position: 'absolute', left: x, top: y, transform: 'translate(-50%, -50%)', zIndex: isSelected ? 10 : 1 }}>
-              {/* Soft glow behind available node */}
-              {isAvailable && (
-                <motion.div animate={{ opacity: [0.45, 0.75, 0.45] }} transition={{ duration: 2.2, repeat: Infinity }}
-                  style={{ position: 'absolute', inset: -14, borderRadius: '50%', background: `radial-gradient(circle, ${cfg.color}50 0%, transparent 70%)`, pointerEvents: 'none' }} />
-              )}
-
-              {/* Urgent ring */}
-              {isUrgent && !isComplete && (
-                <motion.div animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 1.4, repeat: Infinity }}
-                  style={{ position: 'absolute', inset: -4, borderRadius: '50%', border: '2px solid #F59E0B', pointerEvents: 'none', zIndex: 2 }} />
-              )}
-
-              {/* 3D circle */}
-              <motion.button
-                whileHover={isAvailable || isComplete ? { translateY: -2, boxShadow: isComplete ? '0 9px 0 #166534, 0 18px 32px rgba(34,197,94,0.35)' : `0 9px 0 ${cfg.shadow}, 0 18px 32px ${cfg.color}55` } : {}}
-                whileTap={isAvailable ? { translateY: 3, boxShadow: isComplete ? '0 4px 0 #166534' : `0 4px 0 ${cfg.shadow}` } : {}}
-                onClick={() => isAvailable ? setSelected(isSelected ? null : node) : null}
-                style={{
-                  width: NODE_R * 2, height: NODE_R * 2, borderRadius: '50%',
-                  background: nodeBg, border: 'none',
-                  boxShadow: nodeShadow,
-                  cursor: isAvailable ? 'pointer' : 'default',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  opacity: (!isComplete && !isAvailable) ? 0.55 : 1,
-                  transition: 'opacity 0.2s',
-                }}>
-                {isShaky
-                  ? <span style={{ fontSize: 18, lineHeight: 1 }}>◐</span>
-                  : isComplete
-                    ? <Check size={22} color="#fff" strokeWidth={3} />
-                    : isAvailable
-                      ? <Icon size={20} color="#fff" strokeWidth={2.2} />
-                      : <Lock size={16} color="rgba(255,255,255,0.55)" strokeWidth={2} />
-                }
-              </motion.button>
-
-              {/* Urgent badge */}
-              {isUrgent && !isComplete && (
-                <div style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#F59E0B', border: '2px solid rgba(8,9,24,1)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3, fontSize: 9, fontWeight: 900, color: '#000' }}>!</div>
-              )}
-
-              {/* Injected-by-Aeva badge */}
-              {isInjected && !isComplete && (
-                <div style={{ position: 'absolute', top: -4, left: -4, width: 16, height: 16, borderRadius: '50%', background: '#818CF8', border: '2px solid rgba(8,9,24,1)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3, fontSize: 8 }}>✦</div>
-              )}
-
-              {/* Drill score badge — shows best drill score on completed nodes */}
-              {isComplete && (() => {
-                const topicDrills = (drillHistory || []).filter(h => h.topic.toLowerCase() === node.topic.toLowerCase())
-                if (topicDrills.length === 0) return null
-                const best = Math.max(...topicDrills.map(h => h.pct))
-                const col  = best >= 80 ? '#4ADE80' : best >= 60 ? '#FBBF24' : '#F87171'
-                const bgCol = best >= 80 ? 'rgba(22,101,52,0.95)' : best >= 60 ? 'rgba(92,64,5,0.95)' : 'rgba(127,29,29,0.95)'
-                return (
-                  <div style={{
-                    position: 'absolute', bottom: -4, right: NODE_R * -0.55,
-                    background: bgCol, color: col,
-                    fontSize: 9, fontWeight: 900,
-                    padding: '2px 5px', borderRadius: 6,
-                    border: `1.5px solid ${col}60`,
-                    zIndex: 4, letterSpacing: '0.02em',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.50)',
-                  }}>{best}%</div>
-                )
-              })()}
-
-              {/* Topic label */}
-              <div style={{
-                position: 'absolute', top: NODE_R * 2 + 14,
-                left: '50%', transform: 'translateX(-50%)',
-                whiteSpace: 'nowrap', textAlign: 'center',
-                fontSize: 11.5, fontWeight: isAvailable ? 700 : 500,
-                color: isShaky ? '#FCD34D' : isComplete ? '#4ADE80' : isUrgent ? '#FCD34D' : isAvailable ? '#fff' : 'rgba(255,255,255,0.28)',
-                letterSpacing: isAvailable ? '-0.01em' : 0,
-              }}>
-                {node.topic}
-              </div>
-
-              {/* Popup card — floats above the node */}
-              <AnimatePresence>
-                {isSelected && (() => {
-                  const isStarted = startedIds.has(node.id)
-                  return (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.88, y: 6 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.88, y: 6 }}
-                      transition={{ type: 'spring', stiffness: 360, damping: 26 }}
-                      style={{
-                        position: 'absolute',
-                        bottom: NODE_R * 2 + 18,
-                        left: '50%', transform: 'translateX(-50%)',
-                        width: 216, borderRadius: 16, zIndex: 20,
-                        background: 'rgba(8,9,24,0.97)',
-                        border: `1px solid ${cfg.color}50`,
-                        boxShadow: `0 16px 48px rgba(0,0,0,0.70), 0 0 0 1px ${cfg.color}18`,
-                        padding: '14px 16px 16px',
-                      }}>
-                      {/* Phase badge */}
-                      {node.phase && (() => {
-                        const pc = PHASE_CFG[node.phase] || PHASE_CFG['Core Topics']
-                        return (
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 99, background: `${pc.color}18`, border: `1px solid ${pc.color}38`, marginBottom: 8 }}>
-                            <div style={{ width: 4, height: 4, borderRadius: '50%', background: pc.color }} />
-                            <span style={{ fontSize: 9.5, fontWeight: 800, color: pc.color, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{node.phase}</span>
-                          </div>
-                        )
-                      })()}
-                      {/* Topic + type + urgent clear */}
-                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6, marginBottom: 2 }}>
-                        <div style={{ fontSize: 14.5, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', flex: 1 }}>{node.topic}</div>
-                        {isUrgent && (
-                          <button onClick={() => flagNode(roadmap.id, node.id, false)}
-                            style={{ flexShrink: 0, padding: '2px 7px', borderRadius: 6, border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.08)', color: '#FCD34D', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginTop: 2 }}>
-                            🚩 Un-flag
-                          </button>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 10.5, color: cfg.light, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>{cfg.label}</div>
-                      {/* Difficulty dots + time + XP */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                        <div style={{ display: 'flex', gap: 3 }}>
-                          {[1,2,3,4,5].map(d => (
-                            <div key={d} style={{ width: 7, height: 7, borderRadius: '50%', background: d <= (node.difficulty || 1) ? cfg.color : 'rgba(255,255,255,0.10)' }} />
-                          ))}
-                        </div>
-                        {node.estimatedMinutes && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'rgba(255,255,255,0.38)', fontWeight: 600 }}>
-                            <Clock size={10} />{node.estimatedMinutes}m
-                          </div>
-                        )}
-                        <div style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 800, color: cfg.color }}>+{node.xp || 50} XP</div>
-                      </div>
-                      <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.42)', marginBottom: node.subtopics?.length ? 8 : 14, lineHeight: 1.55 }}>{node.description || 'Click below to begin this step.'}</div>
-
-                      {/* Subtopics list */}
-                      {node.subtopics?.length > 0 && (
-                        <div style={{ marginBottom: 14, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.30)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>Covers</div>
-                          {node.subtopics.map((s, si) => (
-                            <div key={si} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: si < node.subtopics.length - 1 ? 4 : 0 }}>
-                              <span style={{ color: cfg.color, fontSize: 10, marginTop: 3, flexShrink: 0 }}>▸</span>
-                              <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.58)', lineHeight: 1.45 }}>{s}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {isStarted ? (
-                        /* Three-way confidence selector */
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          <div style={{ fontSize: 10.5, fontWeight: 700, color: 'rgba(255,255,255,0.30)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>How did it go?</div>
-                          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                            onClick={() => setGateNode(node)}
-                            style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#16a34a,#22C55E)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 7 }}>
-                            <Check size={13} strokeWidth={3} /> Got it — fully understood
-                            <span style={{ marginLeft: 'auto', opacity: 0.8, fontSize: 11 }}>+{node.xp || 50} XP</span>
-                          </motion.button>
-                          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                            onClick={() => markDoneWithConfidence(node, 'shaky')}
-                            style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.08)', color: '#FCD34D', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 7 }}>
-                            <span style={{ fontSize: 14 }}>◐</span> Shaky — needs more practice
-                            <span style={{ marginLeft: 'auto', opacity: 0.7, fontSize: 11 }}>+{Math.round((node.xp || 50) * 0.6)} XP</span>
-                          </motion.button>
-                          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                            onClick={() => { setSelected(null); setStartedIds(prev => { const n = new Set(prev); n.delete(node.id); return n }) }}
-                            style={{ width: '100%', padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.09)', background: 'transparent', color: 'rgba(255,255,255,0.38)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <RotateCcw size={11} /> Not done yet — go again
-                          </motion.button>
-                        </div>
-                      ) : node.type === 'mock' && roadmap.readiness < 60 ? (
-                        /* Readiness gate — mock locked until 60% */
-                        <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.22)' }}>
-                          <div style={{ fontSize: 12.5, fontWeight: 700, color: '#F87171', marginBottom: 4 }}>🔒 Not ready yet</div>
-                          <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.40)', lineHeight: 1.55 }}>
-                            Complete more steps to reach <span style={{ color: '#F87171', fontWeight: 700 }}>60% readiness</span> before the mock. You're at {roadmap.readiness}% now.
-                          </div>
-                          <div style={{ marginTop: 10, height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                            <div style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg,#F97316,#EF4444)', width: `${(roadmap.readiness / 60) * 100}%`, transition: 'width 0.5s ease' }} />
-                          </div>
-                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginTop: 4, textAlign: 'right' }}>{roadmap.readiness}/60% needed</div>
-                        </div>
-                      ) : (
-                        /* Not started yet — launch button */
-                        <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                          onClick={() => launchNode(node)}
-                          style={{
-                            width: '100%', padding: '10px 0', borderRadius: 10, border: 'none',
-                            background: `linear-gradient(135deg, ${cfg.color}, ${cfg.shadow})`,
-                            boxShadow: `0 4px 14px ${cfg.color}55`,
-                            color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                            fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                          }}>
-                          <Icon size={14} strokeWidth={2.5} />
-                          {node.type === 'learn' ? 'Ask Aeva' : node.type === 'drill' ? 'Start Drill' : node.type === 'check' ? 'Take Quiz' : 'Start Mock Test'}
-                          <span style={{ opacity: 0.75, fontSize: 11 }}>+{node.xp || 50} XP</span>
-                        </motion.button>
-                      )}
-
-                      {/* Down-pointing caret */}
-                      <div style={{
-                        position: 'absolute', bottom: -9, left: '50%', transform: 'translateX(-50%)',
-                        width: 0, height: 0,
-                        borderLeft: '9px solid transparent',
-                        borderRight: '9px solid transparent',
-                        borderTop: `9px solid rgba(8,9,24,0.97)`,
-                        filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.3))',
-                      }} />
-                    </motion.div>
-                  )
-                })()}
-              </AnimatePresence>
-            </div>
-          )
-        })}
+      {/* ── Swimlane map ─────────────────────────────────────────────────── */}
+      <div style={{ flexShrink: 0, padding: '0 16px' }}>
+        <SwimlaneMap
+          nodes={nodes}
+          roadmap={roadmap}
+          selected={selected}
+          onSelect={setSelected}
+          drillHistory={drillHistory}
+        />
       </div>
+
+      {/* ── Node detail sheet ─────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {selected && (
+          <NodeDetailSheet
+            key={selected.id}
+            node={selected}
+            roadmap={roadmap}
+            isStarted={startedIds.has(selected.id)}
+            onLaunch={() => launchNode(selected)}
+            onGotIt={() => setGateNode(selected)}
+            onShaky={() => markDoneWithConfidence(selected, 'shaky')}
+            onGoAgain={() => {
+              setStartedIds(prev => { const n = new Set(prev); n.delete(selected.id); return n })
+              setSelected(null)
+            }}
+            onFlagNode={(val) => flagNode(roadmap.id, selected.id, val)}
+            onClose={() => setSelected(null)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* ── Completion gate modal ───────────────────────────────────────── */}
       <AnimatePresence>
