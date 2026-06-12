@@ -1852,6 +1852,32 @@ function PathView() {
         )
       })()}
 
+      {/* ── Exam countdown banner ───────────────────────────────────────── */}
+      {(() => {
+        const nodesLeft = nodes.filter(n => n.status !== 'complete').length
+        if (nodesLeft === 0 || daysLeft === 0) return null
+        const pace      = nodesLeft / Math.max(1, daysLeft)          // nodes/day needed
+        const isGreen   = pace <= 1
+        const isAmber   = pace > 1 && pace <= 2
+        const col       = isGreen ? '#4ADE80' : isAmber ? '#FCD34D' : '#F87171'
+        const bgCol     = isGreen ? 'rgba(74,222,128,0.07)'  : isAmber ? 'rgba(251,191,36,0.07)'  : 'rgba(239,68,68,0.07)'
+        const borderCol = isGreen ? 'rgba(74,222,128,0.22)'  : isAmber ? 'rgba(251,191,36,0.22)'  : 'rgba(239,68,68,0.22)'
+        const paceStr   = pace < 1 ? `${pace.toFixed(1)}/day` : pace <= 2 ? `${pace.toFixed(1)}/day` : `${Math.ceil(pace)}/day`
+        return (
+          <div style={{ flexShrink: 0, margin: '10px 20px 0', padding: '10px 16px', borderRadius: 13, background: bgCol, border: `1px solid ${borderCol}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', rowGap: 2 }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: col }}>{daysLeft}d to exam</span>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)', fontWeight: 500 }}>·</span>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.55)' }}>{nodesLeft} node{nodesLeft !== 1 ? 's' : ''} left</span>
+              <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.25)', fontWeight: 500 }}>·</span>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: col }}>need {paceStr}</span>
+            </div>
+            <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 2, repeat: Infinity }}
+              style={{ width: 7, height: 7, borderRadius: '50%', background: col, flexShrink: 0 }} />
+          </div>
+        )
+      })()}
+
       {/* ── Path ─────────────────────────────────────────────────────────── */}
       <div ref={containerRef} style={{ flex: 1, position: 'relative', minHeight: containerH, margin: '24px 0 40px' }}>
         {/* SVG connecting curves */}
