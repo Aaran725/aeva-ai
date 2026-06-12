@@ -312,6 +312,30 @@ function PreparingScreen() {
   )
 }
 
+function IncomingCardToast() {
+  const { incomingCard } = useArenaStore()
+  const def = incomingCard ? CARD_DEFS[incomingCard.card] : null
+  return (
+    <AnimatePresence>
+      {incomingCard && def && (
+        <motion.div
+          initial={{ opacity: 0, y: -32, scale: 0.88 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -24, scale: 0.92 }}
+          transition={{ type: 'spring', stiffness: 380, damping: 26 }}
+          style={{ position: 'fixed', top: 72, left: '50%', transform: 'translateX(-50%)', zIndex: 900, display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', borderRadius: 14, background: 'rgba(244,63,94,0.22)', border: '1.5px solid rgba(244,63,94,0.55)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 8px 32px rgba(244,63,94,0.30)', whiteSpace: 'nowrap' }}
+        >
+          <span style={{ fontSize: 24 }}>{def.emoji}</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{incomingCard.byName} used {def.label} on you!</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.60)' }}>{def.desc}</div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
 function QuestionScreen() {
   const { stubs, questions, currentQIdx, timerSeconds, answers, myUserId, submitAnswer, isHost, effects } = useArenaStore()
   const stub  = stubs[currentQIdx]
@@ -506,108 +530,159 @@ function RevealScreen() {
 }
 
 function SabotageScreen() {
-  const { players, myUserId, sabotagePlayed, effects } = useArenaStore()
+  const { players, myUserId, sabotagePlayed } = useArenaStore()
   const playCard = useArenaStore(s => s.playCard)
   const me = players.find(p => p.userId === myUserId)
-  const myCards = me?.cards || []
+  const myCards = [...new Set(me?.cards || [])]
   const [selectedCard, setSelectedCard] = useState(null)
   const [timer, setTimer] = useState(6)
+  const [used, setUsed] = useState(false)
 
   useEffect(() => {
-    const ref = setInterval(() => setTimer(t => Math.max(0, t - 1)), 1000)
+    const ref = setInterval(() => setTimer(t => { if (t <= 1) { clearInterval(ref); return 0 } return t - 1 }), 1000)
     return () => clearInterval(ref)
   }, [])
 
   const targets = players.filter(p => p.userId !== myUserId)
   const def = selectedCard ? CARD_DEFS[selectedCard] : null
+  const progress = timer / 6
+
+  const handlePlay = (card, targetId) => {
+    playCard(card, targetId)
+    setSelectedCard(null)
+    setUsed(true)
+  }
 
   return (
     <motion.div key="sabotage" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
-      style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 900, color: '#fff', letterSpacing: '-0.03em' }}>💣 Sabotage Window</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>Play a card before the next question</div>
+      {/* Header with countdown bar */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', letterSpacing: '-0.03em' }}>💣 Sabotage Window</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.40)', marginTop: 2 }}>Play a card to affect the next question</div>
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 900, color: timer <= 2 ? '#F43F5E' : '#F59E0B', fontVariantNumeric: 'tabular-nums', transition: 'color 0.3s', minWidth: 36, textAlign: 'right' }}>{timer}</div>
         </div>
-        <div style={{ fontSize: 22, fontWeight: 900, color: timer <= 2 ? '#F43F5E' : '#F59E0B', fontVariantNumeric: 'tabular-nums', transition: 'color 0.3s' }}>{timer}s</div>
+        <div style={{ height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+          <motion.div animate={{ width: `${progress * 100}%` }} transition={{ duration: 0.9, ease: 'linear' }}
+            style={{ height: '100%', borderRadius: 99, background: timer <= 2 ? '#F43F5E' : '#F59E0B' }} />
+        </div>
       </div>
 
-      {/* Cards in hand */}
-      {myCards.length > 0 ? (
-        <div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Your Cards</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {myCards.map((card, i) => {
-              const d = CARD_DEFS[card]
-              if (!d) return null
-              const sel = selectedCard === card
-              return (
-                <motion.button key={`${card}-${i}`} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.94 }}
-                  onClick={() => setSelectedCard(sel ? null : card)}
-                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '10px 12px', borderRadius: 12, background: sel ? 'rgba(244,63,94,0.20)' : 'rgba(255,255,255,0.07)', border: `1.5px solid ${sel ? 'rgba(244,63,94,0.55)' : 'rgba(255,255,255,0.13)'}`, cursor: 'pointer', fontFamily: 'inherit', minWidth: 64, transition: 'all 0.15s' }}>
-                  <span style={{ fontSize: 22 }}>{d.emoji}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: sel ? '#FDA4AF' : 'rgba(255,255,255,0.75)' }}>{d.label}</span>
-                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', textAlign: 'center', lineHeight: 1.3 }}>{d.desc}</span>
-                </motion.button>
-              )
-            })}
-          </div>
-        </div>
-      ) : (
-        <div style={{ textAlign: 'center', padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: 12, fontSize: 12, color: 'rgba(255,255,255,0.28)', fontStyle: 'italic' }}>
-          No cards in hand
-        </div>
-      )}
-
-      {/* Target picker (if card selected + it's not self-use) */}
-      {selectedCard && def && !def.self && targets.length > 0 && (
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Choose Target</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {targets.map(p => (
-              <motion.button key={p.userId} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.94 }}
-                onClick={() => { playCard(selectedCard, p.userId); setSelectedCard(null) }}
-                style={{ flex: 1, padding: '10px 8px', borderRadius: 12, background: 'rgba(244,63,94,0.14)', border: '1.5px solid rgba(244,63,94,0.40)', cursor: 'pointer', fontFamily: 'inherit' }}>
-                <PlayerChip player={p} myUserId={myUserId} showScore size={28} />
-              </motion.button>
-            ))}
-          </div>
+      {used ? (
+        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+          style={{ textAlign: 'center', padding: '20px', background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.30)', borderRadius: 14 }}>
+          <div style={{ fontSize: 28, marginBottom: 6 }}>✅</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#6EE7B7' }}>Card played!</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.40)', marginTop: 3 }}>Next question starts in {timer}s</div>
         </motion.div>
+      ) : myCards.length > 0 ? (
+        <>
+          {/* Step 1: pick a card */}
+          {!selectedCard && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+                Step 1 — Pick a card
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {myCards.map((card, i) => {
+                  const d = CARD_DEFS[card]
+                  if (!d) return null
+                  return (
+                    <motion.button key={`${card}-${i}`} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.96 }}
+                      onClick={() => setSelectedCard(card)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 14, background: 'rgba(244,63,94,0.10)', border: '1.5px solid rgba(244,63,94,0.30)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', width: '100%', transition: 'all 0.15s' }}>
+                      <span style={{ fontSize: 26, flexShrink: 0 }}>{d.emoji}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{d.label}</div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.50)', marginTop: 2 }}>{d.desc}</div>
+                      </div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: d.self ? '#A5B4FC' : '#FDA4AF', background: d.self ? 'rgba(99,102,241,0.15)' : 'rgba(244,63,94,0.15)', border: `1px solid ${d.self ? 'rgba(99,102,241,0.30)' : 'rgba(244,63,94,0.30)'}`, borderRadius: 99, padding: '2px 7px', flexShrink: 0 }}>
+                        {d.self ? 'SELF' : 'TARGET'}
+                      </div>
+                    </motion.button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: pick a target */}
+          {selectedCard && def && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+              {/* Show selected card */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: 'rgba(244,63,94,0.14)', border: '1.5px solid rgba(244,63,94,0.40)', marginBottom: 14 }}>
+                <span style={{ fontSize: 22 }}>{def.emoji}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: '#FDA4AF' }}>{def.label} selected</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>{def.desc}</div>
+                </div>
+                <motion.button whileTap={{ scale: 0.92 }} onClick={() => setSelectedCard(null)}
+                  style={{ fontSize: 11, color: 'rgba(255,255,255,0.40)', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  ← Back
+                </motion.button>
+              </div>
+
+              {def.self ? (
+                <>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+                    Step 2 — Use on yourself
+                  </div>
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                    onClick={() => handlePlay(selectedCard, myUserId)}
+                    style={{ width: '100%', padding: '14px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(99,102,241,0.28), rgba(139,92,246,0.22))', border: '1.5px solid rgba(99,102,241,0.55)', color: '#A5B4FC', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    {def.emoji} Activate {def.label} → 2× next answer
+                  </motion.button>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+                    Step 2 — Pick your target
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {targets.map(p => (
+                      <motion.button key={p.userId} whileHover={{ scale: 1.02, background: 'rgba(244,63,94,0.22)' }} whileTap={{ scale: 0.96 }}
+                        onClick={() => handlePlay(selectedCard, p.userId)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, background: 'rgba(244,63,94,0.12)', border: '1.5px solid rgba(244,63,94,0.38)', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s' }}>
+                        <PlayerChip player={p} myUserId={myUserId} showScore size={36} />
+                        <div style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: '#FDA4AF' }}>
+                          {def.emoji} Hit →
+                        </div>
+                      </motion.button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </motion.div>
+          )}
+        </>
+      ) : (
+        <div style={{ textAlign: 'center', padding: '20px', background: 'rgba(255,255,255,0.03)', borderRadius: 12, fontSize: 13, color: 'rgba(255,255,255,0.28)', fontStyle: 'italic' }}>
+          No cards — earn one by getting 3 in a row ⚡
+        </div>
       )}
 
-      {/* Self-use card */}
-      {selectedCard && def?.self && (
-        <motion.button initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-          whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-          onClick={() => { playCard(selectedCard, myUserId); setSelectedCard(null) }}
-          style={{ padding: '12px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(139,92,246,0.20))', border: '1.5px solid rgba(99,102,241,0.45)', color: '#A5B4FC', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-          {def.emoji} Use {def.label} on yourself
-        </motion.button>
-      )}
-
-      {/* Cards played this round */}
+      {/* Cards played log */}
       {sabotagePlayed.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Played This Round</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5, borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 10 }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>Played this window</div>
           {sabotagePlayed.map((s, i) => {
             const cd = CARD_DEFS[s.card]
             const target = players.find(p => p.userId === s.target)
+            const isMe = s.target === myUserId
             return (
-              <div key={i} style={{ fontSize: 11, color: 'rgba(255,255,255,0.50)', padding: '6px 10px', background: 'rgba(244,63,94,0.08)', borderRadius: 8, border: '1px solid rgba(244,63,94,0.20)' }}>
-                <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.75)' }}>{s.byName}</span>
-                {' used '}<span style={{ fontWeight: 700 }}>{cd?.emoji} {cd?.label}</span>
-                {s.target !== s.by && target && <>{' on '}<span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.75)' }}>{target.displayName}</span></>}
+              <div key={i} style={{ fontSize: 12, padding: '7px 10px', background: isMe ? 'rgba(244,63,94,0.12)' : 'rgba(255,255,255,0.04)', borderRadius: 9, border: `1px solid ${isMe ? 'rgba(244,63,94,0.30)' : 'rgba(255,255,255,0.08)'}`, color: 'rgba(255,255,255,0.70)' }}>
+                <span style={{ fontWeight: 700 }}>{s.byName}</span>{' '}
+                used <span style={{ fontWeight: 700 }}>{cd?.emoji} {cd?.label}</span>
+                {s.target !== s.by && target && <> on <span style={{ fontWeight: 700, color: isMe ? '#FDA4AF' : '#fff' }}>{isMe ? 'YOU' : target.displayName}</span></>}
               </div>
             )
           })}
         </div>
       )}
-
-      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', textAlign: 'center', fontStyle: 'italic' }}>
-        Next question starts in {timer}s
-      </div>
     </motion.div>
   )
 }
@@ -702,6 +777,7 @@ export default function Arena() {
         exit={{ opacity: 0 }}
         style={{ position: 'fixed', inset: 0, zIndex: 600, background: 'linear-gradient(180deg, #06061a 0%, #04040f 100%)', fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', flexDirection: 'column' }}
       >
+        <IncomingCardToast />
         {/* Accent glow top */}
         <div style={{ position: 'absolute', top: -80, left: '50%', transform: 'translateX(-50%)', width: 400, height: 200, background: 'radial-gradient(ellipse, rgba(99,102,241,0.20) 0%, transparent 70%)', pointerEvents: 'none' }} />
 

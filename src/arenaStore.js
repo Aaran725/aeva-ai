@@ -73,6 +73,9 @@ export const useArenaStore = create((set, get) => ({
   aevaLine:     '',
   scoreDeltas:  {},   // { userId: delta } shown after reveal
 
+  // ── Incoming card notification (shown on target's screen)
+  incomingCard: null, // { byName, card } — cleared after 2.5s
+
   // ── Countdown
   countdownVal: 3,
 
@@ -96,7 +99,8 @@ export const useArenaStore = create((set, get) => ({
       isOpen: false, phase: 'idle', code: null, isHost: false,
       players: [], questions: [], stubs: [], currentQIdx: -1,
       answers: {}, correctIdx: null, effects: {}, sabotagePlayed: [],
-      aevaLine: '', scoreDeltas: {}, _channel: null, _timerRef: null, _cdRef: null,
+      aevaLine: '', scoreDeltas: {}, incomingCard: null,
+      _channel: null, _timerRef: null, _cdRef: null,
     })
   },
 
@@ -185,7 +189,8 @@ export const useArenaStore = create((set, get) => ({
       if (get().isHost) return
       const { qIdx } = payload
       get()._clearTimer()
-      set({ currentQIdx: qIdx, timerSeconds: Q_TIME, answers: {}, correctIdx: null, effects: {}, sabotagePlayed: [], aevaLine: '', phase: 'question' })
+      // Do NOT reset effects — they carry over from the sabotage window into this question
+      set({ currentQIdx: qIdx, timerSeconds: Q_TIME, answers: {}, correctIdx: null, sabotagePlayed: [], aevaLine: '', phase: 'question' })
       get()._startTimer()
     })
 
@@ -199,12 +204,21 @@ export const useArenaStore = create((set, get) => ({
 
     ch.on('broadcast', { event: 'card_played' }, ({ payload }) => {
       const { by, byName, target, card } = payload
-      const effectKey = card === 'freeze' ? 'frozen' : card === 'bomb' ? 'bomb' : card === 'stolen' ? 'stolen' : card === 'double_down' ? 'doubled' : card
+      // Consistent effect keys: freeze→frozen, steal→stolen, bomb→bomb, double_down→doubled
+      const effectKey = card === 'freeze' ? 'frozen' : card === 'steal' ? 'stolen' : card === 'bomb' ? 'bomb' : card === 'double_down' ? 'doubled' : card
+      const { myUserId } = get()
       set(s => ({
         effects: { ...s.effects, [target]: { ...(s.effects[target] || {}), [effectKey]: true } },
         sabotagePlayed: [...s.sabotagePlayed, { by, byName, target, card }],
-        players: s.players.map(p => p.userId === by ? { ...p, cards: (() => { const c = [...p.cards]; c.splice(c.indexOf(card), 1); return c })() } : p),
+        // Remove the card from the sender's hand
+        players: s.players.map(p => p.userId === by ? { ...p, cards: (() => { const c = [...p.cards]; const i = c.indexOf(card); if (i > -1) c.splice(i, 1); return c })() } : p),
+        // Show notification if this card was played ON ME
+        incomingCard: target === myUserId ? { byName, card } : s.incomingCard,
       }))
+      // Auto-clear the notification after 2.5s
+      if (target === myUserId) {
+        setTimeout(() => set({ incomingCard: null }), 2500)
+      }
     })
 
     ch.on('broadcast', { event: 'question_end' }, ({ payload }) => {
@@ -214,7 +228,7 @@ export const useArenaStore = create((set, get) => ({
         correctIdx, explanation, aevaLine, phase: 'reveal', scoreDeltas,
         players: s.players.map(p => playerUpdates[p.userId] ? { ...p, ...playerUpdates[p.userId] } : p),
       }))
-      setTimeout(() => set({ phase: 'sabotage', sabotagePlayed: [] }), 3500)
+      setTimeout(() => set({ phase: 'sabotage', sabotagePlayed: [], effects: {} }), 3500)
     })
 
     ch.on('broadcast', { event: 'next_question' }, ({ payload }) => {
@@ -285,7 +299,9 @@ export const useArenaStore = create((set, get) => ({
     const stub = stubs[qIdx]
     if (!stub) { get()._endGame(); return }
     get()._clearTimer()
-    set({ currentQIdx: qIdx, timerSeconds: Q_TIME, answers: {}, correctIdx: null, effects: {}, sabotagePlayed: [], aevaLine: '', scoreDeltas: {}, phase: 'question' })
+    // NOTE: do NOT reset effects here — they are set during the sabotage window
+    // and must persist into the next question. Effects are cleared after _endQuestion.
+    set({ currentQIdx: qIdx, timerSeconds: Q_TIME, answers: {}, correctIdx: null, sabotagePlayed: [], aevaLine: '', scoreDeltas: {}, phase: 'question' })
     if (isHost) {
       _channel?.send({ type: 'broadcast', event: 'question_start', payload: { qIdx } })
     }
@@ -363,9 +379,10 @@ export const useArenaStore = create((set, get) => ({
     }))
     _channel?.send({ type: 'broadcast', event: 'question_end', payload: { correctIdx, explanation: q.explain, playerUpdates, aevaLine, scoreDeltas } })
 
-    // Open sabotage window after 3.5s
+    // Open sabotage window after 3.5s — clear previous effects HERE so the
+    // window starts clean and fresh cards can be played for the NEXT question
     setTimeout(() => {
-      set({ phase: 'sabotage', sabotagePlayed: [] })
+      set({ phase: 'sabotage', sabotagePlayed: [], effects: {} })
       setTimeout(() => {
         const { currentQIdx, questions, _channel } = get()
         const next = currentQIdx + 1
