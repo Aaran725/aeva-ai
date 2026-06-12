@@ -6498,47 +6498,6 @@ If no clear changes: {"changes":[]}`
                       )}
                     </AnimatePresence>
 
-                    {/* First-time starter cards — shown when no session memories yet */}
-                    {!chipEditMode && sessionMemories.length === 0 && totalExchanges === 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.3, duration: 0.4 }}
-                        style={{ width: '100%', marginBottom: 4 }}
-                      >
-                        <p style={{ fontSize: 11, fontWeight: 700, color: isLight ? 'rgba(0,0,0,0.30)' : 'rgba(255,255,255,0.28)', letterSpacing: '0.10em', textTransform: 'uppercase', textAlign: 'center', marginBottom: 10 }}>
-                          What are you studying?
-                        </p>
-                        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-                          {[
-                            { icon: '🧬', label: 'Biology', prompt: "I'm studying Biology. Can you teach me something and check my understanding?" },
-                            { icon: '📐', label: 'Maths', prompt: "I'm studying Maths. Start me on a topic and test me as we go." },
-                            { icon: '⚗️', label: 'Chemistry', prompt: "I'm studying Chemistry. Teach me a key concept and quiz me on it." },
-                            { icon: '📚', label: 'History', prompt: "I'm studying History. Pick an important topic and help me understand it deeply." },
-                            { icon: '💻', label: 'Computer Science', prompt: "I'm studying Computer Science. Teach me something and check I understand it." },
-                            { icon: '✏️', label: 'Something else', prompt: "I'm studying something — ask me what subject and help me learn it." },
-                          ].map((s, i) => (
-                            <motion.button key={s.label}
-                              initial={{ opacity: 0, scale: 0.90 }} animate={{ opacity: 1, scale: 1 }}
-                              transition={{ delay: 0.32 + i * 0.05, type: 'spring', stiffness: 300 }}
-                              whileHover={{ scale: 1.06, y: -2 }} whileTap={{ scale: 0.96 }}
-                              onClick={() => { setInput(s.prompt); setTimeout(() => inputRef.current?.focus(), 50) }}
-                              style={{
-                                display: 'inline-flex', alignItems: 'center', gap: 7,
-                                padding: '9px 16px', borderRadius: 99,
-                                background: isLight ? 'rgba(99,102,241,0.07)' : 'rgba(99,102,241,0.10)',
-                                border: isLight ? '1px solid rgba(99,102,241,0.20)' : '1px solid rgba(99,102,241,0.25)',
-                                color: isLight ? 'rgba(79,70,229,0.85)' : 'rgba(165,180,252,0.85)',
-                                fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                                fontFamily: "'Inter', system-ui, sans-serif",
-                              }}
-                            >
-                              <span>{s.icon}</span> {s.label}
-                            </motion.button>
-                          ))}
-                        </div>
-                        <div style={{ width: '100%', height: 1, background: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)', margin: '14px 0 6px' }} />
-                      </motion.div>
-                    )}
 
                     {chipEditMode && (
                       <p style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.30)', letterSpacing: '0.10em', textTransform: 'uppercase' }}>Suggestions</p>
