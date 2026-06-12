@@ -3326,7 +3326,7 @@ Write a focused 3–5 sentence explanation of this specific step only.
                   ))}
                 </div>
               ) : (
-                <DrillRenderer text={drillText} streaming={loading} isLight={isLight} />
+                <MarkdownRenderer text={drillText} streaming={loading} isLight={isLight} isDrill />
               )}
             </div>
           </motion.div>
@@ -3336,7 +3336,7 @@ Write a focused 3–5 sentence explanation of this specific step only.
   )
 }
 
-function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
+function MarkdownRenderer({ text, streaming, cursorColor, isLight = false, isDrill = false }) {
   const txtBody = isLight ? 'rgba(0,0,0,0.82)'  : 'rgba(255,255,255,0.86)'
   const txtP    = isLight ? 'rgba(0,0,0,0.78)'  : 'rgba(255,255,255,0.82)'
   const purple  = isLight ? '#5B5BD6'            : '#818CF8'
@@ -3660,9 +3660,19 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
     const stepMatch = trimmed.match(/^(?:\*\*)?(?:Step\s+)?(\d+):\s+(.+?)(?:\*\*)?$/)
     if (stepMatch && trimmed.replace(/\*\*/g, '').length < 100) {
       flushList()
-      elements.push(
-        <StepCard key={`step-${i}`} stepNum={stepMatch[1]} stepTitle={stepMatch[2]} fullText={clean} isLight={isLight} />
-      )
+      if (isDrill) {
+        // In drill context: render as a compact bold label, no nested expansion
+        elements.push(
+          <div key={`step-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '14px 0 4px' }}>
+            <span style={{ fontSize: 11, fontWeight: 900, color: isLight ? '#6366F1' : '#818CF8', background: isLight ? 'rgba(99,102,241,0.10)' : 'rgba(99,102,241,0.16)', borderRadius: 6, padding: '2px 7px', flexShrink: 0 }}>{stepMatch[1]}</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: isLight ? 'rgba(0,0,0,0.88)' : 'rgba(255,255,255,0.90)', letterSpacing: '-0.01em' }}>{parseInline(stepMatch[2], isLight)}</span>
+          </div>
+        )
+      } else {
+        elements.push(
+          <StepCard key={`step-${i}`} stepNum={stepMatch[1]} stepTitle={stepMatch[2]} fullText={clean} isLight={isLight} />
+        )
+      }
       i++; continue
     }
 
