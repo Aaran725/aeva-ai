@@ -12,6 +12,7 @@ import { supabase } from './supabase'
 import { useXPStore } from './xpStore'
 import { useAevaControlStore } from './aevaControlStore'
 import { nextGroqKey as gKey, GROQ_URL } from './groqClient'
+import { matchTemplate } from './syllabusTemplates'
 
 export async function generateRoadmapNodes(title, examDate, assessmentInfo, options = {}) {
   const daysLeft = Math.max(1, Math.ceil((new Date(examDate) - Date.now()) / 86400000))
@@ -192,14 +193,210 @@ function ShareModal({ roadmap, onClose }) {
   )
 }
 
+/* ── Syllabus Verification View — review & edit nodes before starting ──────── */
+function SyllabusCheckView({ nodes: initialNodes, examTitle, onConfirm }) {
+  const template = matchTemplate(examTitle)
+
+  // Each node gets a checked state; unchecked = excluded on confirm
+  const [items, setItems]     = useState(() =>
+    (initialNodes || []).map(n => ({ ...n, _checked: true }))
+  )
+  const [newTopics, setNewTopics] = useState({ Foundation: '', 'Core Topics': '', Practice: '', 'Exam Prep': '' })
+  const [confirmed, setConfirmed] = useState(false)
+
+  const PHASES = ['Foundation', 'Core Topics', 'Practice', 'Exam Prep']
+
+  const toggle = (id) => setItems(prev => prev.map(n => n.id === id ? { ...n, _checked: !n._checked } : n))
+
+  const addTopic = (phase) => {
+    const topic = newTopics[phase]?.trim()
+    if (!topic) return
+    const newNode = {
+      id: `n_custom_${Date.now()}`,
+      topic,
+      type: 'learn',
+      phase,
+      difficulty: 2,
+      estimatedMinutes: 20,
+      xp: 50,
+      description: '',
+      subtopics: [],
+      status: 'locked',
+      _checked: true,
+      _custom: true,
+    }
+    setItems(prev => {
+      // Insert after last node of same phase
+      const lastIdx = [...prev].reverse().findIndex(n => n.phase === phase)
+      const insertAt = lastIdx === -1 ? prev.length : prev.length - lastIdx
+      const out = [...prev]
+      out.splice(insertAt, 0, newNode)
+      return out
+    })
+    setNewTopics(prev => ({ ...prev, [phase]: '' }))
+  }
+
+  const handleConfirm = () => {
+    setConfirmed(true)
+    // Strip _checked/_custom helpers, keep only checked nodes, re-index statuses
+    const final = items
+      .filter(n => n._checked)
+      .map(({ _checked, _custom, ...n }) => n)
+    // Recalculate statuses — first available, rest locked
+    const recalculated = final.map((n, i) => ({ ...n, status: i === 0 ? 'available' : 'locked' }))
+    onConfirm(recalculated)
+  }
+
+  // Detect topics from template that are missing in generated nodes
+  const missingFromTemplate = template
+    ? template.topics.filter(t =>
+        !items.some(n => n.topic.toLowerCase().includes(t.toLowerCase().slice(0, 12)))
+      ).slice(0, 5)
+    : []
+
+  const checkedCount = items.filter(n => n._checked).length
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+      style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', padding: '16px 20px 32px', fontFamily: "'Inter', system-ui, sans-serif" }}>
+
+      {/* Header */}
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ fontSize: 17, fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', marginBottom: 6 }}>
+          Review your roadmap
+        </div>
+        <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.42)', lineHeight: 1.6 }}>
+          Aeva generated these topics for <strong style={{ color: 'rgba(255,255,255,0.70)' }}>{examTitle}</strong>. Uncheck anything not in your spec, or add missing topics below.
+        </div>
+        {template && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8, padding: '4px 10px', borderRadius: 99, background: 'rgba(74,222,128,0.10)', border: '1px solid rgba(74,222,128,0.28)' }}>
+            <Check size={10} color="#4ADE80" strokeWidth={3} />
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#4ADE80' }}>Matches {template.label} spec</span>
+          </div>
+        )}
+      </div>
+
+      {/* Missing topics warning */}
+      {missingFromTemplate.length > 0 && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          style={{ marginBottom: 16, padding: '11px 14px', borderRadius: 13, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.25)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
+            <AlertTriangle size={12} color="#FCD34D" />
+            <span style={{ fontSize: 12, fontWeight: 800, color: '#FCD34D' }}>These spec topics weren't generated</span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {missingFromTemplate.map(t => (
+              <button key={t}
+                onClick={() => {
+                  const phase = 'Core Topics'
+                  const newNode = { id: `n_missing_${Date.now()}_${t.slice(0,4)}`, topic: t, type: 'learn', phase, difficulty: 2, estimatedMinutes: 20, xp: 50, description: '', subtopics: [], status: 'locked', _checked: true, _custom: true }
+                  setItems(prev => {
+                    const lastIdx = [...prev].map((n,i)=>({n,i})).filter(({n})=>n.phase===phase).pop()?.i ?? prev.length - 1
+                    const out = [...prev]; out.splice(lastIdx + 1, 0, newNode); return out
+                  })
+                }}
+                style={{ padding: '4px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.30)', color: '#FCD34D', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Plus size={9} /> {t}
+              </button>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Nodes grouped by phase */}
+      {PHASES.map(phase => {
+        const phaseNodes = items.filter(n => n.phase === phase)
+        if (!phaseNodes.length) return null
+        const phaseCfg = { Foundation: '#3B82F6', 'Core Topics': '#8B5CF6', Practice: '#F59E0B', 'Exam Prep': '#EF4444' }
+        const col = phaseCfg[phase] || '#6366F1'
+
+        return (
+          <div key={phase} style={{ marginBottom: 20 }}>
+            {/* Phase header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: col, flexShrink: 0 }} />
+              <span style={{ fontSize: 11, fontWeight: 800, color: col, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{phase}</span>
+              <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.22)', fontWeight: 500 }}>{phaseNodes.filter(n=>n._checked).length}/{phaseNodes.length}</span>
+            </div>
+
+            {/* Node rows */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {phaseNodes.map(node => {
+                const nodeCfg = { learn: '#6366F1', drill: '#F97316', check: '#8B5CF6', mock: '#EF4444' }
+                const nodeCol = nodeCfg[node.type] || '#6366F1'
+                return (
+                  <motion.div key={node.id} layout
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 11, background: node._checked ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)', border: node._checked ? '1px solid rgba(255,255,255,0.09)' : '1px solid rgba(255,255,255,0.04)', opacity: node._checked ? 1 : 0.4, transition: 'all 0.15s', cursor: 'pointer' }}
+                    onClick={() => toggle(node.id)}
+                  >
+                    {/* Checkbox */}
+                    <div style={{ width: 18, height: 18, borderRadius: 5, border: node._checked ? 'none' : '1.5px solid rgba(255,255,255,0.25)', background: node._checked ? col : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
+                      {node._checked && <Check size={11} color="#fff" strokeWidth={3} />}
+                    </div>
+
+                    {/* Topic */}
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: node._checked ? 600 : 400, color: node._checked ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.35)', textDecoration: node._checked ? 'none' : 'line-through' }}>
+                      {node.topic}
+                      {node._custom && <span style={{ marginLeft: 6, fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.28)', background: 'rgba(255,255,255,0.07)', padding: '1px 5px', borderRadius: 4 }}>custom</span>}
+                    </span>
+
+                    {/* Type badge */}
+                    <span style={{ fontSize: 9.5, fontWeight: 800, color: nodeCol, background: `${nodeCol}18`, padding: '2px 7px', borderRadius: 99, border: `1px solid ${nodeCol}35`, flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{node.type}</span>
+
+                    {/* Time */}
+                    {node.estimatedMinutes && (
+                      <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.22)', fontWeight: 500, flexShrink: 0 }}>{node.estimatedMinutes}m</span>
+                    )}
+                  </motion.div>
+                )
+              })}
+            </div>
+
+            {/* Add topic inline */}
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <input
+                value={newTopics[phase] || ''}
+                onChange={e => setNewTopics(prev => ({ ...prev, [phase]: e.target.value }))}
+                onKeyDown={e => e.key === 'Enter' && addTopic(phase)}
+                placeholder={`Add ${phase} topic…`}
+                style={{ flex: 1, padding: '7px 11px', borderRadius: 9, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.70)', fontSize: 12, fontFamily: 'inherit', outline: 'none' }}
+              />
+              <motion.button whileTap={{ scale: 0.95 }} onClick={() => addTopic(phase)}
+                disabled={!newTopics[phase]?.trim()}
+                style={{ padding: '7px 13px', borderRadius: 9, background: newTopics[phase]?.trim() ? `${col}22` : 'rgba(255,255,255,0.04)', border: `1px solid ${newTopics[phase]?.trim() ? col + '44' : 'rgba(255,255,255,0.07)'}`, color: newTopics[phase]?.trim() ? col : 'rgba(255,255,255,0.22)', fontSize: 12, fontWeight: 700, cursor: newTopics[phase]?.trim() ? 'pointer' : 'default', fontFamily: 'inherit', transition: 'all 0.15s' }}>
+                Add
+              </motion.button>
+            </div>
+          </div>
+        )
+      })}
+
+      {/* Confirm button */}
+      <div style={{ position: 'sticky', bottom: 0, paddingTop: 16, background: 'linear-gradient(to bottom, transparent, #05060f 60%)' }}>
+        <motion.button
+          whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+          onClick={handleConfirm}
+          disabled={confirmed || checkedCount === 0}
+          style={{ width: '100%', padding: '13px 0', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #4F46E5, #7C3AED)', boxShadow: '0 4px 18px rgba(79,70,229,0.40)', color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '-0.01em', opacity: confirmed ? 0.6 : 1 }}>
+          {confirmed ? 'Starting…' : `Confirm ${checkedCount} topic${checkedCount !== 1 ? 's' : ''} — start roadmap`}
+        </motion.button>
+        <div style={{ textAlign: 'center', marginTop: 8, fontSize: 11, color: 'rgba(255,255,255,0.22)' }}>
+          You can always add or remove topics later
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
 export default function RoadmapHub() {
-  const { roadmapOpen, closeRoadmapHub, roadmaps, getActive } = useRoadmapStore()
+  const { roadmapOpen, closeRoadmapHub, roadmaps, getActive, updateRoadmap } = useRoadmapStore()
   const [view, setView] = useState(() => {
     const active = useRoadmapStore.getState().getActive()
     return active?.nodes?.length ? 'path' : 'home'
   })
-  const [pendingForm, setPending] = useState(null)  // holds form data during generation
-  const [showShare, setShowShare] = useState(false)
+  const [pendingForm, setPending]         = useState(null)  // holds form data during generation
+  const [pendingNodes, setPendingNodes]   = useState(null)  // holds generated nodes for verification
+  const [showShare, setShowShare]         = useState(false)
   const [widgetMode, setWidgetMode] = useState(() => localStorage.getItem('aeva_roadmap_widget') === '1')
   const toggleWidget = () => setWidgetMode(m => { const n = !m; localStorage.setItem('aeva_roadmap_widget', n ? '1' : '0'); return n })
 
@@ -291,7 +488,8 @@ export default function RoadmapHub() {
         <AnimatePresence mode="wait">
           {view === 'home'       && <HomeView       key="home"       onCreate={() => setView('create')} onOpen={() => setView('path')} widgetMode={widgetMode} />}
           {view === 'create'     && <CreateView     key="create"     onGenerate={(fd) => { setPending(fd); setView('generating') }} />}
-          {view === 'generating' && <GeneratingView key="generating" formData={pendingForm} onDone={() => { setPending(null); setView('path') }} />}
+          {view === 'generating' && <GeneratingView key="generating" formData={pendingForm} onDone={(nodes) => { setPendingNodes(nodes); setPending(null); setView('verify') }} />}
+          {view === 'verify'     && <SyllabusCheckView key="verify" nodes={pendingNodes} examTitle={getActive()?.title || ''} onConfirm={(finalNodes) => { const rm = getActive(); if (rm) updateRoadmap(rm.id, { nodes: finalNodes }); setPendingNodes(null); setView('path') }} />}
           {view === 'path'       && <PathView       key="path" />}
         </AnimatePresence>
       </div>
@@ -847,14 +1045,15 @@ function GeneratingView({ formData, onDone }) {
         const id = createRoadmap({ title: formData.title, examDate: formData.examDate, targetGrade: formData.targetGrade || 'B', assessmentInfo: formData.info })
         const { overview, nodes } = await generateRoadmapNodes(formData.title, formData.examDate, formData.info, formData.options || {})
         if (cancelled) return
+        // Store overview + placeholder nodes — user verifies before finalising
         updateRoadmap(id, { overview, nodes })
-        // Generate daily mission
+        // Generate daily mission in background
         const roadmapSnap = { title: formData.title, examDate: formData.examDate, nodes, learningProfile: {} }
         const mission = await generateDailyMission(roadmapSnap)
         if (cancelled) return
         setDailyMission(id, mission)
         clearInterval(stepInterval)
-        onDone()
+        onDone(nodes)  // pass nodes to verification view
       } catch (e) {
         if (!cancelled) setError('Generation failed — check your connection and try again.')
         clearInterval(stepInterval)
@@ -1333,6 +1532,18 @@ function NodeDetailSheet({ node, roadmap, isStarted, onLaunch, onGotIt, onShaky,
         </motion.button>
       )}
 
+      {/* ── Next review date (for completed nodes) ──────────────────── */}
+      {node.status === 'complete' && node.nextReview && (
+        <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <RotateCcw size={10} color={node.nextReview <= Date.now() ? '#67E8F9' : 'rgba(255,255,255,0.22)'} />
+          <span style={{ fontSize: 10.5, fontWeight: 600, color: node.nextReview <= Date.now() ? '#67E8F9' : 'rgba(255,255,255,0.28)' }}>
+            {node.nextReview <= Date.now()
+              ? 'Review due now'
+              : `Next review: ${new Date(node.nextReview).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
+          </span>
+        </div>
+      )}
+
       {/* ── Flag inaccuracy ─────────────────────────────────────────── */}
       <div style={{ marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10 }}>
         {isFlagged && !showFlagPanel ? (
@@ -1383,10 +1594,11 @@ function NodeDetailSheet({ node, roadmap, isStarted, onLaunch, onGotIt, onShaky,
 
 /* ── Node config ─────────────────────────────────────────────────────────── */
 const NODE_CFG = {
-  learn: { label: 'Learn with Aeva', color: '#6366F1', light: '#818CF8', shadow: '#3730A3', Icon: BookOpen },
-  drill: { label: 'Drill',           color: '#F97316', light: '#FB923C', shadow: '#9A3412', Icon: Zap },
-  check: { label: 'Knowledge Check', color: '#8B5CF6', light: '#A78BFA', shadow: '#5B21B6', Icon: Target },
-  mock:  { label: 'Mock Test',       color: '#EF4444', light: '#F87171', shadow: '#991B1B', Icon: ClipboardList },
+  learn:  { label: 'Learn with Aeva', color: '#6366F1', light: '#818CF8', shadow: '#3730A3', Icon: BookOpen },
+  drill:  { label: 'Drill',           color: '#F97316', light: '#FB923C', shadow: '#9A3412', Icon: Zap },
+  check:  { label: 'Knowledge Check', color: '#8B5CF6', light: '#A78BFA', shadow: '#5B21B6', Icon: Target },
+  mock:   { label: 'Mock Test',       color: '#EF4444', light: '#F87171', shadow: '#991B1B', Icon: ClipboardList },
+  review: { label: 'Spaced Review',   color: '#06B6D4', light: '#67E8F9', shadow: '#0E7490', Icon: RotateCcw },
 }
 
 /* ── Phase config ────────────────────────────────────────────────────────── */
@@ -1625,8 +1837,19 @@ function GradeTrendChart({ gradeHistory, targetGrade }) {
 function computeSmartTasks(nodes, drillHistory, daysLeft, roadmapTitle) {
   const tasks = []
 
+  // Priority 0: SRS due reviews — overdue or due today
+  const dueReviews = nodes.filter(n =>
+    n.status === 'complete' && n.nextReview && n.nextReview <= Date.now()
+  ).sort((a, b) => a.nextReview - b.nextReview)
+  if (dueReviews.length > 0) {
+    const n = dueReviews[0]
+    const overdueDays = Math.floor((Date.now() - n.nextReview) / 86400000)
+    const label = overdueDays > 1 ? `Overdue review (+${overdueDays}d): ${n.topic}` : `Due for review: ${n.topic}`
+    tasks.push({ id: `t_review_${n.id}`, type: 'review', topic: n.topic, nodeId: n.id, label, status: 'pending', urgent: overdueDays > 1 })
+  }
+
   // Priority 1: Shaky nodes — student flagged they don't know this
-  const shakyNodes = nodes.filter(n => n.status === 'complete' && n.confidence === 'shaky')
+  const shakyNodes = nodes.filter(n => n.status === 'complete' && n.confidence === 'shaky' && !tasks.find(t => t.topic === n.topic))
   if (shakyNodes.length > 0) {
     const n = shakyNodes[0]
     tasks.push({ id: `t_shaky_${n.id}`, type: 'drill', topic: n.topic, label: 'Revisit weak spot', status: 'pending', urgent: true })
@@ -1956,6 +2179,352 @@ function CompletionGate({ node, onPass, onFail, onSkip }) {
   )
 }
 
+/* ── Review Gate — lightweight 1-question SRS check for completed nodes ───── */
+function ReviewGate({ node, onPass, onFail, onDismiss }) {
+  const [phase, setPhase]       = useState('loading')
+  const [question, setQuestion] = useState(null)
+  const [selected, setSelected] = useState(null)
+  const [apiError, setApiError] = useState(false)
+
+  useEffect(() => {
+    generateGateQuestions(node.topic, node.difficulty || 2)
+      .then(qs => { setQuestion(qs[0]); setPhase('question') })
+      .catch(() => { setApiError(true); setPhase('question') })
+  }, [])
+
+  const handleAnswer = (idx) => {
+    if (selected !== null || !question) return
+    setSelected(idx)
+    const correct = idx === question.answer
+    setTimeout(() => correct ? onPass() : onFail(), 1000)
+  }
+
+  // How many days until next review
+  const nextDays = node.reviewInterval ? Math.round(node.reviewInterval / 86400000) : 14
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 510, background: 'rgba(4,5,18,0.88)', backdropFilter: 'blur(16px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+      onClick={e => { if (e.target === e.currentTarget) onDismiss() }}
+    >
+      <motion.div
+        initial={{ scale: 0.92, y: 18 }} animate={{ scale: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 340, damping: 26 }}
+        onClick={e => e.stopPropagation()}
+        style={{ background: 'rgba(6,8,20,0.99)', border: '1px solid rgba(6,182,212,0.28)', borderRadius: 24, padding: '22px 22px 24px', maxWidth: 380, width: '100%', fontFamily: "'Inter', system-ui, sans-serif" }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(6,182,212,0.65)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 4 }}>Spaced review</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>{node.topic}</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.30)', marginTop: 2 }}>
+              {selected === null ? 'Quick check — do you still remember this?' : ''}
+            </div>
+          </div>
+          <button onClick={onDismiss} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.30)', padding: 2, display: 'flex', flexShrink: 0 }}>
+            <X size={16} />
+          </button>
+        </div>
+
+        {phase === 'loading' && (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+              style={{ width: 24, height: 24, border: '3px solid rgba(6,182,212,0.15)', borderTopColor: '#06B6D4', borderRadius: '50%', margin: '0 auto 12px' }} />
+            <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.30)' }}>Loading…</div>
+          </div>
+        )}
+
+        {phase === 'question' && apiError && (
+          <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 14, lineHeight: 1.6 }}>Couldn't load question. Do you still remember this topic?</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <motion.button whileTap={{ scale: 0.97 }} onClick={onPass} style={{ flex: 1, padding: '10px', borderRadius: 11, background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.32)', color: '#4ADE80', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>✓ Yes, solid</motion.button>
+              <motion.button whileTap={{ scale: 0.97 }} onClick={onFail} style={{ flex: 1, padding: '10px', borderRadius: 11, background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.28)', color: '#FCD34D', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>◐ Getting fuzzy</motion.button>
+            </div>
+          </div>
+        )}
+
+        {phase === 'question' && !apiError && question && (
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.88)', lineHeight: 1.55, marginBottom: 14 }}>{question.q}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              {question.options.map((opt, idx) => {
+                const isCorrect  = idx === question.answer
+                const isSelected = idx === selected
+                const showResult = selected !== null
+                return (
+                  <motion.button key={idx}
+                    whileHover={selected === null ? { scale: 1.015 } : {}}
+                    whileTap={selected === null ? { scale: 0.985 } : {}}
+                    onClick={() => handleAnswer(idx)}
+                    style={{
+                      padding: '10px 14px', borderRadius: 11, textAlign: 'left', cursor: selected !== null ? 'default' : 'pointer',
+                      fontFamily: 'inherit', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 10,
+                      background: !showResult ? 'rgba(255,255,255,0.05)' : isCorrect ? 'rgba(74,222,128,0.13)' : isSelected ? 'rgba(248,113,113,0.10)' : 'rgba(255,255,255,0.02)',
+                      border: !showResult ? '1px solid rgba(255,255,255,0.10)' : isCorrect ? '1px solid rgba(74,222,128,0.35)' : isSelected ? '1px solid rgba(248,113,113,0.30)' : '1px solid rgba(255,255,255,0.05)',
+                      color: !showResult ? 'rgba(255,255,255,0.80)' : isCorrect ? '#4ADE80' : isSelected ? '#F87171' : 'rgba(255,255,255,0.22)',
+                      transition: 'all 0.15s',
+                    }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, opacity: 0.40, flexShrink: 0, minWidth: 12 }}>{['A','B','C','D'][idx]}</span>
+                    <span style={{ flex: 1 }}>{opt}</span>
+                    {showResult && isCorrect  && <Check size={12} color="#4ADE80" strokeWidth={3} style={{ flexShrink: 0 }} />}
+                    {showResult && isSelected && !isCorrect && <X size={12} color="#F87171" strokeWidth={3} style={{ flexShrink: 0 }} />}
+                  </motion.button>
+                )
+              })}
+            </div>
+            {selected !== null && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ marginTop: 12, fontSize: 11, color: 'rgba(6,182,212,0.60)', textAlign: 'center' }}>
+                {selected === question.answer
+                  ? `✓ Next review in ${nextDays * 2} days`
+                  : '✗ Marked shaky — review again in 3 days'}
+              </motion.div>
+            )}
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  )
+}
+
+/* ── Exam Practice Gate — written answer after MCQ gate for learn nodes ───── */
+async function generateExamQuestion(topic, roadmapTitle, difficulty = 2) {
+  const commandWords = difficulty <= 2
+    ? ['State', 'Identify', 'Describe', 'Calculate']
+    : difficulty <= 3
+    ? ['Explain', 'Calculate', 'Show that', 'Find']
+    : ['Evaluate', 'Derive', 'Prove', 'Show that', 'Hence find']
+  const cmd = commandWords[Math.floor(Math.random() * commandWords.length)]
+  const marks = difficulty <= 2 ? 4 : difficulty <= 3 ? 5 : 6
+
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
+    body: JSON.stringify({
+      model: 'llama-3.1-8b-instant',
+      messages: [{ role: 'user', content: `Write one exam-style question on "${topic}" for ${roadmapTitle}. Command word: "${cmd}". Marks: ${marks}. Make it specific — include numbers, context, or a scenario where appropriate. No multiple choice. Return ONLY valid JSON: { "question": "Full question text here.", "marks": ${marks}, "markScheme": ["Mark scheme point 1 (1 mark)", "Mark scheme point 2 (1 mark)", "Mark scheme point 3 (1 mark)"] }. Include exactly ${marks} mark scheme bullet points. Keep question under 60 words.` }],
+      response_format: { type: 'json_object' },
+      temperature: 0.5,
+      max_tokens: 400,
+    }),
+  })
+  const data = await res.json()
+  return JSON.parse(data.choices[0].message.content)
+}
+
+async function gradeExamAnswer(question, marks, markScheme, studentAnswer) {
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'user', content: `You are an exam marker. Grade this student answer strictly against the mark scheme.
+
+Question: ${question}
+Total marks: ${marks}
+Mark scheme:
+${markScheme.map((m, i) => `${i+1}. ${m}`).join('\n')}
+
+Student answer: "${studentAnswer}"
+
+Return ONLY valid JSON: { "awarded": <integer 0-${marks}>, "feedback": "2-3 sentences: which mark scheme points were hit, what was missing or wrong, what would get full marks." }` }],
+      response_format: { type: 'json_object' },
+      temperature: 0.2,
+      max_tokens: 250,
+    }),
+  })
+  const data = await res.json()
+  return JSON.parse(data.choices[0].message.content)
+}
+
+function ExamPracticeGate({ node, roadmapTitle, onSolid, onShaky, onSkip }) {
+  const [phase, setPhase]       = useState('loading')  // loading | question | grading | result
+  const [examQ, setExamQ]       = useState(null)
+  const [answer, setAnswer]     = useState('')
+  const [result, setResult]     = useState(null)        // { awarded, feedback }
+  const [apiError, setApiError] = useState(false)
+  const textRef = useRef(null)
+
+  useEffect(() => {
+    generateExamQuestion(node.topic, roadmapTitle, node.difficulty || 2)
+      .then(q => { setExamQ(q); setPhase('question') })
+      .catch(() => { setApiError(true); setPhase('question') })
+  }, [])
+
+  useEffect(() => {
+    if (phase === 'question' && textRef.current) textRef.current.focus()
+  }, [phase])
+
+  const handleSubmit = async () => {
+    if (!answer.trim() || phase !== 'question' || !examQ) return
+    setPhase('grading')
+    try {
+      const r = await gradeExamAnswer(examQ.question, examQ.marks, examQ.markScheme, answer)
+      setResult(r)
+      setPhase('result')
+    } catch {
+      setResult({ awarded: 0, feedback: 'Could not grade — please self-assess.' })
+      setPhase('result')
+    }
+  }
+
+  const pct = result ? Math.round((result.awarded / (examQ?.marks || 1)) * 100) : 0
+  const passed = pct >= 50
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 510, background: 'rgba(4,5,18,0.92)', backdropFilter: 'blur(18px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={e => { if (e.target === e.currentTarget) onSkip() }}
+    >
+      <motion.div
+        initial={{ scale: 0.90, y: 22 }} animate={{ scale: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 320, damping: 26 }}
+        onClick={e => e.stopPropagation()}
+        style={{ background: 'rgba(8,9,24,0.99)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 24, padding: '22px 22px 24px', maxWidth: 440, width: '100%', fontFamily: "'Inter', system-ui, sans-serif", maxHeight: '90vh', overflowY: 'auto' }}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(99,102,241,0.70)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 4 }}>Exam practice</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>{node.topic}</div>
+          </div>
+          <button onClick={onSkip} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.30)', padding: 2, display: 'flex', flexShrink: 0, marginTop: 2 }}>
+            <X size={16} />
+          </button>
+        </div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginBottom: 18 }}>One written question — show your working</div>
+
+        {/* Loading */}
+        {phase === 'loading' && (
+          <div style={{ textAlign: 'center', padding: '28px 0' }}>
+            <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+              style={{ width: 26, height: 26, border: '3px solid rgba(99,102,241,0.18)', borderTopColor: '#6366F1', borderRadius: '50%', margin: '0 auto 14px' }} />
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>Generating exam question…</div>
+          </div>
+        )}
+
+        {/* API error fallback */}
+        {phase === 'question' && apiError && (
+          <div style={{ textAlign: 'center', padding: '8px 0' }}>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginBottom: 16, lineHeight: 1.6 }}>Couldn't generate a question. Skip or self-assess.</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <motion.button whileTap={{ scale: 0.97 }} onClick={onSolid} style={{ flex: 1, padding: '10px', borderRadius: 11, background: 'rgba(74,222,128,0.13)', border: '1px solid rgba(74,222,128,0.35)', color: '#4ADE80', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>✓ I could answer this</motion.button>
+              <motion.button whileTap={{ scale: 0.97 }} onClick={onShaky} style={{ flex: 1, padding: '10px', borderRadius: 11, background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.28)', color: '#FCD34D', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>◐ Still shaky</motion.button>
+            </div>
+          </div>
+        )}
+
+        {/* Question */}
+        {phase === 'question' && !apiError && examQ && (
+          <div>
+            {/* Question box */}
+            <div style={{ padding: '14px 16px', borderRadius: 14, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.22)', marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 10, fontWeight: 800, color: 'rgba(165,180,252,0.55)', letterSpacing: '0.10em', textTransform: 'uppercase' }}>Question</span>
+                <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(165,180,252,0.70)', background: 'rgba(99,102,241,0.18)', padding: '2px 8px', borderRadius: 99, border: '1px solid rgba(99,102,241,0.30)' }}>{examQ.marks} marks</span>
+              </div>
+              <div style={{ fontSize: 14.5, fontWeight: 600, color: 'rgba(255,255,255,0.90)', lineHeight: 1.6 }}>{examQ.question}</div>
+            </div>
+
+            {/* Answer textarea */}
+            <textarea
+              ref={textRef}
+              value={answer}
+              onChange={e => setAnswer(e.target.value)}
+              placeholder="Write your answer here — show your full working and reasoning…"
+              rows={5}
+              style={{
+                width: '100%', padding: '12px 14px', borderRadius: 13,
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)',
+                color: 'rgba(255,255,255,0.85)', fontSize: 13.5, fontFamily: 'inherit',
+                resize: 'vertical', outline: 'none', lineHeight: 1.6,
+                boxSizing: 'border-box', transition: 'border 0.15s',
+              }}
+              onFocus={e => { e.target.style.border = '1px solid rgba(99,102,241,0.50)' }}
+              onBlur={e => { e.target.style.border = '1px solid rgba(255,255,255,0.12)' }}
+            />
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <motion.button
+                whileHover={{ scale: answer.trim() ? 1.02 : 1 }}
+                whileTap={{ scale: answer.trim() ? 0.97 : 1 }}
+                onClick={handleSubmit}
+                disabled={!answer.trim()}
+                style={{ flex: 1, padding: '11px', borderRadius: 12, border: 'none', background: answer.trim() ? 'linear-gradient(135deg,#4F46E5,#7C3AED)' : 'rgba(255,255,255,0.06)', color: answer.trim() ? '#fff' : 'rgba(255,255,255,0.25)', fontSize: 13, fontWeight: 700, cursor: answer.trim() ? 'pointer' : 'default', fontFamily: 'inherit', boxShadow: answer.trim() ? '0 4px 14px rgba(79,70,229,0.40)' : 'none', transition: 'all 0.15s' }}>
+                Submit for marking
+              </motion.button>
+              <motion.button whileTap={{ scale: 0.97 }} onClick={onSkip}
+                style={{ padding: '11px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.28)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Skip
+              </motion.button>
+            </div>
+          </div>
+        )}
+
+        {/* Grading */}
+        {phase === 'grading' && (
+          <div style={{ textAlign: 'center', padding: '28px 0' }}>
+            <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+              style={{ width: 26, height: 26, border: '3px solid rgba(99,102,241,0.18)', borderTopColor: '#6366F1', borderRadius: '50%', margin: '0 auto 14px' }} />
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>Aeva is marking your answer…</div>
+          </div>
+        )}
+
+        {/* Result */}
+        {phase === 'result' && result && examQ && (
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+            {/* Score */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: 14, background: passed ? 'rgba(74,222,128,0.07)' : 'rgba(248,113,113,0.07)', border: `1px solid ${passed ? 'rgba(74,222,128,0.28)' : 'rgba(248,113,113,0.25)'}`, marginBottom: 14 }}>
+              <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                <div style={{ fontSize: 26, fontWeight: 900, color: passed ? '#4ADE80' : '#F87171', lineHeight: 1 }}>{result.awarded}</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>of {examQ.marks}</div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: passed ? '#4ADE80' : '#F87171', marginBottom: 4 }}>
+                  {pct >= 80 ? 'Excellent!' : pct >= 50 ? 'Good — passed' : 'Needs work'}
+                </div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.50)', lineHeight: 1.55 }}>{result.feedback}</div>
+              </div>
+            </div>
+
+            {/* Mark scheme reveal */}
+            <div style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', marginBottom: 16 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Mark Scheme</div>
+              {examQ.markScheme.map((pt, i) => (
+                <div key={i} style={{ display: 'flex', gap: 7, alignItems: 'flex-start', marginBottom: i < examQ.markScheme.length - 1 ? 5 : 0 }}>
+                  <span style={{ fontSize: 10, color: '#818CF8', marginTop: 3, flexShrink: 0 }}>▸</span>
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.50)', lineHeight: 1.5 }}>{pt}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {passed ? (
+                <motion.button whileTap={{ scale: 0.97 }} onClick={pct >= 80 ? onSolid : onShaky}
+                  style={{ width: '100%', padding: '11px', borderRadius: 12, border: 'none', background: pct >= 80 ? 'linear-gradient(135deg,#16a34a,#22C55E)' : 'rgba(245,158,11,0.14)', color: pct >= 80 ? '#fff' : '#FCD34D', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', boxShadow: pct >= 80 ? '0 4px 14px rgba(34,197,94,0.30)' : 'none' }}>
+                  {pct >= 80 ? '✓ Mark complete — solid' : '◐ Mark complete — shaky (drill to reinforce)'}
+                </motion.button>
+              ) : (
+                <>
+                  <motion.button whileTap={{ scale: 0.97 }} onClick={onShaky}
+                    style={{ width: '100%', padding: '11px', borderRadius: 12, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.32)', color: '#FCD34D', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>◐ Mark shaky and continue</motion.button>
+                  <motion.button whileTap={{ scale: 0.97 }} onClick={() => { setAnswer(''); setResult(null); setPhase('question') }}
+                    style={{ width: '100%', padding: '11px', borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.42)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    <RotateCcw size={12} /> Try again
+                  </motion.button>
+                </>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </motion.div>
+    </motion.div>
+  )
+}
+
 function PathView() {
   const { getActive, completeNode, completeNodeWithConfidence, closeRoadmapHub, startNodeSession, endNodeSession, markLogSeen, flagNode, activeNodeSession } = useRoadmapStore()
   // Subscribe to roadmaps array so component re-renders when Aeva mutates nodes
@@ -1970,6 +2539,8 @@ function PathView() {
   const [startedIds, setStartedIds]         = useState(new Set())
   const [shakyPrompt, setShakyPrompt]       = useState(null) // { topic } — shown after marking shaky
   const [gateNode, setGateNode]             = useState(null)   // node awaiting completion gate
+  const [practiceNode, setPracticeNode]     = useState(null)   // node awaiting exam practice gate
+  const [reviewNode, setReviewNode]         = useState(null)   // node awaiting SRS review
   const [bridgeDismissed, setBridgeDismissed] = useState(false) // hide return-to-session banner
   const scrollRef = useRef(null)
 
@@ -2126,14 +2697,24 @@ function PathView() {
         }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
-                <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase' }}>Today's Plan</div>
-                {hasWeakSpots && (
-                  <span style={{ fontSize: 9.5, fontWeight: 800, color: '#F87171', background: 'rgba(248,113,113,0.18)', padding: '1px 7px', borderRadius: 99, border: '1px solid rgba(248,113,113,0.30)', letterSpacing: '0.06em' }}>
-                    GAPS DETECTED
-                  </span>
-                )}
-              </div>
+              {(() => {
+                const dueCount = nodes.filter(n => n.status === 'complete' && n.nextReview && n.nextReview <= Date.now()).length
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
+                    <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase' }}>Today's Plan</div>
+                    {hasWeakSpots && (
+                      <span style={{ fontSize: 9.5, fontWeight: 800, color: '#F87171', background: 'rgba(248,113,113,0.18)', padding: '1px 7px', borderRadius: 99, border: '1px solid rgba(248,113,113,0.30)', letterSpacing: '0.06em' }}>
+                        GAPS DETECTED
+                      </span>
+                    )}
+                    {dueCount > 0 && (
+                      <span style={{ fontSize: 9.5, fontWeight: 800, color: '#67E8F9', background: 'rgba(6,182,212,0.14)', padding: '1px 7px', borderRadius: 99, border: '1px solid rgba(6,182,212,0.30)', letterSpacing: '0.04em' }}>
+                        {dueCount} REVIEW{dueCount !== 1 ? 'S' : ''} DUE
+                      </span>
+                    )}
+                  </div>
+                )
+              })()}
               <div style={{ fontSize: 16, fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.25 }}>
                 {hasWeakSpots
                   ? 'Close your weak spots first'
@@ -2235,7 +2816,10 @@ function PathView() {
                     whileTap={!done ? { scale: 0.98 } : {}}
                     onClick={() => {
                       if (done) return
-                      if (task.type === 'learn') {
+                      if (task.type === 'review') {
+                        const reviewN = nodes.find(n => n.id === task.nodeId)
+                        if (reviewN) setReviewNode(reviewN)
+                      } else if (task.type === 'learn') {
                         setPendingChatPrompt(`Teach me "${task.topic}" for my ${roadmap.title}. I have ${daysLeft} days until the exam.`)
                         closeRoadmapHub()
                       } else if (task.type === 'drill') {
@@ -2488,7 +3072,12 @@ function PathView() {
           <CompletionGate
             node={gateNode}
             onPass={() => {
-              markDoneWithConfidence(gateNode, 'solid')
+              // learn nodes → chain into exam practice gate
+              if (gateNode.type === 'learn') {
+                setPracticeNode(gateNode)
+              } else {
+                markDoneWithConfidence(gateNode, 'solid')
+              }
               setGateNode(null)
             }}
             onFail={() => {
@@ -2496,6 +3085,49 @@ function PathView() {
               setGateNode(null)
             }}
             onSkip={() => setGateNode(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── Exam practice gate modal ────────────────────────────────────── */}
+      <AnimatePresence>
+        {practiceNode && (
+          <ExamPracticeGate
+            node={practiceNode}
+            roadmapTitle={roadmap.title}
+            onSolid={() => {
+              markDoneWithConfidence(practiceNode, 'solid')
+              setPracticeNode(null)
+            }}
+            onShaky={() => {
+              markDoneWithConfidence(practiceNode, 'shaky')
+              setPracticeNode(null)
+            }}
+            onSkip={() => {
+              // Skip exam practice → mark shaky (less XP, surfaces for drill)
+              markDoneWithConfidence(practiceNode, 'shaky')
+              setPracticeNode(null)
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── SRS Review Gate modal ────────────────────────────────────────── */}
+      <AnimatePresence>
+        {reviewNode && (
+          <ReviewGate
+            node={reviewNode}
+            onPass={() => {
+              useRoadmapStore.getState().recordReviewResult(roadmap.id, reviewNode.id, true)
+              addXP('DRILL_COMPLETE')
+              setReviewNode(null)
+            }}
+            onFail={() => {
+              useRoadmapStore.getState().recordReviewResult(roadmap.id, reviewNode.id, false)
+              setReviewNode(null)
+              setShakyPrompt({ topic: reviewNode.topic })
+            }}
+            onDismiss={() => setReviewNode(null)}
           />
         )}
       </AnimatePresence>

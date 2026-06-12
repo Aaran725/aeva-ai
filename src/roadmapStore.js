@@ -203,9 +203,15 @@ export const useRoadmapStore = create((set, get) => {
 
     completeNodeWithConfidence: (roadmapId, nodeId, confidence = 'solid') => {
       set(s => {
+        const DAY = 86400000
+        // SRS intervals: solid = 14 days, shaky = 3 days
+        const reviewInterval = confidence === 'shaky' ? 3 * DAY : 14 * DAY
         const roadmaps = s.roadmaps.map(r => {
           if (r.id !== roadmapId) return r
-          let nodes = r.nodes.map(n => n.id === nodeId ? { ...n, status: 'complete', confidence } : n)
+          let nodes = r.nodes.map(n => n.id === nodeId
+            ? { ...n, status: 'complete', confidence, nextReview: Date.now() + reviewInterval, reviewInterval, reviewHistory: [...(n.reviewHistory || []), { date: Date.now(), result: 'complete', confidence }] }
+            : n
+          )
           nodes = recalc(nodes)
           const readiness = calcReadiness(nodes)
           const gradeObj  = calcGrade(readiness)
@@ -359,6 +365,44 @@ export const useRoadmapStore = create((set, get) => {
         })
         const u = { ...s, roadmaps }; save(u); return u
       })
+    },
+
+    // Roadmap-level SRS: reschedule a node after a review
+    recordReviewResult: (roadmapId, nodeId, passed) => {
+      set(s => {
+        const DAY = 86400000
+        const roadmaps = s.roadmaps.map(r => {
+          if (r.id !== roadmapId) return r
+          const nodes = r.nodes.map(n => {
+            if (n.id !== nodeId) return n
+            const prevInterval = n.reviewInterval || 14 * DAY
+            const newInterval  = passed
+              ? Math.min(prevInterval * 2, 90 * DAY)   // double, cap at 90 days
+              : 3 * DAY                                  // reset to 3 days on fail
+            const newConfidence = passed ? (n.confidence === 'shaky' ? 'solid' : n.confidence) : 'shaky'
+            return {
+              ...n,
+              confidence:    newConfidence,
+              reviewInterval: newInterval,
+              nextReview:    Date.now() + newInterval,
+              reviewHistory: [...(n.reviewHistory || []), { date: Date.now(), result: passed ? 'pass' : 'fail' }],
+            }
+          })
+          // Update weak areas if failed
+          const weakUpdate = !passed
+            ? { learningProfile: { ...(r.learningProfile || {}), weak: [...new Set([...(r.learningProfile?.weak || []), r.nodes.find(n => n.id === nodeId)?.topic || ''].filter(Boolean))] } }
+            : {}
+          return { ...r, nodes, ...weakUpdate }
+        })
+        const u = { ...s, roadmaps }; save(u); return u
+      })
+    },
+
+    // Returns nodes due for review today (nextReview <= now)
+    getDueReviews: (roadmapId) => {
+      const roadmap = get().roadmaps.find(r => r.id === roadmapId)
+      if (!roadmap) return []
+      return roadmap.nodes.filter(n => n.status === 'complete' && n.nextReview && n.nextReview <= Date.now())
     },
 
     // Report a syllabus inaccuracy on a specific node
