@@ -13,14 +13,76 @@ const uid  = () => Math.random().toString(36).slice(2, 10)
 
 const DEFAULT = { roadmaps: [], activeRoadmapId: null, roadmapOpen: false, activeNodeSession: null }
 
-// Re-compute unlock chain after any node mutation
+// Phase-aware unlock: within a phase, open all nodes once 60% done; cross-phase gates at 70%
+const PHASE_ORDER = ['Foundation', 'Core Topics', 'Practice', 'Exam Prep']
+
 function recalc(nodes) {
-  const out = [...nodes]
+  const out = nodes.map(n => ({ ...n }))
+
+  // Always keep at least the first node available
+  if (out.length && out[0].status === 'locked') out[0].status = 'available'
+
+  // Group by phase
+  const byPhase = {}
+  PHASE_ORDER.forEach(p => { byPhase[p] = [] })
+  out.forEach((n, i) => {
+    const p = n.phase && byPhase[n.phase] ? n.phase : 'Core Topics'
+    byPhase[p].push(i)
+  })
+
+  const phaseComplete = (phaseName) => {
+    const idxs = byPhase[phaseName] || []
+    if (!idxs.length) return true
+    const done = idxs.filter(i => out[i].status === 'complete').length
+    return done / idxs.length >= 0.70
+  }
+  const phasePct = (phaseName) => {
+    const idxs = byPhase[phaseName] || []
+    if (!idxs.length) return 1
+    const done = idxs.filter(i => out[i].status === 'complete').length
+    return done / idxs.length
+  }
+
+  // Determine which phases are open
+  const openPhases = new Set()
+  let prevUnlocked = true
+  for (const phase of PHASE_ORDER) {
+    if (!byPhase[phase]?.length) { prevUnlocked = true; continue }
+    if (prevUnlocked) openPhases.add(phase)
+    // Cross-phase gate: need 70% of this phase done to unlock next
+    prevUnlocked = phaseComplete(phase)
+  }
+
+  // Within each open phase: unlock all nodes once 60% of that phase is done
+  for (const phase of PHASE_ORDER) {
+    const idxs = byPhase[phase] || []
+    if (!idxs.length) continue
+    if (!openPhases.has(phase)) continue
+
+    const pct = phasePct(phase)
+    // If 60%+ of this phase done, unlock all remaining nodes in it
+    // Otherwise, just ensure at least one available node in the phase
+    const unlockAll = pct >= 0.60
+
+    let hasAvailable = idxs.some(i => out[i].status === 'available' || out[i].status === 'complete')
+    idxs.forEach(i => {
+      if (out[i].status === 'complete') return
+      if (unlockAll) {
+        out[i].status = 'available'
+      } else if (!hasAvailable) {
+        out[i].status = 'available'
+        hasAvailable = true
+      }
+    })
+  }
+
+  // Fallback: original sequential unlock so locked nodes adjacent to complete always open
   for (let i = 0; i < out.length - 1; i++) {
     if (out[i].status === 'complete' && out[i + 1].status === 'locked') {
-      out[i + 1] = { ...out[i + 1], status: 'available' }
+      out[i + 1].status = 'available'
     }
   }
+
   return out
 }
 
@@ -293,6 +355,21 @@ export const useRoadmapStore = create((set, get) => {
         const roadmaps = s.roadmaps.map(r => {
           if (r.id !== roadmapId) return r
           const nodes = r.nodes.map(n => n.id === nodeId ? { ...n, urgent } : n)
+          return { ...r, nodes }
+        })
+        const u = { ...s, roadmaps }; save(u); return u
+      })
+    },
+
+    // Report a syllabus inaccuracy on a specific node
+    reportNodeIssue: (roadmapId, nodeId, issueType, note = '') => {
+      set(s => {
+        const roadmaps = s.roadmaps.map(r => {
+          if (r.id !== roadmapId) return r
+          const nodes = r.nodes.map(n => n.id === nodeId
+            ? { ...n, inaccuracyFlag: { type: issueType, note, reportedAt: Date.now() } }
+            : n
+          )
           return { ...r, nodes }
         })
         const u = { ...s, roadmaps }; save(u); return u

@@ -1039,6 +1039,13 @@ function MapNode({ node, laneNodes, isSelected, onSelect, drillHistory, showTip,
         </div>
       )}
 
+      {/* Inaccuracy flag badge */}
+      {node.inaccuracyFlag && (
+        <div style={{ position: 'absolute', top: -4, left: r * -0.70, background: 'rgba(245,158,11,0.18)', color: '#FCD34D', fontSize: 7.5, fontWeight: 900, padding: '1px 4px', borderRadius: 4, border: '1px solid rgba(245,158,11,0.45)', zIndex: 5, whiteSpace: 'nowrap' }}>
+          ⚠
+        </div>
+      )}
+
       {/* Topic label */}
       <div style={{
         position: 'absolute', top: r * 2 + 7, left: '50%', transform: 'translateX(-50%)',
@@ -1216,12 +1223,15 @@ function SwimlaneMap({ nodes, roadmap, selected, onSelect, drillHistory }) {
 }
 
 /* ── NodeDetailSheet — slides in below the map when a node is selected ───── */
-function NodeDetailSheet({ node, roadmap, isStarted, onLaunch, onGotIt, onShaky, onGoAgain, onFlagNode, onClose }) {
+function NodeDetailSheet({ node, roadmap, isStarted, onLaunch, onGotIt, onShaky, onGoAgain, onFlagNode, onReportIssue, onClose }) {
   if (!node) return null
   const cfg = NODE_CFG[node.type] || NODE_CFG.learn
   const { Icon } = cfg
-  const isUrgent = !!node.urgent
+  const isUrgent  = !!node.urgent
+  const isFlagged = !!node.inaccuracyFlag
   const pc = node.phase ? (PHASE_CFG[node.phase] || null) : null
+  const [showFlagPanel, setShowFlagPanel] = useState(false)
+  const [flagNote, setFlagNote]           = useState('')
 
   return (
     <motion.div
@@ -1322,6 +1332,51 @@ function NodeDetailSheet({ node, roadmap, isStarted, onLaunch, onGotIt, onShaky,
           <span style={{ opacity: 0.75, fontSize: 11 }}>+{node.xp || 50} XP</span>
         </motion.button>
       )}
+
+      {/* ── Flag inaccuracy ─────────────────────────────────────────── */}
+      <div style={{ marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10 }}>
+        {isFlagged && !showFlagPanel ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <AlertTriangle size={10} color="#FCD34D" />
+            <span style={{ fontSize: 10.5, color: '#FCD34D', fontWeight: 600 }}>
+              Flagged: {node.inaccuracyFlag.type.replace(/_/g,' ')}
+            </span>
+            <button onClick={() => setShowFlagPanel(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.25)', fontSize: 10.5, padding: 0, fontFamily: 'inherit', marginLeft: 'auto' }}>Edit</button>
+          </div>
+        ) : !showFlagPanel ? (
+          <button
+            onClick={() => setShowFlagPanel(true)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.22)', fontSize: 10.5, padding: 0, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <AlertTriangle size={10} />
+            Flag inaccuracy in this node
+          </button>
+        ) : (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} style={{ overflow: 'hidden' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.35)', marginBottom: 8, letterSpacing: '0.06em', textTransform: 'uppercase' }}>What's wrong?</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+              {[
+                { id: 'not_in_spec',       label: 'Not in my spec' },
+                { id: 'wrong_difficulty',  label: 'Wrong difficulty' },
+                { id: 'missing_content',   label: 'Missing content' },
+                { id: 'other',             label: 'Other' },
+              ].map(opt => (
+                <button key={opt.id}
+                  onClick={() => { onReportIssue(opt.id, flagNote); setShowFlagPanel(false); setFlagNote('') }}
+                  style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.08)', color: '#FCD34D', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <input
+              value={flagNote}
+              onChange={e => setFlagNote(e.target.value)}
+              placeholder="Optional note…"
+              style={{ width: '100%', padding: '7px 10px', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.70)', fontSize: 12, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+            />
+            <button onClick={() => setShowFlagPanel(false)} style={{ marginTop: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.20)', fontSize: 10.5, padding: 0, fontFamily: 'inherit' }}>Cancel</button>
+          </motion.div>
+        )}
+      </div>
     </motion.div>
   )
 }
@@ -1677,46 +1732,65 @@ function GapAnalysisPanel({ nodes, drillHistory, onDrill, onRelearn }) {
   )
 }
 
-/* ── Completion gate — generates one MCQ before marking a node done ──────── */
-async function generateGateQuestion(topic, difficulty = 2) {
+/* ── Completion gate — generates 3 MCQs; need 2/3 to pass ───────────────── */
+async function generateGateQuestions(topic, difficulty = 2) {
   const res = await fetch(GROQ_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
     body: JSON.stringify({
       model: 'llama-3.1-8b-instant',
-      messages: [{ role: 'user', content: `Write one multiple-choice question to check understanding of "${topic}" at difficulty ${difficulty}/5.
-Return ONLY valid JSON: { "q": "One clear question sentence?", "options": ["Option A text", "Option B text", "Option C text", "Option D text"], "answer": 0, "explanation": "One sentence: why the correct answer is right." }
-Rules: answer is the 0-based index of the correct option. Keep options under 12 words each. No markdown.` }],
+      messages: [{ role: 'user', content: `Write exactly 3 multiple-choice questions to check understanding of "${topic}". Vary the difficulty: first easy (${Math.max(1,difficulty-1)}/5), then medium (${difficulty}/5), then harder (${Math.min(5,difficulty+1)}/5).
+Return ONLY valid JSON: { "questions": [ { "q": "Question text?", "options": ["A","B","C","D"], "answer": 0, "explanation": "One sentence why correct." }, ... ] }
+Rules: answer is 0-based index. Options under 14 words each. No markdown. Make each question test a different aspect of the topic.` }],
       response_format: { type: 'json_object' },
       temperature: 0.4,
-      max_tokens: 280,
+      max_tokens: 700,
     }),
   })
   const data = await res.json()
-  return JSON.parse(data.choices[0].message.content)
+  const parsed = JSON.parse(data.choices[0].message.content)
+  return parsed.questions || []
 }
 
 function CompletionGate({ node, onPass, onFail, onSkip }) {
-  const [phase, setPhase]       = useState('loading') // loading | question | passed | failed
-  const [question, setQuestion] = useState(null)
-  const [selected, setSelected] = useState(null)
-  const [apiError, setApiError] = useState(false)
+  const [phase, setPhase]         = useState('loading') // loading | question | result
+  const [questions, setQuestions] = useState([])
+  const [qIndex, setQIndex]       = useState(0)
+  const [results, setResults]     = useState([])   // array of booleans
+  const [selected, setSelected]   = useState(null)
+  const [apiError, setApiError]   = useState(false)
 
   useEffect(() => {
-    generateGateQuestion(node.topic, node.difficulty || 2)
-      .then(q => { setQuestion(q); setPhase('question') })
+    generateGateQuestions(node.topic, node.difficulty || 2)
+      .then(qs => { setQuestions(qs.slice(0, 3)); setPhase('question') })
       .catch(() => { setApiError(true); setPhase('question') })
   }, [])
 
+  const currentQ = questions[qIndex]
+  const correctCount = results.filter(Boolean).length
+
   const handleAnswer = (idx) => {
-    if (phase !== 'question' || selected !== null || !question) return
+    if (phase !== 'question' || selected !== null || !currentQ) return
     setSelected(idx)
-    if (idx === question.answer) {
-      setPhase('passed')
-      setTimeout(() => onPass(), 1000)
-    } else {
-      setPhase('failed')
-    }
+    const isCorrect = idx === currentQ.answer
+    const newResults = [...results, isCorrect]
+
+    setTimeout(() => {
+      if (qIndex < questions.length - 1) {
+        // More questions to go
+        setResults(newResults)
+        setQIndex(qIndex + 1)
+        setSelected(null)
+      } else {
+        // All done — tally score
+        const score = newResults.filter(Boolean).length
+        setResults(newResults)
+        setPhase('result')
+        if (score >= 2) {
+          setTimeout(() => onPass(), 1200)
+        }
+      }
+    }, 900)
   }
 
   return (
@@ -1729,12 +1803,12 @@ function CompletionGate({ node, onPass, onFail, onSkip }) {
         initial={{ scale: 0.90, y: 20 }} animate={{ scale: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 340, damping: 26 }}
         onClick={e => e.stopPropagation()}
-        style={{ background: 'rgba(10,11,30,0.99)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 24, padding: '22px 22px 24px', maxWidth: 380, width: '100%', fontFamily: "'Inter', system-ui, sans-serif" }}
+        style={{ background: 'rgba(10,11,30,0.99)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 24, padding: '22px 22px 24px', maxWidth: 400, width: '100%', fontFamily: "'Inter', system-ui, sans-serif" }}
       >
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(165,180,252,0.55)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 4 }}>Quick check</div>
+            <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(165,180,252,0.55)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 4 }}>Knowledge check</div>
             <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>{node.topic}</div>
           </div>
           <button onClick={onSkip} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.35)', padding: 2, display: 'flex', flexShrink: 0, marginTop: 2 }}>
@@ -1742,33 +1816,56 @@ function CompletionGate({ node, onPass, onFail, onSkip }) {
           </button>
         </div>
 
+        {/* Question progress dots */}
+        {phase !== 'loading' && !apiError && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16 }}>
+            {[0, 1, 2].map(i => (
+              <div key={i} style={{
+                height: 4, flex: 1, borderRadius: 99,
+                background: i < results.length
+                  ? results[i] ? 'rgba(74,222,128,0.7)' : 'rgba(248,113,113,0.7)'
+                  : i === qIndex && phase === 'question'
+                    ? 'rgba(165,180,252,0.7)'
+                    : 'rgba(255,255,255,0.10)',
+                transition: 'background 0.3s',
+              }} />
+            ))}
+            <span style={{ fontSize: 10.5, fontWeight: 700, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>
+              {phase === 'result' ? `${correctCount}/3` : `${qIndex + 1} of 3`}
+            </span>
+          </div>
+        )}
+
         {/* Loading */}
         {phase === 'loading' && (
           <div style={{ textAlign: 'center', padding: '24px 0 12px' }}>
             <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
               style={{ width: 28, height: 28, border: '3px solid rgba(99,102,241,0.18)', borderTopColor: '#6366F1', borderRadius: '50%', margin: '0 auto 14px' }} />
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.38)' }}>One question on {node.topic}…</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.38)' }}>Generating 3 questions on {node.topic}…</div>
+          </div>
+        )}
+
+        {/* API Error fallback */}
+        {phase === 'question' && apiError && (
+          <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
+            <div style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.55)', marginBottom: 18, lineHeight: 1.6 }}>Couldn't load questions. How confident do you actually feel?</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <motion.button whileTap={{ scale: 0.97 }} onClick={onPass} style={{ width: '100%', padding: '11px', borderRadius: 12, background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.35)', color: '#4ADE80', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>✓ I genuinely got it</motion.button>
+              <motion.button whileTap={{ scale: 0.97 }} onClick={onFail} style={{ width: '100%', padding: '11px', borderRadius: 12, background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.30)', color: '#FCD34D', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>◐ Still a bit shaky</motion.button>
+            </div>
           </div>
         )}
 
         {/* Question */}
-        {phase === 'question' && (
-          apiError ? (
-            <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
-              <div style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.55)', marginBottom: 18, lineHeight: 1.6 }}>Couldn't load a question. How confident do you actually feel?</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <motion.button whileTap={{ scale: 0.97 }} onClick={onPass} style={{ width: '100%', padding: '11px', borderRadius: 12, background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.35)', color: '#4ADE80', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>✓ I genuinely got it</motion.button>
-                <motion.button whileTap={{ scale: 0.97 }} onClick={onFail} style={{ width: '100%', padding: '11px', borderRadius: 12, background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.30)', color: '#FCD34D', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>◐ Still a bit shaky</motion.button>
-              </div>
-            </div>
-          ) : question && (
-            <div>
-              <div style={{ fontSize: 14.5, fontWeight: 700, color: 'rgba(255,255,255,0.92)', lineHeight: 1.55, marginBottom: 16 }}>{question.q}</div>
+        {phase === 'question' && !apiError && currentQ && (
+          <AnimatePresence mode="wait">
+            <motion.div key={qIndex} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.18 }}>
+              <div style={{ fontSize: 14.5, fontWeight: 700, color: 'rgba(255,255,255,0.92)', lineHeight: 1.55, marginBottom: 14 }}>{currentQ.q}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                {question.options.map((opt, idx) => {
-                  const isCorrect   = idx === question.answer
-                  const isSelected  = idx === selected
-                  const showResult  = selected !== null
+                {currentQ.options.map((opt, idx) => {
+                  const isCorrect  = idx === currentQ.answer
+                  const isSelected = idx === selected
+                  const showResult = selected !== null
                   return (
                     <motion.button key={idx}
                       whileHover={selected === null ? { scale: 1.015 } : {}}
@@ -1792,41 +1889,67 @@ function CompletionGate({ node, onPass, onFail, onSkip }) {
                   )
                 })}
               </div>
-            </div>
-          )
-        )}
-
-        {/* Passed */}
-        {phase === 'passed' && (
-          <motion.div initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} style={{ textAlign: 'center', padding: '18px 0 10px' }}>
-            <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 0.45 }}
-              style={{ width: 58, height: 58, borderRadius: '50%', background: 'linear-gradient(135deg,#16a34a,#22C55E)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px', boxShadow: '0 8px 28px rgba(34,197,94,0.38)' }}>
-              <Check size={26} color="#fff" strokeWidth={3} />
+              {selected !== null && currentQ.explanation && (
+                <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+                  style={{ marginTop: 10, fontSize: 12, color: 'rgba(255,255,255,0.38)', lineHeight: 1.55, fontStyle: 'italic' }}>
+                  {currentQ.explanation}
+                </motion.div>
+              )}
             </motion.div>
-            <div style={{ fontSize: 17, fontWeight: 800, color: '#4ADE80', marginBottom: 6 }}>Correct!</div>
-            {question?.explanation && <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.42)', lineHeight: 1.6, maxWidth: 280, margin: '0 auto' }}>{question.explanation}</div>}
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.20)', marginTop: 14 }}>Marking complete…</div>
-          </motion.div>
+          </AnimatePresence>
         )}
 
-        {/* Failed */}
-        {phase === 'failed' && (
-          <div>
-            <div style={{ padding: '12px 14px', borderRadius: 13, background: 'rgba(248,113,113,0.07)', border: '1px solid rgba(248,113,113,0.22)', marginBottom: 14 }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#F87171', marginBottom: 4 }}>Not quite</div>
-              {question?.explanation && <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.48)', lineHeight: 1.55 }}>{question.explanation}</div>}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <motion.button whileTap={{ scale: 0.97 }} onClick={onFail}
-                style={{ width: '100%', padding: '11px', borderRadius: 12, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.35)', color: '#FCD34D', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
-                <span style={{ fontSize: 15 }}>◐</span> Mark done — still shaky
-              </motion.button>
-              <motion.button whileTap={{ scale: 0.97 }} onClick={onSkip}
-                style={{ width: '100%', padding: '11px', borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.42)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
-                <RotateCcw size={13} /> Go again
-              </motion.button>
-            </div>
-          </div>
+        {/* Result screen */}
+        {phase === 'result' && (
+          <motion.div initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }} style={{ textAlign: 'center', padding: '10px 0 6px' }}>
+            {correctCount >= 2 ? (
+              <>
+                <motion.div animate={{ scale: [1, 1.18, 1] }} transition={{ duration: 0.5 }}
+                  style={{ width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg,#16a34a,#22C55E)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px', boxShadow: '0 8px 28px rgba(34,197,94,0.38)' }}>
+                  <Check size={27} color="#fff" strokeWidth={3} />
+                </motion.div>
+                <div style={{ fontSize: 18, fontWeight: 900, color: '#4ADE80', marginBottom: 5 }}>
+                  {correctCount === 3 ? 'Perfect — 3/3!' : 'Passed — 2/3'}
+                </div>
+                <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.40)', lineHeight: 1.6 }}>
+                  {correctCount === 3 ? 'Strong understanding. Node marked complete.' : 'Good enough. Marking complete — drill this later to solidify.'}
+                </div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.20)', marginTop: 12 }}>Marking complete…</div>
+              </>
+            ) : correctCount === 1 ? (
+              <>
+                <div style={{ fontSize: 42, marginBottom: 10 }}>◐</div>
+                <div style={{ fontSize: 17, fontWeight: 800, color: '#FCD34D', marginBottom: 6 }}>1/3 — Shaky</div>
+                <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.42)', lineHeight: 1.6, marginBottom: 16 }}>
+                  You got the basics but gaps remain. Marking as shaky — Aeva will flag this for revisiting.
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <motion.button whileTap={{ scale: 0.97 }} onClick={onFail}
+                    style={{ width: '100%', padding: '11px', borderRadius: 12, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.35)', color: '#FCD34D', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>◐ Mark shaky and continue</motion.button>
+                  <motion.button whileTap={{ scale: 0.97 }} onClick={onSkip}
+                    style={{ width: '100%', padding: '11px', borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.42)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    <RotateCcw size={12} /> Try again
+                  </motion.button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 42, marginBottom: 10 }}>✗</div>
+                <div style={{ fontSize: 17, fontWeight: 800, color: '#F87171', marginBottom: 6 }}>0/3 — Needs work</div>
+                <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.42)', lineHeight: 1.6, marginBottom: 16 }}>
+                  This topic needs more time. Re-learn with Aeva before marking complete.
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <motion.button whileTap={{ scale: 0.97 }} onClick={onFail}
+                    style={{ width: '100%', padding: '11px', borderRadius: 12, background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.30)', color: '#F87171', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Mark shaky anyway</motion.button>
+                  <motion.button whileTap={{ scale: 0.97 }} onClick={onSkip}
+                    style={{ width: '100%', padding: '11px', borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.42)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    <RotateCcw size={12} /> Try again
+                  </motion.button>
+                </div>
+              </>
+            )}
+          </motion.div>
         )}
       </motion.div>
     </motion.div>
@@ -1834,7 +1957,7 @@ function CompletionGate({ node, onPass, onFail, onSkip }) {
 }
 
 function PathView() {
-  const { getActive, completeNode, completeNodeWithConfidence, closeRoadmapHub, startNodeSession, endNodeSession, markLogSeen, flagNode } = useRoadmapStore()
+  const { getActive, completeNode, completeNodeWithConfidence, closeRoadmapHub, startNodeSession, endNodeSession, markLogSeen, flagNode, activeNodeSession } = useRoadmapStore()
   // Subscribe to roadmaps array so component re-renders when Aeva mutates nodes
   useRoadmapStore(state => state.roadmaps)
   const { openLab, addOrder, setLabTab, setPendingAutoStart, drillHistory } = useLabStore()
@@ -1842,11 +1965,12 @@ function PathView() {
   const { setPendingChatPrompt } = useAevaControlStore()
   const { getDueCount } = useSRStore()
   const roadmap = getActive()
-  const [askAevaFlash, setAskAevaFlash] = useState(false)
-  const [selected, setSelected]     = useState(null)
-  const [startedIds, setStartedIds] = useState(new Set())
-  const [shakyPrompt, setShakyPrompt] = useState(null) // { topic } — shown after marking shaky
-  const [gateNode, setGateNode]     = useState(null)   // node awaiting completion gate
+  const [askAevaFlash, setAskAevaFlash]     = useState(false)
+  const [selected, setSelected]             = useState(null)
+  const [startedIds, setStartedIds]         = useState(new Set())
+  const [shakyPrompt, setShakyPrompt]       = useState(null) // { topic } — shown after marking shaky
+  const [gateNode, setGateNode]             = useState(null)   // node awaiting completion gate
+  const [bridgeDismissed, setBridgeDismissed] = useState(false) // hide return-to-session banner
   const scrollRef = useRef(null)
 
   if (!roadmap?.nodes?.length) return (
@@ -1921,12 +2045,24 @@ function PathView() {
   }
 
   // Behind-pace detection
-  const totalDays = Math.max(1, Math.ceil((new Date(roadmap.examDate) - new Date(roadmap.createdAt || Date.now())) / 86400000))
-  const daysElapsed = Math.max(0, totalDays - daysLeft)
+  const totalDays    = Math.max(1, Math.ceil((new Date(roadmap.examDate) - new Date(roadmap.createdAt || Date.now())) / 86400000))
+  const daysElapsed  = Math.max(0, totalDays - daysLeft)
   const completedCount = nodes.filter(n => n.status === 'complete').length
   const expectedDone = Math.floor((daysElapsed / totalDays) * nodes.length)
-  const behindBy = Math.max(0, expectedDone - completedCount)
-  const isBehind = behindBy >= 2 && daysElapsed > 1
+  const behindBy     = Math.max(0, expectedDone - completedCount)
+  const isBehind     = behindBy >= 2 && daysElapsed > 1
+
+  // Pace stats — show proactively from day 1
+  const nodesRemaining = nodes.length - completedCount
+  const nodesPerDay    = daysLeft > 0 ? (nodesRemaining / daysLeft).toFixed(1) : '—'
+  const paceHigh       = daysLeft > 0 && (nodesRemaining / daysLeft) > 2
+
+  // Chat-to-roadmap bridge — active session for a node still marked available
+  const resumeNode = (() => {
+    if (!activeNodeSession || bridgeDismissed) return null
+    const n = nodes.find(nd => nd.id === activeNodeSession.nodeId && nd.status === 'available')
+    return n || null
+  })()
 
   const mission      = roadmap.dailyMission
   const missionTasks = mission?.tasks || []
@@ -1939,6 +2075,46 @@ function PathView() {
   return (
     <motion.div ref={scrollRef} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+
+      {/* ── Return-to-session bridge banner ──────────────────────────────── */}
+      <AnimatePresence>
+        {resumeNode && (
+          <motion.div
+            key="bridge-banner"
+            initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+            style={{ flexShrink: 0, margin: '14px 20px 0', borderRadius: 16, background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.35)', padding: '13px 16px', display: 'flex', gap: 12, alignItems: 'flex-start' }}
+          >
+            <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(99,102,241,0.20)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+              <BookOpen size={15} color="#A5B4FC" />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#A5B4FC', marginBottom: 2 }}>
+                Continue where you left off
+              </div>
+              <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.45)', marginBottom: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                Last session: <strong style={{ color: 'rgba(255,255,255,0.70)' }}>{resumeNode.topic}</strong> — did you finish it?
+              </div>
+              <div style={{ display: 'flex', gap: 7 }}>
+                <motion.button whileTap={{ scale: 0.96 }}
+                  onClick={() => setGateNode(resumeNode)}
+                  style={{ padding: '7px 13px', borderRadius: 9, background: 'rgba(74,222,128,0.14)', border: '1px solid rgba(74,222,128,0.38)', color: '#4ADE80', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <Check size={11} strokeWidth={3} /> Got it
+                </motion.button>
+                <motion.button whileTap={{ scale: 0.96 }}
+                  onClick={() => { markDoneWithConfidence(resumeNode, 'shaky'); setBridgeDismissed(true) }}
+                  style={{ padding: '7px 13px', borderRadius: 9, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.32)', color: '#FCD34D', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  ◐ Still shaky
+                </motion.button>
+                <motion.button whileTap={{ scale: 0.96 }}
+                  onClick={() => setBridgeDismissed(true)}
+                  style={{ padding: '7px 11px', borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  Still going
+                </motion.button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Mission card ─────────────────────────────────────────────────── */}
       <div style={{ flexShrink: 0, padding: '16px 20px 0' }}>
@@ -1970,6 +2146,10 @@ function PathView() {
             <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
               <div style={{ fontSize: 18, fontWeight: 900, color: daysLeft <= 3 ? '#F87171' : daysLeft <= 7 ? '#FBBF24' : '#fff' }}>{daysLeft}d</div>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>until exam</div>
+              <div style={{ fontSize: 10, fontWeight: 800, marginTop: 3, color: paceHigh ? '#F87171' : daysLeft > 0 ? 'rgba(165,180,252,0.70)' : 'rgba(255,255,255,0.25)' }}>
+                {daysLeft > 0 ? `${nodesPerDay}/day` : '—'}
+              </div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', fontWeight: 500 }}>needed</div>
             </div>
           </div>
 
@@ -2024,6 +2204,21 @@ function PathView() {
                 </div>
               ) : null
             })()}
+
+            {/* Pace row — node progress */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, padding: '7px 11px', borderRadius: 10, background: 'rgba(0,0,0,0.18)', border: paceHigh ? '1px solid rgba(248,113,113,0.22)' : '1px solid rgba(255,255,255,0.07)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>{completedCount}/{nodes.length} nodes done</span>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.18)' }}>·</span>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.30)', fontWeight: 500 }}>{nodesRemaining} remaining</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                {paceHigh && <AlertTriangle size={10} color="#F87171" />}
+                <span style={{ fontSize: 11, fontWeight: 800, color: paceHigh ? '#F87171' : daysLeft > 0 ? 'rgba(165,180,252,0.80)' : 'rgba(255,255,255,0.25)' }}>
+                  {daysLeft > 0 ? `${nodesPerDay} nodes/day` : 'Exam day!'}
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Mission tasks — smart computed from real drill data */}
@@ -2281,6 +2476,7 @@ function PathView() {
               setSelected(null)
             }}
             onFlagNode={(val) => flagNode(roadmap.id, selected.id, val)}
+            onReportIssue={(issueType, note) => useRoadmapStore.getState().reportNodeIssue(roadmap.id, selected.id, issueType, note)}
             onClose={() => setSelected(null)}
           />
         )}
