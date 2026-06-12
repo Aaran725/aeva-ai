@@ -481,10 +481,21 @@ ROADMAP EDITS — when adjusting the roadmap, describe changes clearly in your r
 Use the EXACT topic name as it appears in the roadmap. You can make multiple changes in one response. Student sees a confirmation card of what changed.
 
 ━━━ AEVA CANVAS ━━━
-Use ⚡CANVAS SPARINGLY — only when a visual is the only way to explain something clearly. Most concepts do NOT need canvas.
-Skip canvas for: greetings, casual questions, anything explainable in text, follow-up questions, practice problems, feedback on student answers, and any time canvas appeared in the last 4 responses.
-Only fire canvas when: the student explicitly asks for a diagram, OR the concept is spatial/visual and cannot be understood without seeing it (e.g. a graph shape, a process flow, a timeline).
-Default: text first. Canvas only as a last resort.
+Use ⚡CANVAS whenever a visual would make the explanation significantly clearer, faster to understand, or more engaging. Canvas is a strength — lean into it.
+
+FIRE CANVAS by default for any of these:
+• A mathematical function, equation, or relationship that has a graph shape (linear, quadratic, trig, exponential, etc.)
+• A multi-step process, cycle, or system (photosynthesis, digestive system, water cycle, algorithm steps)
+• A timeline of events (historical, scientific, narrative)
+• A comparison between two or more concepts, formulas, or options → use table block
+• A spatial or structural concept (circuits, forces, DNA structure, geometry proofs)
+• A practice problem that involves graphing, plotting, or visual reasoning
+• Any follow-up where the student says "show me", "visualise", "what does that look like", "draw it", "graph it"
+• Any concept the student is struggling with where a different visual angle might unlock it
+
+SKIP canvas only for: pure greetings, casual chitchat, single-word answers, feedback on a student's written answer (unless you're drawing what their answer should look like), and any time canvas appeared in the last 2 responses.
+
+Default: if in doubt, fire it. A well-timed canvas is always better than a wall of text.
 
 ⚡CANVAS:{"topic":"Topic Name","blocks":[...]} — ONE line, end of response.
 
@@ -527,7 +538,7 @@ table — sortable comparison
 diagram — flowchart (node positions as % of 100×100 grid)
 {"type":"diagram","title":"Process","nodes":[{"id":"a","label":"Start","x":50,"y":15},{"id":"b","label":"Middle","x":50,"y":50},{"id":"c","label":"End","x":50,"y":85}],"edges":[{"from":"a","to":"b","label":"leads to"},{"from":"b","to":"c","label":"produces"}]}
 
-⚡FUNCGRAPH (RARELY USE — only for a single function plot where no interaction is needed):
+⚡FUNCGRAPH (use for a quick single function plot when you don't need sliders or extra blocks — faster than a full canvas):
 ⚡FUNCGRAPH:{"type":"function","expr":"x**2","xMin":-4,"xMax":4,"title":"Parabola"}
 Never use both ⚡FUNCGRAPH and ⚡CANVAS in the same response.`
 }
@@ -5523,7 +5534,7 @@ If no clear changes: {"changes":[]}`
           return false
         })()
         const canvasIdx = rawResponse.indexOf('⚡CANVAS:')
-        const canvasCooledDown = (exchangeCountRef.current - lastCanvasExchangeRef.current) >= 4
+        const canvasCooledDown = (exchangeCountRef.current - lastCanvasExchangeRef.current) >= 2
         if (canvasIdx !== -1 && !isCanvasSuppressed && canvasCooledDown) {
           lastCanvasExchangeRef.current = exchangeCountRef.current
           try {
