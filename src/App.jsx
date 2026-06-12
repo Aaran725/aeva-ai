@@ -3114,6 +3114,141 @@ function MarkdownTable({ lines, isLight = false }) {
   )
 }
 
+// ── StepCard — expandable step with tap-to-drill deeper explanation ──────────
+function StepCard({ stepNum, stepTitle, fullText, isLight }) {
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [drillText, setDrillText] = useState('')
+  const abortRef = useRef(null)
+
+  const handleToggle = async () => {
+    if (open) { setOpen(false); return }
+    setOpen(true)
+    if (drillText) return  // already fetched — show cached
+
+    setLoading(true)
+    const context = fullText.slice(0, 800)
+    const prompt = `You are a focused tutor. A student is reading a worked explanation and needs more detail on one specific step.
+
+Context (what the full explanation covered):
+${context}
+
+The step they need more detail on: Step ${stepNum}: ${stepTitle}
+
+Give a focused 3–5 sentence explanation of this specific step. Use a concrete example with numbers if applicable. Write in plain flowing prose — no headers, no bullet points. Be direct and clear.`
+
+    const controller = new AbortController()
+    abortRef.current = controller
+    let raw = ''
+    try {
+      await streamGroq([], prompt, chunk => {
+        raw += chunk
+        setDrillText(raw)
+      }, controller.signal, { model: 'llama-3.1-8b-instant', maxTokens: 180, temperature: 0.6 })
+    } catch { /* silent fail */ }
+    finally { setLoading(false) }
+  }
+
+  return (
+    <div style={{ marginTop: 22, marginBottom: open ? 4 : 6 }}>
+      {/* Step header — clickable */}
+      <div
+        onClick={handleToggle}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 13,
+          cursor: 'pointer', userSelect: 'none',
+          borderRadius: 10, padding: '2px 2px 2px 0',
+        }}
+      >
+        {/* Number badge */}
+        <div style={{
+          flexShrink: 0, width: 30, height: 30, borderRadius: 10,
+          background: isLight
+            ? 'linear-gradient(135deg,rgba(99,102,241,0.25),rgba(79,70,229,0.18))'
+            : 'linear-gradient(135deg,rgba(99,102,241,0.40),rgba(79,70,229,0.28))',
+          border: isLight ? '1px solid rgba(99,102,241,0.40)' : '1px solid rgba(139,143,255,0.50)',
+          boxShadow: isLight ? 'none' : '0 2px 8px rgba(99,102,241,0.25)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 13, fontWeight: 900,
+          color: isLight ? '#4338CA' : '#C4B5FD',
+          letterSpacing: '-0.02em',
+        }}>
+          {stepNum}
+        </div>
+        {/* Step title */}
+        <span style={{
+          fontWeight: 700, fontSize: 15, flex: 1,
+          color: isLight ? 'rgba(0,0,0,0.92)' : 'rgba(255,255,255,0.97)',
+          lineHeight: 1.3, letterSpacing: '-0.015em',
+        }}>
+          {parseInline(stepTitle, isLight)}
+        </span>
+        {/* Expand chevron */}
+        <motion.div
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ duration: 0.2, ease: 'easeInOut' }}
+          style={{
+            flexShrink: 0, width: 22, height: 22, borderRadius: 7,
+            background: isLight ? 'rgba(99,102,241,0.10)' : 'rgba(139,143,255,0.12)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
+            <path d="M1 1l4 4 4-4" stroke={isLight ? '#6366F1' : '#A5B4FC'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </motion.div>
+      </div>
+
+      {/* Drill expansion panel */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            key="drill"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div style={{
+              marginLeft: 43,
+              marginTop: 8, marginBottom: 8,
+              padding: '12px 16px',
+              background: isLight ? 'rgba(99,102,241,0.07)' : 'rgba(99,102,241,0.10)',
+              borderLeft: `3px solid ${isLight ? 'rgba(99,102,241,0.40)' : 'rgba(139,143,255,0.40)'}`,
+              borderRadius: '0 12px 12px 0',
+            }}>
+              {loading && !drillText ? (
+                <div style={{ display: 'flex', gap: 5, alignItems: 'center', padding: '4px 0' }}>
+                  {[0, 1, 2].map(n => (
+                    <motion.div
+                      key={n}
+                      animate={{ y: [0, -4, 0] }}
+                      transition={{ duration: 0.7, delay: n * 0.15, repeat: Infinity, ease: 'easeInOut' }}
+                      style={{
+                        width: 5, height: 5, borderRadius: '50%',
+                        background: isLight ? 'rgba(99,102,241,0.55)' : 'rgba(139,143,255,0.60)',
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p style={{
+                  margin: 0, fontSize: 14, lineHeight: 1.78,
+                  color: isLight ? 'rgba(0,0,0,0.80)' : 'rgba(255,255,255,0.82)',
+                  fontWeight: 400,
+                }}>
+                  {drillText}
+                </p>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
   const txtBody = isLight ? 'rgba(0,0,0,0.82)'  : 'rgba(255,255,255,0.86)'
   const txtP    = isLight ? 'rgba(0,0,0,0.78)'  : 'rgba(255,255,255,0.82)'
@@ -3434,27 +3569,12 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
       continue
     }
 
-    // Step heading: "1: Title", "Step 1: Title", or "**Step 1: Title**" — numbered badge chip
+    // Step heading: "1: Title", "Step 1: Title", or "**Step 1: Title**" — tap to drill deeper
     const stepMatch = trimmed.match(/^(?:\*\*)?(?:Step\s+)?(\d+):\s+(.+?)(?:\*\*)?$/)
     if (stepMatch && trimmed.replace(/\*\*/g, '').length < 100) {
       flushList()
       elements.push(
-        <div key={`step-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 13, marginTop: 24, marginBottom: 8 }}>
-          <div style={{
-            flexShrink: 0, width: 30, height: 30, borderRadius: 10,
-            background: isLight ? 'linear-gradient(135deg,rgba(99,102,241,0.25),rgba(79,70,229,0.18))' : 'linear-gradient(135deg,rgba(99,102,241,0.40),rgba(79,70,229,0.28))',
-            border: isLight ? '1px solid rgba(99,102,241,0.40)' : '1px solid rgba(139,143,255,0.50)',
-            boxShadow: isLight ? 'none' : '0 2px 8px rgba(99,102,241,0.25)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 13, fontWeight: 900, color: isLight ? '#4338CA' : '#C4B5FD',
-            letterSpacing: '-0.02em',
-          }}>
-            {stepMatch[1]}
-          </div>
-          <span style={{ fontWeight: 700, fontSize: 15, color: isLight ? 'rgba(0,0,0,0.92)' : 'rgba(255,255,255,0.97)', lineHeight: 1.3, letterSpacing: '-0.015em' }}>
-            {parseInline(stepMatch[2], isLight)}
-          </span>
-        </div>
+        <StepCard key={`step-${i}`} stepNum={stepMatch[1]} stepTitle={stepMatch[2]} fullText={clean} isLight={isLight} />
       )
       i++; continue
     }
