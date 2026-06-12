@@ -56,7 +56,7 @@ const SharedRoadmapView  = lazy(() => import('./SharedRoadmapView'))
 const YourUI             = lazy(() => import('./YourUI'))
 const RevisionCalendar   = lazy(() => import('./RevisionCalendar'))
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
-import { useEchoStore, TRUST_TIERS, getTrustTier, getTrustProgress } from './echoStore'
+import { useEchoStore } from './echoStore'
 import { useMemoryStore } from './memoryStore'
 import { useUITheme, applyCSS, useIsHidden } from './uiThemeStore'
 import { saveSession, loadSessions, deleteSession, clearAllHistory, syncHistoryToCloud, formatSessionDate, groupSessions } from './chatHistoryStore'
@@ -2653,8 +2653,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
   const currentLevel = levelFromXP(xp)
   const xpProgress = xpIntoLevel(xp)
   const activeOrbDef = ORBS.find(o => o.id === activeOrbId) || ORBS[0]
-  const { totalExchanges: dashTotalEx, masteredTopics: dashMastered } = useNeuralStore()
-  const dashTrustTier = getTrustTier(dashTotalEx, dashMastered?.length || 0, streak)
+
   const { dashboardBg, fontStyle } = useAppSettings()
   const dashBgPreset = SECTION_BG_PRESETS.find(p => p.id === (dashboardBg || 'default')) || SECTION_BG_PRESETS[1]
   const fontFamily = FONT_STYLES[fontStyle || 'inter']?.family || "'Inter', system-ui, sans-serif"
@@ -2741,9 +2740,6 @@ function DashboardView({ onChatOpen, onSignOut }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(129,140,248,0.25)', borderRadius: 99, fontSize: 11 }}>
                   <Zap size={10} style={{ color: '#A5B4FC' }} /><span style={{ fontWeight: 700, color: '#A5B4FC' }}>Lv {currentLevel}</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', background: dashTrustTier.glow, border: `1px solid ${dashTrustTier.border}`, borderRadius: 99, fontSize: 11 }}>
-                  <span style={{ fontSize: 10 }}>{dashTrustTier.emoji}</span><span style={{ fontWeight: 700, color: dashTrustTier.color }}>{dashTrustTier.label}</span>
-                </div>
               </div>
             </div>
           </header>
@@ -2770,9 +2766,6 @@ function DashboardView({ onChatOpen, onSignOut }) {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(129,140,248,0.28)', borderRadius: 99, fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>
                 <Zap size={12} style={{ color: '#A5B4FC' }} /><span style={{ fontWeight: 700, color: '#A5B4FC' }}>Lv {currentLevel}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: dashTrustTier.glow, border: `1px solid ${dashTrustTier.border}`, borderRadius: 99, fontSize: 12 }}>
-                <span>{dashTrustTier.emoji}</span><span style={{ fontWeight: 700, color: dashTrustTier.color }}>{dashTrustTier.label}</span>
               </div>
               <WidgetToggle active={dashLayout === 'widget'} onToggle={toggleDashLayout} style={{ height: 34, fontSize: 12, padding: '0 14px', borderRadius: 99 }} />
             </div>
@@ -5114,14 +5107,6 @@ RULES:
         const detectedSubject = sessionSubjectRef.current
         systemPrompt = feedbackPrefix + orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, fullMemory + roadmapCtx + nodeCtx, extras, T.aevaLanguageDirective, detectedSubject)
 
-        // ── Trust Tier — changes how Aeva treats the student ──────────────
-        {
-          const ns = useNeuralStore.getState()
-          const xs = useXPStore.getState()
-          const tier = getTrustTier(ns.totalExchanges, ns.masteredTopics?.length || 0, xs.streak)
-          systemPrompt += `\n\n${tier.promptInstruction(name)}`
-        }
-
         if (socraticActive) {
           systemPrompt += '\n\nSOCRATIC MODE: You must NEVER state facts, answers, or explanations directly. Respond ONLY with 1-3 targeted questions that guide the student to discover the answer themselves. If they arrive at the correct answer, confirm warmly and deepen with another question. If wrong, ask a question that exposes the specific gap without revealing the answer. Never say "the answer is", never explain anything outright. Make them think every time.'
         }
@@ -5344,10 +5329,7 @@ RULES:
             } else if (action.type === 'echo') {
               const topic  = (action.topic  || 'a concept').slice(0, 60)
               const moment = (action.moment || 'A breakthrough moment.').slice(0, 200)
-              const ns = useNeuralStore.getState()
-              const xs = useXPStore.getState()
-              const tier = getTrustTier(ns.totalExchanges, ns.masteredTopics?.length || 0, xs.streak)
-              useEchoStore.getState().addEcho({ topic, moment, tier: tier.id })
+              useEchoStore.getState().addEcho({ topic, moment })
               label = `Echo saved · ${topic}`
             }
 
@@ -7923,8 +7905,6 @@ function EchoToast() {
     return () => clearTimeout(t)
   }, [pendingEchoToast?.id])
 
-  const tierDef = TRUST_TIERS.find(t => t.id === pendingEchoToast?.tier) || TRUST_TIERS[0]
-
   return (
     <AnimatePresence>
       {pendingEchoToast && (
@@ -7940,22 +7920,20 @@ function EchoToast() {
             maxWidth: 340, width: 'calc(100% - 48px)',
             borderRadius: 20,
             background: 'rgba(8,10,26,0.97)',
-            border: `1px solid ${tierDef.border}`,
-            boxShadow: `0 16px 60px rgba(0,0,0,0.65), 0 0 40px ${tierDef.glow}`,
+            border: '1px solid rgba(167,139,250,0.35)',
+            boxShadow: '0 16px 60px rgba(0,0,0,0.65), 0 0 40px rgba(167,139,250,0.15)',
             backdropFilter: 'blur(28px)',
             WebkitBackdropFilter: 'blur(28px)',
             fontFamily: "'Inter', system-ui, sans-serif",
             padding: '16px 20px',
           }}
         >
-          {/* Shimmer line */}
           <motion.div
             initial={{ scaleX: 0 }} animate={{ scaleX: 1 }}
             transition={{ duration: 1.2, ease: 'easeOut' }}
-            style={{ height: 2, borderRadius: 99, background: `linear-gradient(90deg, transparent, ${tierDef.color}, transparent)`, marginBottom: 12, transformOrigin: 'left' }}
+            style={{ height: 2, borderRadius: 99, background: 'linear-gradient(90deg, transparent, #A78BFA, transparent)', marginBottom: 12, transformOrigin: 'left' }}
           />
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-            {/* Icon */}
             <motion.div
               animate={{ scale: [1, 1.18, 1], rotate: [0, 8, -8, 0] }}
               transition={{ duration: 1.4, repeat: 1 }}
@@ -7964,7 +7942,7 @@ function EchoToast() {
               ✨
             </motion.div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: tierDef.color, marginBottom: 4 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: '#A78BFA', marginBottom: 4 }}>
                 Echo Saved
               </div>
               <div style={{ fontSize: 13.5, fontWeight: 700, color: 'rgba(255,255,255,0.92)', lineHeight: 1.35, marginBottom: 4 }}>
