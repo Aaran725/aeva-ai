@@ -278,7 +278,7 @@ function CountdownScreen() {
   const { countdownVal, settings } = useArenaStore()
   return (
     <motion.div key="countdown" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 16 }}>
+      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 16 }}>
       <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
         {settings.topic} · {settings.questionCount} questions
       </div>
@@ -291,6 +291,23 @@ function CountdownScreen() {
         </motion.div>
       </AnimatePresence>
       <div style={{ fontSize: 15, color: 'rgba(255,255,255,0.55)', fontStyle: 'italic' }}>Get ready…</div>
+    </motion.div>
+  )
+}
+
+function PreparingScreen() {
+  return (
+    <motion.div key="preparing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 20 }}>
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ duration: 1.4, repeat: Infinity, ease: 'linear' }}
+        style={{ width: 44, height: 44, borderRadius: '50%', border: '3px solid rgba(99,102,241,0.15)', borderTopColor: '#6366F1' }}
+      />
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>Aeva is generating questions…</div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>Sit tight, this takes a few seconds</div>
+      </div>
     </motion.div>
   )
 }
@@ -683,47 +700,41 @@ export default function Arena() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        style={{ position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(4,5,20,0.75)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, fontFamily: "'Inter', system-ui, sans-serif" }}
-        onClick={e => e.target === e.currentTarget && close()}
+        style={{ position: 'fixed', inset: 0, zIndex: 600, background: 'linear-gradient(180deg, #06061a 0%, #04040f 100%)', fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', flexDirection: 'column' }}
       >
-        <motion.div
-          initial={{ scale: 0.92, y: 20 }}
-          animate={{ scale: 1, y: 0 }}
-          exit={{ scale: 0.92, y: 20 }}
-          transition={{ type: 'spring', stiffness: 340, damping: 28 }}
-          style={{ width: '100%', maxWidth: 420, maxHeight: '90vh', background: 'linear-gradient(180deg, rgba(8,8,28,0.99) 0%, rgba(6,6,22,1) 100%)', borderRadius: 24, border: '1px solid rgba(255,255,255,0.10)', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}
-        >
-          {/* Accent glow top */}
-          <div style={{ position: 'absolute', top: -60, left: '50%', transform: 'translateX(-50%)', width: 200, height: 120, background: 'radial-gradient(ellipse, rgba(99,102,241,0.25) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        {/* Accent glow top */}
+        <div style={{ position: 'absolute', top: -80, left: '50%', transform: 'translateX(-50%)', width: 400, height: 200, background: 'radial-gradient(ellipse, rgba(99,102,241,0.20) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
-          {/* Header bar */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px 12px', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0, position: 'relative' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ fontSize: 16 }}>⚔️</div>
-              <span style={{ fontSize: 14, fontWeight: 800, color: 'rgba(255,255,255,0.90)', letterSpacing: '-0.02em' }}>Arena</span>
-              <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(244,63,94,0.80)', background: 'rgba(244,63,94,0.12)', border: '1px solid rgba(244,63,94,0.25)', borderRadius: 99, padding: '2px 7px', letterSpacing: '0.06em' }}>SABOTAGE</span>
-            </div>
-            <motion.button whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }} onClick={close}
-              style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.50)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <X size={13} />
-            </motion.button>
+        {/* Header bar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px 12px', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0, position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontSize: 16 }}>⚔️</div>
+            <span style={{ fontSize: 15, fontWeight: 800, color: 'rgba(255,255,255,0.90)', letterSpacing: '-0.02em' }}>Arena</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(244,63,94,0.80)', background: 'rgba(244,63,94,0.12)', border: '1px solid rgba(244,63,94,0.25)', borderRadius: 99, padding: '2px 7px', letterSpacing: '0.06em' }}>SABOTAGE</span>
           </div>
+          <motion.button whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }} onClick={close}
+            style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.50)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <X size={14} />
+          </motion.button>
+        </div>
 
-          {/* Screen content */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px 20px', position: 'relative' }}>
+        {/* Screen content — centred column, max width on large screens */}
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+          <div style={{ width: '100%', maxWidth: 480, padding: '20px 20px 32px', flex: 1, display: 'flex', flexDirection: 'column' }}>
             <AnimatePresence mode="wait">
-              {phase === 'entry'     && <EntryScreen key="entry" />}
-              {phase === 'create'    && <CreateScreen key="create" />}
-              {phase === 'join'      && <JoinScreen key="join" prefillCode={prefillCode} />}
-              {phase === 'lobby'     && <LobbyScreen key="lobby" />}
-              {phase === 'countdown' && <CountdownScreen key="countdown" />}
-              {phase === 'question'  && <QuestionScreen key="question" />}
-              {phase === 'reveal'    && <RevealScreen key="reveal" />}
-              {phase === 'sabotage'  && <SabotageScreen key="sabotage" />}
-              {phase === 'done'      && <DoneScreen key="done" />}
+              {phase === 'entry'      && <EntryScreen key="entry" />}
+              {phase === 'create'     && <CreateScreen key="create" />}
+              {phase === 'join'       && <JoinScreen key="join" prefillCode={prefillCode} />}
+              {phase === 'lobby'      && <LobbyScreen key="lobby" />}
+              {phase === 'countdown'  && <CountdownScreen key="countdown" />}
+              {phase === 'preparing'  && <PreparingScreen key="preparing" />}
+              {phase === 'question'   && <QuestionScreen key="question" />}
+              {phase === 'reveal'     && <RevealScreen key="reveal" />}
+              {phase === 'sabotage'   && <SabotageScreen key="sabotage" />}
+              {phase === 'done'       && <DoneScreen key="done" />}
             </AnimatePresence>
           </div>
-        </motion.div>
+        </div>
       </motion.div>
     </AnimatePresence>
   )

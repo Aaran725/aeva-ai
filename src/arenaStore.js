@@ -171,7 +171,14 @@ export const useArenaStore = create((set, get) => ({
     ch.on('broadcast', { event: 'countdown_start' }, () => {
       if (get().isHost) return
       set({ phase: 'countdown', countdownVal: 3 })
-      get()._runCountdown(() => {})  // guests just show countdown; host drives questions
+      // After countdown, guests show preparing state until stubs_sync arrives
+      get()._runCountdown(() => set({ phase: 'preparing' }))
+    })
+
+    // Host sends question stubs (no answers) before first question
+    ch.on('broadcast', { event: 'stubs_sync' }, ({ payload }) => {
+      if (get().isHost) return
+      set({ stubs: payload.stubs })
     })
 
     ch.on('broadcast', { event: 'question_start' }, ({ payload }) => {
@@ -267,9 +274,10 @@ export const useArenaStore = create((set, get) => ({
     questions = questions.slice(0, settings.questionCount)
     const stubs = questions.map(q => ({ q: q.q, choices: q.choices }))
     set({ questions, stubs })
-    _channel?.send({ type: 'broadcast', event: 'question_start', payload: { qIdx: 0, stubs } })
-    // guests need stubs — send them with first question
-    get()._startQuestion(0)
+    // Send stubs to guests first, then kick off Q1
+    _channel?.send({ type: 'broadcast', event: 'stubs_sync', payload: { stubs } })
+    // Small delay so guests store stubs before question_start fires
+    setTimeout(() => get()._startQuestion(0), 300)
   },
 
   _startQuestion: (qIdx) => {
