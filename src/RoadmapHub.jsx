@@ -1279,6 +1279,162 @@ function GapAnalysisPanel({ nodes, drillHistory, onDrill, onRelearn }) {
   )
 }
 
+/* ── Completion gate — generates one MCQ before marking a node done ──────── */
+async function generateGateQuestion(topic, difficulty = 2) {
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
+    body: JSON.stringify({
+      model: 'llama-3.1-8b-instant',
+      messages: [{ role: 'user', content: `Write one multiple-choice question to check understanding of "${topic}" at difficulty ${difficulty}/5.
+Return ONLY valid JSON: { "q": "One clear question sentence?", "options": ["Option A text", "Option B text", "Option C text", "Option D text"], "answer": 0, "explanation": "One sentence: why the correct answer is right." }
+Rules: answer is the 0-based index of the correct option. Keep options under 12 words each. No markdown.` }],
+      response_format: { type: 'json_object' },
+      temperature: 0.4,
+      max_tokens: 280,
+    }),
+  })
+  const data = await res.json()
+  return JSON.parse(data.choices[0].message.content)
+}
+
+function CompletionGate({ node, onPass, onFail, onSkip }) {
+  const [phase, setPhase]       = useState('loading') // loading | question | passed | failed
+  const [question, setQuestion] = useState(null)
+  const [selected, setSelected] = useState(null)
+  const [apiError, setApiError] = useState(false)
+
+  useEffect(() => {
+    generateGateQuestion(node.topic, node.difficulty || 2)
+      .then(q => { setQuestion(q); setPhase('question') })
+      .catch(() => { setApiError(true); setPhase('question') })
+  }, [])
+
+  const handleAnswer = (idx) => {
+    if (phase !== 'question' || selected !== null || !question) return
+    setSelected(idx)
+    if (idx === question.answer) {
+      setPhase('passed')
+      setTimeout(() => onPass(), 1000)
+    } else {
+      setPhase('failed')
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(4,5,18,0.88)', backdropFilter: 'blur(16px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+      onClick={e => { if (e.target === e.currentTarget) onSkip() }}
+    >
+      <motion.div
+        initial={{ scale: 0.90, y: 20 }} animate={{ scale: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 340, damping: 26 }}
+        onClick={e => e.stopPropagation()}
+        style={{ background: 'rgba(10,11,30,0.99)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 24, padding: '22px 22px 24px', maxWidth: 380, width: '100%', fontFamily: "'Inter', system-ui, sans-serif" }}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(165,180,252,0.55)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 4 }}>Quick check</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>{node.topic}</div>
+          </div>
+          <button onClick={onSkip} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.35)', padding: 2, display: 'flex', flexShrink: 0, marginTop: 2 }}>
+            <X size={17} />
+          </button>
+        </div>
+
+        {/* Loading */}
+        {phase === 'loading' && (
+          <div style={{ textAlign: 'center', padding: '24px 0 12px' }}>
+            <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+              style={{ width: 28, height: 28, border: '3px solid rgba(99,102,241,0.18)', borderTopColor: '#6366F1', borderRadius: '50%', margin: '0 auto 14px' }} />
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.38)' }}>One question on {node.topic}…</div>
+          </div>
+        )}
+
+        {/* Question */}
+        {phase === 'question' && (
+          apiError ? (
+            <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
+              <div style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.55)', marginBottom: 18, lineHeight: 1.6 }}>Couldn't load a question. How confident do you actually feel?</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <motion.button whileTap={{ scale: 0.97 }} onClick={onPass} style={{ width: '100%', padding: '11px', borderRadius: 12, background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.35)', color: '#4ADE80', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>✓ I genuinely got it</motion.button>
+                <motion.button whileTap={{ scale: 0.97 }} onClick={onFail} style={{ width: '100%', padding: '11px', borderRadius: 12, background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.30)', color: '#FCD34D', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>◐ Still a bit shaky</motion.button>
+              </div>
+            </div>
+          ) : question && (
+            <div>
+              <div style={{ fontSize: 14.5, fontWeight: 700, color: 'rgba(255,255,255,0.92)', lineHeight: 1.55, marginBottom: 16 }}>{question.q}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {question.options.map((opt, idx) => {
+                  const isCorrect   = idx === question.answer
+                  const isSelected  = idx === selected
+                  const showResult  = selected !== null
+                  return (
+                    <motion.button key={idx}
+                      whileHover={selected === null ? { scale: 1.015 } : {}}
+                      whileTap={selected === null ? { scale: 0.985 } : {}}
+                      onClick={() => handleAnswer(idx)}
+                      style={{
+                        padding: '11px 14px', borderRadius: 11, textAlign: 'left',
+                        cursor: selected !== null ? 'default' : 'pointer',
+                        fontFamily: 'inherit', fontSize: 13.5, fontWeight: 600,
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        background: !showResult ? 'rgba(255,255,255,0.05)' : isCorrect ? 'rgba(74,222,128,0.13)' : isSelected ? 'rgba(248,113,113,0.10)' : 'rgba(255,255,255,0.02)',
+                        border: !showResult ? '1px solid rgba(255,255,255,0.10)' : isCorrect ? '1px solid rgba(74,222,128,0.38)' : isSelected ? '1px solid rgba(248,113,113,0.32)' : '1px solid rgba(255,255,255,0.05)',
+                        color: !showResult ? 'rgba(255,255,255,0.80)' : isCorrect ? '#4ADE80' : isSelected ? '#F87171' : 'rgba(255,255,255,0.25)',
+                        transition: 'all 0.15s',
+                      }}>
+                      <span style={{ fontSize: 10, fontWeight: 800, opacity: 0.45, flexShrink: 0, minWidth: 12 }}>{['A','B','C','D'][idx]}</span>
+                      <span style={{ flex: 1 }}>{opt}</span>
+                      {showResult && isCorrect  && <Check size={13} color="#4ADE80" strokeWidth={3} style={{ flexShrink: 0 }} />}
+                      {showResult && isSelected && !isCorrect && <X size={13} color="#F87171" strokeWidth={3} style={{ flexShrink: 0 }} />}
+                    </motion.button>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        )}
+
+        {/* Passed */}
+        {phase === 'passed' && (
+          <motion.div initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} style={{ textAlign: 'center', padding: '18px 0 10px' }}>
+            <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 0.45 }}
+              style={{ width: 58, height: 58, borderRadius: '50%', background: 'linear-gradient(135deg,#16a34a,#22C55E)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px', boxShadow: '0 8px 28px rgba(34,197,94,0.38)' }}>
+              <Check size={26} color="#fff" strokeWidth={3} />
+            </motion.div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: '#4ADE80', marginBottom: 6 }}>Correct!</div>
+            {question?.explanation && <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.42)', lineHeight: 1.6, maxWidth: 280, margin: '0 auto' }}>{question.explanation}</div>}
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.20)', marginTop: 14 }}>Marking complete…</div>
+          </motion.div>
+        )}
+
+        {/* Failed */}
+        {phase === 'failed' && (
+          <div>
+            <div style={{ padding: '12px 14px', borderRadius: 13, background: 'rgba(248,113,113,0.07)', border: '1px solid rgba(248,113,113,0.22)', marginBottom: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#F87171', marginBottom: 4 }}>Not quite</div>
+              {question?.explanation && <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.48)', lineHeight: 1.55 }}>{question.explanation}</div>}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <motion.button whileTap={{ scale: 0.97 }} onClick={onFail}
+                style={{ width: '100%', padding: '11px', borderRadius: 12, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.35)', color: '#FCD34D', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+                <span style={{ fontSize: 15 }}>◐</span> Mark done — still shaky
+              </motion.button>
+              <motion.button whileTap={{ scale: 0.97 }} onClick={onSkip}
+                style={{ width: '100%', padding: '11px', borderRadius: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.42)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+                <RotateCcw size={13} /> Go again
+              </motion.button>
+            </div>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  )
+}
+
 function PathView() {
   const { getActive, completeNode, completeNodeWithConfidence, closeRoadmapHub, startNodeSession, endNodeSession, markLogSeen, flagNode } = useRoadmapStore()
   // Subscribe to roadmaps array so component re-renders when Aeva mutates nodes
@@ -1292,6 +1448,7 @@ function PathView() {
   const [selected, setSelected]     = useState(null)
   const [startedIds, setStartedIds] = useState(new Set())
   const [shakyPrompt, setShakyPrompt] = useState(null) // { topic } — shown after marking shaky
+  const [gateNode, setGateNode]     = useState(null)   // node awaiting completion gate
   const containerRef = useRef(null)
   const scrollRef    = useRef(null)
   const [cw, setCw]  = useState(360)
@@ -1914,7 +2071,7 @@ function PathView() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                           <div style={{ fontSize: 10.5, fontWeight: 700, color: 'rgba(255,255,255,0.30)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>How did it go?</div>
                           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                            onClick={() => markDoneWithConfidence(node, 'solid')}
+                            onClick={() => setGateNode(node)}
                             style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#16a34a,#22C55E)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 7 }}>
                             <Check size={13} strokeWidth={3} /> Got it — fully understood
                             <span style={{ marginLeft: 'auto', opacity: 0.8, fontSize: 11 }}>+{node.xp || 50} XP</span>
@@ -1977,6 +2134,24 @@ function PathView() {
           )
         })}
       </div>
+
+      {/* ── Completion gate modal ───────────────────────────────────────── */}
+      <AnimatePresence>
+        {gateNode && (
+          <CompletionGate
+            node={gateNode}
+            onPass={() => {
+              markDoneWithConfidence(gateNode, 'solid')
+              setGateNode(null)
+            }}
+            onFail={() => {
+              markDoneWithConfidence(gateNode, 'shaky')
+              setGateNode(null)
+            }}
+            onSkip={() => setGateNode(null)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* ── Shaky node drill prompt ──────────────────────────────────────── */}
       <AnimatePresence>
