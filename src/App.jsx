@@ -3249,7 +3249,7 @@ Give a focused 3–5 sentence explanation of this specific step. Use a concrete 
   )
 }
 
-function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
+function MarkdownRenderer({ text, streaming, cursorColor, isLight = false, onTryThis }) {
   const txtBody = isLight ? 'rgba(0,0,0,0.82)'  : 'rgba(255,255,255,0.86)'
   const txtP    = isLight ? 'rgba(0,0,0,0.78)'  : 'rgba(255,255,255,0.82)'
   const purple  = isLight ? '#5B5BD6'            : '#818CF8'
@@ -3612,25 +3612,47 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false }) {
       i++; continue
     }
 
-    // Standalone italic *text* → question/challenge row (amber tint)
+    // Standalone italic *text* → question/challenge row (amber tint) + Try this button
     const isStandaloneItalic = trimmed.startsWith('*') && trimmed.endsWith('*')
       && !trimmed.startsWith('**') && !trimmed.endsWith('**') && trimmed.length > 2
     if (isStandaloneItalic) {
       flushList()
+      const questionText = trimmed.slice(1, -1)
       elements.push(
         <div key={`qi-${i}`} style={{
-          marginTop: 16, padding: '13px 16px',
+          marginTop: 16, padding: '11px 14px',
           background: isLight ? 'rgba(234,179,8,0.08)' : 'rgba(251,191,36,0.09)',
           border: isLight ? '1px solid rgba(234,179,8,0.35)' : '1px solid rgba(251,191,36,0.28)',
           borderLeft: '4px solid #FBBF24',
           borderRadius: 13,
-          display: 'flex', alignItems: 'flex-start', gap: 10,
+          display: 'flex', alignItems: 'center', gap: 10,
           boxShadow: '0 2px 12px rgba(251,191,36,0.08)',
         }}>
-          <span style={{ fontSize: 16, color: '#FBBF24', flexShrink: 0, lineHeight: 1.3, marginTop: 1 }}>?</span>
-          <span style={{ fontSize: 15, color: isLight ? 'rgba(0,0,0,0.80)' : 'rgba(255,245,200,0.90)', fontStyle: 'italic', lineHeight: 1.65, fontWeight: 500, letterSpacing: '-0.01em' }}>
-            {parseInline(trimmed.slice(1, -1), isLight)}
+          <span style={{ fontSize: 16, color: '#FBBF24', flexShrink: 0, lineHeight: 1.3 }}>?</span>
+          <span style={{ flex: 1, fontSize: 15, color: isLight ? 'rgba(0,0,0,0.80)' : 'rgba(255,245,200,0.90)', fontStyle: 'italic', lineHeight: 1.65, fontWeight: 500, letterSpacing: '-0.01em' }}>
+            {parseInline(questionText, isLight)}
           </span>
+          {onTryThis && (
+            <motion.button
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.96 }}
+              onClick={() => onTryThis(questionText)}
+              style={{
+                flexShrink: 0,
+                padding: '6px 13px',
+                borderRadius: 20,
+                background: 'rgba(251,191,36,0.18)',
+                border: '1px solid rgba(251,191,36,0.45)',
+                color: isLight ? '#92400E' : '#FCD34D',
+                fontSize: 12, fontWeight: 700,
+                letterSpacing: '0.01em',
+                cursor: 'pointer', fontFamily: 'inherit',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Try this →
+            </motion.button>
+          )}
         </div>
       )
       i++; continue
@@ -4076,7 +4098,7 @@ ${guide.examTip ? `<div class="section"><div class="section-label">Exam Tip</div
 /* CHAT_THEMES moved to ./chatThemes.js (shared by Chat + Aeva Docs) */
 
 /* ═══ CHAT BUBBLE ═════════════════════════════════ */
-function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false, isWidget = false, widgetTheme = null }) {
+function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false, isWidget = false, widgetTheme = null, onTryThis }) {
   const isUser = msg.role === 'user'
 
   /* ── Widget card style (Ai OS) ── */
@@ -4155,7 +4177,7 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false, isWidg
                 <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#4ADE80' }}>Lock-In</span>
               </div>
             )}
-            <MarkdownRenderer text={msg.text} streaming={!!msg.streaming} cursorColor={isLight ? 'rgba(99,102,241,0.8)' : 'rgba(139,143,255,0.9)'} isLight={isLight} />
+            <MarkdownRenderer text={msg.text} streaming={!!msg.streaming} cursorColor={isLight ? 'rgba(99,102,241,0.8)' : 'rgba(139,143,255,0.9)'} isLight={isLight} onTryThis={onTryThis} />
             {msg.aevaViz && <AevaViz config={msg.aevaViz} />}
             {msg.aevaCanvas && !msg.streaming && (
               <motion.button
@@ -6674,7 +6696,7 @@ If no clear changes: {"changes":[]}`
                 {messages.map((msg, i) =>
                   isMission
                     ? <ThemedChatBubble key={i} msg={msg} mission={activeMission} />
-                    : <ChatBubble key={i} msg={msg} deepDiveCards={deepDiveMap[i] || []} onDismissCard={(cardId) => setDeepDiveMap(prev => ({ ...prev, [i]: (prev[i] || []).filter(c => c.id !== cardId) }))} isLight={isLight} isWidget={isWidget} widgetTheme={isWidget ? activeTheme : null} />
+                    : <ChatBubble key={i} msg={msg} deepDiveCards={deepDiveMap[i] || []} onDismissCard={(cardId) => setDeepDiveMap(prev => ({ ...prev, [i]: (prev[i] || []).filter(c => c.id !== cardId) }))} isLight={isLight} isWidget={isWidget} widgetTheme={isWidget ? activeTheme : null} onTryThis={(q) => { setInput(q); setTimeout(() => inputRef.current?.focus(), 50) }} />
                 )}
 
                 {/* Worksheet generating indicator */}
