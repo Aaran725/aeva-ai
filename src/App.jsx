@@ -56,6 +56,7 @@ const SharedRoadmapView  = lazy(() => import('./SharedRoadmapView'))
 const YourUI             = lazy(() => import('./YourUI'))
 const RevisionCalendar   = lazy(() => import('./RevisionCalendar'))
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
+import { useEchoStore, TRUST_TIERS, getTrustTier, getTrustProgress } from './echoStore'
 import { useMemoryStore } from './memoryStore'
 import { useUITheme, applyCSS, useIsHidden } from './uiThemeStore'
 import { saveSession, loadSessions, deleteSession, clearAllHistory, syncHistoryToCloud, formatSessionDate, groupSessions } from './chatHistoryStore'
@@ -452,6 +453,7 @@ At most ONE ⚡CMD per response. Executes silently — student never sees the ta
 ⚡CMD:{"type":"pin_note","title":"SHORT TITLE","content":"KEY FORMULA OR CONCEPT — stays pinned on screen"}
 ⚡CMD:{"type":"set_timer","seconds":120,"label":"Challenge label e.g. Solve the circuit"}
 ⚡CMD:{"type":"lock_topic","topic":"EXACT TOPIC","reason":"short reason e.g. you keep skipping the hard step","exchanges":5}
+⚡CMD:{"type":"echo","topic":"EXACT TOPIC e.g. chain rule","moment":"one specific sentence — what ${userName} just demonstrated, in your voice, e.g. 'Finally derived it from scratch after three failed attempts'"}
 
 TRIGGER CONDITIONS — only fire when one of these is true:
 - Student types "open lab" or "go to lab" → open_lab
@@ -463,6 +465,7 @@ TRIGGER CONDITIONS — only fire when one of these is true:
 - You introduced THE single most critical formula/definition of this ENTIRE topic that they MUST have visible — not for every concept, not for examples, not for reminders. Once per session maximum → pin_note
 - You are explicitly setting a TIMED challenge (you told the student how long they have). Not for regular practice problems → set_timer (30-300 seconds)
 - Student keeps avoiding or skipping a concept they're struggling with → lock_topic (3-8 exchanges)
+- Student has a genuine breakthrough moment: understands something they visibly struggled with this session, makes an unprompted connection between two concepts, or solves something correctly after repeated failure → echo (once per session max, make the moment description specific and personal)
 DO NOT fire CMDs routinely. pin_note and set_timer in particular should be RARE — most sessions have zero of them.
 Only use LaTeX math ($...$, \[...\]) for actual mathematical or scientific expressions. Never use math delimiters for non-math content.
 Never announce commands. Describe in past tense: "I've pinned that formula", "Timer's running", "I've awarded you 60 XP for that."
@@ -2650,6 +2653,8 @@ function DashboardView({ onChatOpen, onSignOut }) {
   const currentLevel = levelFromXP(xp)
   const xpProgress = xpIntoLevel(xp)
   const activeOrbDef = ORBS.find(o => o.id === activeOrbId) || ORBS[0]
+  const { totalExchanges: dashTotalEx, masteredTopics: dashMastered } = useNeuralStore()
+  const dashTrustTier = getTrustTier(dashTotalEx, dashMastered?.length || 0, streak)
   const { dashboardBg, fontStyle } = useAppSettings()
   const dashBgPreset = SECTION_BG_PRESETS.find(p => p.id === (dashboardBg || 'default')) || SECTION_BG_PRESETS[1]
   const fontFamily = FONT_STYLES[fontStyle || 'inter']?.family || "'Inter', system-ui, sans-serif"
@@ -2736,6 +2741,9 @@ function DashboardView({ onChatOpen, onSignOut }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(129,140,248,0.25)', borderRadius: 99, fontSize: 11 }}>
                   <Zap size={10} style={{ color: '#A5B4FC' }} /><span style={{ fontWeight: 700, color: '#A5B4FC' }}>Lv {currentLevel}</span>
                 </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', background: dashTrustTier.glow, border: `1px solid ${dashTrustTier.border}`, borderRadius: 99, fontSize: 11 }}>
+                  <span style={{ fontSize: 10 }}>{dashTrustTier.emoji}</span><span style={{ fontWeight: 700, color: dashTrustTier.color }}>{dashTrustTier.label}</span>
+                </div>
               </div>
             </div>
           </header>
@@ -2761,7 +2769,10 @@ function DashboardView({ onChatOpen, onSignOut }) {
                 <span>🔥</span><span style={{ fontWeight: 700, color: '#FB923C' }}>{streak}</span><span style={{ color: 'rgba(255,255,255,0.5)' }}>day streak</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(129,140,248,0.28)', borderRadius: 99, fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>
-                <Zap size={12} style={{ color: '#A5B4FC' }} /><span style={{ fontWeight: 700, color: '#A5B4FC' }}>Lv {currentLevel}</span><span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>Sage</span>
+                <Zap size={12} style={{ color: '#A5B4FC' }} /><span style={{ fontWeight: 700, color: '#A5B4FC' }}>Lv {currentLevel}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: dashTrustTier.glow, border: `1px solid ${dashTrustTier.border}`, borderRadius: 99, fontSize: 12 }}>
+                <span>{dashTrustTier.emoji}</span><span style={{ fontWeight: 700, color: dashTrustTier.color }}>{dashTrustTier.label}</span>
               </div>
               <WidgetToggle active={dashLayout === 'widget'} onToggle={toggleDashLayout} style={{ height: 34, fontSize: 12, padding: '0 14px', borderRadius: 99 }} />
             </div>
@@ -5103,6 +5114,14 @@ RULES:
         const detectedSubject = sessionSubjectRef.current
         systemPrompt = feedbackPrefix + orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, fullMemory + roadmapCtx + nodeCtx, extras, T.aevaLanguageDirective, detectedSubject)
 
+        // ── Trust Tier — changes how Aeva treats the student ──────────────
+        {
+          const ns = useNeuralStore.getState()
+          const xs = useXPStore.getState()
+          const tier = getTrustTier(ns.totalExchanges, ns.masteredTopics?.length || 0, xs.streak)
+          systemPrompt += `\n\n${tier.promptInstruction(name)}`
+        }
+
         if (socraticActive) {
           systemPrompt += '\n\nSOCRATIC MODE: You must NEVER state facts, answers, or explanations directly. Respond ONLY with 1-3 targeted questions that guide the student to discover the answer themselves. If they arrive at the correct answer, confirm warmly and deepen with another question. If wrong, ask a question that exposes the specific gap without revealing the answer. Never say "the answer is", never explain anything outright. Make them think every time.'
         }
@@ -5321,6 +5340,15 @@ RULES:
               const lockFor = Math.min(10, Math.max(3, Math.round(action.exchanges || 5)))
               setTopicLock({ topic, reason, until: exchangeCountRef.current + lockFor })
               label = `Topic locked: ${topic}`
+
+            } else if (action.type === 'echo') {
+              const topic  = (action.topic  || 'a concept').slice(0, 60)
+              const moment = (action.moment || 'A breakthrough moment.').slice(0, 200)
+              const ns = useNeuralStore.getState()
+              const xs = useXPStore.getState()
+              const tier = getTrustTier(ns.totalExchanges, ns.masteredTopics?.length || 0, xs.streak)
+              useEchoStore.getState().addEcho({ topic, moment, tier: tier.id })
+              label = `Echo saved · ${topic}`
             }
 
             if (label) {
@@ -7800,6 +7828,7 @@ const CMD_ICONS = {
   pin_note:              '📌',
   set_timer:             '⏱',
   lock_topic:            '🔒',
+  echo:                  '✨',
 }
 const CMD_VERBS = {
   open_lab:              'Lab suggested',
@@ -7819,6 +7848,7 @@ const CMD_VERBS = {
   pin_note:              'Note pinned',
   set_timer:             'Timer started',
   lock_topic:            'Topic locked',
+  echo:                  'Echo saved',
 }
 
 function AevaCommandToast() {
@@ -7877,6 +7907,74 @@ function AevaCommandToast() {
               </span>
             </>
           )}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
+/* ── Echo Toast ─────────────────────────────────────────────────────────── */
+function EchoToast() {
+  const { pendingEchoToast, clearEchoToast } = useEchoStore()
+
+  useEffect(() => {
+    if (!pendingEchoToast) return
+    const t = setTimeout(clearEchoToast, 5000)
+    return () => clearTimeout(t)
+  }, [pendingEchoToast?.id])
+
+  const tierDef = TRUST_TIERS.find(t => t.id === pendingEchoToast?.tier) || TRUST_TIERS[0]
+
+  return (
+    <AnimatePresence>
+      {pendingEchoToast && (
+        <motion.div
+          key={pendingEchoToast.id}
+          initial={{ opacity: 0, y: 60, scale: 0.92 }}
+          animate={{ opacity: 1, y: 0,  scale: 1 }}
+          exit={{   opacity: 0, y: 60,  scale: 0.92 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 26 }}
+          style={{
+            position: 'fixed', bottom: 88, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 8100, pointerEvents: 'none',
+            maxWidth: 340, width: 'calc(100% - 48px)',
+            borderRadius: 20,
+            background: 'rgba(8,10,26,0.97)',
+            border: `1px solid ${tierDef.border}`,
+            boxShadow: `0 16px 60px rgba(0,0,0,0.65), 0 0 40px ${tierDef.glow}`,
+            backdropFilter: 'blur(28px)',
+            WebkitBackdropFilter: 'blur(28px)',
+            fontFamily: "'Inter', system-ui, sans-serif",
+            padding: '16px 20px',
+          }}
+        >
+          {/* Shimmer line */}
+          <motion.div
+            initial={{ scaleX: 0 }} animate={{ scaleX: 1 }}
+            transition={{ duration: 1.2, ease: 'easeOut' }}
+            style={{ height: 2, borderRadius: 99, background: `linear-gradient(90deg, transparent, ${tierDef.color}, transparent)`, marginBottom: 12, transformOrigin: 'left' }}
+          />
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+            {/* Icon */}
+            <motion.div
+              animate={{ scale: [1, 1.18, 1], rotate: [0, 8, -8, 0] }}
+              transition={{ duration: 1.4, repeat: 1 }}
+              style={{ fontSize: 26, flexShrink: 0, lineHeight: 1, marginTop: 2 }}
+            >
+              ✨
+            </motion.div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: tierDef.color, marginBottom: 4 }}>
+                Echo Saved
+              </div>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: 'rgba(255,255,255,0.92)', lineHeight: 1.35, marginBottom: 4 }}>
+                {pendingEchoToast.topic}
+              </div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.50)', lineHeight: 1.5, fontStyle: 'italic' }}>
+                "{pendingEchoToast.moment}"
+              </div>
+            </div>
+          </div>
         </motion.div>
       )}
     </AnimatePresence>
@@ -8078,6 +8176,8 @@ export default function App() {
       <XPToast />
       {/* Aeva Command Toast — slides from top when Aeva fires a command */}
       <AevaCommandToast />
+      {/* Echo Toast — slides from bottom when a breakthrough is saved */}
+      <EchoToast />
       {/* Aeva Intervention — renders above everything, no escape */}
       <AnimatePresence>
         <AevaIntervention key="intervention" />

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ChevronLeft } from 'lucide-react'
 import { useNeuralStore } from './neuralStore'
+import { useEchoStore, TRUST_TIERS, getTrustTier, getTrustProgress } from './echoStore'
+import { useXPStore } from './xpStore'
 
 const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
@@ -220,6 +222,11 @@ export default function UserProfile({ name, onClose }) {
     conceptMap, strugglePredictions, topicInterest,
   } = store
 
+  const { streak } = useXPStore()
+  const { echoes } = useEchoStore()
+  const trustTier = getTrustTier(totalExchanges, masteredTopics?.length || 0, streak)
+  const trustProgress = getTrustProgress(totalExchanges, masteredTopics?.length || 0, streak)
+
   const [assessment, setAssessment] = useState(null)
   const [assessLoading, setAssessLoading] = useState(true)
 
@@ -405,6 +412,86 @@ export default function UserProfile({ name, onClose }) {
           <StatChip label="Mastered Topics" value={masteredTopics.length} color="#4ADE80" />
           <StatChip label="Struggle Zones" value={struggleZones.length} color="#F87171" />
           <StatChip label="Concepts Mapped" value={conceptMap.length} color="#60A5FA" />
+        </motion.div>
+
+        {/* ── Trust Tier ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12 }}
+          style={{
+            marginBottom: 14, padding: '20px 22px', borderRadius: 20,
+            background: `linear-gradient(135deg, ${trustTier.glow}, rgba(255,255,255,0.02))`,
+            border: `1px solid ${trustTier.border}`,
+            position: 'relative', overflow: 'hidden',
+          }}
+        >
+          {/* Glow orb */}
+          <div aria-hidden style={{
+            position: 'absolute', top: -40, right: -40, width: 140, height: 140,
+            borderRadius: '50%', background: `radial-gradient(circle, ${trustTier.glow} 0%, transparent 70%)`,
+            filter: 'blur(24px)', pointerEvents: 'none',
+          }} />
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, position: 'relative', zIndex: 1 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', marginBottom: 6 }}>
+                Trust Tier
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                <span style={{ fontSize: 24 }}>{trustTier.emoji}</span>
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: trustTier.color, letterSpacing: '-0.03em', lineHeight: 1 }}>
+                    {trustTier.label}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+                    {trustTier.desc}
+                  </div>
+                </div>
+              </div>
+              <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.32)', fontStyle: 'italic', marginBottom: 10 }}>
+                {trustTier.subDesc}
+              </div>
+              {/* Progress bar to next tier */}
+              {trustProgress.next ? (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', fontWeight: 600 }}>Progress to {trustProgress.next.label}</span>
+                    <span style={{ fontSize: 10, color: trustTier.color, fontWeight: 700 }}>{trustProgress.pct}%</span>
+                  </div>
+                  <div style={{ height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                    <motion.div
+                      initial={{ width: 0 }} animate={{ width: `${trustProgress.pct}%` }}
+                      transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }}
+                      style={{ height: '100%', borderRadius: 99, background: `linear-gradient(90deg, ${trustTier.color}, ${trustProgress.next.color})` }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: 11, color: trustTier.color, fontWeight: 700 }}>
+                  ✦ Maximum tier reached
+                </div>
+              )}
+            </div>
+            {/* Tier ladder */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end', flexShrink: 0 }}>
+              {[...TRUST_TIERS].reverse().map(t => {
+                const isActive = t.id === trustTier.id
+                return (
+                  <div key={t.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '4px 10px', borderRadius: 99,
+                    background: isActive ? `${t.glow}` : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${isActive ? t.border : 'rgba(255,255,255,0.06)'}`,
+                    opacity: isActive ? 1 : 0.4,
+                    transition: 'all 0.2s',
+                  }}>
+                    <span style={{ fontSize: 11 }}>{t.emoji}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: isActive ? t.color : 'rgba(255,255,255,0.35)' }}>{t.label}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </motion.div>
 
         {/* ── Aeva's Assessment ── */}
@@ -716,6 +803,81 @@ export default function UserProfile({ name, onClose }) {
             </Section>
           </div>
         )}
+
+        {/* ── Echoes ── */}
+        <div style={{ marginTop: 14 }}>
+          <motion.div
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.50 }}
+            style={{ padding: '20px 22px', borderRadius: 20, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+              <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.30)' }}>
+                Echoes
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', fontWeight: 500 }}>
+                {echoes.length} moment{echoes.length !== 1 ? 's' : ''} saved
+              </div>
+            </div>
+
+            {echoes.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                <div style={{ fontSize: 32, marginBottom: 10 }}>✨</div>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: 'rgba(255,255,255,0.40)', marginBottom: 6 }}>
+                  No echoes yet
+                </div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.22)', lineHeight: 1.6 }}>
+                  When you have a real breakthrough moment,<br />Aeva saves it here. Keep going.
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {echoes.map((echo, i) => {
+                  const tier = TRUST_TIERS.find(t => t.id === echo.tier) || TRUST_TIERS[0]
+                  const dateStr = new Date(echo.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                  return (
+                    <motion.div
+                      key={echo.id}
+                      initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.50 + i * 0.06 }}
+                      style={{ display: 'flex', gap: 14, padding: '14px 0', borderBottom: i < echoes.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}
+                    >
+                      {/* Timeline spine */}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, paddingTop: 2 }}>
+                        <div style={{
+                          width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                          background: tier.glow, border: `1px solid ${tier.border}`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 13, boxShadow: `0 0 12px ${tier.glow}`,
+                        }}>
+                          ✨
+                        </div>
+                        {i < echoes.length - 1 && (
+                          <div style={{ width: 1, flex: 1, marginTop: 6, background: 'rgba(255,255,255,0.06)' }} />
+                        )}
+                      </div>
+                      {/* Content */}
+                      <div style={{ flex: 1, minWidth: 0, paddingBottom: i < echoes.length - 1 ? 14 : 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.88)' }}>{echo.topic}</span>
+                          <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 99, background: tier.glow, border: `1px solid ${tier.border}`, color: tier.color, fontWeight: 700 }}>
+                            {tier.emoji} {tier.label}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.50)', lineHeight: 1.55, fontStyle: 'italic', marginBottom: 6 }}>
+                          "{echo.moment}"
+                        </div>
+                        <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.22)', fontWeight: 500 }}>
+                          {dateStr}
+                        </div>
+                      </div>
+                    </motion.div>
+                  )
+                })}
+              </div>
+            )}
+          </motion.div>
+        </div>
 
         {/* ── Footer ── */}
         <motion.div
