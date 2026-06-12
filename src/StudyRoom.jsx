@@ -200,6 +200,231 @@ function XPBar({ label, xp, max, color }) {
   )
 }
 
+// ─── Squad Panel (right sidebar during active session) ────────────────────────
+
+function SquadPanel({ members, myUserId, mode, answers, speedRound, sessionNumber, totalSessions, timerPhase, compact = false }) {
+  const scores = speedRound?.scores || {}
+
+  // Sort: leader first (highest focus %)
+  const sorted = [...members].sort((a, b) => {
+    const aF = a.stats?.totalSeconds > 0 ? a.stats.focusSeconds / a.stats.totalSeconds : 0
+    const bF = b.stats?.totalSeconds > 0 ? b.stats.focusSeconds / b.stats.totalSeconds : 0
+    return bF - aF
+  })
+
+  const getModeScore = (m) => {
+    if (mode === 'speed')   return { val: scores[m.userId] || 0, label: 'pts', color: '#10B981' }
+    if (mode === 'battle' || mode === 'weakspot') return { val: m.stats?.battlesStarsTotal || 0, label: '★', color: '#F59E0B' }
+    if (mode === 'tagteam') return { val: m.stats?.tagGroupScores?.length || 0, label: 'rounds', color: '#8B5CF6' }
+    return null
+  }
+
+  const totalXP = (m) => Math.round((m.stats?.xp?.focus || 0) + (m.stats?.xp?.battles || 0))
+
+  const collectiveEnergy = members.length
+    ? Math.round(members.filter(m => m.status === 'working').length / members.length * 100)
+    : 0
+
+  const energyColor = collectiveEnergy >= 80 ? '#10B981' : collectiveEnergy >= 50 ? '#F59E0B' : '#F43F5E'
+
+  if (compact) {
+    // Mobile: horizontal scrollable strip
+    return (
+      <div style={{ marginBottom: 10, padding: '10px 12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14 }}>
+        <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.28)', marginBottom: 8 }}>
+          Squad · {members.length} members
+        </div>
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+          {sorted.map((m, i) => {
+            const col = m.color || SLOT_COLORS[0]
+            const focusPct = m.stats?.totalSeconds > 0 ? Math.round(m.stats.focusSeconds / m.stats.totalSeconds * 100) : 0
+            const isMe = m.userId === myUserId
+            const isLeader = i === 0 && members.length > 1
+            const modeScore = getModeScore(m)
+            return (
+              <div key={m.userId} style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, minWidth: 60 }}>
+                <div style={{ position: 'relative' }}>
+                  {isLeader && <div style={{ position: 'absolute', top: -8, left: '50%', transform: 'translateX(-50%)', fontSize: 10 }}>👑</div>}
+                  <motion.div
+                    animate={m.status === 'working' ? { boxShadow: [`0 0 0px ${col.glow}`, `0 0 10px ${col.glow}`, `0 0 0px ${col.glow}`] } : {}}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    style={{ width: 32, height: 32, borderRadius: '50%', background: m.status === 'working' ? col.bg : 'rgba(255,255,255,0.08)', border: `2px solid ${m.status === 'working' ? col.bg : 'rgba(255,255,255,0.12)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>
+                    {m.displayName?.[0]?.toUpperCase() || '?'}
+                  </motion.div>
+                </div>
+                <div style={{ fontSize: 9, color: isMe ? col.bg : 'rgba(255,255,255,0.50)', fontWeight: isMe ? 700 : 500, maxWidth: 56, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                  {isMe ? 'You' : m.displayName}
+                </div>
+                <div style={{ width: 44, height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                  <motion.div animate={{ width: `${focusPct}%` }} transition={{ duration: 0.8 }}
+                    style={{ height: '100%', borderRadius: 99, background: focusPct >= 75 ? '#10B981' : focusPct >= 45 ? '#F59E0B' : '#F43F5E' }} />
+                </div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', fontVariantNumeric: 'tabular-nums' }}>{focusPct}%</div>
+                {modeScore && <div style={{ fontSize: 9, fontWeight: 700, color: modeScore.color }}>{modeScore.val}{modeScore.label}</div>}
+              </div>
+            )
+          })}
+        </div>
+        {/* Collective energy */}
+        <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ flex: 1, height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+            <motion.div animate={{ width: `${collectiveEnergy}%` }} transition={{ duration: 1 }}
+              style={{ height: '100%', borderRadius: 99, background: energyColor }} />
+          </div>
+          <span style={{ fontSize: 9, color: energyColor, fontWeight: 700, flexShrink: 0 }}>{collectiveEnergy}% energy</span>
+        </div>
+      </div>
+    )
+  }
+
+  // Desktop: full right panel
+  return (
+    <div style={{
+      width: 200, flexShrink: 0,
+      borderLeft: '1px solid rgba(255,255,255,0.07)',
+      padding: '14px 14px 14px 14px',
+      display: 'flex', flexDirection: 'column', gap: 0,
+      overflowY: 'auto',
+    }}>
+      {/* Header */}
+      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.28)', marginBottom: 12 }}>
+        Squad · {members.length}
+      </div>
+
+      {/* Member list */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 16 }}>
+        {sorted.map((m, i) => {
+          const col = m.color || SLOT_COLORS[0]
+          const focusPct = m.stats?.totalSeconds > 0 ? Math.round(m.stats.focusSeconds / m.stats.totalSeconds * 100) : 0
+          const focusColor = focusPct >= 75 ? '#10B981' : focusPct >= 45 ? '#F59E0B' : '#F43F5E'
+          const xp = totalXP(m)
+          const modeScore = getModeScore(m)
+          const isMe = m.userId === myUserId
+          const isLeader = i === 0 && members.length > 1
+
+          return (
+            <motion.div
+              key={m.userId}
+              initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.06 }}
+              style={{ display: 'flex', flexDirection: 'column', gap: 5 }}
+            >
+              {/* Name row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  {isLeader && (
+                    <div style={{ position: 'absolute', top: -7, left: '50%', transform: 'translateX(-50%)', fontSize: 9, lineHeight: 1 }}>👑</div>
+                  )}
+                  <motion.div
+                    animate={m.status === 'working' ? { boxShadow: [`0 0 0px ${col.glow}`, `0 0 8px ${col.glow}`, `0 0 0px ${col.glow}`] } : {}}
+                    transition={{ duration: 2.2, repeat: Infinity }}
+                    style={{ width: 26, height: 26, borderRadius: '50%', background: m.status === 'working' ? col.bg : 'rgba(255,255,255,0.08)', border: `2px solid ${m.status === 'working' ? col.bg : 'rgba(255,255,255,0.10)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                    {m.displayName?.[0]?.toUpperCase() || '?'}
+                  </motion.div>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, fontWeight: isMe ? 700 : 500, color: isMe ? col.bg : 'rgba(255,255,255,0.75)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {isMe ? 'You' : m.displayName}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <div style={{ width: 5, height: 5, borderRadius: '50%', background: m.status === 'working' ? '#10B981' : '#F43F5E', flexShrink: 0 }} />
+                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.30)' }}>{m.status === 'working' ? 'working' : 'away'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Focus bar */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.06em' }}>FOCUS</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: focusColor, fontVariantNumeric: 'tabular-nums' }}>{focusPct}%</span>
+                </div>
+                <div style={{ height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                  <motion.div
+                    animate={{ width: `${focusPct}%` }}
+                    transition={{ duration: 0.9, ease: 'easeOut' }}
+                    style={{ height: '100%', borderRadius: 99, background: `linear-gradient(90deg, ${focusColor}99, ${focusColor})` }}
+                  />
+                </div>
+              </div>
+
+              {/* Stats row */}
+              <div style={{ display: 'flex', gap: 6 }}>
+                <div style={{ flex: 1, padding: '4px 6px', borderRadius: 7, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#A5B4FC', lineHeight: 1 }}>{xp}</div>
+                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)', marginTop: 1 }}>XP</div>
+                </div>
+                {modeScore && (
+                  <div style={{ flex: 1, padding: '4px 6px', borderRadius: 7, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: modeScore.color, lineHeight: 1 }}>{modeScore.val}<span style={{ fontSize: 8 }}>{modeScore.label}</span></div>
+                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)', marginTop: 1 }}>
+                      {mode === 'speed' ? 'pts' : mode === 'tagteam' ? 'done' : 'stars'}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )
+        })}
+      </div>
+
+      {/* Divider */}
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', marginBottom: 14 }} />
+
+      {/* Collective Energy */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.28)' }}>Energy</span>
+          <span style={{ fontSize: 9, fontWeight: 700, color: energyColor }}>{collectiveEnergy}%</span>
+        </div>
+        <div style={{ height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+          <motion.div animate={{ width: `${collectiveEnergy}%` }} transition={{ duration: 1, ease: 'easeOut' }}
+            style={{ height: '100%', borderRadius: 99, background: energyColor }} />
+        </div>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.22)', marginTop: 4 }}>
+          {collectiveEnergy >= 80 ? 'Everyone locked in 🔥' : collectiveEnergy >= 50 ? 'Getting there' : 'Needs focus'}
+        </div>
+      </div>
+
+      {/* Round Progress */}
+      <div>
+        <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.28)', marginBottom: 8 }}>
+          Rounds
+        </div>
+        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+          {Array.from({ length: totalSessions }).map((_, i) => {
+            const done = i < sessionNumber - (timerPhase === 'work' ? 0 : 0)
+            const current = i === sessionNumber - 1
+            return (
+              <div key={i} style={{
+                width: 20, height: 20, borderRadius: 6, fontSize: 9, fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: done && !current ? 'rgba(99,102,241,0.20)' : current ? 'rgba(99,102,241,0.45)' : 'rgba(255,255,255,0.05)',
+                border: `1px solid ${current ? 'rgba(99,102,241,0.70)' : done && !current ? 'rgba(99,102,241,0.30)' : 'rgba(255,255,255,0.08)'}`,
+                color: current ? '#A5B4FC' : done && !current ? 'rgba(99,102,241,0.70)' : 'rgba(255,255,255,0.20)',
+              }}>
+                {done && !current ? '✓' : i + 1}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Goal of current leader */}
+      {sorted[0]?.goal && (
+        <div style={{ marginTop: 14, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            👑 {sorted[0].displayName === myUserId ? 'Your' : `${sorted[0].displayName}'s`} goal
+          </div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.50)', fontStyle: 'italic', lineHeight: 1.4 }}>
+            {sorted[0].goal}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Mode-specific session stats bars ─────────────────────────────────────────
 
 function SilentStatsBar({ members, myUserId }) {
@@ -598,6 +823,13 @@ function SessionScreen({ onMinimize }) {
   const [goalSet, setGoalSet] = useState(false)
   const feedBottomRef = useRef(null)
   const chatInputRef = useRef(null)
+  const [isWide, setIsWide] = useState(() => window.innerWidth > 580)
+
+  useEffect(() => {
+    const onResize = () => setIsWide(window.innerWidth > 580)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   const myMember = members.find(m => m.userId === myUserId)
   const isWorking = myMember?.status === 'working'
@@ -626,10 +858,8 @@ function SessionScreen({ onMinimize }) {
     ...chatMessages.map(m => ({ ...m, _type: 'chat', id: m.id, time: m.ts })),
   ].sort((a, b) => (a.time || 0) - (b.time || 0))
 
-  return (
-    <motion.div key="session" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
-      style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', gap: 0 }}>
-
+  const mainContent = (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: '100%' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <div>
@@ -651,41 +881,27 @@ function SessionScreen({ onMinimize }) {
         </div>
       </div>
 
-      {/* Member orbs + goal prompt */}
-      <div style={{ marginBottom: 10, padding: '10px 10px 6px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14 }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'center', marginBottom: goalSet ? 0 : 8 }}>
-          {members.map(m => (
-            <MemberOrb
-              key={m.userId} member={m} size={38} showName myUserId={myUserId}
-              goal={sessionGoals[m.userId]}
-              reaction={reactions.find(r => r.userId === m.userId)}
-            />
-          ))}
-        </div>
-        {/* Goal input for current user (shows once per work block) */}
-        {!goalSet && (
-          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-            <input
-              value={goalInput}
-              onChange={e => setGoalInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleGoalSubmit()}
-              placeholder="What are you working on? (optional)"
-              style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 8, padding: '6px 10px', color: 'rgba(255,255,255,0.75)', fontSize: 11, fontFamily: 'inherit', outline: 'none' }}
-            />
-            <motion.button whileTap={{ scale: 0.92 }} onClick={handleGoalSubmit}
-              style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(99,102,241,0.20)', border: '1px solid rgba(99,102,241,0.35)', color: '#A5B4FC', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-              Set
-            </motion.button>
-          </div>
-        )}
-      </div>
+      {/* Mobile: compact squad strip */}
+      {!isWide && (
+        <SquadPanel compact members={members} myUserId={myUserId} mode={mode} answers={answers} speedRound={speedRound} sessionNumber={sessionNumber} totalSessions={totalSessions} timerPhase={timerPhase} />
+      )}
 
-      {/* Mode-specific stats bar */}
-      {mode === 'silent'   && <SilentStatsBar members={members} myUserId={myUserId} />}
-      {mode === 'battle'   && <BattleStatsBar members={members} answers={answers} />}
-      {mode === 'weakspot' && <WeakSpotStatsBar members={members} currentQuestion={currentQuestion} />}
-      {mode === 'speed'    && <SpeedStatsBar speedRound={speedRound} members={members} myUserId={myUserId} />}
-      {mode === 'tagteam'  && <TagTeamStatsBar tagRound={tagRound} members={members} />}
+      {/* Goal input (desktop only — on mobile it's a bit much) */}
+      {!goalSet && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+          <input
+            value={goalInput}
+            onChange={e => setGoalInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleGoalSubmit()}
+            placeholder="What are you working on this round?"
+            style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 8, padding: '6px 10px', color: 'rgba(255,255,255,0.75)', fontSize: 11, fontFamily: 'inherit', outline: 'none' }}
+          />
+          <motion.button whileTap={{ scale: 0.92 }} onClick={handleGoalSubmit}
+            style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(99,102,241,0.20)', border: '1px solid rgba(99,102,241,0.35)', color: '#A5B4FC', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+            Set
+          </motion.button>
+        </div>
+      )}
 
       {/* Status toggle */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
@@ -740,6 +956,21 @@ function SessionScreen({ onMinimize }) {
           <Send size={13} />
         </motion.button>
       </div>
+    </div>
+  )
+
+  return (
+    <motion.div key="session" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+      style={{ display: 'flex', flexDirection: 'row', width: '100%', height: '100%', gap: 0 }}>
+      {mainContent}
+      {isWide && members.length > 1 && (
+        <SquadPanel
+          members={members} myUserId={myUserId} mode={mode}
+          answers={answers} speedRound={speedRound}
+          sessionNumber={sessionNumber} totalSessions={totalSessions}
+          timerPhase={timerPhase}
+        />
+      )}
     </motion.div>
   )
 }
@@ -1452,7 +1683,7 @@ export default function StudyRoom() {
 
         <motion.div key="studyroom-panel" initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }}
           transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-          style={{ width: '100%', maxWidth: 440, maxHeight: '92vh', background: 'rgba(8,8,22,0.98)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: '20px 20px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          style={{ width: '100%', maxWidth: ['session','break','battle','speed','tagteam'].includes(phase) ? 680 : 440, maxHeight: '92vh', background: 'rgba(8,8,22,0.98)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: '20px 20px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'max-width 0.3s ease' }}>
 
           {/* Handle */}
           <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 10, paddingBottom: 2 }}>
