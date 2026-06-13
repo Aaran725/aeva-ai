@@ -3091,7 +3091,7 @@ const GRAPH_COLORS = ['#818CF8', '#34D399', '#F472B6', '#FBBF24', '#60A5FA', '#F
 if (typeof document !== 'undefined' && !document.getElementById('mafs-aeva-bg')) {
   const s = document.createElement('style')
   s.id = 'mafs-aeva-bg'
-  s.textContent = '.mafs-view { background: #0d0f1e !important; }'
+  s.textContent = '.MafsView { background: #0d0f1e !important; }'
   document.head.appendChild(s)
 }
 
