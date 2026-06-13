@@ -3090,12 +3090,22 @@ const GRAPH_COLORS = ['#818CF8', '#34D399', '#F472B6', '#FBBF24', '#60A5FA', '#F
 function MafsGraph({ exprs, isLight }) {
   const wrapperRef = useRef(null)
 
-  // Mafs applies its black background after React render — retry at multiple intervals to override
+  // Override all Mafs theme variables — retry at multiple intervals to beat Mafs's own CSS
   useEffect(() => {
-    const bg = isLight ? '#f8f9ff' : '#0d0f1e'
     const apply = () => {
       const el = wrapperRef.current?.querySelector('.MafsView')
-      if (el) el.style.background = bg
+      if (!el) return
+      if (isLight) {
+        el.style.setProperty('--mafs-bg', '#f8f9ff')
+        el.style.setProperty('--mafs-line-color', 'rgba(99,102,241,0.30)')
+        el.style.setProperty('--grid-line-subdivision-color', 'rgba(99,102,241,0.12)')
+        el.style.background = '#f8f9ff'
+      } else {
+        el.style.setProperty('--mafs-bg', '#1a1b3e')
+        el.style.setProperty('--mafs-line-color', 'rgba(99,102,241,0.35)')
+        el.style.setProperty('--grid-line-subdivision-color', 'rgba(99,102,241,0.15)')
+        el.style.background = '#1a1b3e'
+      }
     }
     const timers = [0, 30, 100, 300, 600].map(ms => setTimeout(apply, ms))
     return () => timers.forEach(clearTimeout)
