@@ -3116,12 +3116,16 @@ function DesmosGraph({ exprs, isLight }) {
 
 // ── sanitizeMermaid — fix common AI-generated Mermaid syntax errors ───────────
 function sanitizeMermaid(src) {
+  // Wrap node labels that contain special chars (parens, commas, slashes, &) in double-quotes
+  // Handles: A[Label (with parens)] → A["Label (with parens)"]
+  //          A(Label (nested)) → A("Label (nested)")
   return src
-    // Quote ALL unquoted square bracket labels: [text] → ["text"]
-    // Safe — quoted labels are always valid in Mermaid
-    .replace(/\[([^\]"[\n]+)\]/g, (_, inner) => `["${inner.trim().replace(/"/g, "'")}"]`)
-    // Quote round bracket labels that contain special chars: (text (nested)) → ("text (nested)")
-    .replace(/\(([^)"(\n]*[(),;/&+][^)"(\n]*)\)/g, (_, inner) => `("${inner.trim().replace(/"/g, "'")}") `)
+    // Square bracket labels: [some text with () or , or /]
+    .replace(/\[([^\]"]*[(),/&+][^\]"]*)\]/g, (_, inner) => `["${inner.replace(/"/g, "'")}"]`)
+    // Round bracket labels: (some text with () or , or /)
+    .replace(/\(([^)"]*[(),/&+][^)"]*)\)/g, (_, inner) => `("${inner.replace(/"/g, "'")}") `)
+    // Curly bracket labels: {some text with special chars}
+    .replace(/\{([^}"]*[(),/&+][^}"]*)\}/g, (_, inner) => `{"${inner.replace(/"/g, "'")}"}`)
 }
 
 // ── MermaidDiagram — inline Mermaid diagram render ────────────────────────────
