@@ -3327,25 +3327,34 @@ function StepCard({ stepNum, stepTitle, fullText, isLight }) {
 
     setLoading(true)
     const context = fullText.slice(0, 800)
-    const prompt = `You are a focused tutor. A student tapped to expand one step for more detail.
+    const prompt = `You are a focused tutor. A student tapped a step to get more detail.
 
-Context (the full explanation they already read):
+Context already shown to the student:
 ${context}
 
-Step they tapped: Step ${stepNum}: ${stepTitle}
+Step tapped: Step ${stepNum}: ${stepTitle}
 
-CONTENT RULES:
-- The student ALREADY SAW the step title and the surrounding explanation. Do NOT restate or redefine the title.
-- Do NOT open with "In this step..." — cut straight to the new insight.
-- Add what the title leaves out: the "why", a common pitfall, or one concrete example with real numbers.
-- Keep it tight: 2–3 sentences of prose max. One callout or formula block if it genuinely helps.
+RULES:
+- Do NOT restate the step title or anything already in the context.
+- 1–2 sentences max. Add the "why" or a common mistake — nothing else.
+- If the step involves an equation, show it as a display block on its own line.
+- If there is one key insight worth calling out, use a callout block on its own line.
 
-FORMATTING — match the main chat exactly:
-- **bold** for new technical terms and key values
-- $...$ for inline math symbols, $$...$$ on its own line for any full equation or formula
-- > **Key Insight:** or > **Note:** or > **Tip:** — use ONE callout block only if there is a genuine insight worth highlighting
-- Bullet points only if listing 3+ truly distinct things (rare at this scale)
-- Do NOT use step headings (no "1:", "Step 1:", etc.)`
+OUTPUT FORMAT — copy this structure exactly (use only what applies):
+
+One or two sentences of insight. Use **bold** for key terms, $x$ for inline symbols.
+
+$$
+equation here if relevant
+$$
+
+> **Key Insight:** One sentence callout if genuinely useful. Otherwise omit entirely.
+
+CRITICAL SYNTAX RULES — the renderer is line-based:
+- $$...$$ must be on THREE separate lines: line 1 = $$, line 2 = the LaTeX, line 3 = $$
+- > **Key Insight:** must be on its OWN line with a blank line before it
+- Never put > on the same line as a sentence — it will render as broken text
+- Do NOT use step headings (1:, Step 1:, etc.)`
 
     const controller = new AbortController()
     abortRef.current = controller
@@ -3354,7 +3363,7 @@ FORMATTING — match the main chat exactly:
       await streamGroq([], prompt, chunk => {
         raw += chunk
         setDrillText(raw)
-      }, controller.signal, { model: 'llama-3.3-70b-versatile', maxTokens: 260, temperature: 0.55 })
+      }, controller.signal, { model: 'llama-3.3-70b-versatile', maxTokens: 300, temperature: 0.5 })
     } catch { /* silent fail */ }
     finally { setLoading(false) }
   }
