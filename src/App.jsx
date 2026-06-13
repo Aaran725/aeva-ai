@@ -3356,33 +3356,31 @@ ${context}
 Step tapped: "${stepTitle}"
 
 WHAT TO WRITE:
-Write exactly ONE of these — whichever adds the most value the title didn't already give:
-  A) The non-obvious "why" behind this step (not a restatement)
-  B) The single most common mistake students make on this specific step
-  C) A concrete edge case that catches people out
+Pick exactly ONE angle — whichever adds the most value the title didn't give:
+  A) The non-obvious "why" behind this step
+  B) The single most common mistake on this specific step
+  C) A concrete edge case or trap
 
-MAX LENGTH: 1–2 tight sentences. If you can say it in 1, use 1.
+FORMATTING — must match main chat quality exactly:
+- Start with **bold** on the first key technical term — no exceptions
+- Use $...$ for EVERY math symbol mentioned inline: $a$, $x^2$, $\\frac{b}{2a}$
+- Use $$...$$ display block only if it shows something NEW the context didn't already show — never repeat an equation already above
+- Key Insight callout: only if genuinely non-obvious — a trap, an exception, something that surprises. Never a restatement.
 
-EQUATION: Show ONE display equation only if it reveals something the title didn't show. Skip it if the title already showed the formula.
-✗ Never repeat an equation that was already in the context — show the next form or nothing.
+MAX LENGTH: 1–2 sentences before the equation. If 1 is enough, stop at 1.
 
-KEY INSIGHT callout: Only if there's a genuine trap or non-obvious fact. Must NOT be a restatement of the step. If you can't think of one, omit it entirely.
-✗ BAD: "This step is essential for completing the square method." (restates the obvious)
-✓ GOOD: "If $a = 0$ this step breaks — always verify you actually have a quadratic first."
-
-OUTPUT STRUCTURE (use only what applies, in this order):
-1–2 sentences.
+OUTPUT STRUCTURE (use only what applies):
+**Key term** — one or two sentences using $inline math$ for every symbol. Use **bold** for terms.
 
 $$
-LaTeX only if it adds new information
+new equation only if needed
 $$
 
-> **Key Insight:** One genuinely surprising or trap-avoiding sentence. Omit if nothing qualifies.
+> **Key Insight:** One sentence that would actually surprise a student. Omit if nothing qualifies.
 
 SYNTAX RULES:
-- $$ blocks: line 1 = $$, line 2 = LaTeX, line 3 = $$ (three separate lines, no exceptions)
-- > callout: must be on its own line with a blank line before it
-- Never place > inline in a sentence — it breaks the renderer`
+- $$ blocks: line 1 = $$, line 2 = LaTeX, line 3 = $$ — three separate lines always
+- > callout: own line, blank line before it, never inline in a sentence`
 
     const controller = new AbortController()
     abortRef.current = controller
@@ -3460,27 +3458,43 @@ SYNTAX RULES:
             <div style={{
               marginLeft: 43,
               marginTop: 10,
-              paddingTop: 2,
-              borderLeft: `2px solid ${isLight ? 'rgba(99,102,241,0.22)' : 'rgba(139,143,255,0.20)'}`,
-              paddingLeft: 16,
+              borderRadius: 14,
+              background: isLight ? 'rgba(99,102,241,0.05)' : 'rgba(99,102,241,0.08)',
+              border: isLight ? '1px solid rgba(99,102,241,0.18)' : '1px solid rgba(139,143,255,0.18)',
+              overflow: 'hidden',
             }}>
-              {loading && !drillText ? (
-                <div style={{ display: 'flex', gap: 5, alignItems: 'center', padding: '6px 0' }}>
-                  {[0, 1, 2].map(n => (
-                    <motion.div
-                      key={n}
-                      animate={{ y: [0, -4, 0] }}
-                      transition={{ duration: 0.7, delay: n * 0.15, repeat: Infinity, ease: 'easeInOut' }}
-                      style={{
-                        width: 5, height: 5, borderRadius: '50%',
-                        background: isLight ? 'rgba(99,102,241,0.55)' : 'rgba(139,143,255,0.60)',
-                      }}
-                    />
-                  ))}
-                </div>
-              ) : drillText ? (
-                <MarkdownRenderer text={drillText} streaming={loading} isLight={isLight} isDrill />
-              ) : null}
+              {/* Header label */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 7,
+                padding: '8px 14px 7px',
+                borderBottom: isLight ? '1px solid rgba(99,102,241,0.12)' : '1px solid rgba(139,143,255,0.12)',
+              }}>
+                <span style={{
+                  fontSize: 9.5, fontWeight: 800, letterSpacing: '0.10em',
+                  textTransform: 'uppercase',
+                  color: isLight ? '#6366F1' : '#A5B4FC',
+                }}>↳ Step {stepNum} — Deep dive</span>
+              </div>
+              {/* Content */}
+              <div style={{ padding: '12px 16px 14px' }}>
+                {loading && !drillText ? (
+                  <div style={{ display: 'flex', gap: 5, alignItems: 'center', padding: '4px 0' }}>
+                    {[0, 1, 2].map(n => (
+                      <motion.div
+                        key={n}
+                        animate={{ y: [0, -4, 0] }}
+                        transition={{ duration: 0.7, delay: n * 0.15, repeat: Infinity, ease: 'easeInOut' }}
+                        style={{
+                          width: 5, height: 5, borderRadius: '50%',
+                          background: isLight ? 'rgba(99,102,241,0.55)' : 'rgba(139,143,255,0.60)',
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : drillText ? (
+                  <MarkdownRenderer text={drillText} streaming={loading} isLight={isLight} isDrill />
+                ) : null}
+              </div>
             </div>
           </motion.div>
         )}
