@@ -493,13 +493,20 @@ y = 2x + 1
 \`\`\`
 
 \`\`\`mermaid
-— For diagrams, flowcharts, concept maps, and process flows. Use standard Mermaid syntax.
-— Use for: biological cycles (photosynthesis, cell cycle), chemistry reaction pathways, physics concept maps, history timelines, decision trees, topic relationship maps.
+— For diagrams, flowcharts, concept maps, and process flows.
+— Use for: biological cycles, chemistry reaction pathways, physics concept maps, history timelines, decision trees, topic relationships.
+— SYNTAX RULES (strict — violations break rendering):
+  · Node IDs must be short alphanumeric: A, B, C1, etc. — never spaces in IDs
+  · If a label contains parentheses, commas, or slashes, wrap it in double-quotes: A["Light reactions (PS II)"]
+  · Keep labels short (3–5 words max)
+  · Always start with graph TD or graph LR
+  · Do NOT use subgraph unless essential
 Example:
 \`\`\`mermaid
 graph TD
   A[Glucose] --> B[Glycolysis]
   B --> C[Pyruvate]
+  C --> D["Krebs Cycle (mitochondria)"]
 \`\`\`
 
 TABLES — standard markdown pipe tables for comparisons, properties, or structured data.
@@ -3107,6 +3114,20 @@ function DesmosGraph({ exprs, isLight }) {
   )
 }
 
+// ── sanitizeMermaid — fix common AI-generated Mermaid syntax errors ───────────
+function sanitizeMermaid(src) {
+  // Wrap node labels that contain special chars (parens, commas, slashes, &) in double-quotes
+  // Handles: A[Label (with parens)] → A["Label (with parens)"]
+  //          A(Label (nested)) → A("Label (nested)")
+  return src
+    // Square bracket labels: [some text with () or , or /]
+    .replace(/\[([^\]"]*[(),/&+][^\]"]*)\]/g, (_, inner) => `["${inner.replace(/"/g, "'")}"]`)
+    // Round bracket labels: (some text with () or , or /)
+    .replace(/\(([^)"]*[(),/&+][^)"]*)\)/g, (_, inner) => `("${inner.replace(/"/g, "'")}") `)
+    // Curly bracket labels: {some text with special chars}
+    .replace(/\{([^}"]*[(),/&+][^}"]*)\}/g, (_, inner) => `{"${inner.replace(/"/g, "'")}"}`)
+}
+
 // ── MermaidDiagram — inline Mermaid diagram render ────────────────────────────
 function MermaidDiagram({ src, isLight }) {
   const containerRef = useRef(null)
@@ -3116,10 +3137,12 @@ function MermaidDiagram({ src, isLight }) {
 
   useEffect(() => {
     let cancelled = false
+    const sanitized = sanitizeMermaid(src)
     import('mermaid').then(({ default: mermaid }) => {
       mermaid.initialize({
         startOnLoad: false,
         theme: isLight ? 'default' : 'dark',
+        securityLevel: 'loose',
         themeVariables: isLight ? {} : {
           background: '#0d0f1e',
           primaryColor: '#1e1f3a',
@@ -3132,18 +3155,40 @@ function MermaidDiagram({ src, isLight }) {
           fontSize: '14px',
         },
       })
-      mermaid.render(idRef.current, src).then(({ svg: rendered }) => {
+      mermaid.render(idRef.current, sanitized).then(({ svg: rendered }) => {
         if (!cancelled) setSvg(rendered)
-      }).catch(e => {
-        if (!cancelled) setErr(String(e))
+      }).catch(() => {
+        if (!cancelled) setErr(true)
       })
     })
     return () => { cancelled = true }
   }, [src, isLight])
 
+  const headerBar = (
+    <div style={{
+      padding: '7px 14px',
+      background: isLight ? 'rgba(99,102,241,0.07)' : 'rgba(99,102,241,0.12)',
+      borderBottom: isLight ? '1px solid rgba(99,102,241,0.14)' : '1px solid rgba(99,102,241,0.20)',
+      fontSize: 10, fontWeight: 900, letterSpacing: '0.10em', textTransform: 'uppercase',
+      color: isLight ? '#6366F1' : '#818CF8',
+    }}>Diagram</div>
+  )
+
   if (err) return (
-    <div style={{ margin: '12px 0', padding: '12px 16px', borderRadius: 12, background: 'rgba(248,113,113,0.10)', border: '1px solid rgba(248,113,113,0.25)', fontSize: 12, color: '#F87171', fontFamily: 'monospace' }}>
-      Diagram error: {err}
+    <div style={{
+      margin: '14px 0', borderRadius: 16, overflow: 'hidden',
+      border: isLight ? '1px solid rgba(99,102,241,0.18)' : '1px solid rgba(99,102,241,0.25)',
+    }}>
+      {headerBar}
+      <div style={{
+        padding: '20px 16px', background: isLight ? '#f9f9fc' : '#0d0f1e',
+        display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center',
+      }}>
+        <span style={{ fontSize: 18 }}>⚠️</span>
+        <span style={{ fontSize: 13, color: isLight ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.35)', textAlign: 'center' }}>
+          Couldn't render this diagram — the syntax may be too complex.
+        </span>
+      </div>
     </div>
   )
 
@@ -3153,13 +3198,7 @@ function MermaidDiagram({ src, isLight }) {
       border: isLight ? '1px solid rgba(99,102,241,0.18)' : '1px solid rgba(99,102,241,0.25)',
       boxShadow: isLight ? 'none' : '0 4px 24px rgba(0,0,0,0.30)',
     }}>
-      <div style={{
-        padding: '7px 14px',
-        background: isLight ? 'rgba(99,102,241,0.07)' : 'rgba(99,102,241,0.12)',
-        borderBottom: isLight ? '1px solid rgba(99,102,241,0.14)' : '1px solid rgba(99,102,241,0.20)',
-        fontSize: 10, fontWeight: 900, letterSpacing: '0.10em', textTransform: 'uppercase',
-        color: isLight ? '#6366F1' : '#818CF8',
-      }}>Diagram</div>
+      {headerBar}
       {svg
         ? <div
             ref={containerRef}
