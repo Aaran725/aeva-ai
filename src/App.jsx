@@ -331,11 +331,13 @@ $$m = \\frac{y_2 - y_1}{x_2 - x_1}$$
 ✗ Never bury formulas inline: "slope is $ \\frac{y_2-y_1}{x_2-x_1} $ which is similar to..." — always $$...$$ on its own line.
 
 STEPS: "N: Title" only — never **Step N:** or ## Step N. Renders as badge chip.
-Step titles: ≤ 8 words. Describe the ACTION, not the result.
-✗ WRONG: "1: Find two numbers that multiply to 6 and add to 5 — they are 2 and 3" (gives away the answer)
-✓ RIGHT: "1: Find two numbers that multiply to c and add to b"
-The answer and working belong in the expansion — not the title.
-After the final step, do NOT add a plain-text summary line ("So the roots are x = ..."). The steps already showed the answer. End with the closing question instead.
+Step titles: ≤ 8 words. THE ACTION only — never the result, never the answer, no colon at the end.
+✗ WRONG: "1: Divide by a to make the coefficient of x² equal to 1" — too long, includes the result
+✗ WRONG: "1: Find two numbers that multiply to 6 and add to 5 — they are 2 and 3" — gives the answer
+✓ RIGHT: "1: Divide through by a"
+✓ RIGHT: "2: Move the constant to the right"
+Count the words before writing. If the title is more than 8 words, cut it.
+After the final step, do NOT add a plain-text summary line ("So the roots are x = ..."). End with the closing question instead.
 
 MARKDOWN: Tables need header + \`| --- |\` row. Blockquotes only for callouts. Bold only for new technical terms.
 
@@ -3346,34 +3348,41 @@ function StepCard({ stepNum, stepTitle, fullText, isLight }) {
 
     setLoading(true)
     const context = fullText.slice(0, 800)
-    const prompt = `You are a focused tutor. A student tapped a step to get more detail.
+    const prompt = `You are a focused tutor. A student tapped a step to drill deeper.
 
-Context already shown to the student:
+Already shown to the student:
 ${context}
 
-Step tapped: Step ${stepNum}: ${stepTitle}
+Step tapped: "${stepTitle}"
 
-RULES:
-- Do NOT restate the step title or anything already in the context.
-- 1–2 sentences max. Add the "why" or a common mistake — nothing else.
-- If the step involves an equation, show it as a display block on its own line.
-- If there is one key insight worth calling out, use a callout block on its own line.
+WHAT TO WRITE:
+Write exactly ONE of these — whichever adds the most value the title didn't already give:
+  A) The non-obvious "why" behind this step (not a restatement)
+  B) The single most common mistake students make on this specific step
+  C) A concrete edge case that catches people out
 
-OUTPUT FORMAT — copy this structure exactly (use only what applies):
+MAX LENGTH: 1–2 tight sentences. If you can say it in 1, use 1.
 
-One or two sentences of insight. Use **bold** for key terms, $x$ for inline symbols.
+EQUATION: Show ONE display equation only if it reveals something the title didn't show. Skip it if the title already showed the formula.
+✗ Never repeat an equation that was already in the context — show the next form or nothing.
+
+KEY INSIGHT callout: Only if there's a genuine trap or non-obvious fact. Must NOT be a restatement of the step. If you can't think of one, omit it entirely.
+✗ BAD: "This step is essential for completing the square method." (restates the obvious)
+✓ GOOD: "If $a = 0$ this step breaks — always verify you actually have a quadratic first."
+
+OUTPUT STRUCTURE (use only what applies, in this order):
+1–2 sentences.
 
 $$
-equation here if relevant
+LaTeX only if it adds new information
 $$
 
-> **Key Insight:** One sentence callout if genuinely useful. Otherwise omit entirely.
+> **Key Insight:** One genuinely surprising or trap-avoiding sentence. Omit if nothing qualifies.
 
-CRITICAL SYNTAX RULES — the renderer is line-based:
-- $$...$$ must be on THREE separate lines: line 1 = $$, line 2 = the LaTeX, line 3 = $$
-- > **Key Insight:** must be on its OWN line with a blank line before it
-- Never put > on the same line as a sentence — it will render as broken text
-- Do NOT use step headings (1:, Step 1:, etc.)`
+SYNTAX RULES:
+- $$ blocks: line 1 = $$, line 2 = LaTeX, line 3 = $$ (three separate lines, no exceptions)
+- > callout: must be on its own line with a blank line before it
+- Never place > inline in a sentence — it breaks the renderer`
 
     const controller = new AbortController()
     abortRef.current = controller
