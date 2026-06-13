@@ -3090,20 +3090,15 @@ const GRAPH_COLORS = ['#818CF8', '#34D399', '#F472B6', '#FBBF24', '#60A5FA', '#F
 function MafsGraph({ exprs, isLight }) {
   const wrapperRef = useRef(null)
 
-  // Mafs continuously re-applies its own black background — use MutationObserver to win the fight
+  // Mafs applies its black background after React render — retry at multiple intervals to override
   useEffect(() => {
     const bg = isLight ? '#f8f9ff' : '#0d0f1e'
     const apply = () => {
       const el = wrapperRef.current?.querySelector('.MafsView')
-      if (el && el.style.background !== bg) el.style.setProperty('background', bg, 'important')
+      if (el) el.style.background = bg
     }
-    apply()
-    const observer = new MutationObserver(apply)
-    if (wrapperRef.current) {
-      observer.observe(wrapperRef.current, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] })
-    }
-    const t = setTimeout(apply, 100)
-    return () => { clearTimeout(t); observer.disconnect() }
+    const timers = [0, 30, 100, 300, 600].map(ms => setTimeout(apply, ms))
+    return () => timers.forEach(clearTimeout)
   }, [isLight])
 
   const fns = exprs.map(e => parseMathExpr(e))
