@@ -3088,6 +3088,14 @@ function parseMathExpr(raw) {
 const GRAPH_COLORS = ['#818CF8', '#34D399', '#F472B6', '#FBBF24', '#60A5FA', '#F97316']
 
 function MafsGraph({ exprs, isLight }) {
+  const wrapperRef = useRef(null)
+
+  // Mafs hardcodes --mafs-bg: black on .mafs-view — override via inline style (higher specificity)
+  useEffect(() => {
+    const el = wrapperRef.current?.querySelector('.mafs-view')
+    if (el) el.style.setProperty('--mafs-bg', isLight ? '#f8f9ff' : '#0d0f1e')
+  }, [isLight])
+
   const fns = exprs.map(e => parseMathExpr(e))
   const valid = fns.filter(Boolean)
 
@@ -3114,7 +3122,7 @@ function MafsGraph({ exprs, isLight }) {
           {exprs[0]}{exprs.length > 1 ? ` +${exprs.length - 1} more` : ''}
         </span>
       </div>
-      <div style={{ '--mafs-bg': isLight ? '#f8f9ff' : '#0d0f1e', background: isLight ? '#f8f9ff' : '#0d0f1e' }}>
+      <div ref={wrapperRef} style={{ background: isLight ? '#f8f9ff' : '#0d0f1e' }}>
         <Mafs height={340} viewBox={{ x: [-8, 8], y: [-6, 10] }}>
           <Coordinates.Cartesian />
           {fns.map((fn, i) => fn && (
