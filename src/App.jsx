@@ -499,7 +499,8 @@ y = 2x + 1
   · Node IDs must be short alphanumeric: A, B, C1, etc. — never spaces in IDs
   · If a label contains parentheses, commas, or slashes, wrap it in double-quotes: A["Light reactions (PS II)"]
   · Keep labels short (3–5 words max)
-  · Always start with graph TD or graph LR
+  · Use graph TD (top-down) by default — it reads much better for sequences and processes
+  · Only use graph LR (left-right) for very short chains (3 nodes or fewer)
   · Do NOT use subgraph unless essential
 Example:
 \`\`\`mermaid
@@ -3156,7 +3157,14 @@ function MermaidDiagram({ src, isLight }) {
         },
       })
       mermaid.render(idRef.current, sanitized).then(({ svg: rendered }) => {
-        if (!cancelled) setSvg(rendered)
+        if (!cancelled) {
+          setSvg(rendered)
+          // After paint, make SVG fill width
+          requestAnimationFrame(() => {
+            const s = containerRef.current?.querySelector('svg')
+            if (s) { s.style.width = '100%'; s.style.height = 'auto'; s.removeAttribute('width') }
+          })
+        }
       }).catch(() => {
         if (!cancelled) setErr(true)
       })
@@ -3205,7 +3213,7 @@ function MermaidDiagram({ src, isLight }) {
             style={{ padding: '20px 16px', background: isLight ? '#fff' : '#0d0f1e', overflowX: 'auto' }}
             dangerouslySetInnerHTML={{ __html: svg }}
           />
-        : <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', background: isLight ? '#f9f9fc' : '#0d0f1e' }}>
+        : <div style={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', background: isLight ? '#f9f9fc' : '#0d0f1e' }}>
             <span style={{ fontSize: 12, color: isLight ? 'rgba(0,0,0,0.30)' : 'rgba(255,255,255,0.25)' }}>Rendering…</span>
           </div>
       }
