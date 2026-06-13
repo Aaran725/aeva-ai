@@ -3395,21 +3395,20 @@ function StepCard({ stepNum, stepTitle, fullText, isLight }) {
 
     setLoading(true)
     const context = fullText.slice(0, 800)
-    const prompt = `You are a focused tutor. A student tapped to get more detail on one step of an explanation.
+    const prompt = `You are a focused tutor. A student tapped to expand one step for more detail.
 
-Context (what was covered):
+Context (the full explanation they already read):
 ${context}
 
-They want more detail on: Step ${stepNum}: ${stepTitle}
+Step they tapped: Step ${stepNum}: ${stepTitle}
 
-Write a clear, focused explanation of this specific step. Format it exactly like a high-quality tutor chat response:
-- Use **bold** for key terms and important values (e.g. **slope**, **m = 2**)
-- Wrap any equation or expression in $$...$$ on its own line (e.g. $$ y = mx + b $$)
-- Use inline math with $...$ for symbols within sentences (e.g. "the slope $m$ is")
-- You may use short bullet points if listing multiple things
-- End with one concrete worked example with real numbers
-- Do NOT use step headings like "Step 1:" — just write the explanation directly
-- Keep it focused: 4–7 sentences maximum`
+Rules — read carefully before writing:
+- The student ALREADY SAW the step title and the surrounding explanation. Do NOT restate or redefine what is in the title.
+- Do NOT open with "In this step..." or "To do this step..." — cut straight to the new insight.
+- Add what the title leaves out: the "why", a common pitfall, or a quick concrete example with real numbers.
+- Maximum 3 sentences + optionally one $$ equation block. No bullets unless there are genuinely 3+ distinct points.
+- Use **bold** for key terms, $...$ for inline math, $$...$$ on its own line for display equations.
+- Do NOT use step headings. Do NOT repeat the equation already shown.`
 
     const controller = new AbortController()
     abortRef.current = controller
@@ -3418,7 +3417,7 @@ Write a clear, focused explanation of this specific step. Format it exactly like
       await streamGroq([], prompt, chunk => {
         raw += chunk
         setDrillText(raw)
-      }, controller.signal, { model: 'llama-3.1-8b-instant', maxTokens: 280, temperature: 0.6 })
+      }, controller.signal, { model: 'llama-3.1-8b-instant', maxTokens: 180, temperature: 0.5 })
     } catch { /* silent fail */ }
     finally { setLoading(false) }
   }
