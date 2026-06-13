@@ -3313,74 +3313,6 @@ function MarkdownTable({ lines, isLight = false }) {
   )
 }
 
-// ── DrillRenderer — lightweight renderer for step drill expansions ────────────
-// Only handles: $$formula$$ blocks, **bold** inline, plain paragraphs.
-// Intentionally avoids all heavy MarkdownRenderer styles (step badges, callout
-// cards, list chips) so the drill text reads as clean focused prose.
-function DrillRenderer({ text, streaming, isLight }) {
-  const lines = text.split('\n')
-  const elements = []
-  let i = 0
-
-  while (i < lines.length) {
-    const trimmed = lines[i].trim()
-
-    // $$ display formula block
-    if (trimmed === '$$') {
-      const formulaLines = []
-      i++
-      while (i < lines.length && lines[i].trim() !== '$$') {
-        formulaLines.push(lines[i]); i++
-      }
-      i++ // skip closing $$
-      const latex = formulaLines.join('\n').trim()
-      let html = null
-      try { html = katex.renderToString(latex, { throwOnError: false, displayMode: true }) } catch {}
-      elements.push(
-        <div key={`df-${elements.length}`} style={{
-          margin: '10px 0', padding: '10px 16px',
-          background: isLight ? 'rgba(99,102,241,0.06)' : 'rgba(14,16,48,0.55)',
-          border: isLight ? '1px solid rgba(99,102,241,0.18)' : '1px solid rgba(99,102,241,0.22)',
-          borderRadius: 12, overflowX: 'auto', textAlign: 'center',
-        }}>
-          {html
-            ? <span dangerouslySetInnerHTML={{ __html: html }} />
-            : <code style={{ fontSize: 13, color: isLight ? '#4338CA' : '#A5B4FC' }}>{latex}</code>}
-        </div>
-      )
-      continue
-    }
-
-    // Skip blank lines
-    if (!trimmed) { i++; continue }
-
-    // Paragraph — parseInline handles **bold** and inline $$
-    elements.push(
-      <p key={`dp-${elements.length}`} style={{
-        margin: '0 0 9px 0', fontSize: 14, lineHeight: 1.78,
-        color: isLight ? 'rgba(0,0,0,0.80)' : 'rgba(255,255,255,0.82)',
-        fontWeight: 400,
-      }}>
-        {parseInline(trimmed, isLight)}
-      </p>
-    )
-    i++
-  }
-
-  return (
-    <div>
-      {elements}
-      {streaming && (
-        <motion.span
-          animate={{ opacity: [1, 0, 1] }}
-          transition={{ duration: 0.75, repeat: Infinity }}
-          style={{ display: 'inline-block', width: 2, height: 12, background: isLight ? 'rgba(99,102,241,0.7)' : 'rgba(139,143,255,0.8)', borderRadius: 1, marginLeft: 2, verticalAlign: 'middle' }}
-        />
-      )}
-    </div>
-  )
-}
-
 // ── StepCard — expandable step with tap-to-drill deeper explanation ──────────
 function StepCard({ stepNum, stepTitle, fullText, isLight }) {
   const [open, setOpen] = useState(false)
@@ -3402,13 +3334,18 @@ ${context}
 
 Step they tapped: Step ${stepNum}: ${stepTitle}
 
-Rules — read carefully before writing:
-- The student ALREADY SAW the step title and the surrounding explanation. Do NOT restate or redefine what is in the title.
-- Do NOT open with "In this step..." or "To do this step..." — cut straight to the new insight.
-- Add what the title leaves out: the "why", a common pitfall, or a quick concrete example with real numbers.
-- Maximum 3 sentences + optionally one $$ equation block. No bullets unless there are genuinely 3+ distinct points.
-- Use **bold** for key terms, $...$ for inline math, $$...$$ on its own line for display equations.
-- Do NOT use step headings. Do NOT repeat the equation already shown.`
+CONTENT RULES:
+- The student ALREADY SAW the step title and the surrounding explanation. Do NOT restate or redefine the title.
+- Do NOT open with "In this step..." — cut straight to the new insight.
+- Add what the title leaves out: the "why", a common pitfall, or one concrete example with real numbers.
+- Keep it tight: 2–3 sentences of prose max. One callout or formula block if it genuinely helps.
+
+FORMATTING — match the main chat exactly:
+- **bold** for new technical terms and key values
+- $...$ for inline math symbols, $$...$$ on its own line for any full equation or formula
+- > **Key Insight:** or > **Note:** or > **Tip:** — use ONE callout block only if there is a genuine insight worth highlighting
+- Bullet points only if listing 3+ truly distinct things (rare at this scale)
+- Do NOT use step headings (no "1:", "Step 1:", etc.)`
 
     const controller = new AbortController()
     abortRef.current = controller
@@ -3417,7 +3354,7 @@ Rules — read carefully before writing:
       await streamGroq([], prompt, chunk => {
         raw += chunk
         setDrillText(raw)
-      }, controller.signal, { model: 'llama-3.1-8b-instant', maxTokens: 180, temperature: 0.5 })
+      }, controller.signal, { model: 'llama-3.3-70b-versatile', maxTokens: 260, temperature: 0.55 })
     } catch { /* silent fail */ }
     finally { setLoading(false) }
   }
