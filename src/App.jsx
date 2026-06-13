@@ -3,6 +3,9 @@ import { GROQ_KEYS, GROQ_URL, nextGroqKey } from './groqClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
+import 'mafs/core.css'
+import { Mafs, Coordinates, Plot } from 'mafs'
+import { compile as mathCompile } from 'mathjs'
 import { ArrowUp, ArrowRight, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, ChevronRight, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Users, FileText, Palette, Home, Map, Clock, Trash2, Calendar, ScanSearch } from 'lucide-react'
 import { useAppSettings, SECTION_BG_PRESETS, CARD_STYLES, FONT_STYLES } from './appSettings'
 import { useLanguageStore } from './languageStore'
@@ -483,13 +486,14 @@ Use the EXACT topic name as it appears in the roadmap. You can make multiple cha
 These render directly in the chat — no buttons, no modals. Use them freely.
 
 \`\`\`graph
-— For ANY function, curve, or equation. One LaTeX expression per line. Use standard LaTeX notation: x^{2}, \\sin(x), \\frac{1}{x}, etc.
+— For ANY function, curve, or equation. One expression per line. Use PLAIN math notation (NOT LaTeX): x^2, sin(x), sqrt(x), log(x), pi, abs(x).
 — ALWAYS use for: sketching functions, showing intersections, transformations, inequalities, comparing two curves.
 — NEVER describe a graph in words when you can show it. NEVER say "imagine a graph where...".
+— Output just the right-hand side: write x^2 - 4, NOT y = x^2 - 4
 Example:
 \`\`\`graph
-y = x^{2} - 4
-y = 2x + 1
+x^2 - 4
+2*x + 1
 \`\`\`
 
 \`\`\`mermaid
@@ -3063,37 +3067,48 @@ function parseInline(text, isLight = false) {
   return parts
 }
 
-// ── DesmosGraph — inline Desmos calculator embed ─────────────────────────────
-function DesmosGraph({ exprs, isLight }) {
-  const containerRef = useRef(null)
-  const calcRef = useRef(null)
-
-  useEffect(() => {
-    if (!containerRef.current) return
-    let attempts = 0
-    const init = () => {
-      if (window.Desmos) {
-        const calc = window.Desmos.GraphingCalculator(containerRef.current, {
-          expressionsCollapsed: true,
-          settingsMenu: false,
-          zoomButtons: true,
-          border: false,
-          keypad: false,
-          expressions: true,
-          lockViewport: false,
-          backgroundColor: isLight ? '#f9f9fc' : '#0d0f1e',
-        })
-        exprs.forEach((expr, idx) => {
-          calc.setExpression({ id: `e${idx}`, latex: expr, color: ['#818CF8','#34D399','#F472B6','#FBBF24'][idx % 4] })
-        })
-        calcRef.current = calc
-      } else if (attempts++ < 20) {
-        setTimeout(init, 300)
-      }
+// ── parseMathExpr — convert AI math strings to evaluable JS functions ────────
+function parseMathExpr(raw) {
+  try {
+    // Strip "y = " / "f(x) = " prefix
+    let s = raw.trim()
+      .replace(/^\s*[yf]\s*(?:\(x\))?\s*=\s*/, '')
+      // LaTeX → plain math
+      .replace(/\^{([^}]+)}/g, '^($1)')   // x^{2} → x^(2)
+      .replace(/\\frac{([^}]+)}{([^}]+)}/g, '($1)/($2)')
+      .replace(/\\sqrt{([^}]+)}/g, 'sqrt($1)')
+      .replace(/\\sqrt/g, 'sqrt')
+      .replace(/\\sin/g, 'sin').replace(/\\cos/g, 'cos').replace(/\\tan/g, 'tan')
+      .replace(/\\ln/g, 'log').replace(/\\log/g, 'log10')
+      .replace(/\\pi/g, 'pi').replace(/\\e\b/g, 'e')
+      .replace(/\\left|\\right/g, '')
+      .replace(/\\abs{([^}]+)}/g, 'abs($1)')
+      .replace(/\|([^|]+)\|/g, 'abs($1)')
+      // implicit multiplication: 2x → 2*x, 3(x → 3*(x
+      .replace(/(\d)([a-zA-Z(])/g, '$1*$2')
+      .replace(/([a-zA-Z)])(\d)/g, '$1*$2')
+    const compiled = mathCompile(s)
+    return (x) => {
+      try {
+        const v = compiled.evaluate({ x })
+        return typeof v === 'number' && isFinite(v) ? v : NaN
+      } catch { return NaN }
     }
-    init()
-    return () => { try { calcRef.current?.destroy() } catch {} }
-  }, [exprs.join('|'), isLight])
+  } catch { return null }
+}
+
+// ── MafsGraph — inline Mafs function graph ───────────────────────────────────
+const GRAPH_COLORS = ['#818CF8', '#34D399', '#F472B6', '#FBBF24', '#60A5FA', '#F97316']
+
+function MafsGraph({ exprs, isLight }) {
+  const fns = exprs.map(e => parseMathExpr(e))
+  const valid = fns.filter(Boolean)
+
+  if (valid.length === 0) return (
+    <div style={{ margin: '14px 0', padding: '14px 16px', borderRadius: 14, background: isLight ? 'rgba(99,102,241,0.07)' : 'rgba(99,102,241,0.10)', border: isLight ? '1px solid rgba(99,102,241,0.18)' : '1px solid rgba(99,102,241,0.22)', fontSize: 12, color: isLight ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.35)' }}>
+      Couldn't parse expression: {exprs[0]}
+    </div>
+  )
 
   return (
     <div style={{
@@ -3108,9 +3123,18 @@ function DesmosGraph({ exprs, isLight }) {
         display: 'flex', alignItems: 'center', gap: 8,
       }}>
         <span style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.10em', textTransform: 'uppercase', color: isLight ? '#6366F1' : '#818CF8' }}>Graph</span>
-        <span style={{ fontSize: 10.5, color: isLight ? 'rgba(0,0,0,0.38)' : 'rgba(255,255,255,0.30)', fontFamily: 'monospace' }}>{exprs[0]}{exprs.length > 1 ? ` +${exprs.length - 1} more` : ''}</span>
+        <span style={{ fontSize: 10.5, color: isLight ? 'rgba(0,0,0,0.38)' : 'rgba(255,255,255,0.30)', fontFamily: 'monospace' }}>
+          {exprs[0]}{exprs.length > 1 ? ` +${exprs.length - 1} more` : ''}
+        </span>
       </div>
-      <div ref={containerRef} style={{ width: '100%', height: 340 }} />
+      <div style={{ background: isLight ? '#f8f9ff' : '#0d0f1e' }}>
+        <Mafs height={300}>
+          <Coordinates.Cartesian />
+          {fns.map((fn, i) => fn && (
+            <Plot.OfX key={i} y={fn} color={GRAPH_COLORS[i % GRAPH_COLORS.length]} />
+          ))}
+        </Mafs>
+      </div>
     </div>
   )
 }
@@ -3773,7 +3797,7 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false, isDri
       i++
       const exprs = graphLines.filter(Boolean)
       if (exprs.length > 0) {
-        elements.push(<DesmosGraph key={`graph-${elements.length}`} exprs={exprs} isLight={isLight} />)
+        elements.push(<MafsGraph key={`graph-${elements.length}`} exprs={exprs} isLight={isLight} />)
       }
       continue
     }
