@@ -331,6 +331,11 @@ $$m = \\frac{y_2 - y_1}{x_2 - x_1}$$
 ✗ Never bury formulas inline: "slope is $ \\frac{y_2-y_1}{x_2-x_1} $ which is similar to..." — always $$...$$ on its own line.
 
 STEPS: "N: Title" only — never **Step N:** or ## Step N. Renders as badge chip.
+Step titles: ≤ 8 words. Describe the ACTION, not the result.
+✗ WRONG: "1: Find two numbers that multiply to 6 and add to 5 — they are 2 and 3" (gives away the answer)
+✓ RIGHT: "1: Find two numbers that multiply to c and add to b"
+The answer and working belong in the expansion — not the title.
+After the final step, do NOT add a plain-text summary line ("So the roots are x = ..."). The steps already showed the answer. End with the closing question instead.
 
 MARKDOWN: Tables need header + \`| --- |\` row. Blockquotes only for callouts. Bold only for new technical terms.
 
@@ -4834,6 +4839,7 @@ function ChatView({ onBack }) {
   const masteryMapRef = useRef({})         // kept in sync for session-end save
   const lastTopicRef = useRef(null)        // previous critic topic for change detection
   const phaseStreakRef = useRef(0)         // consecutive solid/mastery answers in current phase
+  const hypeStreakRef = useRef(0)          // consecutive hype (solid/mastery) critic results — MOMENTUM only shows at ≥2
   const sessionSubjectRef = useRef(null)  // Fix 3: persisted subject for this session
   const topicStreakRef = useRef({ topic: null, count: 0, strongCount: 0 }) // per-topic progression tracker
 
@@ -5368,7 +5374,10 @@ RULES:
         const isCasualMessage = userText.length < 18
           || /^(ok|okay|yes|no|sure|fine|got it|thanks?|thank you|bye|goodbye|hi|hey|hello|cool|nice|great|lol|haha|lmao|yep|nope|wow|what|really|hm+|ah+|oh+|alright|sounds good|makes sense|i see|got it|interesting|go on|continue|and\??|also\??|next\??)\b[.!?]?\s*$/i.test(userText.trim())
         criticResult = isCasualMessage ? CRITIC_FALLBACK : await runCritic(messages, userText)
-        setCriticism(prev => { if (prev?.mode !== criticResult?.mode) setChipTick(t => t + 1); return criticResult })
+        // Gate MOMENTUM (hype): only show after 2+ consecutive hype results — prevents premature label on a single good answer
+        if (criticResult.mode === 'hype') { hypeStreakRef.current += 1 } else { hypeStreakRef.current = 0 }
+        const displayedCritic = hypeStreakRef.current >= 2 ? criticResult : { ...criticResult, mode: criticResult.mode === 'hype' ? 'coach' : criticResult.mode }
+        setCriticism(prev => { if (prev?.mode !== displayedCritic?.mode) setChipTick(t => t + 1); return displayedCritic })
         updateMastery(criticResult)
         exchangeCountRef.current += 1
         advanceSessionState(exchangeCountRef.current, criticResult)
