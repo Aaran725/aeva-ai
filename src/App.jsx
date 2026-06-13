@@ -3,7 +3,7 @@ import { GROQ_KEYS, GROQ_URL, nextGroqKey } from './groqClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import { ArrowUp, ArrowRight, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, ChevronRight, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Users, FileText, LayoutGrid, Palette, Home, Map, Clock, Trash2, Calendar, ScanSearch } from 'lucide-react'
+import { ArrowUp, ArrowRight, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, ChevronRight, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Users, FileText, Palette, Home, Map, Clock, Trash2, Calendar, ScanSearch } from 'lucide-react'
 import { useAppSettings, SECTION_BG_PRESETS, CARD_STYLES, FONT_STYLES } from './appSettings'
 import { useLanguageStore } from './languageStore'
 import { useT } from './translations'
@@ -15,8 +15,7 @@ import { useAevaControlStore } from './aevaControlStore'
 import { useRoadmapStore } from './roadmapStore'
 import AevaIntervention from './AevaIntervention'
 import AevaViz from './AevaViz'
-import AevaCanvas from './AevaCanvas'
-import { useCanvasStore } from './canvasStore'
+
 import { useNeuralStore } from './neuralStore'
 import { ChaosEventBanner, MissionVitalsBar, DebateLogicFeed, ThemedChatBubble, MissionBadge, ProTipBanner } from './SimCockpit'
 import { useSRStore } from './srStore'
@@ -406,7 +405,7 @@ YOUR RESPONSE MUST REFLECT THIS SIGNAL. Do not ignore it. If mode is REDIRECT, u
 
 ━━━ VISUAL COMPONENTS — [VIZ:...] tags ━━━
 These are LIGHTWEIGHT inline visuals. Embed ONE tag on its own line (no backticks, no code block, no other text on that line).
-Use INSTEAD of ⚡CANVAS when a simple static visual is all that's needed. Do NOT wrap in backticks.
+Use for lightweight inline visuals. Do NOT wrap in backticks.
 
 TRIGGER RULES — MUST use a [VIZ:...] tag when ANY of these apply. Do NOT use a markdown table instead.
 - User says "compare X and Y", "X vs Y", "difference between X and Y", or ANY request to compare two things → [VIZ:comparison|...] — NEVER a markdown table for two-thing comparisons
@@ -480,65 +479,41 @@ ROADMAP EDITS — when adjusting the roadmap, describe changes clearly in your r
 - Crunch: "I've activated crunch mode — trimmed your roadmap down to essentials"
 Use the EXACT topic name as it appears in the roadmap. You can make multiple changes in one response. Student sees a confirmation card of what changed.
 
-━━━ AEVA CANVAS ━━━
-Use ⚡CANVAS whenever a visual would make the explanation significantly clearer, faster to understand, or more engaging. Canvas is a strength — lean into it.
+━━━ INLINE VISUALS ━━━
+These render directly in the chat — no buttons, no modals. Use them freely.
 
-FIRE CANVAS by default for any of these:
-• A mathematical function, equation, or relationship that has a graph shape (linear, quadratic, trig, exponential, etc.) — ALWAYS ⚡CANVAS, never ⚡FUNCGRAPH
-• A multi-step process, cycle, or system (photosynthesis, digestive system, water cycle, algorithm steps)
-• A timeline of events (historical, scientific, narrative)
-• A comparison between two or more concepts, formulas, or options → use table block
-• A spatial or structural concept (circuits, forces, DNA structure, geometry proofs)
-• A practice problem that involves graphing, plotting, or visual reasoning
-• Any follow-up where the student says "show me", "visualise", "what does that look like", "draw it", "graph it"
-• Any concept the student is struggling with where a different visual angle might unlock it
+\`\`\`graph
+— For ANY function, curve, or equation. One LaTeX expression per line. Use standard LaTeX notation: x^{2}, \\sin(x), \\frac{1}{x}, etc.
+— ALWAYS use for: sketching functions, showing intersections, transformations, inequalities, comparing two curves.
+— NEVER describe a graph in words when you can show it. NEVER say "imagine a graph where...".
+Example:
+\`\`\`graph
+y = x^{2} - 4
+y = 2x + 1
+\`\`\`
 
-SKIP canvas only for: pure greetings, casual chitchat, single-word answers, feedback on a student's written answer (unless you're drawing what their answer should look like), and any time canvas appeared in the last 2 responses.
+\`\`\`mermaid
+— For diagrams, flowcharts, concept maps, and process flows. Use standard Mermaid syntax.
+— Use for: biological cycles (photosynthesis, cell cycle), chemistry reaction pathways, physics concept maps, history timelines, decision trees, topic relationship maps.
+Example:
+\`\`\`mermaid
+graph TD
+  A[Glucose] --> B[Glycolysis]
+  B --> C[Pyruvate]
+\`\`\`
 
-Default: if in doubt, fire it. A well-timed canvas is always better than a wall of text.
+TABLES — standard markdown pipe tables for comparisons, properties, or structured data.
+Example:
+| Concept | Formula | Unit |
+| ------- | ------- | ---- |
+| Speed   | d ÷ t   | m/s  |
 
-⚡CANVAS:{"topic":"Topic Name","blocks":[...]} — ONE line, end of response.
-
-BLOCK SETS:
-Math equations → graph + formula + explanation + mission [+ quiz or challenge]
-Science processes → diagram + explanation + quiz + mission [+ table]
-History → timeline + quiz + mission [+ table]
-Comparisons → table + explanation + quiz [+ mission]
-
-━━ BLOCK TYPE REFERENCE ━━
-
-graph — interactive plot with live sliders
-{"type":"graph","title":"Title","expr":"m*x+b","xMin":-8,"xMax":8,"params":{"m":2,"b":3}}
-expr rules: x is the variable · ** not ^ · 2*x not 2x · each params key becomes a slider
-
-formula — LaTeX formula with variable chips that sync to graph sliders
-{"type":"formula","title":"y = mx + b","latex":"y = mx + b","variables":{"m":2,"b":3},"steps":["Step 1","Step 2"]}
-CRITICAL: variable keys must exactly match graph params keys for live sync to work
-
-explanation — reactive text that AI auto-rewrites when sliders change (ALWAYS include with graph)
-{"type":"explanation","title":"What's Happening","topic":"EXACT TOPIC NAME","text":"1-2 sentence explanation of the initial state."}
-The topic field MUST match the canvas topic — it's used by AI to generate contextual live updates.
-
-mission — a specific goal the student achieves using the canvas above
-{"type":"mission","title":"Try This","goal":"Specific action using the sliders/canvas","hint":"One sentence guide","reward":20}
-Make goal achievable using only the blocks in this canvas. reward is mastery points (10-25).
-
-quiz — multiple choice with instant feedback
-{"type":"quiz","title":"Quick Check","questions":[{"q":"Question?","options":["A","B","C","D"],"answer":1,"explanation":"Why this is correct."}]}
-
-challenge — open-ended problem with hint ladder
-{"type":"challenge","title":"Solve It","problem":"Problem statement","answer":"x=3","hints":["Hint 1","Hint 2","Hint 3"]}
-
-timeline — expandable chronological events
-{"type":"timeline","title":"Key Events","events":[{"date":"1939","label":"WWII Begins","desc":"Germany invades Poland; UK and France declare war."}]}
-
-table — sortable comparison
-{"type":"table","title":"Comparison","headers":["Concept","Formula","Example"],"rows":[["Speed","d÷t","60 km/h"]]}
-
-diagram — flowchart (node positions as % of 100×100 grid)
-{"type":"diagram","title":"Process","nodes":[{"id":"a","label":"Start","x":50,"y":15},{"id":"b","label":"Middle","x":50,"y":50},{"id":"c","label":"End","x":50,"y":85}],"edges":[{"from":"a","to":"b","label":"leads to"},{"from":"b","to":"c","label":"produces"}]}
-
-IMPORTANT: Do NOT use ⚡FUNCGRAPH. It is disabled. Always use ⚡CANVAS for any function, graph, or equation — it provides sliders, formula sync, and an explanation block. A graph block alone is enough if you want it lightweight: {"type":"graph","title":"...","expr":"...","xMin":...,"xMax":...,"params":{}}`
+WHEN TO USE:
+• Student asks to sketch, graph, draw, or visualise → \`\`\`graph
+• Explaining a process, cycle, or pathway → \`\`\`mermaid
+• Comparing two or more things → table
+• Showing how concepts connect → \`\`\`mermaid
+• Any equation with a shape → \`\`\`graph`
 }
 
 /* ─── Trend / scaffold / difficulty helpers ─── */
@@ -3080,34 +3055,159 @@ function parseInline(text, isLight = false) {
   return parts
 }
 
+// ── DesmosGraph — inline Desmos calculator embed ─────────────────────────────
+function DesmosGraph({ exprs, isLight }) {
+  const containerRef = useRef(null)
+  const calcRef = useRef(null)
+
+  useEffect(() => {
+    if (!containerRef.current) return
+    let attempts = 0
+    const init = () => {
+      if (window.Desmos) {
+        const calc = window.Desmos.GraphingCalculator(containerRef.current, {
+          expressionsCollapsed: true,
+          settingsMenu: false,
+          zoomButtons: true,
+          border: false,
+          keypad: false,
+          expressions: true,
+          lockViewport: false,
+          backgroundColor: isLight ? '#f9f9fc' : '#0d0f1e',
+        })
+        exprs.forEach((expr, idx) => {
+          calc.setExpression({ id: `e${idx}`, latex: expr, color: ['#818CF8','#34D399','#F472B6','#FBBF24'][idx % 4] })
+        })
+        calcRef.current = calc
+      } else if (attempts++ < 20) {
+        setTimeout(init, 300)
+      }
+    }
+    init()
+    return () => { try { calcRef.current?.destroy() } catch {} }
+  }, [exprs.join('|'), isLight])
+
+  return (
+    <div style={{
+      margin: '14px 0', borderRadius: 16, overflow: 'hidden',
+      border: isLight ? '1px solid rgba(99,102,241,0.20)' : '1px solid rgba(99,102,241,0.28)',
+      boxShadow: isLight ? 'none' : '0 4px 24px rgba(0,0,0,0.35)',
+    }}>
+      <div style={{
+        padding: '7px 14px',
+        background: isLight ? 'rgba(99,102,241,0.07)' : 'rgba(99,102,241,0.12)',
+        borderBottom: isLight ? '1px solid rgba(99,102,241,0.14)' : '1px solid rgba(99,102,241,0.20)',
+        display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <span style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.10em', textTransform: 'uppercase', color: isLight ? '#6366F1' : '#818CF8' }}>Graph</span>
+        <span style={{ fontSize: 10.5, color: isLight ? 'rgba(0,0,0,0.38)' : 'rgba(255,255,255,0.30)', fontFamily: 'monospace' }}>{exprs[0]}{exprs.length > 1 ? ` +${exprs.length - 1} more` : ''}</span>
+      </div>
+      <div ref={containerRef} style={{ width: '100%', height: 340 }} />
+    </div>
+  )
+}
+
+// ── MermaidDiagram — inline Mermaid diagram render ────────────────────────────
+function MermaidDiagram({ src, isLight }) {
+  const containerRef = useRef(null)
+  const [svg, setSvg] = useState(null)
+  const [err, setErr] = useState(null)
+  const idRef = useRef(`mermaid-${Math.random().toString(36).slice(2)}`)
+
+  useEffect(() => {
+    let cancelled = false
+    import('mermaid').then(({ default: mermaid }) => {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: isLight ? 'default' : 'dark',
+        themeVariables: isLight ? {} : {
+          background: '#0d0f1e',
+          primaryColor: '#1e1f3a',
+          primaryTextColor: '#c4b5fd',
+          primaryBorderColor: '#4338ca',
+          lineColor: '#6366F1',
+          secondaryColor: '#1e1f3a',
+          tertiaryColor: '#12132a',
+          edgeLabelBackground: '#12132a',
+          fontSize: '14px',
+        },
+      })
+      mermaid.render(idRef.current, src).then(({ svg: rendered }) => {
+        if (!cancelled) setSvg(rendered)
+      }).catch(e => {
+        if (!cancelled) setErr(String(e))
+      })
+    })
+    return () => { cancelled = true }
+  }, [src, isLight])
+
+  if (err) return (
+    <div style={{ margin: '12px 0', padding: '12px 16px', borderRadius: 12, background: 'rgba(248,113,113,0.10)', border: '1px solid rgba(248,113,113,0.25)', fontSize: 12, color: '#F87171', fontFamily: 'monospace' }}>
+      Diagram error: {err}
+    </div>
+  )
+
+  return (
+    <div style={{
+      margin: '14px 0', borderRadius: 16, overflow: 'hidden',
+      border: isLight ? '1px solid rgba(99,102,241,0.18)' : '1px solid rgba(99,102,241,0.25)',
+      boxShadow: isLight ? 'none' : '0 4px 24px rgba(0,0,0,0.30)',
+    }}>
+      <div style={{
+        padding: '7px 14px',
+        background: isLight ? 'rgba(99,102,241,0.07)' : 'rgba(99,102,241,0.12)',
+        borderBottom: isLight ? '1px solid rgba(99,102,241,0.14)' : '1px solid rgba(99,102,241,0.20)',
+        fontSize: 10, fontWeight: 900, letterSpacing: '0.10em', textTransform: 'uppercase',
+        color: isLight ? '#6366F1' : '#818CF8',
+      }}>Diagram</div>
+      {svg
+        ? <div
+            ref={containerRef}
+            style={{ padding: '20px 16px', background: isLight ? '#fff' : '#0d0f1e', overflowX: 'auto' }}
+            dangerouslySetInnerHTML={{ __html: svg }}
+          />
+        : <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', background: isLight ? '#f9f9fc' : '#0d0f1e' }}>
+            <span style={{ fontSize: 12, color: isLight ? 'rgba(0,0,0,0.30)' : 'rgba(255,255,255,0.25)' }}>Rendering…</span>
+          </div>
+      }
+    </div>
+  )
+}
+
 function MarkdownTable({ lines, isLight = false }) {
   const parseRow = (line) => line.split('|').map(c => c.trim()).filter((c, i, arr) => i > 0 && i < arr.length - 1)
   const headers = parseRow(lines[0])
   const rows = lines.slice(2).map(parseRow)
 
   return (
-    <div style={{ overflowX: 'auto', margin: '10px 0', borderRadius: 10, border: isLight ? '1px solid rgba(0,0,0,0.10)' : '1px solid rgba(255,255,255,0.10)' }}>
+    <div style={{
+      overflowX: 'auto', margin: '14px 0', borderRadius: 14,
+      border: isLight ? '1px solid rgba(99,102,241,0.18)' : '1px solid rgba(99,102,241,0.25)',
+      boxShadow: isLight ? 'none' : '0 4px 20px rgba(0,0,0,0.25)',
+    }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5, fontFamily: "'Inter', system-ui, sans-serif" }}>
         <thead>
-          <tr style={{ background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.07)' }}>
+          <tr style={{ background: isLight ? 'rgba(99,102,241,0.10)' : 'rgba(99,102,241,0.18)' }}>
             {headers.map((h, i) => (
               <th key={i} style={{
-                padding: '9px 14px', textAlign: 'left',
-                color: isLight ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.85)', fontWeight: 700, fontSize: 12,
-                letterSpacing: '0.04em', textTransform: 'uppercase',
-                borderBottom: isLight ? '1px solid rgba(0,0,0,0.10)' : '1px solid rgba(255,255,255,0.10)',
+                padding: '10px 16px', textAlign: 'left',
+                color: isLight ? '#4338CA' : '#A5B4FC', fontWeight: 800, fontSize: 11.5,
+                letterSpacing: '0.06em', textTransform: 'uppercase',
+                borderBottom: isLight ? '1px solid rgba(99,102,241,0.18)' : '1px solid rgba(99,102,241,0.25)',
               }}>{parseInline(h, isLight)}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {rows.map((row, ri) => (
-            <tr key={ri} style={{ background: ri % 2 === 0 ? 'transparent' : isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)' }}>
+            <tr key={ri} style={{ background: ri % 2 === 0 ? 'transparent' : isLight ? 'rgba(99,102,241,0.04)' : 'rgba(99,102,241,0.06)' }}>
               {row.map((cell, ci) => (
                 <td key={ci} style={{
-                  padding: '8px 14px', color: isLight ? 'rgba(0,0,0,0.68)' : 'rgba(255,255,255,0.75)', fontSize: 13.5,
-                  borderBottom: ri < rows.length - 1 ? isLight ? '1px solid rgba(0,0,0,0.06)' : '1px solid rgba(255,255,255,0.06)' : 'none',
-                  lineHeight: 1.55,
+                  padding: '9px 16px',
+                  color: isLight ? 'rgba(0,0,0,0.78)' : 'rgba(255,255,255,0.82)',
+                  fontSize: 13.5,
+                  borderBottom: ri < rows.length - 1 ? isLight ? '1px solid rgba(99,102,241,0.08)' : '1px solid rgba(99,102,241,0.12)' : 'none',
+                  lineHeight: 1.60,
                 }}>{parseInline(cell, isLight)}</td>
               ))}
             </tr>
@@ -3354,7 +3454,6 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false, isDri
     .replace(/⚡ROADMAP:[\s\S]*$/, '')
     .replace(/⚡FUNCGRAPH:[\s\S]*$/, '')
     .replace(/\[NODE_READY\]/g, '')
-    .replace(/⚡CANVAS:[\s\S]*$/, '')
     .replace(/\[TERM:[^\]]*\]/g, '')
     .replace(/\[SUMMARY:[^\]]*\]/g, '')
     .replace(/\[CORRECT\]/g, '[CORRECT:]')
@@ -3616,6 +3715,34 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false, isDri
         )
       }
       i++; continue
+    }
+
+    // Graph block ```graph
+    if (/^```graph/i.test(trimmed)) {
+      flushList()
+      const graphLines = []
+      i++
+      while (i < lines.length && !/^```/.test(lines[i].trim())) { graphLines.push(lines[i].trim()); i++ }
+      i++
+      const exprs = graphLines.filter(Boolean)
+      if (exprs.length > 0) {
+        elements.push(<DesmosGraph key={`graph-${elements.length}`} exprs={exprs} isLight={isLight} />)
+      }
+      continue
+    }
+
+    // Mermaid block ```mermaid
+    if (/^```mermaid/i.test(trimmed)) {
+      flushList()
+      const mermaidLines = []
+      i++
+      while (i < lines.length && !/^```/.test(lines[i].trim())) { mermaidLines.push(lines[i]); i++ }
+      i++
+      const src = mermaidLines.join('\n').trim()
+      if (src) {
+        elements.push(<MermaidDiagram key={`mermaid-${elements.length}`} src={src} isLight={isLight} />)
+      }
+      continue
     }
 
     // Code block ```
@@ -4293,31 +4420,6 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false, isWidg
             )}
             <MarkdownRenderer text={msg.text} streaming={!!msg.streaming} cursorColor={isLight ? 'rgba(99,102,241,0.8)' : 'rgba(139,143,255,0.9)'} isLight={isLight} />
             {msg.aevaViz && <AevaViz config={msg.aevaViz} />}
-            {msg.aevaCanvas && !msg.streaming && (
-              <motion.button
-                initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.35, duration: 0.28 }}
-                whileHover={{ scale: 1.02, background: 'rgba(99,102,241,0.20)' }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => useCanvasStore.getState().setCanvas(msg.aevaCanvas)}
-                style={{
-                  marginTop: 12, width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '12px 14px', borderRadius: 16, cursor: 'pointer',
-                  background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.35)',
-                  fontFamily: 'inherit', textAlign: 'left',
-                }}>
-                <div style={{ width: 32, height: 32, borderRadius: 10, background: 'linear-gradient(135deg,#4F46E5,#7C3AED)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 12px rgba(99,102,241,0.35)' }}>
-                  <LayoutGrid size={14} color="white" strokeWidth={2.2} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 800, color: '#A5B4FC', letterSpacing: '-0.02em' }}>Open Canvas</div>
-                  <div style={{ fontSize: 11, color: 'rgba(165,180,252,0.50)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {msg.aevaCanvas.topic} · {msg.aevaCanvas.blocks?.length || 0} interactive blocks
-                  </div>
-                </div>
-                <ChevronRight size={14} color="rgba(165,180,252,0.45)" />
-              </motion.button>
-            )}
             {msg.aevaAction && (
               <motion.div
                 initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.25 }}
@@ -4651,7 +4753,6 @@ function ChatToolsMenu({ onLens, onPhoto, onDoc, onDrill, onWorking, photoAttach
 function ChatView({ onBack }) {
   const T = useT()
   const { name } = useUser()
-  const { canvasOpen } = useCanvasStore()
   const {
     activeMode, activeMission, processAIResponse, rewardPlayer, worldMemory,
     cleanText, interruptActive, quickActions, streakCount, missionExchanges,
@@ -4734,7 +4835,6 @@ function ChatView({ onBack }) {
   const lastTopicRef = useRef(null)        // previous critic topic for change detection
   const phaseStreakRef = useRef(0)         // consecutive solid/mastery answers in current phase
   const sessionSubjectRef = useRef(null)  // Fix 3: persisted subject for this session
-  const lastCanvasExchangeRef = useRef(-99) // Fix 6: canvas cooldown tracker
   const topicStreakRef = useRef({ topic: null, count: 0, strongCount: 0 }) // per-topic progression tracker
 
   // ── Chat history ──────────────────────────────────────────────────────────
@@ -5775,44 +5875,6 @@ If no clear changes: {"changes":[]}`
           } catch { /* malformed VIZ tag — ignore */ }
         }
 
-        // ── CANVAS tag parser ────────────────────────────────────────────
-        // Suppress canvas for short/casual messages (greetings, one-liners, thanks, etc.)
-        const isCanvasSuppressed = (() => {
-          const t = userText.toLowerCase().trim()
-          if (t.length < 30) {
-            const words = t.replace(/[^a-z\s]/g, '').split(/\s+/).filter(Boolean)
-            const casualWords = new Set(['hello','hi','hey','hiya','sup','yo','greetings','howdy','thanks','thank','bye','goodbye','ok','okay','sure','yes','no','yep','nope','lol','haha','cool','nice','great','awesome','wow','what','how','why'])
-            if (words.every(w => casualWords.has(w))) return true
-          }
-          return false
-        })()
-        const canvasIdx = rawResponse.indexOf('⚡CANVAS:')
-        const canvasCooledDown = (exchangeCountRef.current - lastCanvasExchangeRef.current) >= 2
-        if (canvasIdx !== -1 && !isCanvasSuppressed && canvasCooledDown) {
-          lastCanvasExchangeRef.current = exchangeCountRef.current
-          try {
-            const start = rawResponse.indexOf('{', canvasIdx)
-            if (start !== -1) {
-              let depth = 0, end = -1
-              for (let i = start; i < rawResponse.length; i++) {
-                if (rawResponse[i] === '{' || rawResponse[i] === '[') depth++
-                else if (rawResponse[i] === '}' || rawResponse[i] === ']') {
-                  depth--
-                  if (depth === 0) { end = i + 1; break }
-                }
-              }
-              if (end !== -1) {
-                const canvasConfig = JSON.parse(rawResponse.slice(start, end))
-                setMessages(prev => {
-                  const copy = [...prev]
-                  copy[copy.length - 1] = { ...copy[copy.length - 1], aevaCanvas: canvasConfig }
-                  return copy
-                })
-              }
-            }
-          } catch { /* malformed CANVAS tag — ignore */ }
-        }
-        // ─────────────────────────────────────────────────────────────────
       }
       // ────────────────────────────────────────────────────────────────────────
 
@@ -7403,11 +7465,6 @@ If no clear changes: {"changes":[]}`
         )}
       </AnimatePresence>
 
-
-      {/* Aeva Canvas — interactive learning workspace */}
-      <AnimatePresence>
-        {canvasOpen && <AevaCanvas key="aeva-canvas" />}
-      </AnimatePresence>
 
       {/* Socratic ambient overlay */}
       <AnimatePresence>
