@@ -3464,9 +3464,9 @@ CRITICAL SYNTAX RULES — the renderer is line-based:
                     />
                   ))}
                 </div>
-              ) : (
+              ) : drillText ? (
                 <MarkdownRenderer text={drillText} streaming={loading} isLight={isLight} isDrill />
-              )}
+              ) : null}
             </div>
           </motion.div>
         )}
@@ -4383,7 +4383,7 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false, isWidg
       }}
     >
       <div style={{
-        maxWidth: 700,
+        maxWidth: 740,
         width: isUser ? 'auto' : '100%',
         padding: isWidget ? widgetPad : (isUser ? '11px 18px' : '16px 20px'),
         borderRadius: isWidget ? widgetRadius : (isUser ? '22px 22px 6px 22px' : '6px 22px 22px 22px'),
@@ -6744,7 +6744,7 @@ If no clear changes: {"changes":[]}`
               className="chat-messages"
               style={{ flex: 1, overflowY: 'auto', padding: 'var(--aeva-space-md, 16px) var(--aeva-space-lg, 20px)', display: 'flex', flexDirection: 'column', justifyContent: isEmpty ? 'flex-end' : 'flex-start' }}
             >
-              <div style={{ width: '100%', maxWidth: isMission ? 720 : 640, margin: '0 auto' }}>
+              <div style={{ width: '100%', maxWidth: isMission ? 800 : 740, margin: '0 auto' }}>
 
                 {/* ── Pinned Note Card ──────────────────────────────────── */}
                 {pinnedNote && (
