@@ -3087,16 +3087,20 @@ function parseMathExpr(raw) {
 // ── MafsGraph — inline Mafs function graph ───────────────────────────────────
 const GRAPH_COLORS = ['#818CF8', '#34D399', '#F472B6', '#FBBF24', '#60A5FA', '#F97316']
 
-// Inject once: override Mafs black background with Aeva navy
-if (typeof document !== 'undefined' && !document.getElementById('mafs-aeva-bg')) {
-  const s = document.createElement('style')
-  s.id = 'mafs-aeva-bg'
-  s.textContent = '.MafsView { background: #0d0f1e !important; }'
-  document.head.appendChild(s)
-}
-
 function MafsGraph({ exprs, isLight }) {
   const wrapperRef = useRef(null)
+
+  // Mafs sets its own inline background after render — override with setProperty('important')
+  useEffect(() => {
+    const bg = isLight ? '#f8f9ff' : '#0d0f1e'
+    const apply = () => {
+      const el = wrapperRef.current?.querySelector('.MafsView')
+      if (el) el.style.setProperty('background', bg, 'important')
+    }
+    apply()
+    const t = setTimeout(apply, 80)
+    return () => clearTimeout(t)
+  }, [isLight])
 
   const fns = exprs.map(e => parseMathExpr(e))
   const valid = fns.filter(Boolean)
