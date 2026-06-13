@@ -483,49 +483,36 @@ ROADMAP EDITS — when adjusting the roadmap, describe changes clearly in your r
 Use the EXACT topic name as it appears in the roadmap. You can make multiple changes in one response. Student sees a confirmation card of what changed.
 
 ━━━ INLINE VISUALS ━━━
-These render directly in the chat — no buttons, no modals. Use them freely.
+These render directly in the chat. Use them when they genuinely add clarity — NOT on every response.
 
-\`\`\`graph
-— For ANY function, curve, or equation. One expression per line. Use PLAIN math notation (NOT LaTeX): x^2, sin(x), sqrt(x), log(x), pi, abs(x).
-— ALWAYS use for: sketching functions, showing intersections, transformations, inequalities, comparing two curves.
-— NEVER describe a graph in words when you can show it. NEVER say "imagine a graph where...".
-— Output just the right-hand side: write x^2 - 4, NOT y = x^2 - 4
-Example:
+\`\`\`graph  ← function graphs
+— Use ONLY when: student asks to sketch/graph/plot, or the explanation is about the shape/behaviour of a function.
+— PLAIN math notation only (no LaTeX): x^2, sin(x), sqrt(x), log(x), pi, abs(x)
+— Output the right-hand side only: x^2 - 4, NOT y = x^2 - 4
+— SKIP for: algebraic manipulation, word problems, anything that doesn't have a curve to show
 \`\`\`graph
 x^2 - 4
 2*x + 1
 \`\`\`
 
-\`\`\`mermaid
-— For diagrams, flowcharts, concept maps, and process flows.
-— Use for: biological cycles, chemistry reaction pathways, physics concept maps, history timelines, decision trees, topic relationships.
-— SYNTAX RULES (strict — violations break rendering):
-  · Node IDs must be short alphanumeric: A, B, C1, etc. — never spaces in IDs
-  · If a label contains parentheses, commas, or slashes, wrap it in double-quotes: A["Light reactions (PS II)"]
-  · Keep labels short (3–5 words max)
-  · Use graph TD (top-down) by default — it reads much better for sequences and processes
-  · Only use graph LR (left-right) for very short chains (3 nodes or fewer)
-  · Do NOT use subgraph unless essential
-Example:
+\`\`\`mermaid  ← diagrams and flowcharts
+— Use ONLY when: explaining a multi-step process, cycle, or pathway where the sequence/structure matters visually.
+— SKIP for: simple definitions, short answers, anything well-explained in text
+— SYNTAX (strict): short alphanumeric node IDs (A, B, C1), labels with parens must use quotes A["text (note)"], graph TD by default
 \`\`\`mermaid
 graph TD
-  A[Glucose] --> B[Glycolysis]
-  B --> C[Pyruvate]
-  C --> D["Krebs Cycle (mitochondria)"]
+  A[Step 1] --> B[Step 2]
+  B --> C["Step 3 (detail)"]
 \`\`\`
 
-TABLES — standard markdown pipe tables for comparisons, properties, or structured data.
-Example:
-| Concept | Formula | Unit |
-| ------- | ------- | ---- |
-| Speed   | d ÷ t   | m/s  |
+TABLES — for comparisons or structured data with 2+ properties across 2+ items. Skip for single-item definitions.
+| Feature | Mitosis | Meiosis |
+| ------- | ------- | ------- |
+| Output  | 2 cells | 4 cells |
 
-WHEN TO USE:
-• Student asks to sketch, graph, draw, or visualise → \`\`\`graph
-• Explaining a process, cycle, or pathway → \`\`\`mermaid
-• Comparing two or more things → table
-• Showing how concepts connect → \`\`\`mermaid
-• Any equation with a shape → \`\`\`graph`
+FIRE RULES:
+✅ DO: sketch/graph/draw request → graph | multi-step process/cycle → mermaid | side-by-side comparison → table
+❌ DON'T: fire on greetings, short answers, definitions, follow-up clarifications, or when you already used a visual in the last response`
 }
 
 /* ─── Trend / scaffold / difficulty helpers ─── */
@@ -3127,8 +3114,8 @@ function MafsGraph({ exprs, isLight }) {
           {exprs[0]}{exprs.length > 1 ? ` +${exprs.length - 1} more` : ''}
         </span>
       </div>
-      <div style={{ background: isLight ? '#f8f9ff' : '#0d0f1e' }}>
-        <Mafs height={300}>
+      <div style={{ '--mafs-bg': isLight ? '#f8f9ff' : '#0d0f1e', background: isLight ? '#f8f9ff' : '#0d0f1e' }}>
+        <Mafs height={340} viewBox={{ x: [-8, 8], y: [-6, 10] }}>
           <Coordinates.Cartesian />
           {fns.map((fn, i) => fn && (
             <Plot.OfX key={i} y={fn} color={GRAPH_COLORS[i % GRAPH_COLORS.length]} />
@@ -3183,10 +3170,24 @@ function MermaidDiagram({ src, isLight }) {
       mermaid.render(idRef.current, sanitized).then(({ svg: rendered }) => {
         if (!cancelled) {
           setSvg(rendered)
-          // After paint, make SVG fill width
+          // After paint: fill width + fix background to match Aeva theme
           requestAnimationFrame(() => {
             const s = containerRef.current?.querySelector('svg')
-            if (s) { s.style.width = '100%'; s.style.height = 'auto'; s.removeAttribute('width') }
+            if (s) {
+              s.style.width = '100%'
+              s.style.height = 'auto'
+              s.removeAttribute('width')
+              s.style.background = isLight ? '#fff' : '#0d0f1e'
+              // Override any explicit background rect Mermaid injects
+              const allRects = s.querySelectorAll('rect')
+              if (allRects.length > 0) {
+                const bg = allRects[0]
+                const fill = bg.getAttribute('fill')
+                if (fill && fill !== 'none' && !fill.startsWith('url')) {
+                  bg.setAttribute('fill', isLight ? '#fff' : '#0d0f1e')
+                }
+              }
+            }
           })
         }
       }).catch(() => {
