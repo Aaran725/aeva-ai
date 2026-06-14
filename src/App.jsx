@@ -5605,12 +5605,16 @@ RULES:
   const calibBand = (skillMap, subject) => {
     const subjectMap = CALIBRATION_MAP[subject] || {}
     const solidOrShaky = Object.entries(skillMap).filter(([, v]) => v === 'solid' || v === 'shaky').map(([id]) => id)
-    if (!solidOrShaky.length) return 'Foundation'
-    const maxBandOrder = Math.max(...solidOrShaky.map(id => subjectMap[id]?.bandOrder || 1))
+    if (!solidOrShaky.length) return 'Grade 1–2'
+    const maxBandOrder = Math.max(...solidOrShaky.map(id => subjectMap[id]?.bandOrder ?? -6))
     if (maxBandOrder >= 8) return 'A-Level'
     if (maxBandOrder >= 6) return 'GCSE Higher'
     if (maxBandOrder >= 4) return 'GCSE Foundation'
-    return 'Foundation'
+    if (maxBandOrder >= 1) return 'Foundation'
+    if (maxBandOrder >= 0) return 'Grade 7–8'
+    if (maxBandOrder >= -1) return 'Grade 5–6'
+    if (maxBandOrder >= -3) return 'Grade 3–4'
+    return 'Grade 1–2'
   }
 
   /** Find the first gap skill to suggest as "start here" */
@@ -5629,27 +5633,29 @@ RULES:
     return null
   }
 
-  /** Build the calibration system prompt for the current question */
-  const buildCalibPrompt = (subject, nodeId, tier) => {
-    const subjectMap = CALIBRATION_MAP[subject] || {}
-    const node = subjectMap[nodeId]
-    if (!node) return ''
-    const q = node.questions?.find(q => q.tier === tier) || node.questions?.[0]
-    return `You are running an AEVA CALIBRATION DIAGNOSTIC for ${SUBJECT_LABELS[subject] || subject}.
+  /** Build a brief acknowledgement prompt for calibration mode.
+   *  Questions are now injected directly — the LLM only responds to the student's answer
+   *  with a single warm sentence before the system injects the next question. */
+  const buildCalibAckPrompt = (subject, understanding) => {
+    const nodeName = CALIBRATION_MAP[subject]?.[calibStateRef.current.currentNode]?.label || 'that'
+    return `You are an examiner running a calibration diagnostic for ${SUBJECT_LABELS[subject] || subject}.
 
-Current skill being tested: "${node.label}" (${node.band})
-Question to ask (pre-written — use it EXACTLY):
-"${q?.q || 'Solve a problem related to ' + node.label}"
+The student just answered a question on "${nodeName}". The automated assessment rated their answer: ${understanding.toUpperCase()}.
 
-RULES — READ CAREFULLY:
-1. Ask ONLY this question. Copy it word for word. No preamble, no context, no hints. Just the question.
-2. After they answer: acknowledge it in ONE sentence (e.g. "Got it." / "Nice." / "Close, but not quite."). Do NOT explain or teach yet.
-3. Do NOT ask the next question yourself. The system handles what comes next.
-4. If they say "I don't know", "skip", or "pass" — say "No worries, we'll come back to it." and stop.
-5. ALL responses during calibration must be under 2 sentences total.
+Write EXACTLY ONE short sentence (max 10 words) acknowledging their answer:
+- solid / mastery  → "Nice, that's correct!" / "Got it, well done." / "Correct!"
+- partial          → "Close, but not quite there." / "Almost — good attempt."
+- none             → "Not quite, but let's keep going." / "That one's tricky, no worries."
 
-You are an examiner right now, not a tutor. Keep it brief and neutral.`
+Rules:
+1. ONE sentence only. No explanations. No hints. No teaching.
+2. Do NOT ask another question — the system sends the next question automatically.
+3. Do NOT say "next question" or "let's try another".
+4. Match the student's energy — warm but brief.`
   }
+
+  // Keep old name as alias so any stray references don't break
+  const buildCalibPrompt = buildCalibAckPrompt
 
   /** Start calibration for a given subject */
   const startCalibration = (subject) => {
@@ -5668,33 +5674,20 @@ You are an examiner right now, not a tutor. Keep it brief and neutral.`
     setCalibTick(0)
   }
 
-  /** Fire the first calibration question directly — no user message needed, avoids the [CALIB_START] hack */
-  const sendCalibFirstQuestion = async (subject) => {
+  /** Fire the first calibration question — DIRECT INJECT, no API call.
+   *  Questions are pre-written in calibrationMap so we skip the LLM entirely.
+   *  This eliminates rate limiting and guarantees exact question text. */
+  const sendCalibFirstQuestion = (subject) => {
     const cs = calibStateRef.current
     if (!cs.currentNode || !calibModeRef.current) return
-    setIsThinking(true)
+    const subjectMap = CALIBRATION_MAP[subject] || {}
+    const node = subjectMap[cs.currentNode]
+    const q = node?.questions?.find(q => q.tier === cs.tierAtNode) || node?.questions?.[0]
+    if (!q) return
     setMessages(prev => [...prev, {
-      role: 'model', text: '', streaming: true,
+      role: 'model', text: q.q, streaming: false,
       isCalibQuestion: true, calibNodeId: cs.currentNode, calibQNum: 1,
     }])
-    const prompt = buildCalibPrompt(cs.subject, cs.currentNode, cs.tierAtNode)
-    const controller = new AbortController()
-    abortRef.current = controller
-    let raw = ''
-    try {
-      await streamGroq([], prompt, chunk => {
-        raw += chunk
-        setMessages(prev => {
-          const copy = [...prev]
-          copy[copy.length - 1] = { ...copy[copy.length - 1], text: raw }
-          return copy
-        })
-      }, controller.signal, { model: 'llama-3.3-70b-versatile', maxTokens: 150, temperature: 0.3 })
-    } catch { /* silent */ }
-    finally {
-      setIsThinking(false)
-      setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, streaming: false } : m))
-    }
   }
 
   /** Finish calibration and show result */
@@ -5943,27 +5936,14 @@ You are an examiner right now, not a tutor. Keep it brief and neutral.`
         const newlyDetected = detectSubject(criticResult?.topic, messages)
         if (newlyDetected) sessionSubjectRef.current = newlyDetected
         const detectedSubject = sessionSubjectRef.current
-        // ── Calibration mode: override system prompt ───────────────────────
+        // ── Calibration mode: brief ack only — next question injected in finally ──
         if (calibModeRef.current && calibStateRef.current.currentNode) {
           const cs = calibStateRef.current
-          systemPrompt = buildCalibPrompt(cs.subject, cs.currentNode, cs.tierAtNode)
-          // After critic runs, advance the calibration
-          handleCalibCriticResult(criticResult?.understanding || 'partial')
-          // If still in calib mode, tag the model placeholder as a question card
-          if (calibModeRef.current && calibStateRef.current.currentNode) {
-            const nextNode = calibStateRef.current.currentNode
-            const qNum = calibStateRef.current.questionsAsked + 1
-            setMessages(prev => {
-              const copy = [...prev]
-              copy[copy.length - 1] = {
-                ...copy[copy.length - 1],
-                isCalibQuestion: true,
-                calibNodeId: nextNode,
-                calibQNum: qNum,
-              }
-              return copy
-            })
-          }
+          const understanding = criticResult?.understanding || 'partial'
+          // Ack prompt: 1 sentence, 8b model, ~15 tokens
+          systemPrompt = buildCalibAckPrompt(cs.subject, understanding)
+          // Advance calibration state NOW (before streaming the ack)
+          handleCalibCriticResult(understanding)
         } else {
           systemPrompt = feedbackPrefix + orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, fullMemory + roadmapCtx + nodeCtx, extras, T.aevaLanguageDirective, detectedSubject)
         }
@@ -5980,7 +5960,11 @@ You are an examiner right now, not a tutor. Keep it brief and neutral.`
         }
       }
 
-      const streamOpts = isMission ? (MISSION_OPTS[activeMode] || {}) : {}
+      const streamOpts = isMission
+        ? (MISSION_OPTS[activeMode] || {})
+        : calibModeRef.current
+          ? { model: 'llama-3.1-8b-instant', maxTokens: 20, temperature: 0.4 }  // ack only — tiny + fast
+          : {}
 
       await streamGroq(
         history,
@@ -6378,6 +6362,27 @@ If no clear changes: {"changes":[]}`
       setIsThinking(false)
       setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, streaming: false } : m))
       inputRef.current?.focus()
+
+      // ── Calibration: inject next question directly after ack ────────────────
+      // Questions are pre-written — no API call needed, instant + exact text
+      if (calibModeRef.current && calibStateRef.current.currentNode) {
+        const cs = calibStateRef.current
+        const subjectMap = CALIBRATION_MAP[cs.subject] || {}
+        const node = subjectMap[cs.currentNode]
+        const q = node?.questions?.find(q => q.tier === cs.tierAtNode) || node?.questions?.[0]
+        if (q) {
+          setTimeout(() => {
+            if (!calibModeRef.current) return  // may have finished during timeout
+            setMessages(prev => [...prev, {
+              role: 'model', text: q.q, streaming: false,
+              isCalibQuestion: true,
+              calibNodeId: cs.currentNode,
+              calibQNum: cs.questionsAsked + 1,
+            }])
+            setCalibTick(t => t + 1)
+          }, 400)  // brief pause after ack so it feels natural
+        }
+      }
 
       // Parse TERM tags from completed response (tutor mode only)
       if (!isMission) {

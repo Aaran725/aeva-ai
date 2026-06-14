@@ -15,11 +15,185 @@
  */
 
 // ─── MATHS ────────────────────────────────────────────────────────────────────
+// bandOrder scale (maths): -6=Grade 1 → 0=Grade 7-8 → 1-9=GCSE/A-Level
 const MATHS = {
+
+  // ── PRIMARY (Grade 1–6 / Year 1–6) ─────────────────────────────────────────
+
+  'counting-number': {
+    label: 'Counting & Numbers',
+    subject: 'maths', band: 'Grade 1', bandOrder: -6,
+    prerequisites: [],
+    nextSkills: ['addition-subtraction'],
+    questions: [
+      { q: 'What number comes after 19? And what number comes before 30?', tier: 1 },
+      { q: 'Count back from 50 in 5s. Write the first 6 numbers.', tier: 2 },
+      { q: 'I have 3 bags. Each bag has 4 apples. How many apples altogether? Explain how you know.', tier: 3 },
+    ],
+  },
+
+  'addition-subtraction': {
+    label: 'Addition & Subtraction',
+    subject: 'maths', band: 'Grade 1–2', bandOrder: -5,
+    prerequisites: ['counting-number'],
+    nextSkills: ['place-value', 'times-tables'],
+    questions: [
+      { q: 'What is 7 + 8? What is 15 − 6?', tier: 1 },
+      { q: 'A box has 24 crayons. 9 get lost. How many are left? Show your working.', tier: 2 },
+      { q: 'True or false: 38 + 47 = 85. If false, what is the correct answer? Show how you worked it out.', tier: 3 },
+    ],
+  },
+
+  'place-value': {
+    label: 'Place Value',
+    subject: 'maths', band: 'Grade 2–3', bandOrder: -5,
+    prerequisites: ['addition-subtraction'],
+    nextSkills: ['times-tables', 'multiplication-division'],
+    questions: [
+      { q: 'What is the value of the digit 4 in the number 3,482?', tier: 1 },
+      { q: 'Write these numbers in order from smallest to largest: 1,024 · 1,240 · 1,042 · 1,204', tier: 2 },
+      { q: 'A number has 5 thousands, 3 hundreds, 0 tens and 7 ones. Write it down and round it to the nearest hundred.', tier: 3 },
+    ],
+  },
+
+  'times-tables': {
+    label: 'Times Tables',
+    subject: 'maths', band: 'Grade 3', bandOrder: -4,
+    prerequisites: ['place-value'],
+    nextSkills: ['multiplication-division', 'basic-fractions'],
+    questions: [
+      { q: 'What is 7 × 8? What is 9 × 6?', tier: 1 },
+      { q: 'I think of a number, multiply by 7 and get 63. What was my number?', tier: 2 },
+      { q: 'List all the factors of 36. Which are also multiples of 4?', tier: 3 },
+    ],
+  },
+
+  'multiplication-division': {
+    label: 'Multiplication & Division',
+    subject: 'maths', band: 'Grade 4', bandOrder: -3,
+    prerequisites: ['times-tables'],
+    nextSkills: ['basic-fractions', 'decimals-intro', 'basic-area-perimeter'],
+    questions: [
+      { q: 'Work out 156 ÷ 12. Show your method.', tier: 1 },
+      { q: 'A school orders 24 boxes of pencils. Each box has 36 pencils. How many pencils in total?', tier: 2 },
+      { q: '576 students are split equally into groups of 8. Each group then splits into pairs. How many pairs are there in total?', tier: 3 },
+    ],
+  },
+
+  'basic-fractions': {
+    label: 'Fractions',
+    subject: 'maths', band: 'Grade 3–4', bandOrder: -3,
+    prerequisites: ['times-tables'],
+    nextSkills: ['fractions-equivalent', 'decimals-intro'],
+    questions: [
+      { q: 'What is ½ of 24? What is ¼ of 36?', tier: 1 },
+      { q: 'Which is larger: 3/5 or 5/8? Show how you decided.', tier: 2 },
+      { q: 'A pizza is cut into 8 slices. Tom eats 3/8, Sara eats 1/4. What fraction is left? Write it in its simplest form.', tier: 3 },
+    ],
+  },
+
+  'fractions-equivalent': {
+    label: 'Equivalent Fractions & Mixed Numbers',
+    subject: 'maths', band: 'Grade 4–5', bandOrder: -2,
+    prerequisites: ['basic-fractions'],
+    nextSkills: ['decimals-intro', 'number-basics'],
+    questions: [
+      { q: 'Are 3/4 and 9/12 equivalent? Explain why.', tier: 1 },
+      { q: 'Convert 2 3/4 to an improper fraction. Then convert 17/5 to a mixed number.', tier: 2 },
+      { q: 'Add: 1 2/3 + 2 3/4. Give your answer as a mixed number in its simplest form.', tier: 3 },
+    ],
+  },
+
+  'decimals-intro': {
+    label: 'Decimals',
+    subject: 'maths', band: 'Grade 4–5', bandOrder: -2,
+    prerequisites: ['fractions-equivalent'],
+    nextSkills: ['negative-numbers', 'number-basics'],
+    questions: [
+      { q: 'Put these in order from smallest to largest: 0.5 · 0.15 · 0.505 · 0.051', tier: 1 },
+      { q: 'Work out: 3.6 × 0.4. Show your working.', tier: 2 },
+      { q: 'A ribbon is 4.2 m long. I cut off three pieces each 0.85 m long. How much ribbon is left?', tier: 3 },
+    ],
+  },
+
+  'negative-numbers': {
+    label: 'Negative Numbers',
+    subject: 'maths', band: 'Grade 5–6', bandOrder: -1,
+    prerequisites: ['decimals-intro'],
+    nextSkills: ['number-basics', 'basic-algebra'],
+    questions: [
+      { q: 'What is −3 + 7? What is 4 − 9?', tier: 1 },
+      { q: 'The temperature is −6°C at midnight and rises 11°C by noon. What is the temperature at noon?', tier: 2 },
+      { q: 'Put these in order: −4, 2, −7, 0, −1, 5. Then find the sum of all six numbers.', tier: 3 },
+    ],
+  },
+
+  'basic-area-perimeter': {
+    label: 'Area & Perimeter',
+    subject: 'maths', band: 'Grade 4–5', bandOrder: -2,
+    prerequisites: ['multiplication-division'],
+    nextSkills: ['angles-shapes'],
+    questions: [
+      { q: 'Find the area and perimeter of a rectangle 6 cm wide and 9 cm tall.', tier: 1 },
+      { q: 'A square has a perimeter of 36 cm. What is its area?', tier: 2 },
+      { q: 'An L-shaped room is made from two rectangles: one is 5 m × 3 m and the other is 2 m × 4 m. Find the total area and perimeter.', tier: 3 },
+    ],
+  },
+
+  'angles-shapes': {
+    label: 'Angles & 2D Shapes',
+    subject: 'maths', band: 'Grade 5–6', bandOrder: -1,
+    prerequisites: ['basic-area-perimeter'],
+    nextSkills: ['statistics-basics'],
+    questions: [
+      { q: 'A triangle has angles of 90° and 35°. What is the third angle?', tier: 1 },
+      { q: 'The angles of a quadrilateral are 110°, 85°, 70°, and x°. Find x.', tier: 2 },
+      { q: 'Explain why the exterior angles of any polygon always sum to 360°. Use a regular hexagon as your example.', tier: 3 },
+    ],
+  },
+
+  'statistics-basics': {
+    label: 'Statistics & Data',
+    subject: 'maths', band: 'Grade 5–6', bandOrder: -1,
+    prerequisites: ['angles-shapes'],
+    nextSkills: ['coordinates-intro'],
+    questions: [
+      { q: 'Find the mean, median, mode and range of: 3, 7, 8, 2, 10, 7, 4', tier: 1 },
+      { q: 'A class of 20 students scored a mean of 14 on a test. A new student joins and scores 18. What is the new class mean?', tier: 2 },
+      { q: 'Two data sets both have a mean of 50. Set A has a range of 4, Set B has a range of 40. What does this tell you about the two sets?', tier: 3 },
+    ],
+  },
+
+  'coordinates-intro': {
+    label: 'Coordinates & Graphs',
+    subject: 'maths', band: 'Grade 6', bandOrder: 0,
+    prerequisites: ['statistics-basics', 'negative-numbers'],
+    nextSkills: ['algebra-intro', 'straight-line-graphs'],
+    questions: [
+      { q: 'Plot the point (3, −2). Which quadrant does it lie in?', tier: 1 },
+      { q: 'A square has three corners at (1,1), (4,1) and (4,4). What are the coordinates of the fourth corner?', tier: 2 },
+      { q: 'Points A(0,0), B(4,0), C(4,3) form a triangle. Find its area and the length of side AC.', tier: 3 },
+    ],
+  },
+
+  'algebra-intro': {
+    label: 'Introduction to Algebra',
+    subject: 'maths', band: 'Grade 7–8', bandOrder: 0,
+    prerequisites: ['coordinates-intro'],
+    nextSkills: ['basic-algebra', 'linear-equations'],
+    questions: [
+      { q: 'If n = 5, find the value of 3n − 2.', tier: 1 },
+      { q: 'Simplify: 4a + 3b − a + 5b', tier: 2 },
+      { q: 'Write an expression for the perimeter of a rectangle where the length is (2x + 1) and the width is (x − 3). Expand and simplify.', tier: 3 },
+    ],
+  },
+
+  // ── EXISTING GCSE / A-Level nodes ──────────────────────────────────────────
+
   'number-basics': {
     label: 'Number & Place Value',
     subject: 'maths', band: 'Foundation', bandOrder: 1,
-    prerequisites: [],
+    prerequisites: ['decimals-intro', 'negative-numbers'],
     nextSkills: ['fractions', 'percentages'],
     questions: [
       { q: 'What is 347 × 8?', tier: 1 },
@@ -232,6 +406,18 @@ const MATHS = {
     ],
   },
 
+  'trig-identities': {
+    label: 'Trig Identities',
+    subject: 'maths', band: 'GCSE Higher', bandOrder: 7,
+    prerequisites: ['trigonometry'],
+    nextSkills: ['further-trig', 'sine-cosine-rule'],
+    questions: [
+      { q: 'State the identity: sin²θ + cos²θ = ?', tier: 1 },
+      { q: 'Prove that (sinθ + cosθ)² = 1 + 2sinθcosθ.', tier: 2 },
+      { q: 'Solve sinθ/cosθ = 2sinθ for 0° ≤ θ ≤ 360°.', tier: 3 },
+    ],
+  },
+
   'further-algebra': {
     label: 'Further Algebra',
     subject: 'maths', band: 'A-Level', bandOrder: 8,
@@ -277,6 +463,80 @@ const MATHS = {
       { q: 'Find the magnitude of vector (3, −4, 0).', tier: 1 },
       { q: 'If a = 2i + j − 3k and b = i − 2j + k, find a · b.', tier: 2 },
       { q: 'Show that vectors (1, 2, 3) and (2, 1, −4/3) are perpendicular.', tier: 3 },
+    ],
+  },
+
+  // ── A-LEVEL GAPS (previously missing) ─────────────────────────────────────
+
+  'logarithms': {
+    label: 'Logarithms & Exponentials',
+    subject: 'maths', band: 'A-Level', bandOrder: 8,
+    prerequisites: ['further-algebra'],
+    nextSkills: ['calculus-intro', 'sequences-series'],
+    questions: [
+      { q: 'Evaluate: log₂(32)', tier: 1 },
+      { q: 'Solve: 3^(x+1) = 27^(x−1)', tier: 2 },
+      { q: 'Solve: log₃(x + 4) + log₃(x − 2) = 3. State any restrictions on x.', tier: 3 },
+    ],
+  },
+
+  'binomial-expansion': {
+    label: 'Binomial Expansion',
+    subject: 'maths', band: 'A-Level', bandOrder: 8,
+    prerequisites: ['further-algebra'],
+    nextSkills: ['sequences-series'],
+    questions: [
+      { q: 'Expand (1 + x)⁴ using the binomial theorem.', tier: 1 },
+      { q: 'Find the coefficient of x³ in the expansion of (2 + x)⁵.', tier: 2 },
+      { q: 'Find the first three terms of (1 − 2x)^(−½) in ascending powers of x. State the range of validity.', tier: 3 },
+    ],
+  },
+
+  'sequences-series': {
+    label: 'Sequences & Series',
+    subject: 'maths', band: 'A-Level', bandOrder: 8,
+    prerequisites: ['further-algebra'],
+    nextSkills: [],
+    questions: [
+      { q: 'The 3rd term of an arithmetic sequence is 11 and the 7th term is 27. Find the first term and common difference.', tier: 1 },
+      { q: 'A geometric series has first term 6 and common ratio 1/3. Find the sum to infinity.', tier: 2 },
+      { q: 'Prove that the sum of the first n terms of an arithmetic series is n/2 × (2a + (n−1)d). Then find the least n for which the sum exceeds 1000, given a = 5, d = 3.', tier: 3 },
+    ],
+  },
+
+  'mathematical-proof': {
+    label: 'Mathematical Proof',
+    subject: 'maths', band: 'A-Level', bandOrder: 8,
+    prerequisites: ['further-algebra'],
+    nextSkills: [],
+    questions: [
+      { q: 'Prove that the sum of any two odd numbers is even.', tier: 1 },
+      { q: 'Disprove by counter-example: "n² + n + 41 is prime for all positive integers n."', tier: 2 },
+      { q: 'Prove by contradiction that √2 is irrational.', tier: 3 },
+    ],
+  },
+
+  'further-trig': {
+    label: 'Further Trigonometry',
+    subject: 'maths', band: 'A-Level', bandOrder: 9,
+    prerequisites: ['trigonometry', 'trig-identities'],
+    nextSkills: ['integration'],
+    questions: [
+      { q: 'Write sin(A + B) and cos(A + B) in expanded form.', tier: 1 },
+      { q: 'Solve: 2sin²x − sinx − 1 = 0 for 0° ≤ x ≤ 360°.', tier: 2 },
+      { q: 'Express 3sinx + 4cosx in the form Rsin(x + α), finding R and α. Hence find the maximum value and the x at which it occurs.', tier: 3 },
+    ],
+  },
+
+  'parametric': {
+    label: 'Parametric Equations',
+    subject: 'maths', band: 'A-Level', bandOrder: 9,
+    prerequisites: ['calculus-intro', 'completing-the-square'],
+    nextSkills: [],
+    questions: [
+      { q: 'A curve is defined by x = t + 1, y = t² − 3. Find y when t = 2.', tier: 1 },
+      { q: 'Convert x = 2cosθ, y = 3sinθ to a Cartesian equation.', tier: 2 },
+      { q: 'A curve has parametric equations x = t², y = t³ − 3t. Find dy/dx in terms of t, and find the coordinates of the stationary points.', tier: 3 },
     ],
   },
 }
@@ -771,8 +1031,10 @@ export const CALIBRATION_MAP = {
 }
 
 // Entry node per subject — where the diagnostic starts
+// Maths starts at algebra-intro (Grade 7-8): advances to GCSE if correct,
+// retreats through primary chain if not — covers Grade 1 through A-Level
 export const ENTRY_NODES = {
-  maths:            'linear-equations',
+  maths:            'algebra-intro',
   physics:          'forces-basics',
   chemistry:        'atomic-structure-chem',
   biology:          'cell-structure',
