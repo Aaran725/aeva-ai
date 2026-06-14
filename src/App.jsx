@@ -6357,6 +6357,12 @@ If no clear changes: {"changes":[]}`
         boxShadow: activeTheme.inputGlow,
         borderRadius: 999,
       }
+    : calibMode
+    ? {
+        background: 'rgba(99,102,241,0.10)',
+        border: '1px solid rgba(139,143,255,0.50)',
+        boxShadow: '0 0 0 3px rgba(99,102,241,0.12), 0 8px 32px rgba(0,0,0,0.40)',
+      }
     : {
         background: 'rgba(255,255,255,0.06)',
         border: '1px solid rgba(139,143,255,0.22)',
@@ -6366,9 +6372,11 @@ If no clear changes: {"changes":[]}`
   const inputTextColor = isLight ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.88)'
   const placeholderNote = isMission
     ? `Respond to ${activeMission?.title || 'the mission'}…`
-    : photoAttachment
-      ? 'Add a message (optional) — or just press send…'
-      : 'Ask Aeva anything…'
+    : calibMode
+      ? 'Type your answer or working…'
+      : photoAttachment
+        ? 'Add a message (optional) — or just press send…'
+        : 'Ask Aeva anything…'
 
   const sendBtnStyle = isMission && activeMission
     ? { background: `linear-gradient(145deg, ${activeMission.color}80, ${activeMission.color}40)`, border: `1.5px solid ${activeMission.color}60`, boxShadow: `0 4px 14px ${activeMission.glow}` }
@@ -6753,6 +6761,97 @@ If no clear changes: {"changes":[]}`
             <span style={{ fontSize: 14.5, fontWeight: 800, color: logoColor, letterSpacing: '-0.03em' }}>aeva</span>
           </div>
         </div>
+
+        {/* ── Calibration Mode Bar ── slides in below header when diagnostic is running */}
+        <AnimatePresence>
+          {calibMode && calibSubject && (
+            <motion.div
+              key="calib-bar"
+              initial={{ opacity: 0, y: -14, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: 'auto' }}
+              exit={{ opacity: 0, y: -10, height: 0 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+              style={{
+                flexShrink: 0, overflow: 'hidden',
+                background: 'linear-gradient(90deg, rgba(99,102,241,0.14) 0%, rgba(139,92,246,0.09) 60%, rgba(99,102,241,0.06) 100%)',
+                borderBottom: '1px solid rgba(139,143,255,0.20)',
+                backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 20px' }}>
+
+                {/* Pulsing target icon + subject label + current node */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                  <motion.div
+                    animate={{ scale: [1, 1.25, 1], opacity: [0.65, 1, 0.65] }}
+                    transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+                    style={{ fontSize: 16, lineHeight: 1 }}
+                  >
+                    {SUBJECT_ICONS[calibSubject] || '🎯'}
+                  </motion.div>
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: '#A5B4FC', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                      Calibrating · {SUBJECT_LABELS[calibSubject] || calibSubject}
+                      {calibTick < 0 ? '' : ''}{/* reads calibTick */}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.40)', marginTop: 1 }}>
+                      {(() => {
+                        void calibTick
+                        const nodeId = calibStateRef.current.currentNode
+                        return nodeId
+                          ? (CALIBRATION_MAP[calibSubject]?.[nodeId]?.label || nodeId)
+                          : 'Warming up…'
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Spacer */}
+                <div style={{ flex: 1 }} />
+
+                {/* Progress dots — 12 total, colour-coded by result */}
+                <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                  {Array.from({ length: 12 }).map((_, i) => {
+                    void calibTick
+                    const skillId = calibStateRef.current.nodesVisited[i]
+                    const status  = skillId ? calibStateRef.current.skillMap[skillId] : null
+                    const isCur   = i === calibStateRef.current.nodesVisited.length
+                    const col = status === 'solid' ? '#4ADE80'
+                      : status === 'shaky'  ? '#FBBF24'
+                      : status === 'gap'    ? '#F87171'
+                      : isCur               ? '#A5B4FC'
+                      : 'rgba(255,255,255,0.14)'
+                    return (
+                      <motion.div
+                        key={i}
+                        animate={isCur ? { scale: [1, 1.45, 1], opacity: [0.55, 1, 0.55] } : {}}
+                        transition={{ duration: 0.9, repeat: isCur ? Infinity : 0, ease: 'easeInOut' }}
+                        style={{
+                          width: isCur ? 10 : 7, height: isCur ? 10 : 7,
+                          borderRadius: '50%', background: col,
+                          transition: 'background 0.35s, width 0.2s, height 0.2s',
+                          flexShrink: 0,
+                        }}
+                      />
+                    )
+                  })}
+                </div>
+
+                {/* Q counter pill */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0,
+                  padding: '4px 11px', borderRadius: 99,
+                  background: 'rgba(99,102,241,0.20)', border: '1px solid rgba(139,143,255,0.35)',
+                  fontSize: 11, fontWeight: 800, color: '#A5B4FC',
+                }}>
+                  {void calibTick}
+                  Q{Math.min(calibStateRef.current.questionsAsked + 1, 12)}
+                  <span style={{ fontWeight: 400, opacity: 0.45 }}>/12</span>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Feature spotlight — one-time tip */}
         {!isMission && (
@@ -7157,42 +7256,19 @@ If no clear changes: {"changes":[]}`
                     })}
                   </div>
                 )}
-                {/* Calibration progress pill — replaces session badges during calibration */}
+                {/* Under-orb state badge — simple pill during calibration, full badge otherwise */}
                 {calibMode && calibSubject ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 99, background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(139,143,255,0.30)' }}>
-                      <span style={{ fontSize: 12 }}>🎯</span>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#A5B4FC' }}>
-                        {/* calibTick in expression forces re-render each question */}
-                        {SUBJECT_LABELS[calibSubject]} Calibration · Q{Math.min(calibStateRef.current.questionsAsked + 1, 12)}/12
-                        {calibTick < 0 ? '' /* never false, just reads calibTick */ : ''}
-                      </span>
-                    </div>
-                    {/* Skill dots — 12 total, colour-coded live */}
-                    <div style={{ display: 'flex', gap: 5 }}>
-                      {Array.from({ length: 12 }).map((_, i) => {
-                        // calibTick ensures this re-renders after every question
-                        void calibTick
-                        const skillId = calibStateRef.current.nodesVisited[i]
-                        const status = skillId ? calibStateRef.current.skillMap[skillId] : null
-                        const isCurrent = i === calibStateRef.current.nodesVisited.length
-                        const col = status === 'solid' ? '#4ADE80'
-                          : status === 'shaky'  ? '#FBBF24'
-                          : status === 'gap'    ? '#F87171'
-                          : isCurrent           ? 'rgba(165,180,252,0.70)'
-                          : i < (calibStateRef.current.nodesVisited.length) ? '#818CF8'
-                          : 'rgba(255,255,255,0.15)'
-                        return (
-                          <motion.div
-                            key={i}
-                            animate={{ scale: isCurrent ? [1, 1.3, 1] : 1 }}
-                            transition={{ duration: 0.6, repeat: isCurrent ? Infinity : 0 }}
-                            style={{ width: 8, height: 8, borderRadius: '50%', background: col, transition: 'background 0.3s' }}
-                          />
-                        )
-                      })}
-                    </div>
-                  </div>
+                  <motion.div
+                    animate={{ opacity: [0.6, 1, 0.6] }}
+                    transition={{ duration: 1.8, repeat: Infinity }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 11px', borderRadius: 99, background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(139,143,255,0.28)' }}
+                  >
+                    <span style={{ fontSize: 11 }}>🎯</span>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: '#A5B4FC', letterSpacing: '0.03em' }}>
+                      {void calibTick}
+                      Diagnostic in progress
+                    </span>
+                  </motion.div>
                 ) : (
                   /* Session state badges — moved from header to live under the orb */
                   <SessionBadge sessionState={sessionState} criticism={criticism} />
@@ -7853,6 +7929,39 @@ If no clear changes: {"changes":[]}`
                         </div>
                       </div>
                     </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Calibration answer label — appears above input bar during diagnostic */}
+              <AnimatePresence>
+                {calibMode && calibSubject && (
+                  <motion.div
+                    key="calib-input-label"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 6 }}
+                    transition={{ duration: 0.22 }}
+                    style={{
+                      width: '100%', maxWidth: isMission ? 720 : 640, margin: '0 auto 6px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '0 4px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <motion.div
+                        animate={{ opacity: [0.5, 1, 0.5] }}
+                        transition={{ duration: 1.4, repeat: Infinity }}
+                        style={{ width: 5, height: 5, borderRadius: '50%', background: '#818CF8', flexShrink: 0 }}
+                      />
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(165,180,252,0.75)', letterSpacing: '0.02em' }}>
+                        {void calibTick}
+                        Answering Q{Math.min(calibStateRef.current.questionsAsked + 1, 12)}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', fontWeight: 500 }}>
+                      Show your working for full credit
+                    </span>
                   </motion.div>
                 )}
               </AnimatePresence>
