@@ -4450,6 +4450,135 @@ ${guide.examTip ? `<div class="section"><div class="section-label">Exam Tip</div
 
 /* CHAT_THEMES moved to ./chatThemes.js (shared by Chat + Aeva Docs) */
 
+/* ═══ CALIBRATION QUESTION CARD ══════════════════════ */
+const CALIB_STATUS_CFG = {
+  solid:   { icon: '✅', color: '#4ADE80', bg: 'rgba(74,222,128,0.10)',  border: 'rgba(74,222,128,0.22)' },
+  shaky:   { icon: '⚠️',  color: '#FBBF24', bg: 'rgba(251,191,36,0.10)',  border: 'rgba(251,191,36,0.22)' },
+  gap:     { icon: '❌', color: '#F87171', bg: 'rgba(248,113,113,0.10)', border: 'rgba(248,113,113,0.22)' },
+}
+
+function CalibQuestionCard({ msg, subject, nodeId, qNum, isLight }) {
+  const subjectMap = CALIBRATION_MAP[subject] || {}
+  const nodeLabel = nodeId ? (subjectMap[nodeId]?.label || nodeId) : null
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.30, ease: [0.16, 1, 0.3, 1] }}
+      style={{ marginBottom: 14 }}
+    >
+      {/* Tag strip — Q number + skill label */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8, paddingLeft: 2 }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          padding: '3px 9px', borderRadius: 99,
+          background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(139,143,255,0.35)',
+          fontSize: 10, fontWeight: 800, color: '#A5B4FC', letterSpacing: '0.07em',
+        }}>
+          Q{qNum}
+        </div>
+        {nodeLabel && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '3px 9px', borderRadius: 99,
+            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)',
+            fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.02em',
+          }}>
+            {nodeLabel}
+          </div>
+        )}
+      </div>
+
+      {/* Question body */}
+      <div style={{
+        maxWidth: 740, width: '100%',
+        padding: '15px 20px',
+        borderRadius: '6px 22px 22px 22px',
+        background: 'rgba(14,16,40,0.88)',
+        backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
+        border: '1px solid rgba(139,143,255,0.18)',
+        borderLeft: '3px solid rgba(99,102,241,0.75)',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.05)',
+        color: 'rgba(255,255,255,0.90)',
+        fontFamily: "'Inter', system-ui, sans-serif",
+      }}>
+        <MarkdownRenderer
+          text={msg.text}
+          streaming={!!msg.streaming}
+          cursorColor="rgba(139,143,255,0.9)"
+          isLight={isLight}
+        />
+      </div>
+    </motion.div>
+  )
+}
+
+/* ═══ CALIBRATION LIVE SKILL REVEAL ══════════════════ */
+function CalibSkillReveal({ calibStateRef, calibTick, subject }) {
+  void calibTick  // register dependency so component re-renders on tick
+  const cs = calibStateRef.current
+  const subjectMap = CALIBRATION_MAP[subject] || {}
+  const visited = cs.nodesVisited || []
+
+  if (visited.length === 0) return null
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+      style={{ marginBottom: 16 }}
+    >
+      <div style={{
+        padding: '12px 16px', borderRadius: 16,
+        background: 'rgba(8,10,28,0.72)',
+        border: '1px solid rgba(139,143,255,0.14)',
+        display: 'flex', flexDirection: 'column', gap: 10,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <motion.div
+            animate={{ opacity: [0.4, 1, 0.4] }}
+            transition={{ duration: 1.6, repeat: Infinity }}
+            style={{ width: 4, height: 4, borderRadius: '50%', background: '#818CF8' }}
+          />
+          <span style={{ fontSize: 9.5, fontWeight: 800, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.10em', textTransform: 'uppercase' }}>
+            Discovered so far
+          </span>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <AnimatePresence>
+            {visited.map(skillId => {
+              void calibTick  // each pill also depends on tick
+              const status = cs.skillMap[skillId]
+              const cfg = CALIB_STATUS_CFG[status]
+              const label = subjectMap[skillId]?.label || skillId
+              return cfg ? (
+                <motion.div
+                  key={skillId}
+                  initial={{ opacity: 0, scale: 0.75 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.75 }}
+                  transition={{ type: 'spring', stiffness: 360, damping: 26 }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    padding: '4px 11px', borderRadius: 99,
+                    background: cfg.bg, border: `1px solid ${cfg.border}`,
+                    fontSize: 11, fontWeight: 600, color: cfg.color,
+                  }}
+                >
+                  <span style={{ fontSize: 11 }}>{cfg.icon}</span>
+                  {label}
+                </motion.div>
+              ) : null
+            })}
+          </AnimatePresence>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
 /* ═══ CHAT BUBBLE ═════════════════════════════════ */
 function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false, isWidget = false, widgetTheme = null }) {
   const isUser = msg.role === 'user'
@@ -5544,7 +5673,10 @@ You are an examiner right now, not a tutor. Keep it brief and neutral.`
     const cs = calibStateRef.current
     if (!cs.currentNode || !calibModeRef.current) return
     setIsThinking(true)
-    setMessages(prev => [...prev, { role: 'model', text: '', streaming: true }])
+    setMessages(prev => [...prev, {
+      role: 'model', text: '', streaming: true,
+      isCalibQuestion: true, calibNodeId: cs.currentNode, calibQNum: 1,
+    }])
     const prompt = buildCalibPrompt(cs.subject, cs.currentNode, cs.tierAtNode)
     const controller = new AbortController()
     abortRef.current = controller
@@ -5817,6 +5949,21 @@ You are an examiner right now, not a tutor. Keep it brief and neutral.`
           systemPrompt = buildCalibPrompt(cs.subject, cs.currentNode, cs.tierAtNode)
           // After critic runs, advance the calibration
           handleCalibCriticResult(criticResult?.understanding || 'partial')
+          // If still in calib mode, tag the model placeholder as a question card
+          if (calibModeRef.current && calibStateRef.current.currentNode) {
+            const nextNode = calibStateRef.current.currentNode
+            const qNum = calibStateRef.current.questionsAsked + 1
+            setMessages(prev => {
+              const copy = [...prev]
+              copy[copy.length - 1] = {
+                ...copy[copy.length - 1],
+                isCalibQuestion: true,
+                calibNodeId: nextNode,
+                calibQNum: qNum,
+              }
+              return copy
+            })
+          }
         } else {
           systemPrompt = feedbackPrefix + orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, fullMemory + roadmapCtx + nodeCtx, extras, T.aevaLanguageDirective, detectedSubject)
         }
@@ -7405,7 +7552,25 @@ If no clear changes: {"changes":[]}`
                 {messages.map((msg, i) =>
                   isMission
                     ? <ThemedChatBubble key={i} msg={msg} mission={activeMission} />
-                    : <ChatBubble key={i} msg={msg} deepDiveCards={deepDiveMap[i] || []} onDismissCard={(cardId) => setDeepDiveMap(prev => ({ ...prev, [i]: (prev[i] || []).filter(c => c.id !== cardId) }))} isLight={isLight} isWidget={isWidget} widgetTheme={isWidget ? activeTheme : null}  />
+                    : msg.isCalibQuestion && msg.role === 'model'
+                      ? <CalibQuestionCard
+                          key={i}
+                          msg={msg}
+                          subject={calibSubject}
+                          nodeId={msg.calibNodeId}
+                          qNum={msg.calibQNum}
+                          isLight={isLight}
+                        />
+                      : <ChatBubble key={i} msg={msg} deepDiveCards={deepDiveMap[i] || []} onDismissCard={(cardId) => setDeepDiveMap(prev => ({ ...prev, [i]: (prev[i] || []).filter(c => c.id !== cardId) }))} isLight={isLight} isWidget={isWidget} widgetTheme={isWidget ? activeTheme : null}  />
+                )}
+
+                {/* Live skill reveal — grows during calibration as skills are assessed */}
+                {calibMode && calibSubject && (
+                  <CalibSkillReveal
+                    calibStateRef={calibStateRef}
+                    calibTick={calibTick}
+                    subject={calibSubject}
+                  />
                 )}
 
                 {/* Calibration result card */}
