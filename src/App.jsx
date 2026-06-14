@@ -59,7 +59,7 @@ const YourUI             = lazy(() => import('./YourUI'))
 const RevisionCalendar   = lazy(() => import('./RevisionCalendar'))
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
 import { useCalibrationStore } from './calibrationStore'
-import { CALIBRATION_MAP, ENTRY_NODES, SUBJECT_LABELS, SUBJECT_ICONS } from './calibrationMap'
+import { CALIBRATION_MAP, ENTRY_NODES, SUBJECT_LABELS, SUBJECT_ICONS, FAST_LANE } from './calibrationMap'
 import CalibrationResult from './CalibrationResult'
 import { useEchoStore } from './echoStore'
 import { useMemoryStore } from './memoryStore'
@@ -4460,6 +4460,8 @@ const CALIB_STATUS_CFG = {
 function CalibQuestionCard({ msg, subject, nodeId, qNum, isLight }) {
   const subjectMap = CALIBRATION_MAP[subject] || {}
   const nodeLabel = nodeId ? (subjectMap[nodeId]?.label || nodeId) : null
+  const isFastLane = !!msg.isFastLane
+  const fastLaneLabel = msg.fastLaneLabel || 'Quick Check'
 
   return (
     <motion.div
@@ -4468,17 +4470,28 @@ function CalibQuestionCard({ msg, subject, nodeId, qNum, isLight }) {
       transition={{ duration: 0.30, ease: [0.16, 1, 0.3, 1] }}
       style={{ marginBottom: 14 }}
     >
-      {/* Tag strip — Q number + skill label */}
+      {/* Tag strip — fast lane badge OR Q number + skill label */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8, paddingLeft: 2 }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 4,
-          padding: '3px 9px', borderRadius: 99,
-          background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(139,143,255,0.35)',
-          fontSize: 10, fontWeight: 800, color: '#A5B4FC', letterSpacing: '0.07em',
-        }}>
-          Q{qNum}
-        </div>
-        {nodeLabel && (
+        {isFastLane ? (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '3px 10px', borderRadius: 99,
+            background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.35)',
+            fontSize: 10, fontWeight: 800, color: '#FBBF24', letterSpacing: '0.07em',
+          }}>
+            ⚡ {fastLaneLabel}
+          </div>
+        ) : (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 4,
+            padding: '3px 9px', borderRadius: 99,
+            background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(139,143,255,0.35)',
+            fontSize: 10, fontWeight: 800, color: '#A5B4FC', letterSpacing: '0.07em',
+          }}>
+            Q{qNum}
+          </div>
+        )}
+        {nodeLabel && !isFastLane && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: 5,
             padding: '3px 9px', borderRadius: 99,
@@ -5078,6 +5091,7 @@ function ChatView({ onBack }) {
     startTime: null,
   })
   const [calibResult, setCalibResult] = useState(null)       // final result object
+  const calibFastLaneRef = useRef({ active: false, bracketIdx: 0 }) // fast lane bracket state
   const [chatAppSettingsOpen, setChatAppSettingsOpen] = useState(false)
   const [chatSettings, saveChatSettings] = useChatSettings()
   const [chipEditMode, setChipEditMode] = useState(false)
@@ -5667,6 +5681,10 @@ Rules:
       tierAtNode: 1, partialAtNode: false,
       nodesVisited: [], startTime: Date.now(),
     }
+    // Initialise fast lane if this subject has one
+    calibFastLaneRef.current = FAST_LANE[subject]
+      ? { active: true, bracketIdx: 0 }
+      : { active: false, bracketIdx: 0 }
     calibModeRef.current = true   // set ref synchronously — safe to read inside async fns immediately
     setCalibMode(true)
     setCalibSubject(subject)
@@ -5674,14 +5692,34 @@ Rules:
     setCalibTick(0)
   }
 
+  /** Inject a fast-lane bracket question directly into the chat */
+  const injectFastLaneBracket = (subject, bracketIdx) => {
+    const bracket = FAST_LANE[subject]?.[bracketIdx]
+    if (!bracket) return
+    setMessages(prev => [...prev, {
+      role: 'model', text: bracket.q, streaming: false,
+      isCalibQuestion: true, calibNodeId: bracket.nodeId,
+      calibQNum: 0,          // 0 = bracket (not counted in main Q counter)
+      isFastLane: true,
+      fastLaneLabel: bracket.label,
+    }])
+  }
+
   /** Fire the first calibration question — DIRECT INJECT, no API call.
-   *  Questions are pre-written in calibrationMap so we skip the LLM entirely.
-   *  This eliminates rate limiting and guarantees exact question text. */
+   *  If a fast lane exists for this subject, starts with a bracket question
+   *  that quickly locates the right entry point (2 Qs max).
+   *  Otherwise injects the first node question from calibrationMap. */
   const sendCalibFirstQuestion = (subject) => {
+    if (!calibModeRef.current) return
+    // Fast lane: inject bracket Q1
+    if (calibFastLaneRef.current.active && FAST_LANE[subject]) {
+      injectFastLaneBracket(subject, 0)
+      return
+    }
+    // Normal: inject from calibration map
     const cs = calibStateRef.current
-    if (!cs.currentNode || !calibModeRef.current) return
-    const subjectMap = CALIBRATION_MAP[subject] || {}
-    const node = subjectMap[cs.currentNode]
+    if (!cs.currentNode) return
+    const node = CALIBRATION_MAP[subject]?.[cs.currentNode]
     const q = node?.questions?.find(q => q.tier === cs.tierAtNode) || node?.questions?.[0]
     if (!q) return
     setMessages(prev => [...prev, {
@@ -5937,13 +5975,40 @@ Rules:
         if (newlyDetected) sessionSubjectRef.current = newlyDetected
         const detectedSubject = sessionSubjectRef.current
         // ── Calibration mode: brief ack only — next question injected in finally ──
-        if (calibModeRef.current && calibStateRef.current.currentNode) {
+        if (calibModeRef.current) {
           const cs = calibStateRef.current
           const understanding = criticResult?.understanding || 'partial'
+          const passed = understanding === 'solid' || understanding === 'mastery'
+
           // Ack prompt: 1 sentence, 8b model, ~15 tokens
           systemPrompt = buildCalibAckPrompt(cs.subject, understanding)
-          // Advance calibration state NOW (before streaming the ack)
-          handleCalibCriticResult(understanding)
+
+          if (calibFastLaneRef.current.active) {
+            // ── Fast lane bracket routing ──────────────────────────────────
+            const fl = FAST_LANE[cs.subject]
+            const bracket = fl?.[calibFastLaneRef.current.bracketIdx]
+            if (bracket) {
+              if (passed && bracket.onPass) {
+                // Student passed bracket → set real entry node, end fast lane
+                calibStateRef.current.currentNode = bracket.onPass
+                calibFastLaneRef.current = { active: false, bracketIdx: 0 }
+              } else if (!passed && bracket.onFail === null) {
+                // Student failed → try next bracket
+                calibFastLaneRef.current.bracketIdx += 1
+                // Don't set currentNode yet — next bracket will decide
+              } else if (!passed && bracket.onFail) {
+                // Student failed final bracket → set lowest entry node
+                calibStateRef.current.currentNode = bracket.onFail
+                calibFastLaneRef.current = { active: false, bracketIdx: 0 }
+              }
+            } else {
+              // No more brackets — fall through to normal entry
+              calibFastLaneRef.current = { active: false, bracketIdx: 0 }
+            }
+          } else if (cs.currentNode) {
+            // ── Normal calibration advance ─────────────────────────────────
+            handleCalibCriticResult(understanding)
+          }
         } else {
           systemPrompt = feedbackPrefix + orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, fullMemory + roadmapCtx + nodeCtx, extras, T.aevaLanguageDirective, detectedSubject)
         }
@@ -6363,25 +6428,29 @@ If no clear changes: {"changes":[]}`
       setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, streaming: false } : m))
       inputRef.current?.focus()
 
-      // ── Calibration: inject next question directly after ack ────────────────
-      // Questions are pre-written — no API call needed, instant + exact text
-      if (calibModeRef.current && calibStateRef.current.currentNode) {
+      // ── Calibration: inject next question/bracket directly after ack ────────
+      if (calibModeRef.current) {
         const cs = calibStateRef.current
-        const subjectMap = CALIBRATION_MAP[cs.subject] || {}
-        const node = subjectMap[cs.currentNode]
-        const q = node?.questions?.find(q => q.tier === cs.tierAtNode) || node?.questions?.[0]
-        if (q) {
-          setTimeout(() => {
-            if (!calibModeRef.current) return  // may have finished during timeout
-            setMessages(prev => [...prev, {
-              role: 'model', text: q.q, streaming: false,
-              isCalibQuestion: true,
-              calibNodeId: cs.currentNode,
-              calibQNum: cs.questionsAsked + 1,
-            }])
-            setCalibTick(t => t + 1)
-          }, 400)  // brief pause after ack so it feels natural
-        }
+        setTimeout(() => {
+          if (!calibModeRef.current) return
+          if (calibFastLaneRef.current.active) {
+            // Still in fast lane → inject next bracket
+            injectFastLaneBracket(cs.subject, calibFastLaneRef.current.bracketIdx)
+          } else if (cs.currentNode) {
+            // Fast lane done / never existed → inject first real diagnostic question
+            const node = CALIBRATION_MAP[cs.subject]?.[cs.currentNode]
+            const q = node?.questions?.find(q => q.tier === cs.tierAtNode) || node?.questions?.[0]
+            if (q) {
+              setMessages(prev => [...prev, {
+                role: 'model', text: q.q, streaming: false,
+                isCalibQuestion: true,
+                calibNodeId: cs.currentNode,
+                calibQNum: cs.questionsAsked + 1,
+              }])
+              setCalibTick(t => t + 1)
+            }
+          }
+        }, 400)
       }
 
       // Parse TERM tags from completed response (tutor mode only)
@@ -6989,16 +7058,22 @@ If no clear changes: {"changes":[]}`
                   })}
                 </div>
 
-                {/* Q counter pill */}
+                {/* Q counter pill — shows "Placing you…" during fast lane */}
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0,
                   padding: '4px 11px', borderRadius: 99,
-                  background: 'rgba(99,102,241,0.20)', border: '1px solid rgba(139,143,255,0.35)',
-                  fontSize: 11, fontWeight: 800, color: '#A5B4FC',
+                  background: calibFastLaneRef.current.active
+                    ? 'rgba(251,191,36,0.18)' : 'rgba(99,102,241,0.20)',
+                  border: calibFastLaneRef.current.active
+                    ? '1px solid rgba(251,191,36,0.35)' : '1px solid rgba(139,143,255,0.35)',
+                  fontSize: 11, fontWeight: 800,
+                  color: calibFastLaneRef.current.active ? '#FBBF24' : '#A5B4FC',
                 }}>
                   {void calibTick}
-                  Q{Math.min(calibStateRef.current.questionsAsked + 1, 12)}
-                  <span style={{ fontWeight: 400, opacity: 0.45 }}>/12</span>
+                  {calibFastLaneRef.current.active
+                    ? '⚡ Placing you…'
+                    : <>Q{Math.min(calibStateRef.current.questionsAsked + 1, 12)}<span style={{ fontWeight: 400, opacity: 0.45 }}>/12</span></>
+                  }
                 </div>
               </div>
             </motion.div>

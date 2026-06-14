@@ -1066,3 +1066,41 @@ export const SUBJECT_ICONS = {
   economics:        '📊',
   'computer-science': '💻',
 }
+
+/**
+ * FAST_LANE — 2-question bracket that places a student at the right
+ * entry point BEFORE the full diagnostic starts.
+ *
+ * Each bracket has:
+ *   q        — the question text (injected directly, no API)
+ *   label    — short label shown in the "Quick Check" badge
+ *   nodeId   — the calibration node this bracket maps to (for skill reveal)
+ *   onPass   — node ID to start full diagnostic from if solid/mastery
+ *   onFail   — node ID to start from if none/partial (null = try next bracket)
+ *
+ * Maths ladder:
+ *   Bracket 1 (Grade 7-8):  algebra + simple equation
+ *     ✅ Pass → enter at linear-equations (GCSE)
+ *     ❌ Fail → Bracket 2
+ *   Bracket 2 (Grade 3-4):  times tables + simple division
+ *     ✅ Pass → enter at fractions-equivalent (Grade 4-5)
+ *     ❌ Fail → enter at addition-subtraction (Grade 1-2)
+ */
+export const FAST_LANE = {
+  maths: [
+    {
+      label: 'Quick Check 1',
+      q: 'Two quick checks — answer both:\n(a) If n = 5, find the value of 3n − 2.\n(b) Solve for x: 2x + 6 = 12',
+      nodeId: 'algebra-intro',
+      onPass: 'linear-equations',
+      onFail: null,   // → try bracket 2
+    },
+    {
+      label: 'Quick Check 2',
+      q: 'Two more quick checks:\n(a) What is 7 × 8?\n(b) What is 48 ÷ 6?',
+      nodeId: 'times-tables',
+      onPass: 'fractions-equivalent',
+      onFail: 'addition-subtraction',
+    },
+  ],
+}
