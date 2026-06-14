@@ -351,6 +351,10 @@ MATH (maths/science/physics/chemistry/stats — not casual topics):
 - No LaTeX on bare single letters. Fractions always \\frac{}{}. Multiplication always \\times.
 - ✗ "negative b over 2a" → ✓ $$\\frac{-b}{2a}$$
 - ✗ NEVER show two consecutive $$...$$ blocks that are the same equation at different simplification stages. Combine into one step or show ONLY the final simplified form. Example: don't show $$\\frac{-3 \\pm \\sqrt{9+80}}{4}$$ then immediately $$\\frac{-3 \\pm \\sqrt{89}}{4}$$ — just show the final one.
+- ✗ NEVER append prose after the closing $$ on the same line: $$\\text{Mode} = 4$$ (since 4 appears twice) — this breaks the renderer. Put the prose on the next line instead.
+- ✗ $$\\text{Mode} = 4$$ (since 4 appears twice, which is more than any other value) — WRONG
+- ✓ $$\\text{Mode} = 4$$
+  (since 4 appears twice, which is more than any other value) — CORRECT
 
 CALLOUT BLOCKS (1-2 per teaching response):
 > **Definition:** | > **Key Insight:** | > **Example:** | > **Note:** | > **Tip:** | > **Recall:**
@@ -3660,10 +3664,20 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false, isDri
       flushList()
       const mathLines = []
       const startI = i
-      if (trimmed.replace(/^\$\$/, '').replace(/\$\$$/, '').trim()) {
-        mathLines.push(trimmed.replace(/^\$\$/, '').replace(/\$\$$/, ''))
+      // Strip the opening $$
+      const afterOpen = trimmed.slice(2)
+      // Find any closing $$ within the rest of the line
+      const closeIdx = afterOpen.indexOf('$$')
+      if (closeIdx !== -1) {
+        // Inline form: $$equation$$ — extract only the math part (ignore any prose after closing $$)
+        mathLines.push(afterOpen.slice(0, closeIdx).trim())
+        i++
+      } else if (afterOpen.trim()) {
+        // Opening $$ with content on same line but no closing $$ — treat rest as math
+        mathLines.push(afterOpen.trim())
         i++
       } else {
+        // Multi-line form: $$\n...\n$$
         i++
         while (i < lines.length && !/^\$\$/.test(lines[i].trim())) { mathLines.push(lines[i]); i++ }
         i++
