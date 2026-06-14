@@ -1101,7 +1101,7 @@ function SettingsSection({ label, children }) {
   )
 }
 
-function AppSettingsPanel({ onClose }) {
+function AppSettingsPanel({ onClose, chatLayoutProps = null }) {
   const T = useT()
   const { language, setLanguage } = useLanguageStore()
   const { dashboardBg, cardStyle, fontStyle, update } = useAppSettings()
@@ -1201,6 +1201,60 @@ function AppSettingsPanel({ onClose }) {
               })}
             </div>
           </SettingsSection>
+
+          {/* Chat layout — only shown when opened from the chat view */}
+          {chatLayoutProps && (
+            <SettingsSection label="Chat layout">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {/* Classic / Widget toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.75)' }}>Widget mode</div>
+                    <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.28)', marginTop: 2 }}>Card-based layout with stats strip</div>
+                  </div>
+                  <motion.button
+                    whileTap={{ scale: 0.93 }}
+                    onClick={chatLayoutProps.onToggle}
+                    style={{
+                      width: 44, height: 24, borderRadius: 99, cursor: 'pointer', padding: 0, position: 'relative',
+                      background: chatLayoutProps.isWidget ? 'rgba(99,102,241,0.65)' : 'rgba(255,255,255,0.12)',
+                      border: chatLayoutProps.isWidget ? '1.5px solid rgba(129,140,248,0.60)' : '1.5px solid rgba(255,255,255,0.18)',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <motion.div
+                      animate={{ x: chatLayoutProps.isWidget ? 20 : 2 }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+                      style={{ position: 'absolute', top: 2, left: 0, width: 18, height: 18, borderRadius: '50%', background: 'white', boxShadow: '0 1px 4px rgba(0,0,0,0.4)' }}
+                    />
+                  </motion.button>
+                </div>
+                {/* Chat theme — only when in widget mode */}
+                {chatLayoutProps.isWidget && (
+                  <div style={{ padding: '11px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.75)', marginBottom: 10 }}>Widget colour</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {Object.entries(CHAT_THEMES).map(([id, t]) => (
+                        <motion.button
+                          key={id}
+                          whileHover={{ scale: 1.18 }} whileTap={{ scale: 0.88 }}
+                          onClick={() => chatLayoutProps.onChatThemeChange(id)}
+                          title={t.label}
+                          style={{
+                            width: 28, height: 28, borderRadius: '50%', cursor: 'pointer', padding: 0,
+                            background: t.swatch,
+                            border: chatLayoutProps.chatTheme === id ? '3px solid rgba(255,255,255,0.95)' : '2px solid rgba(255,255,255,0.15)',
+                            boxShadow: chatLayoutProps.chatTheme === id ? `0 0 14px ${t.swatch}, 0 0 4px rgba(255,255,255,0.3)` : `0 0 6px ${t.swatch}70`,
+                            transition: 'all 0.15s',
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </SettingsSection>
+          )}
 
         </div>
       </motion.div>
@@ -6198,12 +6252,9 @@ If no clear changes: {"changes":[]}`
             }
           </motion.button>
 
-          {/* Center: mission badge or session badges — flex grows to push right side */}
+          {/* Center: mission badge only — session state badges moved to orb area */}
           <div className="chat-session-badges" style={{ flex: 1, display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
-            {isMission && activeMission
-              ? <MissionBadge mission={activeMission} />
-              : (!isEmpty && <SessionBadge sessionState={sessionState} criticism={criticism} />)
-            }
+            {isMission && activeMission && <MissionBadge mission={activeMission} />}
           </div>
 
           {/* Countdown timer */}
@@ -6355,73 +6406,7 @@ If no clear changes: {"changes":[]}`
               </motion.button>
             )}
 
-            {/* Widget layout toggle */}
-            {!isMission && (
-              <WidgetToggle active={isWidget} onToggle={toggleChatLayout} />
-            )}
-            {/* Widget theme palette picker */}
-            {isWidget && (
-              <div style={{ position: 'relative' }}>
-                <motion.button
-                  whileHover={{ scale: 1.06, boxShadow: `0 0 18px ${activeTheme.swatch}80` }}
-                  whileTap={{ scale: 0.94 }}
-                  onClick={() => setShowThemePicker(v => !v)}
-                  title={`Theme: ${activeTheme.label}`}
-                  style={{
-                    height: 30, borderRadius: 99, cursor: 'pointer', padding: '0 12px',
-                    background: showThemePicker
-                      ? `linear-gradient(135deg, ${activeTheme.swatch}55, ${activeTheme.swatch}35)`
-                      : `linear-gradient(135deg, ${activeTheme.swatch}30, ${activeTheme.swatch}18)`,
-                    border: `1.5px solid ${activeTheme.swatch}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                    boxShadow: `0 0 10px ${activeTheme.swatch}45`,
-                    transition: 'all 0.2s',
-                  }}
-                >
-                  <Palette size={12} color={activeTheme.swatch} />
-                  <div style={{ width: 11, height: 11, borderRadius: '50%', background: activeTheme.swatch, boxShadow: `0 0 8px ${activeTheme.swatch}` }} />
-                  <span style={{ fontSize: 11, fontWeight: 600, color: activeTheme.swatch, letterSpacing: '0.01em' }}>{activeTheme.label}</span>
-                </motion.button>
-                {showThemePicker && (
-                  <div onClick={() => setShowThemePicker(false)}
-                    style={{ position: 'fixed', inset: 0, zIndex: 9998 }} />
-                )}
-                {showThemePicker && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -8, scale: 0.90 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -6, scale: 0.92 }}
-                    transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-                    style={{
-                      position: 'fixed', top: 52, right: 56,
-                      background: 'rgba(8,7,20,0.96)',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      borderRadius: 18, padding: '12px 14px',
-                      display: 'flex', gap: 10, alignItems: 'center',
-                      backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
-                      boxShadow: '0 20px 60px rgba(0,0,0,0.70)',
-                      zIndex: 9999,
-                    }}
-                  >
-                    {Object.entries(CHAT_THEMES).map(([id, t]) => (
-                      <motion.button
-                        key={id}
-                        whileHover={{ scale: 1.18 }} whileTap={{ scale: 0.88 }}
-                        onClick={() => applyChatTheme(id)}
-                        title={t.label}
-                        style={{
-                          width: 28, height: 28, borderRadius: '50%', cursor: 'pointer', padding: 0,
-                          background: t.swatch,
-                          border: chatTheme === id ? '3px solid rgba(255,255,255,0.95)' : '2px solid rgba(255,255,255,0.15)',
-                          boxShadow: chatTheme === id ? `0 0 14px ${t.swatch}, 0 0 4px rgba(255,255,255,0.3)` : `0 0 6px ${t.swatch}70`,
-                          transition: 'all 0.15s',
-                        }}
-                      />
-                    ))}
-                  </motion.div>
-                )}
-              </div>
-            )}
+            {/* Widget layout toggle and theme moved to Settings (⚙) → Chat layout section */}
             {/* Appearance gear */}
             <motion.button
               whileHover={{ scale: 1.08, rotate: 45 }} whileTap={{ scale: 0.94 }}
@@ -6773,6 +6758,8 @@ If no clear changes: {"changes":[]}`
                     })}
                   </div>
                 )}
+                {/* Session state badges — moved from header to live under the orb */}
+                <SessionBadge sessionState={sessionState} criticism={criticism} />
               </div>
             )}
 
@@ -7480,7 +7467,7 @@ If no clear changes: {"changes":[]}`
 
       {/* Appearance settings */}
       <AnimatePresence>
-        {chatAppSettingsOpen && <AppSettingsPanel onClose={() => setChatAppSettingsOpen(false)} />}
+        {chatAppSettingsOpen && <AppSettingsPanel onClose={() => setChatAppSettingsOpen(false)} chatLayoutProps={{ isWidget, onToggle: toggleChatLayout, chatTheme, onChatThemeChange: applyChatTheme }} />}
       </AnimatePresence>
 
       {/* Aeva's Orders toast */}
