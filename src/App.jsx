@@ -4932,15 +4932,17 @@ function ChatView({ onBack }) {
 
   // ── Calibration state ─────────────────────────────────────────────────────
   const calibrationStore = useCalibrationStore()
-  const [calibMode, setCalibMode] = useState(false)          // is calibration running?
+  const [calibMode, setCalibMode] = useState(false)          // is calibration running? (UI)
+  const calibModeRef = useRef(false)                         // sync ref — readable inside async fns without stale closure
   const [calibSubject, setCalibSubject] = useState(null)     // e.g. 'maths'
   const [calibSubjectPicker, setCalibSubjectPicker] = useState(false) // show subject picker?
+  const [calibTick, setCalibTick] = useState(0)              // increments each question → forces progress dots to re-render
   const calibStateRef = useRef({
     subject: null,
     currentNode: null,           // skill ID being tested
-    level: 5, step: 2.5,        // binary search state (fallback)
     skillMap: {},                // { [skillId]: 'solid'|'shaky'|'gap'|'untested' }
-    questionCount: 0,
+    nodeCount: 0,                // distinct skill nodes assessed (used for cap — retries don't count)
+    questionsAsked: 0,           // total questions including tier retries (used for display)
     tierAtNode: 1,               // current tier (1-3) being asked at this node
     partialAtNode: false,        // had a partial on this node already
     nodesVisited: [],
@@ -5526,14 +5528,41 @@ You are an examiner right now, not a tutor. Keep it brief and neutral.`
     if (!entryNode) return
     calibStateRef.current = {
       subject, currentNode: entryNode,
-      level: 5, step: 2.5,
-      skillMap: {}, questionCount: 0,
+      skillMap: {}, nodeCount: 0, questionsAsked: 0,
       tierAtNode: 1, partialAtNode: false,
       nodesVisited: [], startTime: Date.now(),
     }
+    calibModeRef.current = true   // set ref synchronously — safe to read inside async fns immediately
     setCalibMode(true)
     setCalibSubject(subject)
     setCalibResult(null)
+    setCalibTick(0)
+  }
+
+  /** Fire the first calibration question directly — no user message needed, avoids the [CALIB_START] hack */
+  const sendCalibFirstQuestion = async (subject) => {
+    const cs = calibStateRef.current
+    if (!cs.currentNode || !calibModeRef.current) return
+    setIsThinking(true)
+    setMessages(prev => [...prev, { role: 'model', text: '', streaming: true }])
+    const prompt = buildCalibPrompt(cs.subject, cs.currentNode, cs.tierAtNode)
+    const controller = new AbortController()
+    abortRef.current = controller
+    let raw = ''
+    try {
+      await streamGroq([], prompt, chunk => {
+        raw += chunk
+        setMessages(prev => {
+          const copy = [...prev]
+          copy[copy.length - 1] = { ...copy[copy.length - 1], text: raw }
+          return copy
+        })
+      }, controller.signal, { model: 'llama-3.3-70b-versatile', maxTokens: 150, temperature: 0.3 })
+    } catch { /* silent */ }
+    finally {
+      setIsThinking(false)
+      setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, streaming: false } : m))
+    }
   }
 
   /** Finish calibration and show result */
@@ -5551,6 +5580,7 @@ You are an examiner right now, not a tutor. Keep it brief and neutral.`
     }
     calibrationStore.saveResult(cs.subject, result)
     setCalibResult({ ...result, subject: cs.subject })
+    calibModeRef.current = false  // clear ref synchronously
     setCalibMode(false)
     setCalibSubject(null)
   }
@@ -5558,11 +5588,17 @@ You are an examiner right now, not a tutor. Keep it brief and neutral.`
   /** Called after each Critic result during calibration */
   const handleCalibCriticResult = (understanding) => {
     const cs = calibStateRef.current
-    cs.questionCount += 1
-    const shouldStop = cs.questionCount >= 8 || !calibStateRef.current.currentNode
-    if (shouldStop) { finishCalibration(); return }
+    const prevNode = cs.currentNode
     const next = calibAdvance(understanding)
-    if (!next) { finishCalibration(); return }
+    const isRetry = next === prevNode  // same node = tier retry, don't count toward cap
+
+    cs.questionsAsked += 1            // always count for display / progress dots
+    if (!isRetry) cs.nodeCount += 1   // only count node advances toward the 12-node cap
+
+    setCalibTick(t => t + 1)          // force progress UI re-render (refs don't trigger it)
+
+    const shouldStop = cs.nodeCount >= 12 || !next
+    if (shouldStop) { finishCalibration(); return }
   }
 
   // ── END CALIBRATION HELPERS ───────────────────────────────────────────────
@@ -5585,10 +5621,9 @@ You are an examiner right now, not a tutor. Keep it brief and neutral.`
       if (subjectMatch) {
         // Subject detected in message — start directly
         setMessages(prev => [...prev, { role: 'user', text: userText }])
-        setMessages(prev => [...prev, { role: 'model', text: `Starting your ${SUBJECT_LABELS[subjectMatch]} diagnostic — ${Object.keys(CALIBRATION_MAP[subjectMatch]).length} skills mapped, up to 8 questions. Adapts to your answers. Let's go.`, streaming: false }])
+        setMessages(prev => [...prev, { role: 'model', text: `Starting your ${SUBJECT_LABELS[subjectMatch]} diagnostic — ${Object.keys(CALIBRATION_MAP[subjectMatch]).length} skills mapped, up to 12 questions. Adapts as you go.`, streaming: false }])
         startCalibration(subjectMatch)
-        // Kick off first question immediately
-        setTimeout(() => sendWithText(`[CALIB_START:${subjectMatch}]`), 300)
+        setTimeout(() => sendCalibFirstQuestion(subjectMatch), 200)
         return
       }
       // No subject — show picker
@@ -5596,11 +5631,6 @@ You are an examiner right now, not a tutor. Keep it brief and neutral.`
       setCalibSubjectPicker(true)
       setMessages(prev => [...prev, { role: 'model', text: `Which subject do you want to calibrate? Pick one below and I'll run the diagnostic.`, streaming: false }])
       return
-    }
-
-    // Internal calibration start signal
-    if (!isMission && userText.startsWith('[CALIB_START:')) {
-      // Handled above — skip normal processing
     }
 
     // Fix 7: Detect session end — generate summary card (min 12 messages = ~6 real exchanges)
@@ -5782,7 +5812,7 @@ You are an examiner right now, not a tutor. Keep it brief and neutral.`
         if (newlyDetected) sessionSubjectRef.current = newlyDetected
         const detectedSubject = sessionSubjectRef.current
         // ── Calibration mode: override system prompt ───────────────────────
-        if (calibMode && calibStateRef.current.currentNode) {
+        if (calibModeRef.current && calibStateRef.current.currentNode) {
           const cs = calibStateRef.current
           systemPrompt = buildCalibPrompt(cs.subject, cs.currentNode, cs.tierAtNode)
           // After critic runs, advance the calibration
@@ -6927,9 +6957,9 @@ If no clear changes: {"changes":[]}`
                               onClick={() => {
                                 setCalibSubjectPicker(false)
                                 startCalibration(subject)
-                                const intro = `Starting your ${SUBJECT_LABELS[subject]} diagnostic — up to 8 questions, adapts as you go. Answer as best you can. Let's go.`
+                                const intro = `Starting your ${SUBJECT_LABELS[subject]} diagnostic — up to 12 questions, adapts as you go. Answer as best you can.`
                                 setMessages(prev => [...prev, { role: 'model', text: intro, streaming: false }])
-                                setTimeout(() => sendWithText(`[CALIB_START:${subject}]`), 300)
+                                setTimeout(() => sendCalibFirstQuestion(subject), 200)
                               }}
                               style={{ padding: '8px 14px', borderRadius: 99, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: 600 }}
                             >
@@ -7145,17 +7175,33 @@ If no clear changes: {"changes":[]}`
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 99, background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(139,143,255,0.30)' }}>
                       <span style={{ fontSize: 12 }}>🎯</span>
                       <span style={{ fontSize: 11, fontWeight: 700, color: '#A5B4FC' }}>
-                        {SUBJECT_LABELS[calibSubject]} Calibration · Q{calibStateRef.current.questionCount + 1}/8
+                        {/* calibTick in expression forces re-render each question */}
+                        {SUBJECT_LABELS[calibSubject]} Calibration · Q{Math.min(calibStateRef.current.questionsAsked + 1, 12)}/12
+                        {calibTick < 0 ? '' /* never false, just reads calibTick */ : ''}
                       </span>
                     </div>
-                    {/* Skill dots */}
+                    {/* Skill dots — 12 total, colour-coded live */}
                     <div style={{ display: 'flex', gap: 5 }}>
-                      {Array.from({ length: 8 }).map((_, i) => {
-                        const done = i < calibStateRef.current.questionCount
+                      {Array.from({ length: 12 }).map((_, i) => {
+                        // calibTick ensures this re-renders after every question
+                        void calibTick
                         const skillId = calibStateRef.current.nodesVisited[i]
                         const status = skillId ? calibStateRef.current.skillMap[skillId] : null
-                        const col = status === 'solid' ? '#4ADE80' : status === 'shaky' ? '#FBBF24' : status === 'gap' ? '#F87171' : done ? '#818CF8' : 'rgba(255,255,255,0.15)'
-                        return <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: col, transition: 'background 0.3s' }} />
+                        const isCurrent = i === calibStateRef.current.nodesVisited.length
+                        const col = status === 'solid' ? '#4ADE80'
+                          : status === 'shaky'  ? '#FBBF24'
+                          : status === 'gap'    ? '#F87171'
+                          : isCurrent           ? 'rgba(165,180,252,0.70)'
+                          : i < (calibStateRef.current.nodesVisited.length) ? '#818CF8'
+                          : 'rgba(255,255,255,0.15)'
+                        return (
+                          <motion.div
+                            key={i}
+                            animate={{ scale: isCurrent ? [1, 1.3, 1] : 1 }}
+                            transition={{ duration: 0.6, repeat: isCurrent ? Infinity : 0 }}
+                            style={{ width: 8, height: 8, borderRadius: '50%', background: col, transition: 'background 0.3s' }}
+                          />
+                        )
                       })}
                     </div>
                   </div>
@@ -7306,12 +7352,13 @@ If no clear changes: {"changes":[]}`
                     onStartTopic={(topicId, subject) => {
                       setCalibResult(null)
                       const node = CALIBRATION_MAP[subject]?.[topicId]
-                      if (node) sendWithText(`Let's start learning: ${node.label}`)
+                      if (node) sendWithText(`Let's start: ${node.label}`)
                     }}
                     onRecalibrate={() => {
+                      const subj = calibResult.subject
                       setCalibResult(null)
-                      startCalibration(calibResult.subject)
-                      setTimeout(() => sendWithText(`[CALIB_START:${calibResult.subject}]`), 100)
+                      startCalibration(subj)
+                      setTimeout(() => sendCalibFirstQuestion(subj), 200)
                     }}
                     onAnotherSubject={() => {
                       setCalibResult(null)
