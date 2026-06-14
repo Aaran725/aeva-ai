@@ -5192,6 +5192,25 @@ function ChatView({ onBack }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMission])
 
+  // Reset orphaned calibration state when chat is cleared/new session starts
+  // Prevents stale calibMode=true from blocking the CALIB_TRIGGER on the next send
+  useEffect(() => {
+    if (messages.length === 0 && calibModeRef.current) {
+      calibModeRef.current = false
+      calibFastLaneRef.current = { active: false, bracketIdx: 0 }
+      calibStateRef.current = {
+        subject: null, currentNode: null,
+        skillMap: {}, nodeCount: 0, questionsAsked: 0,
+        tierAtNode: 1, partialAtNode: false,
+        nodesVisited: [], startTime: null,
+      }
+      setCalibMode(false)
+      setCalibSubject(null)
+      setCalibTick(0)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length])
+
   useEffect(() => {
     const el = messagesScrollRef.current
     if (!el) { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); return }
