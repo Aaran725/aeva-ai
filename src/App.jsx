@@ -6548,7 +6548,7 @@ If no clear changes: {"changes":[]}`
             </motion.div>
           )}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, overflow: 'hidden', maxWidth: isMobile ? '60%' : 'none' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, overflow: 'visible', maxWidth: isMobile ? '60%' : 'none' }}>
             {/* Live adaptation pill (tutor mode) */}
             {!isMission && (() => {
               const DIMS = ['analogical', 'visual', 'structural', 'exampleFirst', 'conceptual']
@@ -6621,14 +6621,14 @@ If no clear changes: {"changes":[]}`
                       exit={{ opacity: 0, y: -4, scale: 0.94 }}
                       transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
                       style={{
-                        position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                        position: 'fixed', top: 52, right: 54,
                         zIndex: 9997,
                         background: 'rgba(8,9,24,0.97)',
                         border: '1px solid rgba(255,255,255,0.11)',
                         borderRadius: 16, padding: 6,
                         backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
                         boxShadow: '0 16px 48px rgba(0,0,0,0.65)',
-                        minWidth: 210,
+                        minWidth: 220,
                         fontFamily: "'Inter', system-ui, sans-serif",
                       }}
                     >
@@ -6693,6 +6693,26 @@ If no clear changes: {"changes":[]}`
                         <div style={{ flex: 1, textAlign: 'left' }}>
                           <div style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.80)' }}>Feynman</div>
                           <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.28)', marginTop: 1 }}>Teach it back to lock it in</div>
+                        </div>
+                      </button>
+
+                      <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '4px 8px' }} />
+
+                      {/* Calibrate */}
+                      <button
+                        onClick={() => { setCalibSubjectPicker(true); setToolsMenuOpen(false) }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 10, cursor: 'pointer', border: 'none', background: 'transparent', transition: 'background 0.15s' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.10)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                      >
+                        <span style={{ fontSize: 13 }}>🎯</span>
+                        <div style={{ flex: 1, textAlign: 'left' }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(165,180,252,0.85)' }}>
+                            {calibrationStore.hasAnyCalibration() ? 'Re-calibrate' : 'Calibrate my level'}
+                          </div>
+                          <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.28)', marginTop: 1 }}>
+                            {calibrationStore.hasAnyCalibration() ? 'Run the diagnostic again on a subject' : 'Find your level across any subject'}
+                          </div>
                         </div>
                       </button>
                     </motion.div>
@@ -6939,38 +6959,6 @@ If no clear changes: {"changes":[]}`
                       </motion.button>
                     </motion.div>
                   )}
-
-                  {/* ── Subject picker (shown after trigger or Calibrate button) ── */}
-                  <AnimatePresence>
-                    {calibSubjectPicker && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 8, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.97 }}
-                        transition={{ duration: 0.2 }}
-                        style={{ width: '100%', maxWidth: 420, padding: '14px 16px', borderRadius: 16, background: 'rgba(8,10,28,0.97)', border: '1px solid rgba(139,143,255,0.22)', boxShadow: '0 8px 32px rgba(0,0,0,0.55)' }}
-                      >
-                        <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginBottom: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Pick a subject</div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                          {Object.keys(CALIBRATION_MAP).map(subject => (
-                            <motion.button
-                              key={subject}
-                              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                              onClick={() => {
-                                setCalibSubjectPicker(false)
-                                startCalibration(subject)
-                                const intro = `Starting your ${SUBJECT_LABELS[subject]} diagnostic — up to 12 questions, adapts as you go. Answer as best you can.`
-                                setMessages(prev => [...prev, { role: 'model', text: intro, streaming: false }])
-                                setTimeout(() => sendCalibFirstQuestion(subject), 200)
-                              }}
-                              style={{ padding: '8px 14px', borderRadius: 99, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: 600 }}
-                            >
-                              {SUBJECT_ICONS[subject]} {SUBJECT_LABELS[subject]}
-                            </motion.button>
-                          ))}
-                        </div>
-                        <button onClick={() => setCalibSubjectPicker(false)} style={{ marginTop: 10, background: 'none', border: 'none', color: 'rgba(255,255,255,0.28)', fontSize: 11, cursor: 'pointer' }}>Cancel</button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
 
                   {/* Suggestion chips — customisable */}
                   <motion.div
@@ -7969,6 +7957,81 @@ If no clear changes: {"changes":[]}`
       {/* Appearance settings */}
       <AnimatePresence>
         {chatAppSettingsOpen && <AppSettingsPanel onClose={() => setChatAppSettingsOpen(false)} chatLayoutProps={{ isWidget, onToggle: toggleChatLayout, chatTheme, onChatThemeChange: applyChatTheme }} />}
+      </AnimatePresence>
+
+      {/* ── Calibration subject picker — fixed overlay, works empty OR mid-chat ── */}
+      <AnimatePresence>
+        {calibSubjectPicker && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setCalibSubjectPicker(false)}
+              style={{ position: 'fixed', inset: 0, zIndex: 9990, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+            />
+            {/* Picker card */}
+            <motion.div
+              initial={{ opacity: 0, y: 16, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+              style={{
+                position: 'fixed', top: '50%', left: '50%',
+                transform: 'translate(-50%, -50%)',
+                zIndex: 9991,
+                width: '90%', maxWidth: 440,
+                padding: '22px 20px',
+                borderRadius: 20,
+                background: 'rgba(8,10,28,0.99)',
+                border: '1px solid rgba(139,143,255,0.25)',
+                boxShadow: '0 24px 80px rgba(0,0,0,0.70)',
+                fontFamily: "'Inter', system-ui, sans-serif",
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.02em' }}>
+                    🎯 {calibrationStore.hasAnyCalibration() ? 'Calibrate another subject' : 'Calibrate your level'}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 3 }}>Up to 12 questions · adapts to your answers</div>
+                </div>
+                <motion.button whileTap={{ scale: 0.9 }} onClick={() => setCalibSubjectPicker(false)}
+                  style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.45)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <X size={12} />
+                </motion.button>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {Object.keys(CALIBRATION_MAP).map(subject => {
+                  const already = !!calibrationStore.results[subject]
+                  return (
+                    <motion.button
+                      key={subject}
+                      whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        setCalibSubjectPicker(false)
+                        startCalibration(subject)
+                        const intro = `Starting your ${SUBJECT_LABELS[subject]} diagnostic — up to 12 questions, adapts as you go.`
+                        setMessages(prev => [...prev, { role: 'model', text: intro, streaming: false }])
+                        setTimeout(() => sendCalibFirstQuestion(subject), 200)
+                      }}
+                      style={{
+                        padding: '9px 15px', borderRadius: 99, cursor: 'pointer',
+                        border: already ? '1px solid rgba(139,143,255,0.35)' : '1px solid rgba(255,255,255,0.12)',
+                        background: already ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.06)',
+                        color: already ? 'rgba(165,180,252,0.90)' : 'rgba(255,255,255,0.75)',
+                        fontSize: 13, fontWeight: 600,
+                        display: 'flex', alignItems: 'center', gap: 6,
+                      }}
+                    >
+                      {SUBJECT_ICONS[subject]} {SUBJECT_LABELS[subject]}
+                      {already && <span style={{ fontSize: 10, opacity: 0.6 }}>↺</span>}
+                    </motion.button>
+                  )
+                })}
+              </div>
+            </motion.div>
+          </>
+        )}
       </AnimatePresence>
 
       {/* Aeva's Orders toast */}
