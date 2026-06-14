@@ -6,7 +6,7 @@ import 'katex/dist/katex.min.css'
 import 'mafs/core.css'
 import { Mafs, Coordinates, Plot } from 'mafs'
 import { compile as mathCompile } from 'mathjs'
-import { ArrowUp, ArrowRight, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, ChevronRight, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Users, FileText, Palette, Home, Map, Clock, Trash2, Calendar, ScanSearch } from 'lucide-react'
+import { ArrowUp, ArrowRight, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, ChevronRight, ChevronDown, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Users, FileText, Palette, Home, Map, Clock, Trash2, Calendar, ScanSearch } from 'lucide-react'
 import { useAppSettings, SECTION_BG_PRESETS, CARD_STYLES, FONT_STYLES } from './appSettings'
 import { useLanguageStore } from './languageStore'
 import { useT } from './translations'
@@ -4911,6 +4911,7 @@ function ChatView({ onBack }) {
   const [socraticActive, setSocraticActive] = useState(false)
   const socraticExchangeRef = useRef(0)
   const [feynmanOpen, setFeynmanOpen] = useState(false)
+  const [toolsMenuOpen, setToolsMenuOpen] = useState(false)
   const [chatAppSettingsOpen, setChatAppSettingsOpen] = useState(false)
   const [chatSettings, saveChatSettings] = useChatSettings()
   const [chipEditMode, setChipEditMode] = useState(false)
@@ -6324,69 +6325,130 @@ If no clear changes: {"changes":[]}`
               )
             })()}
 
+            {/* ── Tools pill — consolidates Socratic, Library, Study Guide, Feynman ── */}
             {!isMission && (
-              <>
-                {/* Socratic mode toggle */}
+              <div style={{ position: 'relative' }}>
+                {/* Backdrop: click outside to close */}
+                {toolsMenuOpen && (
+                  <div onClick={() => setToolsMenuOpen(false)}
+                    style={{ position: 'fixed', inset: 0, zIndex: 9996 }} />
+                )}
+
+                {/* The pill */}
                 <motion.button
                   whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-                  onClick={toggleSocratic}
-                  animate={socraticActive ? { boxShadow: ['0 0 0px rgba(167,139,250,0)', '0 0 12px rgba(167,139,250,0.55)', '0 0 0px rgba(167,139,250,0)'] } : {}}
+                  onClick={() => setToolsMenuOpen(v => !v)}
+                  animate={socraticActive ? { boxShadow: ['0 0 0px rgba(167,139,250,0)', '0 0 12px rgba(167,139,250,0.45)', '0 0 0px rgba(167,139,250,0)'] } : {}}
                   transition={{ boxShadow: { duration: 2.2, repeat: Infinity } }}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 6,
                     padding: '5px 11px', borderRadius: 99, cursor: 'pointer',
-                    background: socraticActive ? 'rgba(167,139,250,0.18)' : isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.07)',
-                    border: `1.5px solid ${socraticActive ? 'rgba(167,139,250,0.50)' : isLight ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.14)'}`,
-                    color: socraticActive ? '#C4B5FD' : isLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.50)',
+                    background: socraticActive
+                      ? 'rgba(167,139,250,0.18)'
+                      : toolsMenuOpen
+                        ? (isLight ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.12)')
+                        : (isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.07)'),
+                    border: `1.5px solid ${socraticActive ? 'rgba(167,139,250,0.50)' : isLight ? 'rgba(0,0,0,0.14)' : 'rgba(255,255,255,0.16)'}`,
+                    color: socraticActive ? '#C4B5FD' : isLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.55)',
                     fontSize: 11, fontWeight: 700, fontFamily: "'Inter', system-ui, sans-serif",
                   }}
                 >
-                  <Brain size={11} />
-                  Socratic
+                  {socraticActive ? <Brain size={11} /> : <Layers size={11} />}
+                  {socraticActive ? 'Socratic' : 'Tools'}
+                  <ChevronDown size={10} style={{
+                    opacity: 0.55,
+                    transform: toolsMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.18s ease',
+                  }} />
                 </motion.button>
 
-                {/* Library — hidden on mobile */}
-                {!isMobile && <motion.button className="chat-btn-library"
-                  whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-                  onClick={() => setLibraryOpen(true)}
-                  style={{
-                    padding: '5px 11px', borderRadius: 99, cursor: 'pointer',
-                    background: isLight ? 'rgba(139,92,246,0.08)' : 'rgba(167,139,250,0.10)', border: isLight ? '1px solid rgba(139,92,246,0.22)' : '1px solid rgba(167,139,250,0.24)',
-                    color: isLight ? 'rgba(109,40,217,0.80)' : 'rgba(167,139,250,0.80)', fontSize: 11, fontWeight: 600,
-                    fontFamily: "'Inter', system-ui, sans-serif", display: 'flex', alignItems: 'center', gap: 5,
-                  }}
-                >
-                  <BookOpen size={11} /> {T.library}
-                </motion.button>}
+                {/* Dropdown */}
+                <AnimatePresence>
+                  {toolsMenuOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -6, scale: 0.94 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -4, scale: 0.94 }}
+                      transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                      style={{
+                        position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                        zIndex: 9997,
+                        background: 'rgba(8,9,24,0.97)',
+                        border: '1px solid rgba(255,255,255,0.11)',
+                        borderRadius: 16, padding: 6,
+                        backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
+                        boxShadow: '0 16px 48px rgba(0,0,0,0.65)',
+                        minWidth: 210,
+                        fontFamily: "'Inter', system-ui, sans-serif",
+                      }}
+                    >
+                      {/* Socratic */}
+                      <button
+                        onClick={() => { toggleSocratic(); setToolsMenuOpen(false) }}
+                        style={{
+                          width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '9px 10px', borderRadius: 10, cursor: 'pointer', border: 'none',
+                          background: socraticActive ? 'rgba(167,139,250,0.14)' : 'transparent',
+                          transition: 'background 0.15s',
+                        }}
+                        onMouseEnter={e => { if (!socraticActive) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+                        onMouseLeave={e => { if (!socraticActive) e.currentTarget.style.background = 'transparent' }}
+                      >
+                        <Brain size={13} color={socraticActive ? '#C4B5FD' : 'rgba(255,255,255,0.40)'} />
+                        <div style={{ flex: 1, textAlign: 'left' }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 700, color: socraticActive ? '#C4B5FD' : 'rgba(255,255,255,0.80)' }}>Socratic</div>
+                          <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.28)', marginTop: 1 }}>Questions only — no direct answers</div>
+                        </div>
+                        {socraticActive && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#C4B5FD', flexShrink: 0 }} />}
+                      </button>
 
-                {/* Study Guide — hidden on mobile */}
-                {!isMobile && <motion.button className="chat-btn-studyguide"
-                  onClick={() => setStudyGuideOpen(true)}
-                  style={{
-                    padding: '5px 12px', borderRadius: 99, cursor: 'pointer',
-                    background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.08)', border: isLight ? '1px solid rgba(0,0,0,0.12)' : '1px solid rgba(255,255,255,0.15)',
-                    color: isLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: 600,
-                    fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: '0.04em',
-                  }}
-                >
-                  {T.studyGuide}
-                </motion.button>}
+                      <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '4px 8px' }} />
 
-                {/* Feynman — hidden on mobile */}
-                {!isMobile && <motion.button
-                  whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-                  onClick={() => setFeynmanOpen(true)}
-                  style={{
-                    padding: '5px 12px', borderRadius: 99, cursor: 'pointer',
-                    background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.28)',
-                    color: 'rgba(245,158,11,0.85)', fontSize: 11, fontWeight: 700,
-                    fontFamily: "'Inter', system-ui, sans-serif",
-                    display: 'flex', alignItems: 'center', gap: 5,
-                  }}
-                >
-                  {T.feynmanMode}
-                </motion.button>}
-              </>
+                      {/* Library */}
+                      <button
+                        onClick={() => { setLibraryOpen(true); setToolsMenuOpen(false) }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 10, cursor: 'pointer', border: 'none', background: 'transparent', transition: 'background 0.15s' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                      >
+                        <BookOpen size={13} color="rgba(167,139,250,0.60)" />
+                        <div style={{ flex: 1, textAlign: 'left' }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.80)' }}>Library</div>
+                          <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.28)', marginTop: 1 }}>Your saved sessions & notes</div>
+                        </div>
+                      </button>
+
+                      {/* Study Guide */}
+                      <button
+                        onClick={() => { setStudyGuideOpen(true); setToolsMenuOpen(false) }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 10, cursor: 'pointer', border: 'none', background: 'transparent', transition: 'background 0.15s' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                      >
+                        <FileText size={13} color="rgba(255,255,255,0.38)" />
+                        <div style={{ flex: 1, textAlign: 'left' }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.80)' }}>Study Guide</div>
+                          <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.28)', marginTop: 1 }}>Summarise this session</div>
+                        </div>
+                      </button>
+
+                      {/* Feynman */}
+                      <button
+                        onClick={() => { setFeynmanOpen(true); setToolsMenuOpen(false) }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 10, cursor: 'pointer', border: 'none', background: 'transparent', transition: 'background 0.15s' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                      >
+                        <Zap size={13} color="rgba(245,158,11,0.65)" />
+                        <div style={{ flex: 1, textAlign: 'left' }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.80)' }}>Feynman</div>
+                          <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.28)', marginTop: 1 }}>Teach it back to lock it in</div>
+                        </div>
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             )}
             {/* History button */}
             {!isMission && (
