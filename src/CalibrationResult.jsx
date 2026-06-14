@@ -1,6 +1,7 @@
 /**
  * CalibrationResult.jsx
  * Inline result card rendered in chat after calibration convergence.
+ * Phase 6: visual grade ladder replaces flat pill list at the top.
  */
 import { motion } from 'framer-motion'
 import { SUBJECT_LABELS, SUBJECT_ICONS, CALIBRATION_MAP } from './calibrationMap'
@@ -10,6 +11,139 @@ const STATUS_CONFIG = {
   shaky:   { icon: '⚠️',  label: 'Shaky',   color: '#FBBF24', bg: 'rgba(251,191,36,0.10)',  border: 'rgba(251,191,36,0.22)' },
   gap:     { icon: '❌', label: 'Gap',      color: '#F87171', bg: 'rgba(248,113,113,0.10)', border: 'rgba(248,113,113,0.22)' },
   untested:{ icon: '⬜', label: 'Untested', color: 'rgba(255,255,255,0.30)', bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.08)' },
+}
+
+// Grade ladder segments — ordered from lowest to highest
+const LADDER_SEGMENTS = [
+  { label: 'Grade 1–2',      short: 'Gr 1–2', minOrder: -99, maxOrder: -4, color: '#60A5FA', bg: 'rgba(96,165,250,0.18)' },
+  { label: 'Grade 3–4',      short: 'Gr 3–4', minOrder: -4,  maxOrder: -2, color: '#34D399', bg: 'rgba(52,211,153,0.18)' },
+  { label: 'Grade 5–8',      short: 'Gr 5–8', minOrder: -2,  maxOrder: 1,  color: '#A78BFA', bg: 'rgba(167,139,250,0.18)' },
+  { label: 'Foundation',     short: 'Fdn',    minOrder: 1,   maxOrder: 4,  color: '#F59E0B', bg: 'rgba(245,158,11,0.18)' },
+  { label: 'GCSE Foundation',short: 'GCSE F', minOrder: 4,   maxOrder: 6,  color: '#FB923C', bg: 'rgba(251,146,60,0.18)' },
+  { label: 'GCSE Higher',    short: 'GCSE H', minOrder: 6,   maxOrder: 8,  color: '#EF4444', bg: 'rgba(239,68,68,0.18)' },
+  { label: 'A-Level',        short: 'A-Lvl',  minOrder: 8,   maxOrder: 99, color: '#8B5CF6', bg: 'rgba(139,92,246,0.18)' },
+]
+
+function getSegmentForOrder(order) {
+  return LADDER_SEGMENTS.find(s => order >= s.minOrder && order < s.maxOrder) || LADDER_SEGMENTS[0]
+}
+
+function GradeLadder({ skillMap, subjectMap }) {
+  if (!skillMap || Object.keys(skillMap).length === 0) return null
+
+  // Find highest solid/shaky bandOrder (student's level)
+  const solidShaky = Object.entries(skillMap)
+    .filter(([, v]) => v === 'solid' || v === 'shaky')
+    .map(([id]) => subjectMap[id]?.bandOrder ?? -99)
+  const maxSolidOrder = solidShaky.length > 0 ? Math.max(...solidShaky) : -99
+
+  // Find lowest gap bandOrder
+  const gaps = Object.entries(skillMap)
+    .filter(([, v]) => v === 'gap')
+    .map(([id]) => subjectMap[id]?.bandOrder ?? -99)
+  const minGapOrder = gaps.length > 0 ? Math.min(...gaps) : null
+
+  // Current segment
+  const currentSegment = getSegmentForOrder(maxSolidOrder)
+  const currentSegIdx = LADDER_SEGMENTS.indexOf(currentSegment)
+
+  return (
+    <div style={{ marginBottom: 18 }}>
+      {/* Section label */}
+      <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 10 }}>
+        YOUR LEVEL
+      </div>
+
+      {/* Ladder bar */}
+      <div style={{ display: 'flex', gap: 3, alignItems: 'stretch', height: 36, borderRadius: 12, overflow: 'hidden' }}>
+        {LADDER_SEGMENTS.map((seg, idx) => {
+          const isCurrent = idx === currentSegIdx
+          const isPast    = idx < currentSegIdx
+          const isFuture  = idx > currentSegIdx
+
+          return (
+            <motion.div
+              key={seg.label}
+              initial={{ opacity: 0, scaleY: 0.6 }}
+              animate={{ opacity: 1, scaleY: 1 }}
+              transition={{ delay: idx * 0.06, type: 'spring', stiffness: 280, damping: 24 }}
+              style={{
+                flex: isCurrent ? 1.6 : 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: idx === 0 ? '10px 0 0 10px' : idx === LADDER_SEGMENTS.length - 1 ? '0 10px 10px 0' : 4,
+                background: isCurrent ? seg.bg
+                  : isPast ? 'rgba(74,222,128,0.12)'
+                  : 'rgba(255,255,255,0.04)',
+                border: isCurrent ? `1.5px solid ${seg.color}` : isPast ? '1.5px solid rgba(74,222,128,0.25)' : '1.5px solid rgba(255,255,255,0.06)',
+                position: 'relative',
+                transition: 'flex 0.4s ease',
+                cursor: 'default',
+              }}
+              title={seg.label}
+            >
+              {isCurrent && (
+                <motion.div
+                  animate={{ opacity: [0.5, 1, 0.5] }}
+                  transition={{ duration: 1.8, repeat: Infinity }}
+                  style={{
+                    position: 'absolute', top: -1, left: '50%', transform: 'translateX(-50%)',
+                    width: 6, height: 6, borderRadius: '50%', background: seg.color,
+                    boxShadow: `0 0 8px ${seg.color}`,
+                  }}
+                />
+              )}
+              <span style={{
+                fontSize: isCurrent ? 10 : 9,
+                fontWeight: isCurrent ? 800 : 500,
+                color: isCurrent ? seg.color : isPast ? 'rgba(74,222,128,0.60)' : 'rgba(255,255,255,0.18)',
+                letterSpacing: '0.02em',
+                userSelect: 'none',
+              }}>
+                {isCurrent ? seg.label : seg.short}
+              </span>
+            </motion.div>
+          )
+        })}
+      </div>
+
+      {/* Pointer label below current segment */}
+      <div style={{ display: 'flex', marginTop: 8, paddingLeft: `${(currentSegIdx / LADDER_SEGMENTS.length) * 100}%` }}>
+        <div style={{
+          fontSize: 10, fontWeight: 700, color: currentSegment.color,
+          display: 'flex', alignItems: 'center', gap: 4,
+        }}>
+          <span style={{ fontSize: 12 }}>▲</span>
+          You are here
+          {minGapOrder !== null && (
+            <span style={{ color: 'rgba(255,255,255,0.30)', fontWeight: 500 }}>
+              {' '}· gap at {getSegmentForOrder(minGapOrder).label}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
+        {[
+          { key: 'solid',    label: 'Solid',    color: '#4ADE80' },
+          { key: 'shaky',   label: 'Shaky',    color: '#FBBF24' },
+          { key: 'gap',     label: 'Gaps',     color: '#F87171' },
+          { key: 'untested',label: 'Untested', color: 'rgba(255,255,255,0.30)' },
+        ].map(({ key, label, color }) => {
+          const count = Object.values(skillMap).filter(v => v === key).length
+          if (count === 0) return null
+          return (
+            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0 }} />
+              <span style={{ fontSize: 10.5, fontWeight: 600, color: 'rgba(255,255,255,0.45)' }}>
+                <span style={{ color, fontWeight: 800 }}>{count}</span> {label}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 export default function CalibrationResult({ result, subject, onStartTopic, onRecalibrate, onAnotherSubject }) {
@@ -70,10 +204,18 @@ export default function CalibrationResult({ result, subject, onStartTopic, onRec
         </div>
       </div>
 
-      {/* Skill map */}
+      {/* Grade ladder + skill map */}
       <div style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+        {/* Visual grade ladder */}
+        <GradeLadder skillMap={result.skillMap} subjectMap={subjectMap} />
+
+        {/* Divider */}
+        <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '2px 0' }} />
+
+        {/* Skill map pills grouped by status */}
         <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.10em', textTransform: 'uppercase' }}>
-          YOUR SKILL MAP
+          SKILL BREAKDOWN
         </div>
 
         {[
