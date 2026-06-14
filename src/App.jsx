@@ -161,6 +161,53 @@ const MODE_CONFIG = {
 /* ─── Step A: The Critic ─── */
 const CRITIC_FALLBACK = { understanding: 'partial', lazy_thinking: false, mode: 'coach', topic: 'general', confidence: 'uncertain', note: '' }
 
+/** Calibration-specific critic — uses 70b for accurate math verification.
+ *  Unlike the general Critic, this only cares about mathematical correctness,
+ *  not depth of working shown. Brief correct answers still get "solid". */
+async function runCalibCritic(questionText, userAnswer) {
+  try {
+    const res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a math answer verifier for a diagnostic placement test. Your ONLY job is to check if the student's answer is mathematically correct.
+
+Return ONLY valid JSON — no markdown, no explanation:
+{"understanding":"none"|"partial"|"solid","correct":true|false,"note":"<one sentence>"}
+
+Rules:
+- "solid" = the answer is mathematically correct (even if no working is shown — brief correct answers count as solid)
+- "partial" = the approach is right but there's a computational error or the answer is incomplete
+- "none" = the answer is wrong, blank, "I don't know", or completely off-track
+- Do NOT penalise for missing working. A student who writes just "x = 5" when x = 5 is correct gets "solid".
+- Do NOT be strict about notation — "x=5", "5", "x = 5" are all equivalent correct answers.
+- If the student says "skip", "idk", "don't know", "pass" → "none".
+- Compute the correct answer yourself first, then compare.`,
+          },
+          {
+            role: 'user',
+            content: `Question: ${questionText}\n\nStudent's answer: ${userAnswer}`,
+          },
+        ],
+        temperature: 0.1,
+        max_tokens: 120,
+        response_format: { type: 'json_object' },
+      }),
+    })
+    if (!res.ok) return { understanding: 'partial', correct: false, note: '' }
+    const json = await res.json()
+    const parsed = JSON.parse(json.choices?.[0]?.message?.content || '{}')
+    const understanding = ['none', 'partial', 'solid'].includes(parsed.understanding) ? parsed.understanding : 'partial'
+    return { understanding, correct: !!parsed.correct, note: parsed.note || '' }
+  } catch {
+    return { understanding: 'partial', correct: false, note: '' }
+  }
+}
+
 async function runCritic(history, userMessage) {
   try {
     const context = history.slice(-4).map(m => ({
@@ -5883,6 +5930,23 @@ Rules:
           ? `\n\nWORLD MEMORY: ${JSON.stringify(worldMemory)}`
           : ''
         systemPrompt = activeMission.systemPrompt + memoryStr + buildMemoryBlock(name)
+      } else if (calibModeRef.current && calibStateRef.current.currentNode) {
+        // ── Calibration mode: use dedicated math verifier (70b) ──────────────
+        // Finds the pre-written question text for the current node+tier so the
+        // verifier can check correctness, not just reasoning depth.
+        const cs = calibStateRef.current
+        const node = CALIBRATION_MAP[cs.subject]?.[cs.currentNode]
+        const q = node?.questions?.find(q => q.tier === cs.tierAtNode) || node?.questions?.[0]
+        const questionText = q?.q || node?.label || 'the previous question'
+        const calibCriticResult = await runCalibCritic(questionText, userText)
+        criticResult = {
+          understanding: calibCriticResult.understanding,
+          mode: calibCriticResult.understanding === 'solid' ? 'hype' : calibCriticResult.understanding === 'partial' ? 'coach' : 'redirect',
+          topic: node?.label || 'maths',
+          lazy_thinking: false,
+          confidence: 'confident',
+          note: calibCriticResult.note,
+        }
       } else {
         // Standard tutor mode
         // Gate: skip critic for casual/short messages — saves ~40% of API calls
