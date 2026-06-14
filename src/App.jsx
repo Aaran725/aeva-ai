@@ -6843,6 +6843,52 @@ If no clear changes: {"changes":[]}`
                       </motion.div>
                     )}
                   </div>
+                  {/* ── Calibrated subject pills (empty state, already calibrated) ── */}
+                  {calibrationStore.hasAnyCalibration() && !calibMode && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.15, duration: 0.35 }}
+                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, marginBottom: 8, width: '100%', maxWidth: 480 }}
+                    >
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.10em', textTransform: 'uppercase' }}>Pick up where you left off</div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                        {Object.entries(calibrationStore.results).map(([subject, result]) => {
+                          const icon = SUBJECT_ICONS[subject] || '📚'
+                          const label = SUBJECT_LABELS[subject] || subject
+                          const nextNode = result.nextTopic ? CALIBRATION_MAP[subject]?.[result.nextTopic] : null
+                          return (
+                            <motion.button
+                              key={subject}
+                              whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.96 }}
+                              onClick={() => nextNode && sendWithText(`Let's start: ${nextNode.label}`)}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 7,
+                                padding: '9px 16px', borderRadius: 99, cursor: 'pointer',
+                                background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(139,143,255,0.28)',
+                                color: 'rgba(165,180,252,0.90)', fontSize: 13, fontWeight: 600,
+                                fontFamily: "'Inter', system-ui, sans-serif",
+                              }}
+                            >
+                              <span>{icon}</span>
+                              <div style={{ textAlign: 'left' }}>
+                                <div style={{ fontSize: 12, fontWeight: 700 }}>{label}</div>
+                                {nextNode && <div style={{ fontSize: 10, color: 'rgba(165,180,252,0.50)', marginTop: 1 }}>Next: {nextNode.label}</div>}
+                              </div>
+                              {nextNode && <span style={{ fontSize: 11, opacity: 0.5 }}>→</span>}
+                            </motion.button>
+                          )
+                        })}
+                        <motion.button
+                          whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.96 }}
+                          onClick={() => setCalibSubjectPicker(true)}
+                          style={{ padding: '9px 14px', borderRadius: 99, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: 600 }}
+                        >
+                          + Add subject
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                  )}
+
                   {/* ── Calibrate CTA (empty state, no calibration data yet) ── */}
                   {!calibrationStore.hasAnyCalibration() && !calibMode && (
                     <motion.div
@@ -7116,6 +7162,35 @@ If no clear changes: {"changes":[]}`
                 ) : (
                   /* Session state badges — moved from header to live under the orb */
                   <SessionBadge sessionState={sessionState} criticism={criticism} />
+                )}
+
+                {/* Post-calibration subject pills */}
+                {!calibMode && calibrationStore.hasAnyCalibration() && (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', padding: '0 16px' }}>
+                    {Object.entries(calibrationStore.results).map(([subject, result]) => {
+                      const icon = SUBJECT_ICONS[subject] || '📚'
+                      const label = SUBJECT_LABELS[subject] || subject
+                      const nextNode = result.nextTopic ? CALIBRATION_MAP[subject]?.[result.nextTopic] : null
+                      return (
+                        <motion.button
+                          key={subject}
+                          whileHover={{ scale: 1.05, y: -1 }} whileTap={{ scale: 0.96 }}
+                          onClick={() => nextNode && sendWithText(`Let's start: ${nextNode.label}`)}
+                          title={nextNode ? `Start: ${nextNode.label}` : label}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 5,
+                            padding: '4px 11px', borderRadius: 99, cursor: nextNode ? 'pointer' : 'default',
+                            background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(139,143,255,0.22)',
+                            fontSize: 11, fontWeight: 600, color: 'rgba(165,180,252,0.85)',
+                          }}
+                        >
+                          <span>{icon}</span>
+                          <span>{label}</span>
+                          {nextNode && <span style={{ color: 'rgba(165,180,252,0.50)', fontSize: 10 }}>· {nextNode.label} →</span>}
+                        </motion.button>
+                      )
+                    })}
+                  </div>
                 )}
               </div>
             )}
