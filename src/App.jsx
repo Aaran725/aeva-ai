@@ -58,6 +58,9 @@ const SharedRoadmapView  = lazy(() => import('./SharedRoadmapView'))
 const YourUI             = lazy(() => import('./YourUI'))
 const RevisionCalendar   = lazy(() => import('./RevisionCalendar'))
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
+import { useCalibrationStore } from './calibrationStore'
+import { CALIBRATION_MAP, ENTRY_NODES, SUBJECT_LABELS, SUBJECT_ICONS } from './calibrationMap'
+import CalibrationResult from './CalibrationResult'
 import { useEchoStore } from './echoStore'
 import { useMemoryStore } from './memoryStore'
 import { useUITheme, applyCSS, useIsHidden } from './uiThemeStore'
@@ -4926,6 +4929,24 @@ function ChatView({ onBack }) {
   const socraticExchangeRef = useRef(0)
   const [feynmanOpen, setFeynmanOpen] = useState(false)
   const [toolsMenuOpen, setToolsMenuOpen] = useState(false)
+
+  // ── Calibration state ─────────────────────────────────────────────────────
+  const calibrationStore = useCalibrationStore()
+  const [calibMode, setCalibMode] = useState(false)          // is calibration running?
+  const [calibSubject, setCalibSubject] = useState(null)     // e.g. 'maths'
+  const [calibSubjectPicker, setCalibSubjectPicker] = useState(false) // show subject picker?
+  const calibStateRef = useRef({
+    subject: null,
+    currentNode: null,           // skill ID being tested
+    level: 5, step: 2.5,        // binary search state (fallback)
+    skillMap: {},                // { [skillId]: 'solid'|'shaky'|'gap'|'untested' }
+    questionCount: 0,
+    tierAtNode: 1,               // current tier (1-3) being asked at this node
+    partialAtNode: false,        // had a partial on this node already
+    nodesVisited: [],
+    startTime: null,
+  })
+  const [calibResult, setCalibResult] = useState(null)       // final result object
   const [chatAppSettingsOpen, setChatAppSettingsOpen] = useState(false)
   const [chatSettings, saveChatSettings] = useChatSettings()
   const [chipEditMode, setChipEditMode] = useState(false)
@@ -5396,6 +5417,156 @@ RULES:
     }
   }
 
+  // ── CALIBRATION HELPERS ───────────────────────────────────────────────────
+
+  const CALIB_TRIGGER = /\b(calibrat|diagnos|where am i|what level|test my level|placement test|skill check|what should i (learn|study))\b/i
+
+  /** Pick the next skill node to test based on Critic result */
+  const calibAdvance = (understanding) => {
+    const cs = calibStateRef.current
+    const subjectMap = CALIBRATION_MAP[cs.subject] || {}
+    const node = subjectMap[cs.currentNode]
+    if (!node) return null
+
+    const isGood = understanding === 'solid' || understanding === 'mastery'
+    const isPartial = understanding === 'partial'
+    const isNone = understanding === 'none'
+
+    // Handle partial: give one retry at next tier before deciding direction
+    if (isPartial && !cs.partialAtNode && cs.tierAtNode < 3) {
+      cs.partialAtNode = true
+      cs.tierAtNode += 1
+      return cs.currentNode  // stay on same node, harder tier
+    }
+
+    // Mark current node
+    const status = isGood ? 'solid' : (isPartial ? 'shaky' : 'gap')
+    cs.skillMap[cs.currentNode] = status
+    cs.partialAtNode = false
+    cs.tierAtNode = 1
+
+    // Choose next node
+    let nextNode = null
+    if (isGood || isPartial) {
+      // Advance: pick first untested nextSkill
+      const candidates = (node.nextSkills || []).filter(id => !cs.skillMap[id] && !cs.nodesVisited.includes(id))
+      nextNode = candidates[0] || null
+    } else {
+      // Retreat: go to first untested prerequisite
+      const prereqs = (node.prerequisites || []).filter(id => !cs.skillMap[id] && !cs.nodesVisited.includes(id))
+      nextNode = prereqs[0] || null
+      // If all prereqs tested, try a sibling (different nextSkill branch)
+      if (!nextNode) {
+        const siblingCandidates = Object.keys(subjectMap).filter(id =>
+          !cs.skillMap[id] && !cs.nodesVisited.includes(id) &&
+          subjectMap[id].bandOrder <= (node.bandOrder || 5)
+        )
+        nextNode = siblingCandidates[0] || null
+      }
+    }
+
+    cs.nodesVisited.push(cs.currentNode)
+    cs.currentNode = nextNode
+    return nextNode
+  }
+
+  /** Determine curriculum band from skill map */
+  const calibBand = (skillMap, subject) => {
+    const subjectMap = CALIBRATION_MAP[subject] || {}
+    const solidOrShaky = Object.entries(skillMap).filter(([, v]) => v === 'solid' || v === 'shaky').map(([id]) => id)
+    if (!solidOrShaky.length) return 'Foundation'
+    const maxBandOrder = Math.max(...solidOrShaky.map(id => subjectMap[id]?.bandOrder || 1))
+    if (maxBandOrder >= 8) return 'A-Level'
+    if (maxBandOrder >= 6) return 'GCSE Higher'
+    if (maxBandOrder >= 4) return 'GCSE Foundation'
+    return 'Foundation'
+  }
+
+  /** Find the first gap skill to suggest as "start here" */
+  const calibNextTopic = (skillMap, subject) => {
+    const subjectMap = CALIBRATION_MAP[subject] || {}
+    // Priority: gap → shaky → first solid's next skill
+    const gap = Object.entries(skillMap).find(([, v]) => v === 'gap')
+    if (gap) return gap[0]
+    const shaky = Object.entries(skillMap).find(([, v]) => v === 'shaky')
+    if (shaky) return shaky[0]
+    const solid = Object.entries(skillMap).filter(([, v]) => v === 'solid')
+    for (const [id] of solid) {
+      const nexts = (subjectMap[id]?.nextSkills || []).filter(nid => !skillMap[nid])
+      if (nexts.length) return nexts[0]
+    }
+    return null
+  }
+
+  /** Build the calibration system prompt for the current question */
+  const buildCalibPrompt = (subject, nodeId, tier) => {
+    const subjectMap = CALIBRATION_MAP[subject] || {}
+    const node = subjectMap[nodeId]
+    if (!node) return ''
+    const q = node.questions?.find(q => q.tier === tier) || node.questions?.[0]
+    return `You are running an AEVA CALIBRATION DIAGNOSTIC for ${SUBJECT_LABELS[subject] || subject}.
+
+Current skill being tested: "${node.label}" (${node.band})
+Question to ask (pre-written — use it EXACTLY):
+"${q?.q || 'Solve a problem related to ' + node.label}"
+
+RULES — READ CAREFULLY:
+1. Ask ONLY this question. Copy it word for word. No preamble, no context, no hints. Just the question.
+2. After they answer: acknowledge it in ONE sentence (e.g. "Got it." / "Nice." / "Close, but not quite."). Do NOT explain or teach yet.
+3. Do NOT ask the next question yourself. The system handles what comes next.
+4. If they say "I don't know", "skip", or "pass" — say "No worries, we'll come back to it." and stop.
+5. ALL responses during calibration must be under 2 sentences total.
+
+You are an examiner right now, not a tutor. Keep it brief and neutral.`
+  }
+
+  /** Start calibration for a given subject */
+  const startCalibration = (subject) => {
+    const entryNode = ENTRY_NODES[subject]
+    if (!entryNode) return
+    calibStateRef.current = {
+      subject, currentNode: entryNode,
+      level: 5, step: 2.5,
+      skillMap: {}, questionCount: 0,
+      tierAtNode: 1, partialAtNode: false,
+      nodesVisited: [], startTime: Date.now(),
+    }
+    setCalibMode(true)
+    setCalibSubject(subject)
+    setCalibResult(null)
+  }
+
+  /** Finish calibration and show result */
+  const finishCalibration = () => {
+    const cs = calibStateRef.current
+    const skillMap = cs.skillMap
+    const band = calibBand(skillMap, cs.subject)
+    const nextTopic = calibNextTopic(skillMap, cs.subject)
+    const result = {
+      skillMap,
+      band,
+      nextTopic,
+      questionsAsked: cs.questionCount,
+      durationMs: Date.now() - (cs.startTime || Date.now()),
+    }
+    calibrationStore.saveResult(cs.subject, result)
+    setCalibResult({ ...result, subject: cs.subject })
+    setCalibMode(false)
+    setCalibSubject(null)
+  }
+
+  /** Called after each Critic result during calibration */
+  const handleCalibCriticResult = (understanding) => {
+    const cs = calibStateRef.current
+    cs.questionCount += 1
+    const shouldStop = cs.questionCount >= 8 || !calibStateRef.current.currentNode
+    if (shouldStop) { finishCalibration(); return }
+    const next = calibAdvance(understanding)
+    if (!next) { finishCalibration(); return }
+  }
+
+  // ── END CALIBRATION HELPERS ───────────────────────────────────────────────
+
   const sendWithText = async (overrideText) => {
     // If a photo is attached, route to vision send instead
     if (photoAttachment && !overrideText) { sendPhoto(); return }
@@ -5404,6 +5575,33 @@ RULES:
     const userText = overrideText || input.trim()
     if (!userText || isThinking) return
     if (!overrideText) setInput('')
+
+    // ── Calibration trigger detection ────────────────────────────────────────
+    if (!isMission && !calibMode && CALIB_TRIGGER.test(userText)) {
+      // Try to detect subject from the message
+      const subjectMatch = Object.keys(CALIBRATION_MAP).find(s =>
+        userText.toLowerCase().includes(SUBJECT_LABELS[s]?.toLowerCase() || s)
+      )
+      if (subjectMatch) {
+        // Subject detected in message — start directly
+        setMessages(prev => [...prev, { role: 'user', text: userText }])
+        setMessages(prev => [...prev, { role: 'model', text: `Starting your ${SUBJECT_LABELS[subjectMatch]} diagnostic — ${Object.keys(CALIBRATION_MAP[subjectMatch]).length} skills mapped, up to 8 questions. Adapts to your answers. Let's go.`, streaming: false }])
+        startCalibration(subjectMatch)
+        // Kick off first question immediately
+        setTimeout(() => sendWithText(`[CALIB_START:${subjectMatch}]`), 300)
+        return
+      }
+      // No subject — show picker
+      setMessages(prev => [...prev, { role: 'user', text: userText }])
+      setCalibSubjectPicker(true)
+      setMessages(prev => [...prev, { role: 'model', text: `Which subject do you want to calibrate? Pick one below and I'll run the diagnostic.`, streaming: false }])
+      return
+    }
+
+    // Internal calibration start signal
+    if (!isMission && userText.startsWith('[CALIB_START:')) {
+      // Handled above — skip normal processing
+    }
 
     // Fix 7: Detect session end — generate summary card (min 12 messages = ~6 real exchanges)
     if (!isMission && SESSION_END_PATTERNS.test(userText.trim()) && messages.length >= 12) {
@@ -5583,9 +5781,17 @@ RULES:
         const newlyDetected = detectSubject(criticResult?.topic, messages)
         if (newlyDetected) sessionSubjectRef.current = newlyDetected
         const detectedSubject = sessionSubjectRef.current
-        systemPrompt = feedbackPrefix + orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, fullMemory + roadmapCtx + nodeCtx, extras, T.aevaLanguageDirective, detectedSubject)
+        // ── Calibration mode: override system prompt ───────────────────────
+        if (calibMode && calibStateRef.current.currentNode) {
+          const cs = calibStateRef.current
+          systemPrompt = buildCalibPrompt(cs.subject, cs.currentNode, cs.tierAtNode)
+          // After critic runs, advance the calibration
+          handleCalibCriticResult(criticResult?.understanding || 'partial')
+        } else {
+          systemPrompt = feedbackPrefix + orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, fullMemory + roadmapCtx + nodeCtx, extras, T.aevaLanguageDirective, detectedSubject)
+        }
 
-        if (socraticActive) {
+        if (socraticActive && !calibMode) {
           systemPrompt += '\n\nSOCRATIC MODE: You must NEVER state facts, answers, or explanations directly. Respond ONLY with 1-3 targeted questions that guide the student to discover the answer themselves. If they arrive at the correct answer, confirm warmly and deepen with another question. If wrong, ask a question that exposes the specific gap without revealing the answer. Never say "the answer is", never explain anything outright. Make them think every time.'
         }
 
@@ -6637,6 +6843,59 @@ If no clear changes: {"changes":[]}`
                       </motion.div>
                     )}
                   </div>
+                  {/* ── Calibrate CTA (empty state, no calibration data yet) ── */}
+                  {!calibrationStore.hasAnyCalibration() && !calibMode && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.15, duration: 0.4 }}
+                      style={{ width: '100%', maxWidth: 420, margin: '0 0 8px', padding: '14px 18px', borderRadius: 16, background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(139,143,255,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}
+                    >
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.88)' }}>🎯 Don't know where to start?</div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.40)', marginTop: 3 }}>8 questions · finds your exact gaps · adapts as you answer</div>
+                      </div>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                        onClick={() => setCalibSubjectPicker(true)}
+                        style={{ padding: '8px 16px', borderRadius: 10, cursor: 'pointer', border: 'none', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', color: 'white', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}
+                      >
+                        Calibrate →
+                      </motion.button>
+                    </motion.div>
+                  )}
+
+                  {/* ── Subject picker (shown after trigger or Calibrate button) ── */}
+                  <AnimatePresence>
+                    {calibSubjectPicker && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 8, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.97 }}
+                        transition={{ duration: 0.2 }}
+                        style={{ width: '100%', maxWidth: 420, padding: '14px 16px', borderRadius: 16, background: 'rgba(8,10,28,0.97)', border: '1px solid rgba(139,143,255,0.22)', boxShadow: '0 8px 32px rgba(0,0,0,0.55)' }}
+                      >
+                        <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginBottom: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Pick a subject</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                          {Object.keys(CALIBRATION_MAP).map(subject => (
+                            <motion.button
+                              key={subject}
+                              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                              onClick={() => {
+                                setCalibSubjectPicker(false)
+                                startCalibration(subject)
+                                const intro = `Starting your ${SUBJECT_LABELS[subject]} diagnostic — up to 8 questions, adapts as you go. Answer as best you can. Let's go.`
+                                setMessages(prev => [...prev, { role: 'model', text: intro, streaming: false }])
+                                setTimeout(() => sendWithText(`[CALIB_START:${subject}]`), 300)
+                              }}
+                              style={{ padding: '8px 14px', borderRadius: 99, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: 600 }}
+                            >
+                              {SUBJECT_ICONS[subject]} {SUBJECT_LABELS[subject]}
+                            </motion.button>
+                          ))}
+                        </div>
+                        <button onClick={() => setCalibSubjectPicker(false)} style={{ marginTop: 10, background: 'none', border: 'none', color: 'rgba(255,255,255,0.28)', fontSize: 11, cursor: 'pointer' }}>Cancel</button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
                   {/* Suggestion chips — customisable */}
                   <motion.div
                     initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
@@ -6834,8 +7093,30 @@ If no clear changes: {"changes":[]}`
                     })}
                   </div>
                 )}
-                {/* Session state badges — moved from header to live under the orb */}
-                <SessionBadge sessionState={sessionState} criticism={criticism} />
+                {/* Calibration progress pill — replaces session badges during calibration */}
+                {calibMode && calibSubject ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 99, background: 'rgba(99,102,241,0.14)', border: '1px solid rgba(139,143,255,0.30)' }}>
+                      <span style={{ fontSize: 12 }}>🎯</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#A5B4FC' }}>
+                        {SUBJECT_LABELS[calibSubject]} Calibration · Q{calibStateRef.current.questionCount + 1}/8
+                      </span>
+                    </div>
+                    {/* Skill dots */}
+                    <div style={{ display: 'flex', gap: 5 }}>
+                      {Array.from({ length: 8 }).map((_, i) => {
+                        const done = i < calibStateRef.current.questionCount
+                        const skillId = calibStateRef.current.nodesVisited[i]
+                        const status = skillId ? calibStateRef.current.skillMap[skillId] : null
+                        const col = status === 'solid' ? '#4ADE80' : status === 'shaky' ? '#FBBF24' : status === 'gap' ? '#F87171' : done ? '#818CF8' : 'rgba(255,255,255,0.15)'
+                        return <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: col, transition: 'background 0.3s' }} />
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  /* Session state badges — moved from header to live under the orb */
+                  <SessionBadge sessionState={sessionState} criticism={criticism} />
+                )}
               </div>
             )}
 
@@ -6940,6 +7221,28 @@ If no clear changes: {"changes":[]}`
                   isMission
                     ? <ThemedChatBubble key={i} msg={msg} mission={activeMission} />
                     : <ChatBubble key={i} msg={msg} deepDiveCards={deepDiveMap[i] || []} onDismissCard={(cardId) => setDeepDiveMap(prev => ({ ...prev, [i]: (prev[i] || []).filter(c => c.id !== cardId) }))} isLight={isLight} isWidget={isWidget} widgetTheme={isWidget ? activeTheme : null}  />
+                )}
+
+                {/* Calibration result card */}
+                {calibResult && !calibMode && (
+                  <CalibrationResult
+                    result={calibResult}
+                    subject={calibResult.subject}
+                    onStartTopic={(topicId, subject) => {
+                      setCalibResult(null)
+                      const node = CALIBRATION_MAP[subject]?.[topicId]
+                      if (node) sendWithText(`Let's start learning: ${node.label}`)
+                    }}
+                    onRecalibrate={() => {
+                      setCalibResult(null)
+                      startCalibration(calibResult.subject)
+                      setTimeout(() => sendWithText(`[CALIB_START:${calibResult.subject}]`), 100)
+                    }}
+                    onAnotherSubject={() => {
+                      setCalibResult(null)
+                      setCalibSubjectPicker(true)
+                    }}
+                  />
                 )}
 
                 {/* Worksheet generating indicator */}
