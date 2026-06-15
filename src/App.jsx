@@ -324,16 +324,19 @@ ${lp.misconceptions?.length ? `Known misconceptions: ${lp.misconceptions.slice(0
 function buildAevaPrompt(sessionState, criticism, userName, profile, memoryBlock = '', extras = {}, langDirective = '', subject = null) {
   const state = STATE_CONFIG[sessionState] || STATE_CONFIG.DIAGNOSTIC
   const mode = MODE_CONFIG[criticism?.mode] || MODE_CONFIG.coach
-  const { trend, conceptScaffold, difficultyDirective, topicProgress } = extras
+  const { trend, conceptScaffold, difficultyDirective, topicProgress, microEcho } = extras
 
   const trendBlock        = trend           ? `\n\n${trend}`           : ''
   const scaffoldBlock     = conceptScaffold ? `\n\n${conceptScaffold}` : ''
   const diffBlock         = difficultyDirective ? `\n\n${difficultyDirective}` : ''
   const topicProgressBlock = topicProgress  ? `\n\n${topicProgress}`  : ''
+  const microEchoBlock    = microEcho
+    ? `\n\n⚡ MICRO-ECHO — ${userName} just got "${microEcho.topic}" right after struggling with it (previous: ${microEcho.prevUnderstanding}). In your response, name the specific thing they got right this time in ONE sentence — precise and personal, not generic. e.g. "You nailed the sign on b this time" not "Good job on that". One sentence only, then continue normally.`
+    : ''
 
   const subjectBlock = subject && SUBJECT_STYLES[subject] ? SUBJECT_STYLES[subject] : ''
 
-  return `${memoryBlock}${trendBlock}${scaffoldBlock}${diffBlock}${topicProgressBlock}${subjectBlock}
+  return `${memoryBlock}${trendBlock}${scaffoldBlock}${diffBlock}${topicProgressBlock}${microEchoBlock}${subjectBlock}
 
 You are Aeva — a world-class personal mentor for ${userName}. Think: the most precise professor you never had, minus the ego.
 
@@ -4960,6 +4963,52 @@ function PhaseTransitionCard({ from, to }) {
   )
 }
 
+/* ─── Breakthrough Card — permanent in-chat card when echo CMD fires ─── */
+function BreakthroughCard({ topic, moment }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.93, y: 10 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 24, delay: 0.08 }}
+      style={{
+        margin: '12px 0 16px',
+        borderRadius: 16,
+        background: 'linear-gradient(135deg, rgba(167,139,250,0.10) 0%, rgba(139,92,246,0.06) 100%)',
+        border: '1px solid rgba(167,139,250,0.28)',
+        boxShadow: '0 0 32px rgba(167,139,250,0.08)',
+        padding: '14px 16px',
+        fontFamily: "'Inter', system-ui, sans-serif",
+        position: 'relative', overflow: 'hidden',
+      }}
+    >
+      {/* Top glow */}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 48, background: 'radial-gradient(ellipse at 50% 0%, rgba(167,139,250,0.16) 0%, transparent 80%)', pointerEvents: 'none' }} />
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <motion.span
+          animate={{ rotate: [0, 14, -14, 8, -8, 0], scale: [1, 1.25, 1] }}
+          transition={{ duration: 1.3, delay: 0.25 }}
+          style={{ fontSize: 20, flexShrink: 0, lineHeight: 1 }}
+        >🌟</motion.span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 9.5, fontWeight: 800, color: '#A78BFA', letterSpacing: '0.10em', textTransform: 'uppercase' }}>Breakthrough</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.88)', letterSpacing: '-0.01em', marginTop: 1 }}>{topic}</div>
+        </div>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.18)', fontWeight: 500, flexShrink: 0 }}>
+          {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+        </div>
+      </div>
+      {/* Moment quote */}
+      <div style={{
+        fontSize: 12.5, color: 'rgba(255,255,255,0.52)', lineHeight: 1.55, fontStyle: 'italic',
+        borderLeft: '2px solid rgba(167,139,250,0.38)', paddingLeft: 10,
+      }}>
+        "{moment}"
+      </div>
+    </motion.div>
+  )
+}
+
 /* ═══ CHAT VIEW / COCKPIT ═════════════════════════ */
 /* ── Context-aware chip suggestions ──────────────────────────────────────────
    Returns up to 4 chips that update as the conversation evolves.
@@ -5293,6 +5342,7 @@ function ChatView({ onBack }) {
   const exchangeCountRef = useRef(0)
   const recentCriticRef = useRef([])       // last 3 critic results for trend detection
   const sessionConceptsRef = useRef({})    // concept → understanding map this session
+  const prevConceptsRef   = useRef({})     // previous understanding per concept — for micro-echo detection
   const masteryMapRef = useRef({})         // kept in sync for session-end save
   const lastTopicRef = useRef(null)        // previous critic topic for change detection
   const phaseStreakRef = useRef(0)         // consecutive solid/mastery answers in current phase
@@ -6170,7 +6220,19 @@ Rules:
         }
         // Update session tracking refs
         recentCriticRef.current = [...recentCriticRef.current, criticResult].slice(-3)
-        if (criticResult?.topic) sessionConceptsRef.current[criticResult.topic] = criticResult.understanding
+        // Micro-echo detection: was struggling → now solid/mastery?
+        let microEchoSignal = null
+        if (criticResult?.topic) {
+          const prevU = sessionConceptsRef.current[criticResult.topic]
+          const nowU  = criticResult.understanding
+          const wasStruggling = prevU === 'none' || prevU === 'partial'
+          const nowStrong     = nowU  === 'solid' || nowU  === 'mastery'
+          if (wasStruggling && nowStrong) {
+            microEchoSignal = { topic: criticResult.topic, prevUnderstanding: prevU }
+          }
+          prevConceptsRef.current[criticResult.topic] = prevU || null
+          sessionConceptsRef.current[criticResult.topic] = nowU
+        }
 
         // Topic-change recalibration — reset session state when topic shifts significantly
         const newTopic = criticResult?.topic?.toLowerCase().trim()
@@ -6204,6 +6266,7 @@ Rules:
           conceptScaffold: buildConceptScaffold(sessionConceptsRef.current),
           difficultyDirective: buildDifficultyDirective({ frustrationScore, avgResponseLength, totalExchanges, depth }),
           topicProgress: buildTopicProgressSignal(topicStreakRef.current, name),
+          microEcho: microEchoSignal,
         }
 
         // Orb personality — style modifier only, does NOT override teaching rules
@@ -6507,7 +6570,16 @@ Rules:
               const topic  = (action.topic  || 'a concept').slice(0, 60)
               const moment = (action.moment || 'A breakthrough moment.').slice(0, 200)
               useEchoStore.getState().addEcho({ topic, moment })
-              label = `Echo saved · ${topic}`
+              // Push a permanent BreakthroughCard into the chat stream (toast is ephemeral, card persists)
+              setMessages(prev => [...prev, {
+                role: 'system',
+                isBreakthrough: true,
+                topic,
+                moment,
+                text: '',
+                id: `breakthrough_${Date.now()}`,
+              }])
+              label = `Breakthrough · ${topic}`
             }
 
             if (label) {
@@ -7917,7 +7989,9 @@ If no clear changes: {"changes":[]}`
                     ? <ThemedChatBubble key={i} msg={msg} mission={activeMission} />
                     : msg.isPhaseTransition
                       ? <PhaseTransitionCard key={msg.id || i} from={msg.from} to={msg.to} />
-                      : msg.isCalibQuestion && msg.role === 'model'
+                      : msg.isBreakthrough
+                        ? <BreakthroughCard key={msg.id || i} topic={msg.topic} moment={msg.moment} />
+                        : msg.isCalibQuestion && msg.role === 'model'
                         ? <CalibQuestionCard
                             key={i}
                             msg={msg}
