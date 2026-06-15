@@ -136,7 +136,7 @@ const STATE_CONFIG = {
   SCAFFOLDING: {
     label: 'Building',
     color: '#7EC8E3',
-    instruction: 'Build understanding one layer at a time. Confirm each idea before adding the next. Only use an analogy if it genuinely clarifies — never force one.',
+    instruction: 'Build understanding one layer at a time. Confirm each idea before adding the next. When introducing a mechanism or process for the FIRST TIME this session (something with moving parts, not just a definition), lead with ONE "Think of it like..." analogy before the formal explanation — only if a clean real-world parallel exists. Skip for concepts already introduced this session or for pure definitions.',
   },
   STRESS_TEST: {
     label: 'Stress Testing',
@@ -484,6 +484,21 @@ Every response that explains a concept should end with ONE closing question in i
 If ${userName} skips your question once, redirect ONCE: "Quick answer before we move — [restate]." If they skip again or want to move on, let it go. Never redirect more than once per question. Never hold progress hostage.
 Exception: greetings and casual chat only — answer directly. Never use this exception to bypass the ANSWER POLICY above.
 
+CLOSING QUESTION QUALITY TEST — before writing your closing question, run this check:
+Could a student answer it correctly just by re-reading what you wrote? If yes — rewrite it.
+A strong closing question requires applying the concept to an unseen scenario, OR identifying what breaks when one variable changes, OR spotting a subtle trap that the explanation didn't spell out.
+❌ Banned openers: "What is...", "Can you tell me...", "How would you...", "What does X tell you..."
+❌ Banned pattern: "Can you apply this to...?" — too vague.
+✅ Required pattern: Describe a specific concrete scenario, then ask what happens / what's wrong / what breaks.
+✅ OR: Give a statement that is almost-right but subtly wrong, and ask them to spot the error.
+✅ OR: Change one constraint in the problem and ask what that does to the answer.
+
+ANALOGY RULE — when you introduce any mechanism, process, or non-obvious concept for the FIRST TIME in this session:
+Lead with: "Think of [X] like [familiar real-world thing] — [one sentence on why the parallel holds]."
+Then give the formal explanation.
+This is mandatory for mechanisms (things with steps or moving parts). Skip for: pure definitions, revisiting something already introduced this session, casual messages.
+Do NOT force a bad analogy — if nothing clean exists, skip it. But always look first.
+
 SESSION PHASE: ${sessionState} — ${state.instruction}
 
 ━━━ CRITIC SIGNAL — ACT ON THIS NOW ━━━
@@ -554,7 +569,7 @@ TRIGGER CONDITIONS — only fire when one of these is true:
 - You introduced THE single most critical formula/definition of this ENTIRE topic that they MUST have visible — not for every concept, not for examples, not for reminders. Once per session maximum → pin_note
 - You are explicitly setting a TIMED challenge (you told the student how long they have). Not for regular practice problems → set_timer (30-300 seconds)
 - Student keeps avoiding or skipping a concept they're struggling with → lock_topic (3-8 exchanges)
-- Student has a genuine breakthrough moment: understands something they visibly struggled with this session, makes an unprompted connection between two concepts, or solves something correctly after repeated failure → echo (once per session max, make the moment description specific and personal)
+- Student gets something right after getting it wrong earlier in this session (even once wrong is enough) → echo. Student makes an unprompted connection between two concepts → echo. Maximum 2 per session. The "moment" description MUST be specific: "Finally got the discriminant sign right after two wrong attempts" not "understood quadratics better". Generic echo descriptions are prohibited. Fire this more readily — a small win named precisely is more powerful than a grand win named vaguely.
 DO NOT fire CMDs routinely. pin_note and set_timer in particular should be RARE — most sessions have zero of them.
 Only use LaTeX math ($...$, \[...\]) for actual mathematical or scientific expressions. Never use math delimiters for non-math content.
 Never announce commands. Describe in past tense: "I've pinned that formula", "Timer's running", "I've awarded you 60 XP for that."
@@ -619,11 +634,13 @@ function buildConceptScaffold(sessionConcepts) {
   const mastered = entries.filter(([,u]) => u === 'mastery' || u === 'solid').map(([c]) => c)
   const partial  = entries.filter(([,u]) => u === 'partial').map(([c]) => c)
   const none     = entries.filter(([,u]) => u === 'none').map(([c]) => c)
-  let s = 'SESSION SCAFFOLD — concepts built this session (connect new ideas to these explicitly):\n'
+  let s = 'SESSION SCAFFOLD — concepts built this session:\n'
   if (mastered.length) s += `✓ Understands: ${mastered.join(', ')}\n`
   if (partial.length)  s += `⟳ In progress: ${partial.join(', ')}\n`
   if (none.length)     s += `✗ Struggling: ${none.join(', ')}\n`
-  s += 'When introducing a new concept, explicitly connect it to what is already understood.'
+  if (mastered.length) {
+    s += `\nMANDATORY BRIDGE: When moving to any new concept, your FIRST sentence must bridge to something already understood. Format: "[New concept] works like [MASTERED CONCEPT] — [one sentence on the structural parallel]." Example: "Momentum works like a running debt — the bigger the mass and speed, the harder it is to clear." Only skip if there is genuinely zero structural connection — but always look for one. Never say "similarly" without naming the specific parallel.`
+  }
   return s
 }
 
@@ -635,6 +652,11 @@ function buildTopicProgressSignal(streak, userName) {
   // 2+ consecutive strong answers on same topic → advance NOW
   if (streak.strongCount >= 2) {
     return `⚡ ADVANCE SIGNAL — "${streak.topic}" (${streak.count} exchanges, ${streak.strongCount} strong answers in a row): ${userName} has demonstrated solid understanding of this sub-topic. DO NOT ask another question at the same level on "${streak.topic}". Advance immediately: say "Good — let's push this further." then either (a) introduce a harder application or edge case, or (b) connect to the next concept. Move the difficulty up one level.`
+  }
+
+  // 2+ consecutive weak/wrong answers on same topic → REFRAME, not repeat
+  if ((streak.weakCount || 0) >= 2) {
+    return `🔄 REFRAME SIGNAL — "${streak.topic}": ${userName} has not understood this after ${streak.weakCount} consecutive attempts. DO NOT explain it the same way again. Mandatory — choose ONE: (a) use a completely different analogy or real-world parallel, (b) drop back one level to a more fundamental concept they do understand and build up from there, or (c) ask "${userName}, what does [${streak.topic}] mean to you right now?" to expose the exact point of confusion before re-explaining. Name the specific thing that seems to be blocking them.`
   }
 
   // 5+ exchanges on same topic regardless of performance → too long, switch angle
@@ -6047,10 +6069,11 @@ Rules:
           topicStreakRef.current = {
             topic: newTopic,
             count: streak.count + 1,
-            strongCount: isStrong ? streak.strongCount + 1 : 0, // reset streak on weak answer
+            strongCount: isStrong ? streak.strongCount + 1 : 0, // reset on weak answer
+            weakCount: isStrong ? 0 : (streak.weakCount || 0) + 1, // consecutive weak answers
           }
         } else if (newTopic) {
-          topicStreakRef.current = { topic: newTopic, count: 1, strongCount: isStrong ? 1 : 0 }
+          topicStreakRef.current = { topic: newTopic, count: 1, strongCount: isStrong ? 1 : 0, weakCount: isStrong ? 0 : 1 }
         }
 
         // Build live adaptation extras
