@@ -6319,13 +6319,14 @@ Rules:
         }
 
         const recallBlock = buildRecallBlock(name)
-        const fullMemory  = recallBlock + buildMemoryBlock(name)
         const roadmapCtx  = buildRoadmapContext(useRoadmapStore.getState().getActive())
         const nodeCtx     = buildNodeContext(useRoadmapStore.getState().activeNodeSession)
-        // Fix 3: persist subject across the whole session — only update when newly detected
+        // Detect subject first — calibration block is subject-scoped
         const newlyDetected = detectSubject(criticResult?.topic, messages)
         if (newlyDetected) sessionSubjectRef.current = newlyDetected
         const detectedSubject = sessionSubjectRef.current
+        const calibBlock  = calibrationStore.buildCalibBlock(detectedSubject)
+        const fullMemory  = recallBlock + calibBlock + buildMemoryBlock(name)
         // ── Calibration mode: brief ack only — next question injected in finally ──
         if (calibModeRef.current) {
           const cs = calibStateRef.current
