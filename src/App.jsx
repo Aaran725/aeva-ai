@@ -161,9 +161,9 @@ const MODE_CONFIG = {
 /* ─── Step A: The Critic ─── */
 const CRITIC_FALLBACK = { understanding: 'partial', lazy_thinking: false, mode: 'coach', topic: 'general', confidence: 'uncertain', note: '' }
 
-/** Calibration-specific critic — uses 70b for accurate math verification.
- *  Unlike the general Critic, this only cares about mathematical correctness,
- *  not depth of working shown. Brief correct answers still get "solid". */
+/** Calibration-specific critic — uses 70b with forced chain-of-thought for near-perfect accuracy.
+ *  The model MUST compute the correct answer itself (in "my_answer") before comparing to the student.
+ *  This "show your working before judging" pattern eliminates most arithmetic verification errors. */
 async function runCalibCritic(questionText, userAnswer) {
   try {
     const res = await fetch(GROQ_URL, {
@@ -174,20 +174,25 @@ async function runCalibCritic(questionText, userAnswer) {
         messages: [
           {
             role: 'system',
-            content: `You are a math answer verifier for a diagnostic placement test. Your ONLY job is to check if the student's answer is mathematically correct.
+            content: `You are a precise answer verifier for a diagnostic placement test. Follow these steps IN ORDER:
 
-Return ONLY valid JSON — no markdown, no explanation:
-{"understanding":"none"|"partial"|"solid","correct":true|false,"note":"<one sentence>"}
+STEP 1 — Solve the question yourself. Compute every arithmetic step carefully. Write your full working + final answer in "my_answer".
+STEP 2 — Read what the student wrote. Extract their final numerical answer(s) in "student_answer".
+STEP 3 — Compare your answer to the student's. Numbers match = correct. Different = incorrect.
+STEP 4 — Return your verdict in "understanding".
 
-Rules:
-- "solid" = ALL parts of the answer are mathematically correct.
-- "partial" = the approach is right but there is a computational error, or only SOME parts of a multi-part question are correct.
-- "none" = the answer is wrong, blank, "I don't know", or completely off-track.
-- MULTI-PART QUESTIONS: If the question has parts (a), (b), (c) etc., compute the correct answer for EACH part independently. Return "solid" only if EVERY part is correct. If one part is right and another wrong → "partial".
-- Do NOT penalise for missing working. "x=5" and "x = 5" and "5" are all equivalent when x=5 is correct.
-- Do NOT be strict about notation or format — judge mathematical correctness only.
-- If the student says "skip", "idk", "don't know", "pass" → "none".
-- ALWAYS compute the correct answer yourself first before comparing to the student's answer.`,
+Return ONLY valid JSON with this exact structure — no markdown, no text outside JSON:
+{"my_answer":"<your full working and answer>","student_answer":"<what student gave>","understanding":"solid"|"partial"|"none","note":"<one sentence>"}
+
+Grading rules:
+- "solid" = student's final answer matches yours. Method, notation, units format do not matter.
+- "partial" = right approach but arithmetic error, OR multi-part question where some parts correct and some wrong.
+- "none" = answer is numerically wrong, blank, "skip", "idk", or completely off-track.
+- MULTI-PART (a)(b)(c): solve EACH part yourself, check EACH independently. All correct → "solid". Any wrong → "partial" or "none".
+- Equivalent answers: "2 m/s", "v=2", "2", "2.0 m/s" are all the same if 2 m/s is correct.
+- Do NOT penalise for missing units unless the question specifically asks for them.
+- Do NOT penalise for missing working — a correct bare answer like "x=5" gets "solid".
+- If student says "skip", "don't know", "idk", "pass" → "none".`,
           },
           {
             role: 'user',
@@ -195,7 +200,7 @@ Rules:
           },
         ],
         temperature: 0.1,
-        max_tokens: 150,
+        max_tokens: 400,
         response_format: { type: 'json_object' },
       }),
     })
@@ -203,7 +208,7 @@ Rules:
     const json = await res.json()
     const parsed = JSON.parse(json.choices?.[0]?.message?.content || '{}')
     const understanding = ['none', 'partial', 'solid'].includes(parsed.understanding) ? parsed.understanding : 'partial'
-    return { understanding, correct: !!parsed.correct, note: parsed.note || '' }
+    return { understanding, correct: understanding === 'solid', note: parsed.note || '' }
   } catch {
     return { understanding: 'partial', correct: false, note: '' }
   }

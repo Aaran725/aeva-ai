@@ -724,6 +724,30 @@ const PHYSICS = {
       { q: 'A satellite orbits at height h above Earth. Derive an expression for its orbital speed in terms of g at that height and h.', tier: 3 },
     ],
   },
+
+  'simple-harmonic': {
+    label: 'Simple Harmonic Motion',
+    subject: 'physics', band: 'A-Level', bandOrder: 8,
+    prerequisites: ['circular-motion'],
+    nextSkills: ['gravitation'],
+    questions: [
+      { q: 'A mass on a spring oscillates with a period of 2 s. What is the frequency? If the amplitude is 0.1 m, what is the maximum speed?', tier: 1 },
+      { q: 'A pendulum has length 0.25 m. Find its period. (g = 9.8 m/s²)', tier: 2 },
+      { q: 'Show that x = A cos(ωt) satisfies the SHM equation a = −ω²x. State what each symbol represents.', tier: 3 },
+    ],
+  },
+
+  'gravitation': {
+    label: 'Gravitation',
+    subject: 'physics', band: 'A-Level', bandOrder: 8,
+    prerequisites: ['circular-motion'],
+    nextSkills: [],
+    questions: [
+      { q: 'Two masses of 5 kg and 8 kg are 0.4 m apart. Find the gravitational force between them. (G = 6.67×10⁻¹¹ N m² kg⁻²)', tier: 1 },
+      { q: 'A satellite orbits Earth at radius 7×10⁶ m. Find its orbital period. (M_Earth = 6×10²⁴ kg, G = 6.67×10⁻¹¹)', tier: 2 },
+      { q: 'Derive the escape velocity from Earth\'s surface from energy conservation principles.', tier: 3 },
+    ],
+  },
 }
 
 // ─── CHEMISTRY ────────────────────────────────────────────────────────────────
