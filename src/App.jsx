@@ -5947,6 +5947,31 @@ Rules:
           confidence: 'confident',
           note: calibCriticResult.note,
         }
+        // Set systemPrompt here so streamGroq never gets an undefined system message
+        systemPrompt = buildCalibAckPrompt(calibStateRef.current.subject, calibCriticResult.understanding)
+        // Advance calibration state (fast lane bracket routing or normal node advance)
+        const _cs = calibStateRef.current
+        const _understanding = calibCriticResult.understanding
+        const _passed = _understanding === 'solid' || _understanding === 'mastery'
+        if (calibFastLaneRef.current.active) {
+          const _fl = FAST_LANE[_cs.subject]
+          const _bracket = _fl?.[calibFastLaneRef.current.bracketIdx]
+          if (_bracket) {
+            if (_passed && _bracket.onPass) {
+              calibStateRef.current.currentNode = _bracket.onPass
+              calibFastLaneRef.current = { active: false, bracketIdx: 0 }
+            } else if (!_passed && _bracket.onFail === null) {
+              calibFastLaneRef.current.bracketIdx += 1
+            } else if (!_passed && _bracket.onFail) {
+              calibStateRef.current.currentNode = _bracket.onFail
+              calibFastLaneRef.current = { active: false, bracketIdx: 0 }
+            }
+          } else {
+            calibFastLaneRef.current = { active: false, bracketIdx: 0 }
+          }
+        } else {
+          handleCalibCriticResult(_understanding)
+        }
       } else {
         // Standard tutor mode
         // Gate: skip critic for casual/short messages — saves ~40% of API calls
