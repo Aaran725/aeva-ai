@@ -180,13 +180,14 @@ Return ONLY valid JSON — no markdown, no explanation:
 {"understanding":"none"|"partial"|"solid","correct":true|false,"note":"<one sentence>"}
 
 Rules:
-- "solid" = the answer is mathematically correct (even if no working is shown — brief correct answers count as solid)
-- "partial" = the approach is right but there's a computational error or the answer is incomplete
-- "none" = the answer is wrong, blank, "I don't know", or completely off-track
-- Do NOT penalise for missing working. A student who writes just "x = 5" when x = 5 is correct gets "solid".
-- Do NOT be strict about notation — "x=5", "5", "x = 5" are all equivalent correct answers.
+- "solid" = ALL parts of the answer are mathematically correct.
+- "partial" = the approach is right but there is a computational error, or only SOME parts of a multi-part question are correct.
+- "none" = the answer is wrong, blank, "I don't know", or completely off-track.
+- MULTI-PART QUESTIONS: If the question has parts (a), (b), (c) etc., compute the correct answer for EACH part independently. Return "solid" only if EVERY part is correct. If one part is right and another wrong → "partial".
+- Do NOT penalise for missing working. "x=5" and "x = 5" and "5" are all equivalent when x=5 is correct.
+- Do NOT be strict about notation or format — judge mathematical correctness only.
 - If the student says "skip", "idk", "don't know", "pass" → "none".
-- Compute the correct answer yourself first, then compare.`,
+- ALWAYS compute the correct answer yourself first before comparing to the student's answer.`,
           },
           {
             role: 'user',
@@ -194,7 +195,7 @@ Rules:
           },
         ],
         temperature: 0.1,
-        max_tokens: 120,
+        max_tokens: 150,
         response_format: { type: 'json_object' },
       }),
     })
@@ -5932,12 +5933,20 @@ Rules:
         systemPrompt = activeMission.systemPrompt + memoryStr + buildMemoryBlock(name)
       } else if (calibModeRef.current && calibStateRef.current.currentNode) {
         // ── Calibration mode: use dedicated math verifier (70b) ──────────────
-        // Finds the pre-written question text for the current node+tier so the
-        // verifier can check correctness, not just reasoning depth.
         const cs = calibStateRef.current
+        // Use the ACTUAL question that was shown to the student:
+        // - During fast lane: use the bracket's full question text (not the node Q, which is only part a)
+        // - During normal calibration: use the node question for the current tier
+        let questionText
+        if (calibFastLaneRef.current.active) {
+          const activeBracket = FAST_LANE[cs.subject]?.[calibFastLaneRef.current.bracketIdx]
+          questionText = activeBracket?.q || 'the previous question'
+        } else {
+          const node = CALIBRATION_MAP[cs.subject]?.[cs.currentNode]
+          const q = node?.questions?.find(q => q.tier === cs.tierAtNode) || node?.questions?.[0]
+          questionText = q?.q || node?.label || 'the previous question'
+        }
         const node = CALIBRATION_MAP[cs.subject]?.[cs.currentNode]
-        const q = node?.questions?.find(q => q.tier === cs.tierAtNode) || node?.questions?.[0]
-        const questionText = q?.q || node?.label || 'the previous question'
         const calibCriticResult = await runCalibCritic(questionText, userText)
         criticResult = {
           understanding: calibCriticResult.understanding,
@@ -6546,9 +6555,13 @@ If no clear changes: {"changes":[]}`
             injectFastLaneBracket(cs.subject, calibFastLaneRef.current.bracketIdx)
           } else if (cs.currentNode) {
             // Fast lane done / never existed → inject first real diagnostic question
+            // Skip any node whose question text was already asked in the fast lane (avoids repeating 7×8 etc.)
+            const askedInFastLane = new Set(
+              (FAST_LANE[cs.subject] || []).map(b => b.q)
+            )
             const node = CALIBRATION_MAP[cs.subject]?.[cs.currentNode]
             const q = node?.questions?.find(q => q.tier === cs.tierAtNode) || node?.questions?.[0]
-            if (q) {
+            if (q && !askedInFastLane.has(q.q)) {
               setMessages(prev => [...prev, {
                 role: 'model', text: q.q, streaming: false,
                 isCalibQuestion: true,
@@ -6556,6 +6569,10 @@ If no clear changes: {"changes":[]}`
                 calibQNum: cs.questionsAsked + 1,
               }])
               setCalibTick(t => t + 1)
+            } else if (q && askedInFastLane.has(q.q)) {
+              // Question already seen — auto-advance past this node using the fast lane result
+              // (student already demonstrated knowledge here, mark as solid and move on)
+              handleCalibCriticResult('solid')
             }
           }
         }, 400)
@@ -7979,7 +7996,7 @@ If no clear changes: {"changes":[]}`
 
             {/* Prediction banner */}
             <AnimatePresence>
-              {!isMission && strugglePredictions.length > 0 && (
+              {!isMission && !calibMode && strugglePredictions.length > 0 && (
                 <motion.div
                   key={strugglePredictions[0].id}
                   initial={{ opacity: 0, y: 8, height: 0 }}

@@ -91,7 +91,7 @@ const MATHS = {
   },
 
   'basic-fractions': {
-    label: 'Fractions',
+    label: 'Intro to Fractions',
     subject: 'maths', band: 'Grade 3–4', bandOrder: -3,
     prerequisites: ['times-tables'],
     nextSkills: ['fractions-equivalent', 'decimals-intro'],
