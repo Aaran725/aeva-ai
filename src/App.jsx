@@ -500,6 +500,7 @@ This is mandatory for mechanisms (things with steps or moving parts). Skip for: 
 Do NOT force a bad analogy — if nothing clean exists, skip it. But always look first.
 
 SESSION PHASE: ${sessionState} — ${state.instruction}
+When responding in STRESS_TEST for the first time after SCAFFOLDING, signal the shift naturally in one sentence — e.g. "Good, basics are solid — let me push on the edges now." When entering CONSOLIDATION, say something like "You've held up well under that — now make it yours." These are gear-change lines, not announcements. One sentence only, then continue.
 
 ━━━ CRITIC SIGNAL — ACT ON THIS NOW ━━━
 Understanding: ${criticism?.understanding || 'unknown'} | Topic: ${criticism?.topic || 'general'} | Confidence: ${criticism?.confidence || 'uncertain'}
@@ -4849,6 +4850,116 @@ function SessionBadge({ sessionState, criticism }) {
   )
 }
 
+/* ─── Session Arc Bar — shows the 4-phase teaching arc above messages ─── */
+const PHASE_META = {
+  DIAGNOSTIC:    { label: 'Diagnosing',    short: 'Diagnose', icon: '🔍', color: '#8B8FFF', border: 'rgba(139,143,255,0.30)' },
+  SCAFFOLDING:   { label: 'Building',      short: 'Build',    icon: '🧱', color: '#7EC8E3', border: 'rgba(126,200,227,0.30)' },
+  STRESS_TEST:   { label: 'Stress Testing',short: 'Test',     icon: '⚡', color: '#E9A364', border: 'rgba(233,163,100,0.30)' },
+  CONSOLIDATION: { label: 'Lock In',       short: 'Lock In',  icon: '🔒', color: '#A8E6CF', border: 'rgba(168,230,207,0.30)' },
+}
+const PHASE_ORDER = ['DIAGNOSTIC', 'SCAFFOLDING', 'STRESS_TEST', 'CONSOLIDATION']
+
+function SessionArcBar({ sessionState, exchangeCount, isMission, calibMode }) {
+  if (isMission || calibMode || exchangeCount < 1) return null
+  const currentIdx = PHASE_ORDER.indexOf(sessionState)
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      style={{ marginBottom: 14 }}
+    >
+      <div style={{ display: 'flex', gap: 2, height: 28 }}>
+        {PHASE_ORDER.map((id, idx) => {
+          const meta      = PHASE_META[id]
+          const isCurrent = idx === currentIdx
+          const isPast    = idx < currentIdx
+          return (
+            <motion.div
+              key={id}
+              animate={{ flex: isCurrent ? 1.6 : 1 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 26 }}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                borderRadius: idx === 0 ? '8px 0 0 8px' : idx === 3 ? '0 8px 8px 0' : 3,
+                background: isCurrent ? `${meta.color}18` : isPast ? 'rgba(74,222,128,0.07)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${isCurrent ? meta.border : isPast ? 'rgba(74,222,128,0.16)' : 'rgba(255,255,255,0.06)'}`,
+                overflow: 'hidden', position: 'relative', cursor: 'default',
+              }}
+            >
+              {isCurrent && (
+                <motion.div
+                  animate={{ opacity: [0.3, 0.8, 0.3] }}
+                  transition={{ duration: 2.2, repeat: Infinity }}
+                  style={{ position: 'absolute', inset: 0, background: `radial-gradient(ellipse at 50% 50%, ${meta.color}28 0%, transparent 75%)`, pointerEvents: 'none' }}
+                />
+              )}
+              {isPast && <span style={{ fontSize: 8, color: 'rgba(74,222,128,0.65)' }}>✓</span>}
+              <span style={{
+                fontSize: isCurrent ? 9.5 : 8.5,
+                fontWeight: isCurrent ? 800 : 500,
+                color: isCurrent ? meta.color : isPast ? 'rgba(74,222,128,0.50)' : 'rgba(255,255,255,0.16)',
+                letterSpacing: '0.02em', userSelect: 'none', position: 'relative', whiteSpace: 'nowrap',
+              }}>
+                {isCurrent ? meta.label : meta.short}
+              </span>
+            </motion.div>
+          )
+        })}
+      </div>
+    </motion.div>
+  )
+}
+
+/* ─── Phase Transition Card — rendered inline in chat when session advances ─── */
+const TRANSITION_COPY = {
+  'DIAGNOSTIC→SCAFFOLDING':   "Foundations found. Building now.",
+  'SCAFFOLDING→STRESS_TEST':  "Basics solid. Finding the edges.",
+  'STRESS_TEST→CONSOLIDATION':"Held up under pressure. Locking it in.",
+}
+
+function PhaseTransitionCard({ from, to }) {
+  const toMeta  = PHASE_META[to]
+  const copy    = TRANSITION_COPY[`${from}→${to}`] || `Moving to ${toMeta?.label || to}.`
+  const toIdx   = PHASE_ORDER.indexOf(to)
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.97, y: 6 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ type: 'spring', stiffness: 340, damping: 28 }}
+      style={{
+        margin: '10px 0 14px',
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '9px 14px', borderRadius: 12,
+        background: `${toMeta?.color}0f`,
+        border: `1px solid ${toMeta?.color}2a`,
+        fontFamily: "'Inter', system-ui, sans-serif",
+      }}
+    >
+      <div style={{
+        width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+        background: `${toMeta?.color}18`, border: `1px solid ${toMeta?.color}40`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13,
+      }}>
+        {toMeta?.icon}
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 9.5, fontWeight: 800, color: toMeta?.color, letterSpacing: '0.09em', textTransform: 'uppercase' }}>
+          {toMeta?.label}
+        </div>
+        <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.42)', fontWeight: 500, marginTop: 1 }}>
+          {copy}
+        </div>
+      </div>
+      <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.16)', fontWeight: 600, letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
+        Phase {toIdx + 1} / 4
+      </div>
+    </motion.div>
+  )
+}
+
 /* ═══ CHAT VIEW / COCKPIT ═════════════════════════ */
 /* ── Context-aware chip suggestions ──────────────────────────────────────────
    Returns up to 4 chips that update as the conversation evolves.
@@ -5446,7 +5557,18 @@ function ChatView({ onBack }) {
 
     if (nextIdx !== currentIdx) {
       phaseStreakRef.current = 0  // reset streak on phase change
-      setSessionState(states[nextIdx])
+      const fromPhase = states[currentIdx]
+      const toPhase   = states[nextIdx]
+      setSessionState(toPhase)
+      // Push an inline phase-transition card into the chat stream
+      setMessages(prev => [...prev, {
+        role: 'system',
+        isPhaseTransition: true,
+        from: fromPhase,
+        to: toPhase,
+        text: '',
+        id: `phase_${Date.now()}`,
+      }])
     }
   }
 
@@ -7782,19 +7904,29 @@ If no clear changes: {"changes":[]}`
                   </motion.div>
                 )}
 
+                {/* ── Session Arc Bar — 4-phase progress indicator ────── */}
+                <SessionArcBar
+                  sessionState={sessionState}
+                  exchangeCount={exchangeCountRef.current}
+                  isMission={isMission}
+                  calibMode={calibMode}
+                />
+
                 {messages.map((msg, i) =>
                   isMission
                     ? <ThemedChatBubble key={i} msg={msg} mission={activeMission} />
-                    : msg.isCalibQuestion && msg.role === 'model'
-                      ? <CalibQuestionCard
-                          key={i}
-                          msg={msg}
-                          subject={calibSubject}
-                          nodeId={msg.calibNodeId}
-                          qNum={msg.calibQNum}
-                          isLight={isLight}
-                        />
-                      : <ChatBubble key={i} msg={msg} deepDiveCards={deepDiveMap[i] || []} onDismissCard={(cardId) => setDeepDiveMap(prev => ({ ...prev, [i]: (prev[i] || []).filter(c => c.id !== cardId) }))} isLight={isLight} isWidget={isWidget} widgetTheme={isWidget ? activeTheme : null}  />
+                    : msg.isPhaseTransition
+                      ? <PhaseTransitionCard key={msg.id || i} from={msg.from} to={msg.to} />
+                      : msg.isCalibQuestion && msg.role === 'model'
+                        ? <CalibQuestionCard
+                            key={i}
+                            msg={msg}
+                            subject={calibSubject}
+                            nodeId={msg.calibNodeId}
+                            qNum={msg.calibQNum}
+                            isLight={isLight}
+                          />
+                        : <ChatBubble key={i} msg={msg} deepDiveCards={deepDiveMap[i] || []} onDismissCard={(cardId) => setDeepDiveMap(prev => ({ ...prev, [i]: (prev[i] || []).filter(c => c.id !== cardId) }))} isLight={isLight} isWidget={isWidget} widgetTheme={isWidget ? activeTheme : null}  />
                 )}
 
                 {/* Live skill reveal — grows during calibration as skills are assessed */}
