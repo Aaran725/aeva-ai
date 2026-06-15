@@ -59,6 +59,7 @@ const YourUI             = lazy(() => import('./YourUI'))
 const RevisionCalendar   = lazy(() => import('./RevisionCalendar'))
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
 import { useCalibrationStore } from './calibrationStore'
+import { lookupAnalogy } from './analogyBank'
 import { CALIBRATION_MAP, ENTRY_NODES, SUBJECT_LABELS, SUBJECT_ICONS, FAST_LANE } from './calibrationMap'
 import CalibrationResult from './CalibrationResult'
 import { useEchoStore } from './echoStore'
@@ -324,7 +325,7 @@ ${lp.misconceptions?.length ? `Known misconceptions: ${lp.misconceptions.slice(0
 function buildAevaPrompt(sessionState, criticism, userName, profile, memoryBlock = '', extras = {}, langDirective = '', subject = null) {
   const state = STATE_CONFIG[sessionState] || STATE_CONFIG.DIAGNOSTIC
   const mode = MODE_CONFIG[criticism?.mode] || MODE_CONFIG.coach
-  const { trend, conceptScaffold, difficultyDirective, topicProgress, microEcho } = extras
+  const { trend, conceptScaffold, difficultyDirective, topicProgress, microEcho, analogyHint } = extras
 
   const trendBlock        = trend           ? `\n\n${trend}`           : ''
   const scaffoldBlock     = conceptScaffold ? `\n\n${conceptScaffold}` : ''
@@ -333,10 +334,13 @@ function buildAevaPrompt(sessionState, criticism, userName, profile, memoryBlock
   const microEchoBlock    = microEcho
     ? `\n\n⚡ MICRO-ECHO — ${userName} just got "${microEcho.topic}" right after struggling with it (previous: ${microEcho.prevUnderstanding}). In your response, name the specific thing they got right this time in ONE sentence — precise and personal, not generic. e.g. "You nailed the sign on b this time" not "Good job on that". One sentence only, then continue normally.`
     : ''
+  const analogyBlock      = analogyHint
+    ? `\n\nANALOGY READY — for "${analogyHint.topic}": "${analogyHint.text}"\nThis is a curated analogy for this concept. Weave it naturally into your explanation as if it were your own thought — adapt wording freely. Do NOT quote it verbatim. If it genuinely doesn't fit the current context, skip it silently.`
+    : ''
 
   const subjectBlock = subject && SUBJECT_STYLES[subject] ? SUBJECT_STYLES[subject] : ''
 
-  return `${memoryBlock}${trendBlock}${scaffoldBlock}${diffBlock}${topicProgressBlock}${microEchoBlock}${subjectBlock}
+  return `${memoryBlock}${trendBlock}${scaffoldBlock}${diffBlock}${topicProgressBlock}${microEchoBlock}${analogyBlock}${subjectBlock}
 
 You are Aeva — a world-class personal mentor for ${userName}. Think: the most precise professor you never had, minus the ego.
 
@@ -6220,8 +6224,9 @@ Rules:
         }
         // Update session tracking refs
         recentCriticRef.current = [...recentCriticRef.current, criticResult].slice(-3)
-        // Micro-echo detection: was struggling → now solid/mastery?
+        // Micro-echo detection + analogy lookup for new topics
         let microEchoSignal = null
+        let analogyHintSignal = null
         if (criticResult?.topic) {
           const prevU = sessionConceptsRef.current[criticResult.topic]
           const nowU  = criticResult.understanding
@@ -6229,6 +6234,11 @@ Rules:
           const nowStrong     = nowU  === 'solid' || nowU  === 'mastery'
           if (wasStruggling && nowStrong) {
             microEchoSignal = { topic: criticResult.topic, prevUnderstanding: prevU }
+          }
+          // Analogy: fire only on first introduction (prevU undefined = brand new topic)
+          if (prevU === undefined) {
+            const analogy = lookupAnalogy(criticResult.topic)
+            if (analogy) analogyHintSignal = { topic: criticResult.topic, text: analogy }
           }
           prevConceptsRef.current[criticResult.topic] = prevU || null
           sessionConceptsRef.current[criticResult.topic] = nowU
@@ -6267,6 +6277,7 @@ Rules:
           difficultyDirective: buildDifficultyDirective({ frustrationScore, avgResponseLength, totalExchanges, depth }),
           topicProgress: buildTopicProgressSignal(topicStreakRef.current, name),
           microEcho: microEchoSignal,
+          analogyHint: analogyHintSignal,
         }
 
         // Orb personality — style modifier only, does NOT override teaching rules
