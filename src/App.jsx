@@ -826,7 +826,7 @@ function OrderToast({ order, onJump, onDismiss }) {
 }
 
 /* ─── Background session summarisation ─── */
-// Fires every 6 exchanges — fire-and-forget, never blocks the main response.
+// Fires every 6 exchanges AND on session end — fire-and-forget, never blocks.
 async function summariseSessionBackground(messages, userName, topics, addMemory) {
   try {
     const lines = messages.slice(-16).map(m =>
@@ -850,11 +850,12 @@ Return:
   "summary": "one specific sentence: topic studied and overall progress",
   "mastered": ["concepts where student showed solid or mastery understanding — max 4"],
   "struggled": ["concepts where student showed none or partial understanding — max 4"],
-  "keyMistake": "the single most important misconception or error pattern, or null if none"
+  "keyMistake": "the single most important misconception or error pattern, or null if none",
+  "confusions": ["each entry = one specific WRONG BELIEF the student held, written as a quote of their thinking — e.g. 'thought -b/2a gives the y-coordinate of the vertex, not the x-coordinate' or 'confused ionic and covalent: thought sharing = ionic'. Max 3. Only include if a clear wrong belief is evident — return empty array if none."]
 }`,
         }],
         temperature: 0.15,
-        max_tokens: 200,
+        max_tokens: 280,
         response_format: { type: 'json_object' },
       }),
     })
@@ -866,9 +867,10 @@ Return:
         summary:    result.summary,
         topics,
         exchanges:  messages.length,
-        mastered:   result.mastered  || [],
-        struggled:  result.struggled || [],
+        mastered:   result.mastered   || [],
+        struggled:  result.struggled  || [],
         keyMistake: result.keyMistake || null,
+        confusions: Array.isArray(result.confusions) ? result.confusions.slice(0, 3) : [],
       })
     }
   } catch { /* silent — never surface to user */ }
@@ -6066,13 +6068,22 @@ Rules:
       return
     }
 
-    // Fix 7: Detect session end — generate summary card (min 12 messages = ~6 real exchanges)
+    // Detect session end — generate visible summary card (min 12 messages = ~6 real exchanges)
     if (!isMission && SESSION_END_PATTERNS.test(userText.trim()) && messages.length >= 12) {
       setSummaryLoading(true)
       generateSessionSummary(messages, name, sessionConceptsRef.current).then(summary => {
         setSummaryLoading(false)
         if (summary) setSessionSummary(summary)
       })
+    }
+    // Also save a background memory at session end — catches short sessions (3-5 exchanges)
+    // that never reached the every-6-exchanges trigger. Fires for any session with ≥ 6 messages.
+    if (!isMission && SESSION_END_PATTERNS.test(userText.trim()) && messages.length >= 6) {
+      summariseSessionBackground(
+        messages, name,
+        Object.keys(sessionConceptsRef.current).slice(0, 6),
+        addMemory,
+      )
     }
     sendTimeRef.current = Date.now()
 
