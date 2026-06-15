@@ -3790,6 +3790,46 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false, isDri
       continue
     }
 
+    // Auto-promote complex inline $math$ to display block
+    // Catches cases like "The quadratic formula is: $x = \frac{-b \pm \sqrt{b^2-4ac}}{2a}$"
+    // where the model wrote inline $...$ but the content deserves the highlighted box treatment
+    const complexInlineMatch = trimmed.match(/^(.*?)\$([^$\n]+(?:\\frac|\\sqrt|\\pm|\\int|\\sum|\\prod|\\lim)[^$\n]*)\$(.*)$/)
+    if (complexInlineMatch) {
+      flushList()
+      const [, before, mathContent, after] = complexInlineMatch
+      if (before.trim()) {
+        elements.push(
+          <p key={`cilabel-${i}`} style={{ margin: '6px 0 4px', fontSize: 14.5, color: isLight ? 'rgba(0,0,0,0.84)' : 'rgba(255,255,255,0.88)', lineHeight: 1.75 }}>
+            {parseInline(before.trim(), isLight)}
+          </p>
+        )
+      }
+      try {
+        const html = katex.renderToString(mathContent.trim(), { throwOnError: false, displayMode: true })
+        elements.push(
+          <div key={`cimath-${i}`} style={{
+            overflowX: 'auto', margin: '12px 0', padding: '26px 28px',
+            textAlign: 'center', borderRadius: 16, fontSize: 19,
+            background: isLight ? 'rgba(99,102,241,0.07)' : 'rgba(14,16,48,0.80)',
+            border: isLight ? '1px solid rgba(99,102,241,0.22)' : '1px solid rgba(99,102,241,0.30)',
+            boxShadow: isLight ? 'none' : '0 4px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(165,170,255,0.07)',
+          }}
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+        )
+      } catch {
+        elements.push(<p key={`cimath-${i}`} style={{ fontFamily: 'monospace', fontSize: '0.9em', color: isLight ? 'rgba(0,0,0,0.84)' : 'rgba(255,255,255,0.88)' }}>{mathContent}</p>)
+      }
+      if (after.trim()) {
+        elements.push(
+          <p key={`ciafter-${i}`} style={{ margin: '4px 0 6px', fontSize: 14.5, color: isLight ? 'rgba(0,0,0,0.84)' : 'rgba(255,255,255,0.88)', lineHeight: 1.75 }}>
+            {parseInline(after.trim(), isLight)}
+          </p>
+        )
+      }
+      i++; continue
+    }
+
     // Feedback tags [CORRECT: ...], [PARTIAL: ...], [INCORRECT: ...]
     const feedbackMatch = trimmed.match(/^\[(CORRECT|PARTIAL|INCORRECT)(?::\s*(.*))?\]/)
     if (feedbackMatch) {
