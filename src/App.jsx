@@ -5865,12 +5865,12 @@ RULES:
     // Choose next node
     let nextNode = null
     if (isGood || isPartial) {
-      // Advance: pick first untested nextSkill
-      const candidates = (node.nextSkills || []).filter(id => !cs.skillMap[id] && !cs.nodesVisited.includes(id))
+      // Advance: pick first untested nextSkill that actually exists in the map
+      const candidates = (node.nextSkills || []).filter(id => !cs.skillMap[id] && !cs.nodesVisited.includes(id) && subjectMap[id])
       nextNode = candidates[0] || null
     } else {
-      // Retreat: go to first untested prerequisite
-      const prereqs = (node.prerequisites || []).filter(id => !cs.skillMap[id] && !cs.nodesVisited.includes(id))
+      // Retreat: go to first untested prerequisite that actually exists in the map
+      const prereqs = (node.prerequisites || []).filter(id => !cs.skillMap[id] && !cs.nodesVisited.includes(id) && subjectMap[id])
       nextNode = prereqs[0] || null
       // If all prereqs tested, try a sibling (different nextSkill branch)
       if (!nextNode) {

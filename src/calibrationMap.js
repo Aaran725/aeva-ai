@@ -488,7 +488,7 @@ const MATHS = {
     label: 'Further Algebra',
     subject: 'maths', band: 'A-Level', bandOrder: 8,
     prerequisites: ['discriminant', 'surds'],
-    nextSkills: ['calculus-intro', 'binomial'],
+    nextSkills: ['calculus-intro', 'binomial-expansion'],
     questions: [
       { q: 'Simplify: (x² − 9) / (x² + x − 6)', tier: 1 },
       { q: 'Express (3x + 1) / ((x+1)(x−2)) in partial fractions.', tier: 2 },
@@ -610,6 +610,62 @@ const MATHS = {
 
       { q: 'Explain geometrically using the unit circle why sin(π − x) = sin(x) and cos(π − x) = −cos(x).', tier: 4 },
       { q: 'Solve 4sin²x − 4sinx + 1 = 0 for 0 ≤ x ≤ 2π. Show all steps. How many solutions are there and why does the repeated root affect the count?', tier: 5 },    ],
+  },
+
+  'quadratic-simultaneous': {
+    label: 'Quadratic Simultaneous Equations',
+    subject: 'maths', band: 'GCSE Higher', bandOrder: 6,
+    prerequisites: ['simultaneous-equations', 'quadratic-factorising'],
+    nextSkills: ['discriminant'],
+    questions: [
+      { q: 'Solve simultaneously: y = x + 1 and y = x²− 1', tier: 1 },
+      { q: 'Solve simultaneously: x² + y² = 25 and y = 2x', tier: 2 },
+      { q: 'Find the x-coordinates where y = x² − 3x and y = x + 5 intersect. Give exact answers.', tier: 3 },
+      { q: 'Explain why solving y = x + k and y = x² simultaneously gives a quadratic in x. What does the discriminant of that quadratic tell you about the number of intersections?', tier: 4 },
+      { q: 'Show that the line y = mx + c intersects y = x² at two points when m² + 4c > 0. Find the coordinates of both points in terms of m and c.', tier: 5 },
+    ],
+  },
+
+  'quadratic-inequalities': {
+    label: 'Quadratic Inequalities',
+    subject: 'maths', band: 'GCSE Higher', bandOrder: 6,
+    prerequisites: ['inequalities', 'quadratic-factorising'],
+    nextSkills: ['further-algebra'],
+    questions: [
+      { q: 'Solve: x² − 5x + 6 > 0', tier: 1 },
+      { q: 'Solve: 2x² + x − 3 ≤ 0', tier: 2 },
+      { q: 'Find the range of values of x for which x² < 3x + 10. Give your answer using inequality notation.', tier: 3 },
+      { q: 'Explain why the solution to x² − 4 > 0 is two separate regions (x < −2 or x > 2) rather than one continuous range. Use a sketch to justify.', tier: 4 },
+      { q: 'Solve x² + bx + c < 0 in terms of b and c, assuming two real roots α and β where α < β. State clearly when this is possible and when no solution exists.', tier: 5 },
+    ],
+  },
+
+  'transformations': {
+    label: 'Graph Transformations',
+    subject: 'maths', band: 'GCSE Higher', bandOrder: 5,
+    prerequisites: ['straight-line-graphs', 'quadratic-graphs'],
+    nextSkills: ['trigonometry', 'further-trig'],
+    questions: [
+      { q: 'The graph of y = f(x) is translated 3 units right. Write the new equation.', tier: 1 },
+      { q: 'Describe the transformation that maps y = x² to y = −(x + 2)²', tier: 2 },
+      { q: 'The graph of y = sin(x) is stretched vertically by factor 3 and translated π/2 left. Write the equation of the new graph.', tier: 3 },
+      { q: 'Explain why y = f(x + a) shifts the graph LEFT when a > 0, even though adding a feels like it should go right. Use a numerical example to prove it.', tier: 4 },
+      { q: 'Starting from y = x², apply these transformations in order: reflect in x-axis, stretch horizontally by factor 2, translate (1, −3). Write the equation after each step and justify the order matters.', tier: 5 },
+    ],
+  },
+
+  'calculus-applications': {
+    label: 'Calculus Applications',
+    subject: 'maths', band: 'A-Level', bandOrder: 9,
+    prerequisites: ['calculus-intro', 'integration'],
+    nextSkills: [],
+    questions: [
+      { q: 'A particle moves with displacement s = t³ − 6t² + 9t. Find its velocity at t = 2.', tier: 1 },
+      { q: 'Find the minimum value of f(x) = x³ − 3x² + 4 and verify it is a minimum.', tier: 2 },
+      { q: 'A rectangle has perimeter 20 cm. Use calculus to find the dimensions that maximise the area.', tier: 3 },
+      { q: 'A particle has velocity v = 3t² − 12t + 9. Find when it is stationary, and determine whether these are maximum or minimum velocity points.', tier: 4 },
+      { q: 'An open-top box is made from a 12 cm × 12 cm square card by cutting equal squares of side x from each corner. Find x that maximises volume. Show it is a maximum.', tier: 5 },
+    ],
   },
 
   'parametric': {
@@ -737,6 +793,54 @@ const PHYSICS = {
     ],
   },
 
+  'optics': {
+    label: 'Optics & Light',
+    subject: 'physics', band: 'GCSE Higher', bandOrder: 4,
+    prerequisites: ['waves'],
+    nextSkills: ['quantum'],
+    questions: [
+      { q: 'State Snell\'s Law and explain what happens to light when it crosses from air into glass.', tier: 1 },
+      { q: 'A ray of light hits a glass block (n = 1.5) at 30° to the normal. Find the angle of refraction.', tier: 2 },
+      { q: 'Explain total internal reflection and state the condition required. Give one practical application.', tier: 3 },
+    ],
+  },
+
+  'quantum': {
+    label: 'Quantum Physics',
+    subject: 'physics', band: 'A-Level', bandOrder: 7,
+    prerequisites: ['waves', 'atomic-structure'],
+    nextSkills: [],
+    questions: [
+      { q: 'State what the photoelectric effect demonstrates about the nature of light.', tier: 1 },
+      { q: 'Calculate the energy of a photon of frequency 5×10¹⁴ Hz. (h = 6.63×10⁻³⁴ J s)', tier: 2 },
+      { q: 'Explain why increasing the intensity of light below the threshold frequency never causes photoelectric emission, no matter how long you wait.', tier: 3 },
+    ],
+  },
+
+  'nuclear': {
+    label: 'Nuclear Physics',
+    subject: 'physics', band: 'A-Level', bandOrder: 7,
+    prerequisites: ['atomic-structure'],
+    nextSkills: [],
+    questions: [
+      { q: 'Write a balanced nuclear equation for alpha decay of uranium-238 (₉₂²³⁸U).', tier: 1 },
+      { q: 'Calculate the binding energy per nucleon for helium-4, given mass defect of 0.030377 u. (1 u = 931.5 MeV)', tier: 2 },
+      { q: 'Explain why nuclear fission of uranium releases energy but nuclear fusion of hydrogen also releases energy, when both involve rearranging nucleons.', tier: 3 },
+    ],
+  },
+
+  'ac-dc': {
+    label: 'AC & DC Electricity',
+    subject: 'physics', band: 'GCSE Higher', bandOrder: 5,
+    prerequisites: ['electricity-basics', 'electromagnetism'],
+    nextSkills: [],
+    questions: [
+      { q: 'What is the difference between AC and DC? Give one example of each.', tier: 1 },
+      { q: 'An AC supply has peak voltage 325 V. Calculate the RMS voltage.', tier: 2 },
+      { q: 'Explain why the UK mains supply uses AC at 50 Hz rather than DC, referring to the role of transformers.', tier: 3 },
+    ],
+  },
+
   'gravitation': {
     label: 'Gravitation',
     subject: 'physics', band: 'A-Level', bandOrder: 8,
@@ -824,6 +928,30 @@ const CHEMISTRY = {
     ],
   },
 
+  'structure-properties': {
+    label: 'Structure & Properties',
+    subject: 'chemistry', band: 'GCSE Higher', bandOrder: 4,
+    prerequisites: ['bonding'],
+    nextSkills: ['rates'],
+    questions: [
+      { q: 'Why do giant ionic lattices have high melting points but dissolve in water?', tier: 1 },
+      { q: 'Compare the electrical conductivity of ionic compounds when solid vs dissolved. Explain using structure.', tier: 2 },
+      { q: 'Explain why graphite conducts electricity but diamond does not, despite both being covalent carbon structures.', tier: 3 },
+    ],
+  },
+
+  'concentration': {
+    label: 'Concentration & Solutions',
+    subject: 'chemistry', band: 'GCSE Higher', bandOrder: 4,
+    prerequisites: ['moles'],
+    nextSkills: ['reactions'],
+    questions: [
+      { q: 'Calculate the concentration in mol/dm³ of a solution made by dissolving 0.5 mol of NaCl in 250 cm³ of water.', tier: 1 },
+      { q: '50 cm³ of 2 mol/dm³ HCl is diluted to 200 cm³. What is the new concentration?', tier: 2 },
+      { q: 'A titration uses 24.5 cm³ of 0.1 mol/dm³ NaOH to neutralise 25 cm³ of H₂SO₄. Calculate the concentration of the acid.', tier: 3 },
+    ],
+  },
+
   'equilibrium': {
     label: 'Equilibrium & Le Chatelier',
     subject: 'chemistry', band: 'A-Level', bandOrder: 7,
@@ -887,6 +1015,42 @@ const BIOLOGY = {
     ],
   },
 
+  'breathing': {
+    label: 'Breathing & Gas Exchange',
+    subject: 'biology', band: 'GCSE Foundation', bandOrder: 2,
+    prerequisites: ['cell-transport'],
+    nextSkills: ['enzymes'],
+    questions: [
+      { q: 'What is the difference between breathing and respiration?', tier: 1 },
+      { q: 'Explain how the alveoli are adapted for efficient gas exchange. Give three features.', tier: 2 },
+      { q: 'Explain why oxygen moves from the alveoli into the blood and carbon dioxide moves in the opposite direction. Use the concept of concentration gradients.', tier: 3 },
+    ],
+  },
+
+  'digestion': {
+    label: 'Digestion & Nutrition',
+    subject: 'biology', band: 'GCSE Foundation', bandOrder: 3,
+    prerequisites: ['enzymes'],
+    nextSkills: ['dna-genetics'],
+    questions: [
+      { q: 'Name the enzyme that breaks down starch and state where it is produced.', tier: 1 },
+      { q: 'Explain the role of bile in digestion. Why is it not an enzyme?', tier: 2 },
+      { q: 'Describe how the small intestine is adapted to maximise absorption of digested food. Give three structural features.', tier: 3 },
+    ],
+  },
+
+  'genetic-engineering': {
+    label: 'Genetic Engineering',
+    subject: 'biology', band: 'GCSE Higher', bandOrder: 6,
+    prerequisites: ['dna-genetics'],
+    nextSkills: [],
+    questions: [
+      { q: 'What is genetic engineering? Give one example of a genetically engineered product.', tier: 1 },
+      { q: 'Explain the role of restriction enzymes and ligase enzymes in genetic engineering.', tier: 2 },
+      { q: 'Evaluate one benefit and one ethical concern of using genetic engineering to produce insulin.', tier: 3 },
+    ],
+  },
+
   'evolution': {
     label: 'Evolution & Natural Selection',
     subject: 'biology', band: 'GCSE Higher', bandOrder: 5,
@@ -947,6 +1111,42 @@ const HISTORY = {
       { q: 'Name two terms of the Treaty of Versailles that punished Germany.', tier: 1 },
       { q: 'Explain why many Germans felt the Treaty of Versailles was unfair.', tier: 2 },
       { q: 'Evaluate the extent to which the Treaty of Versailles caused the rise of Hitler.', tier: 3 },
+    ],
+  },
+
+  'ww1-trench': {
+    label: 'WW1 — Trench Warfare',
+    subject: 'history', band: 'GCSE', bandOrder: 4,
+    prerequisites: ['ww1-causes'],
+    nextSkills: ['versailles'],
+    questions: [
+      { q: 'Describe two features of life in the trenches during WW1.', tier: 1 },
+      { q: 'Explain why the Western Front became a stalemate by late 1914.', tier: 2 },
+      { q: '"New technology in WW1 favoured defence over attack." How far do you agree? Refer to at least two weapons or tactics.', tier: 3 },
+    ],
+  },
+
+  'weimar': {
+    label: 'Weimar Republic',
+    subject: 'history', band: 'GCSE', bandOrder: 5,
+    prerequisites: ['versailles'],
+    nextSkills: ['ww2-causes'],
+    questions: [
+      { q: 'When was the Weimar Republic established, and what was Article 48?', tier: 1 },
+      { q: 'Explain two problems the Weimar Republic faced in its early years (1919–1923).', tier: 2 },
+      { q: 'How far was the hyperinflation crisis of 1923 responsible for the early weakness of the Weimar Republic?', tier: 3 },
+    ],
+  },
+
+  'ww2-causes': {
+    label: 'Causes of World War Two',
+    subject: 'history', band: 'GCSE', bandOrder: 5,
+    prerequisites: ['versailles', 'causation'],
+    nextSkills: [],
+    questions: [
+      { q: 'Name two policies of appeasement used by Britain and France in the 1930s.', tier: 1 },
+      { q: 'Explain how Hitler\'s foreign policy aims contributed to the outbreak of WW2.', tier: 2 },
+      { q: '"Appeasement was the main cause of WW2." How far do you agree? Consider at least two other causes.', tier: 3 },
     ],
   },
 
@@ -1064,6 +1264,42 @@ const ECONOMICS = {
     ],
   },
 
+  'firms-revenue': {
+    label: 'Firms, Costs & Revenue',
+    subject: 'economics', band: 'GCSE Higher', bandOrder: 4,
+    prerequisites: ['elasticity'],
+    nextSkills: ['market-failure'],
+    questions: [
+      { q: 'What is the difference between fixed costs and variable costs? Give one example of each.', tier: 1 },
+      { q: 'A firm sells 100 units at £5 each. Total costs are £400. Calculate profit.', tier: 2 },
+      { q: 'Explain why a profit-maximising firm produces where MR = MC. What happens to profit if it produces one unit more?', tier: 3 },
+    ],
+  },
+
+  'government-intervention': {
+    label: 'Government Intervention',
+    subject: 'economics', band: 'GCSE Higher', bandOrder: 5,
+    prerequisites: ['market-failure'],
+    nextSkills: ['macroeconomics'],
+    questions: [
+      { q: 'Give two examples of government intervention to correct market failure.', tier: 1 },
+      { q: 'Explain how a subsidy on electric cars could correct a positive externality.', tier: 2 },
+      { q: 'Evaluate the effectiveness of a minimum wage as a government policy. Consider both benefits and drawbacks.', tier: 3 },
+    ],
+  },
+
+  'fiscal-monetary': {
+    label: 'Fiscal & Monetary Policy',
+    subject: 'economics', band: 'GCSE Higher', bandOrder: 6,
+    prerequisites: ['macroeconomics'],
+    nextSkills: [],
+    questions: [
+      { q: 'What is the difference between fiscal policy and monetary policy?', tier: 1 },
+      { q: 'Explain how raising interest rates could reduce inflation.', tier: 2 },
+      { q: 'Evaluate whether cutting income tax is an effective way to reduce unemployment. Consider the trade-offs.', tier: 3 },
+    ],
+  },
+
   'macroeconomics': {
     label: 'Macroeconomic Objectives',
     subject: 'economics', band: 'GCSE Higher', bandOrder: 5,
@@ -1112,6 +1348,54 @@ const COMPUTER_SCIENCE = {
       { q: 'What is the difference between a function and a procedure?', tier: 1 },
       { q: 'Explain the benefits of using subroutines in a program. Give two reasons.', tier: 2 },
       { q: 'Explain the concept of variable scope. What is the risk of using only global variables?', tier: 3 },
+    ],
+  },
+
+  'data-structures': {
+    label: 'Data Structures',
+    subject: 'computer-science', band: 'GCSE Foundation', bandOrder: 2,
+    prerequisites: ['variables-datatypes'],
+    nextSkills: ['algorithms'],
+    questions: [
+      { q: 'What is the difference between a list (array) and a dictionary (hash map)?', tier: 1 },
+      { q: 'Explain the difference between a stack and a queue. Give one real-world example of each.', tier: 2 },
+      { q: 'Describe how a linked list differs from an array in terms of memory and access time. When would you prefer each?', tier: 3 },
+    ],
+  },
+
+  'oop': {
+    label: 'Object-Oriented Programming',
+    subject: 'computer-science', band: 'GCSE Higher', bandOrder: 5,
+    prerequisites: ['subroutines'],
+    nextSkills: ['algorithms'],
+    questions: [
+      { q: 'What is a class? What is an object? Give a real-world example of each.', tier: 1 },
+      { q: 'Explain the concepts of encapsulation and inheritance using a concrete example.', tier: 2 },
+      { q: 'What is polymorphism? Write pseudocode to show how two subclasses can override the same method differently.', tier: 3 },
+    ],
+  },
+
+  'sorting': {
+    label: 'Sorting Algorithms',
+    subject: 'computer-science', band: 'GCSE Higher', bandOrder: 6,
+    prerequisites: ['algorithms'],
+    nextSkills: ['complexity'],
+    questions: [
+      { q: 'Describe the steps of bubble sort on this list: [5, 3, 8, 1, 9]', tier: 1 },
+      { q: 'Compare bubble sort and merge sort in terms of time complexity. When does the difference matter?', tier: 2 },
+      { q: 'Explain why merge sort has O(n log n) complexity while bubble sort is O(n²). Trace through a small example.', tier: 3 },
+    ],
+  },
+
+  'complexity': {
+    label: 'Computational Complexity',
+    subject: 'computer-science', band: 'A-Level', bandOrder: 7,
+    prerequisites: ['algorithms', 'sorting'],
+    nextSkills: [],
+    questions: [
+      { q: 'What does O(n) mean? What does O(n²) mean? Give an algorithm example of each.', tier: 1 },
+      { q: 'An algorithm takes 1 second for n=10 and 100 seconds for n=100. What is its likely complexity?', tier: 2 },
+      { q: 'Explain the difference between time complexity and space complexity. Give an algorithm where they trade off against each other.', tier: 3 },
     ],
   },
 
