@@ -1497,4 +1497,59 @@ export const FAST_LANE = {
       onFail: 'addition-subtraction',
     },
   ],
+
+  // ── PHYSICS — F=ma + energy concept ───────────────────────────────────────
+  physics: [
+    {
+      label: 'Quick Check',
+      q: 'Two quick checks — answer both:\n(a) A 4 kg object accelerates at 3 m/s². What force acts on it?\n(b) A moving car doubles its speed. What happens to its kinetic energy — does it double, halve, or quadruple?',
+      nodeId: 'forces-basics',
+      onPass: 'momentum',      // solid → skip Foundation, enter at GCSE Higher
+      onFail: 'forces-basics', // not solid → start from Foundation
+    },
+  ],
+
+  // ── CHEMISTRY — atomic structure + isotope calculation ────────────────────
+  chemistry: [
+    {
+      label: 'Quick Check',
+      q: 'Two quick checks — answer both:\n(a) How many protons, neutrons and electrons does Carbon-12 have?\n(b) Chlorine has two isotopes: ³⁵Cl (75%) and ³⁷Cl (25%). What is the approximate relative atomic mass?',
+      nodeId: 'atomic-structure-chem',
+      onPass: 'bonding',             // solid → skip Foundation, enter at GCSE Higher
+      onFail: 'atomic-structure-chem',
+    },
+  ],
+
+  // ── BIOLOGY — cell structure + osmosis ────────────────────────────────────
+  biology: [
+    {
+      label: 'Quick Check',
+      q: 'Two quick checks — answer both:\n(a) Name two structures found in a plant cell but NOT in an animal cell.\n(b) In one sentence, what is osmosis?',
+      nodeId: 'cell-structure',
+      onPass: 'dna-genetics',  // solid → skip Foundation, enter at GCSE Higher
+      onFail: 'cell-structure',
+    },
+  ],
+
+  // ── COMPUTER SCIENCE — data types + loop ──────────────────────────────────
+  'computer-science': [
+    {
+      label: 'Quick Check',
+      q: 'Two quick checks — answer both:\n(a) What is the difference between an integer and a float? Give one example of each.\n(b) Write pseudocode for a loop that prints the numbers 1 to 5.',
+      nodeId: 'variables-datatypes',
+      onPass: 'subroutines',        // solid → skip Foundation, enter at GCSE Higher
+      onFail: 'variables-datatypes',
+    },
+  ],
+
+  // ── ECONOMICS — supply/demand + PED ───────────────────────────────────────
+  economics: [
+    {
+      label: 'Quick Check',
+      q: 'Two quick checks — answer both:\n(a) If demand for a good increases and supply stays the same, what happens to the equilibrium price?\n(b) Price rises by 10% and quantity demanded falls by 20%. What is the price elasticity of demand (PED)?',
+      nodeId: 'supply-demand',
+      onPass: 'market-failure',  // solid → skip Foundation, enter at GCSE Higher
+      onFail: 'supply-demand',
+    },
+  ],
 }

@@ -5592,11 +5592,12 @@ function ChatView({ onBack }) {
   const calibStateRef = useRef({
     subject: null,
     currentNode: null,           // skill ID being tested
-    skillMap: {},                // { [skillId]: 'solid'|'shaky'|'gap'|'untested' }
+    skillMap: {},                // { [skillId]: 'mastery'|'solid'|'shaky'|'gap' }
     nodeCount: 0,                // distinct skill nodes assessed (used for cap — retries don't count)
     questionsAsked: 0,           // total questions including tier retries (used for display)
-    tierAtNode: 1,               // current tier (1-3) being asked at this node
-    partialAtNode: false,        // had a partial on this node already
+    tierAtNode: 1,               // current tier being asked at this node
+    partialAtNode: false,        // had a partial on this node already (guards against double-retry)
+    masteryProbed: false,        // already fired tier-4 mastery probe for this node
     nodesVisited: [],
     startTime: null,
   })
@@ -5712,7 +5713,7 @@ function ChatView({ onBack }) {
       calibStateRef.current = {
         subject: null, currentNode: null,
         skillMap: {}, nodeCount: 0, questionsAsked: 0,
-        tierAtNode: 1, partialAtNode: false,
+        tierAtNode: 1, partialAtNode: false, masteryProbed: false,
         nodesVisited: [], startTime: null,
       }
       setCalibMode(false)
@@ -6116,24 +6117,42 @@ RULES:
 
     const isGood = understanding === 'solid' || understanding === 'mastery'
     const isPartial = understanding === 'partial'
-    const isNone = understanding === 'none'
 
-    // Handle partial: give one retry at next tier before deciding direction
+    // ── Tier escalation 1: partial retry (tiers 1→2→3) ──────────────────────
+    // Give one harder-tier retry before deciding direction (existing behaviour)
     if (isPartial && !cs.partialAtNode && cs.tierAtNode < 3) {
       cs.partialAtNode = true
       cs.tierAtNode += 1
-      return cs.currentNode  // stay on same node, harder tier
+      return cs.currentNode  // stay on same node, harder question
     }
 
-    // Mark current node
-    const status = isGood ? 'solid' : (isPartial ? 'shaky' : 'gap')
+    // ── Tier escalation 2: mastery probe (tier 3→4) ──────────────────────────
+    // After acing tier 3, fire one tier-4 question to distinguish solid from mastery.
+    // Only once per node; only if a tier-4 question exists for this node.
+    if (isGood && cs.tierAtNode === 3 && !cs.masteryProbed) {
+      const hasT4 = node.questions?.some(q => q.tier === 4)
+      if (hasT4) {
+        cs.masteryProbed = true
+        cs.tierAtNode = 4
+        return cs.currentNode  // same node, mastery probe question
+      }
+    }
+
+    // ── Mark current node ────────────────────────────────────────────────────
+    // At tier 4: solid = mastery; partial/none still = solid (they passed tier 3)
+    const status = cs.tierAtNode >= 4
+      ? (isGood ? 'mastery' : 'solid')
+      : isGood    ? 'solid'
+      : isPartial ? 'shaky'
+      : 'gap'
     cs.skillMap[cs.currentNode] = status
     cs.partialAtNode = false
+    cs.masteryProbed = false
     cs.tierAtNode = 1
 
-    // Choose next node
+    // ── Choose next node ─────────────────────────────────────────────────────
     let nextNode = null
-    if (isGood || isPartial) {
+    if (isGood || isPartial || cs.tierAtNode >= 4) {
       // Advance: pick first untested nextSkill that actually exists in the map
       const candidates = (node.nextSkills || []).filter(id => !cs.skillMap[id] && !cs.nodesVisited.includes(id) && subjectMap[id])
       nextNode = candidates[0] || null
@@ -6141,7 +6160,7 @@ RULES:
       // Retreat: go to first untested prerequisite that actually exists in the map
       const prereqs = (node.prerequisites || []).filter(id => !cs.skillMap[id] && !cs.nodesVisited.includes(id) && subjectMap[id])
       nextNode = prereqs[0] || null
-      // If all prereqs tested, try a sibling (different nextSkill branch)
+      // If all prereqs tested, try a sibling at or below current band
       if (!nextNode) {
         const siblingCandidates = Object.keys(subjectMap).filter(id =>
           !cs.skillMap[id] && !cs.nodesVisited.includes(id) &&
@@ -6156,19 +6175,32 @@ RULES:
     return nextNode
   }
 
-  /** Determine curriculum band from skill map */
+  /** Determine curriculum band from skill map using weighted bandOrder average.
+   *  mastery=3pts, solid=2pts, shaky=1pt, gap=0pts (gaps don't inflate the band).
+   *  This prevents a single shaky A-Level node from inflating a mostly-GCSE student. */
   const calibBand = (skillMap, subject) => {
     const subjectMap = CALIBRATION_MAP[subject] || {}
-    const solidOrShaky = Object.entries(skillMap).filter(([, v]) => v === 'solid' || v === 'shaky').map(([id]) => id)
-    if (!solidOrShaky.length) return 'Grade 1–2'
-    const maxBandOrder = Math.max(...solidOrShaky.map(id => subjectMap[id]?.bandOrder ?? -6))
-    if (maxBandOrder >= 8) return 'A-Level'
-    if (maxBandOrder >= 6) return 'GCSE Higher'
-    if (maxBandOrder >= 4) return 'GCSE Foundation'
-    if (maxBandOrder >= 1) return 'Foundation'
-    if (maxBandOrder >= 0) return 'Grade 7–8'
-    if (maxBandOrder >= -1) return 'Grade 5–6'
-    if (maxBandOrder >= -3) return 'Grade 3–4'
+    const entries = Object.entries(skillMap)
+    if (!entries.length) return 'Grade 1–2'
+
+    let weightedSum = 0, totalWeight = 0
+    for (const [id, status] of entries) {
+      const bo = subjectMap[id]?.bandOrder ?? -6
+      const w = status === 'mastery' ? 3 : status === 'solid' ? 2 : status === 'shaky' ? 1 : 0
+      weightedSum += bo * w
+      totalWeight += w
+    }
+    // All gaps → no weight → beginner
+    if (totalWeight === 0) return 'Grade 1–2'
+
+    const avg = weightedSum / totalWeight
+    if (avg >= 8)  return 'A-Level'
+    if (avg >= 6)  return 'GCSE Higher'
+    if (avg >= 4)  return 'GCSE Foundation'
+    if (avg >= 1)  return 'Foundation'
+    if (avg >= 0)  return 'Grade 7–8'
+    if (avg >= -1) return 'Grade 5–6'
+    if (avg >= -3) return 'Grade 3–4'
     return 'Grade 1–2'
   }
 
@@ -6219,7 +6251,7 @@ Rules:
     calibStateRef.current = {
       subject, currentNode: entryNode,
       skillMap: {}, nodeCount: 0, questionsAsked: 0,
-      tierAtNode: 1, partialAtNode: false,
+      tierAtNode: 1, partialAtNode: false, masteryProbed: false,
       nodesVisited: [], startTime: Date.now(),
     }
     // Initialise fast lane if this subject has one
@@ -7741,7 +7773,7 @@ If no clear changes: {"changes":[]}`
                   {void calibTick}
                   {calibFastLaneRef.current.active
                     ? '⚡ Placing you…'
-                    : <>Q{Math.min(calibStateRef.current.questionsAsked + 1, 12)}<span style={{ fontWeight: 400, opacity: 0.45 }}>/12</span></>
+                    : <>Q{calibStateRef.current.questionsAsked + 1}</>
                   }
                 </div>
               </div>
@@ -8882,7 +8914,7 @@ If no clear changes: {"changes":[]}`
                       />
                       <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(165,180,252,0.75)', letterSpacing: '0.02em' }}>
                         {void calibTick}
-                        Answering Q{Math.min(calibStateRef.current.questionsAsked + 1, 12)}
+                        Answering Q{calibStateRef.current.questionsAsked + 1}
                       </span>
                     </div>
                     <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', fontWeight: 500 }}>
