@@ -7,7 +7,7 @@
  *   Lens = single maths problem → solve step-by-step or analyse structure
  *   AevaDoc = whole document/homework → free tutoring conversation alongside it
  */
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, createContext, useContext, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import katex from 'katex'
 import {
@@ -18,6 +18,9 @@ import { nextGroqKey as gKey, GROQ_URL } from './groqClient'
 import { CHAT_THEMES } from './chatThemes'
 import * as pdfjsLib from 'pdfjs-dist'
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).href
+
+// ─── Doc context — passes AI annotation fetch down to equation components ─────
+const DocCtx = createContext(null)
 
 const VISION = 'meta-llama/llama-4-scout-17b-16e-instruct'
 const TEXT   = 'llama-3.3-70b-versatile'
@@ -270,6 +273,133 @@ function DocCodeBlock({ code, lang }) {
   )
 }
 
+// ─── BlockEquation — U2 (copy) + U5 (hover annotation) ───────────────────────
+
+function BlockEquation({ latex, html, eqNum }) {
+  const ctx = useContext(DocCtx)
+  const [hovered, setHovered] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [annotation, setAnnotation] = useState(null)
+  const [loadingAnnotation, setLoadingAnnotation] = useState(false)
+  const annotationTriggered = useRef(false)
+
+  const handleMouseEnter = async () => {
+    setHovered(true)
+    if (!annotationTriggered.current && ctx?.getAnnotation) {
+      annotationTriggered.current = true
+      setLoadingAnnotation(true)
+      const text = await ctx.getAnnotation(latex)
+      setAnnotation(text)
+      setLoadingAnnotation(false)
+    }
+  }
+
+  const handleCopy = (e) => {
+    e.stopPropagation()
+    navigator.clipboard.writeText(latex).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    })
+  }
+
+  return (
+    <div
+      style={{ position: 'relative', margin: '16px 0' }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {/* Equation card */}
+      <div style={{
+        overflowX: 'auto', padding: '18px 24px',
+        textAlign: 'center', borderRadius: 12, fontSize: 18,
+        background: 'rgba(99,102,241,0.07)',
+        border: '1px solid rgba(99,102,241,0.22)',
+        borderLeft: '3px solid #6366F1',
+        boxShadow: hovered ? '0 2px 22px rgba(99,102,241,0.20)' : '0 2px 16px rgba(99,102,241,0.10)',
+        color: '#E0E7FF',
+        transition: 'box-shadow 0.2s',
+        userSelect: 'none',
+      }} dangerouslySetInnerHTML={{ __html: html }} />
+
+      {/* eq. badge — slides left when copy button appears */}
+      <span style={{
+        position: 'absolute', top: 8, right: hovered ? 48 : 10,
+        fontSize: 10, fontWeight: 700,
+        color: 'rgba(99,102,241,0.60)',
+        background: 'rgba(99,102,241,0.12)',
+        border: '1px solid rgba(99,102,241,0.20)',
+        padding: '2px 8px', borderRadius: 99,
+        letterSpacing: '0.05em',
+        transition: 'right 0.18s',
+        pointerEvents: 'none',
+      }}>eq. {eqNum}</span>
+
+      {/* Copy button (U2) */}
+      <AnimatePresence>
+        {hovered && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.7 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.7 }}
+            transition={{ duration: 0.14 }}
+            onClick={handleCopy}
+            title="Copy LaTeX"
+            style={{
+              position: 'absolute', top: 8, right: 10,
+              width: 32, height: 24, borderRadius: 7,
+              background: copied ? 'rgba(74,222,128,0.15)' : 'rgba(99,102,241,0.15)',
+              border: `1px solid ${copied ? 'rgba(74,222,128,0.45)' : 'rgba(99,102,241,0.38)'}`,
+              color: copied ? '#4ADE80' : '#A5B4FC',
+              cursor: 'pointer', fontSize: 11, fontWeight: 800,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: 'inherit',
+            }}
+          >
+            {copied ? '✓' : '⎘'}
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* Annotation tooltip (U5) */}
+      <AnimatePresence>
+        {hovered && (annotation || loadingAnnotation) && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18 }}
+            style={{
+              position: 'absolute', top: 'calc(100% + 5px)', left: 0, right: 0, zIndex: 20,
+              background: 'rgba(10,11,26,0.97)',
+              border: '1px solid rgba(99,102,241,0.28)',
+              borderRadius: 10, padding: '10px 14px',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              boxShadow: '0 8px 28px rgba(0,0,0,0.55)',
+            }}
+          >
+            {loadingAnnotation ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {[82, 55].map((w, ii) => (
+                  <motion.div key={ii}
+                    animate={{ opacity: [0.22, 0.50, 0.22] }}
+                    transition={{ duration: 1.5, repeat: Infinity, delay: ii * 0.28 }}
+                    style={{ height: 9, borderRadius: 5, background: 'rgba(99,102,241,0.28)', width: `${w}%` }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: 12.5, color: 'rgba(190,190,240,0.88)', lineHeight: 1.65, fontStyle: 'italic' }}>
+                {annotation}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 // ─── Table ────────────────────────────────────────────────────────────────────
 
 function DocTable({ rows }) {
@@ -331,13 +461,14 @@ function getStepColor(text) {
 
 // ─── DocMarkdown — same rendering engine as MarkdownRenderer in chat ─────────
 
-function DocMarkdown({ text }) {
+function DocMarkdown({ text, messageIdx = 0 }) {
   const lines = text.split('\n')
   const elements = []
   let i = 0
   let listItems = []
   let listType  = null
   let eqCounter = 0  // F1: equation numbering
+  let h2Counter = 0  // U4: step sidebar IDs
 
   const flushList = () => {
     if (!listItems.length) return
@@ -401,28 +532,8 @@ function DocMarkdown({ text }) {
       try {
         const html = katex.renderToString(mathContent, { throwOnError: false, displayMode: true })
         eqCounter++
-        const eqNum = eqCounter
         elements.push(
-          <div key={`dm-${startI}`} style={{ position: 'relative', margin: '16px 0' }}>
-            <div style={{
-              overflowX: 'auto', padding: '18px 24px',
-              textAlign: 'center', borderRadius: 12, fontSize: 18,
-              background: 'rgba(99,102,241,0.07)',
-              border: '1px solid rgba(99,102,241,0.22)',
-              borderLeft: '3px solid #6366F1',
-              boxShadow: '0 2px 16px rgba(99,102,241,0.10)',
-              color: '#E0E7FF',
-            }} dangerouslySetInnerHTML={{ __html: html }} />
-            <span style={{
-              position: 'absolute', top: 8, right: 10,
-              fontSize: 10, fontWeight: 700,
-              color: 'rgba(99,102,241,0.60)',
-              background: 'rgba(99,102,241,0.12)',
-              border: '1px solid rgba(99,102,241,0.20)',
-              padding: '2px 8px', borderRadius: 99,
-              letterSpacing: '0.05em',
-            }}>eq. {eqNum}</span>
-          </div>
+          <BlockEquation key={`dm-${startI}`} latex={mathContent} html={html} eqNum={eqCounter} />
         )
       } catch { elements.push(<p key={`dm-${startI}`} style={{ fontFamily: 'monospace', color: 'rgba(255,255,255,0.86)' }}>{mathContent}</p>) }
       continue
@@ -506,8 +617,9 @@ function DocMarkdown({ text }) {
       flushList()
       const h2Text  = trimmed.replace(/^##\s/, '')
       const h2Color = getStepColor(h2Text)
+      const stepId  = `doc-step-${messageIdx}-${h2Counter++}`
       elements.push(
-        <div key={`h2-${i}`} style={{ marginTop: 34, marginBottom: 14 }}>
+        <div id={stepId} key={`h2-${i}`} style={{ marginTop: 34, marginBottom: 14 }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 12,
             paddingBottom: 12,
@@ -742,6 +854,148 @@ function useIsMobile() {
   return mob
 }
 
+// ─── Step extractor — parses H2s from all assistant messages ─────────────────
+
+function extractDocSteps(messages) {
+  const steps = []
+  messages.forEach((msg, mi) => {
+    if (msg.role !== 'assistant' || !msg.content) return
+    const lines = msg.content.split('\n')
+    let h2Idx = 0
+    lines.forEach(line => {
+      const trimmed = line.trim()
+      if (/^##\s/.test(trimmed)) {
+        const text = trimmed.replace(/^##\s/, '')
+        steps.push({ id: `doc-step-${mi}-${h2Idx}`, text, color: getStepColor(text) })
+        h2Idx++
+      }
+    })
+  })
+  return steps
+}
+
+// ─── Step progress sidebar (U4) ───────────────────────────────────────────────
+
+function StepSidebar({ steps, scrollRoot, mobileTab }) {
+  const isMobile = useIsMobile()
+  const [active, setActive] = useState(null)
+  const [completed, setCompleted] = useState(new Set())
+
+  useEffect(() => {
+    if (!steps.length) return
+    const root = scrollRoot?.current || null
+    const observers = []
+
+    steps.forEach(({ id }) => {
+      const el = document.getElementById(id)
+      if (!el) return
+      const obs = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) {
+            setActive(id)
+          } else if (entry.boundingClientRect.top < 0) {
+            setCompleted(prev => {
+              const next = new Set(prev)
+              next.add(id)
+              return next
+            })
+          }
+        },
+        { root, threshold: 0.2, rootMargin: '0px 0px -40% 0px' }
+      )
+      obs.observe(el)
+      observers.push(obs)
+    })
+
+    return () => observers.forEach(o => o.disconnect())
+  }, [steps, scrollRoot])
+
+  const scrollTo = (id) => {
+    const el = document.getElementById(id)
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const activeIdx = steps.findIndex(s => s.id === active)
+
+  if (!steps.length) return null
+
+  if (isMobile) {
+    if (mobileTab !== 'chat') return null
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        style={{
+          position: 'absolute', bottom: 84, right: 16, zIndex: 15,
+          background: 'rgba(8,9,24,0.93)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          border: '1px solid rgba(99,102,241,0.32)',
+          borderRadius: 99, padding: '6px 16px',
+          fontSize: 12, fontWeight: 700, color: '#A5B4FC',
+          boxShadow: '0 4px 18px rgba(0,0,0,0.50)',
+          pointerEvents: 'none',
+        }}
+      >
+        Step {activeIdx >= 0 ? activeIdx + 1 : '–'} / {steps.length}
+      </motion.div>
+    )
+  }
+
+  return (
+    <div style={{
+      width: 56, flexShrink: 0,
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', paddingTop: 22, paddingBottom: 22,
+      gap: 6,
+      borderLeft: '1px solid rgba(255,255,255,0.06)',
+      overflowY: 'auto',
+    }}>
+      <div style={{
+        fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.18)',
+        letterSpacing: '0.10em', textTransform: 'uppercase',
+        marginBottom: 6, textAlign: 'center', writingMode: 'initial',
+      }}>
+        Steps
+      </div>
+      {steps.map(({ id, text, color }, idx) => {
+        const isActive = id === active
+        const isDone   = completed.has(id)
+        return (
+          <motion.button
+            key={id}
+            onClick={() => scrollTo(id)}
+            title={text}
+            whileHover={{ scale: 1.15 }}
+            whileTap={{ scale: 0.88 }}
+            style={{
+              width: 32, height: 32, borderRadius: 10,
+              background: isActive
+                ? `${color}22`
+                : isDone
+                ? 'rgba(74,222,128,0.08)'
+                : 'rgba(255,255,255,0.03)',
+              border: isActive
+                ? `2px solid ${color}`
+                : isDone
+                ? '1.5px solid rgba(74,222,128,0.28)'
+                : '1px solid rgba(255,255,255,0.08)',
+              boxShadow: isActive ? `0 0 14px ${color}45` : 'none',
+              color: isActive ? color : isDone ? '#4ADE80' : 'rgba(255,255,255,0.22)',
+              cursor: 'pointer',
+              fontSize: isDone ? 10 : 12, fontWeight: 900,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 0.2s', fontFamily: 'inherit',
+            }}
+          >
+            {isDone ? '✓' : idx + 1}
+          </motion.button>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function AevaDoc({ onClose, name = 'Student' }) {
   const isMobile = useIsMobile()
   const [file, setFile]           = useState(null)
@@ -777,11 +1031,46 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
     return () => document.removeEventListener('mousedown', handler)
   }, [showThemePicker])
 
-  const fileInputRef = useRef(null)
-  const inputRef     = useRef(null)
-  const bottomRef    = useRef(null)
-  const base64Ref    = useRef(null) // store image base64 for context
-  const mimeRef      = useRef(null)
+  const fileInputRef      = useRef(null)
+  const inputRef          = useRef(null)
+  const bottomRef         = useRef(null)
+  const messagesScrollRef = useRef(null)
+  const base64Ref         = useRef(null) // store image base64 for context
+  const mimeRef           = useRef(null)
+  const annotationCache   = useRef({})
+
+  // U5 — lazy per-equation AI annotation, called once per unique LaTeX string
+  const getAnnotation = useCallback(async (latex) => {
+    if (annotationCache.current[latex]) return annotationCache.current[latex]
+    try {
+      const res = await fetch(GROQ_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${gKey()}` },
+        body: JSON.stringify({
+          model: TEXT,
+          messages: [
+            {
+              role: 'system',
+              content: `You are a concise math notation explainer.${scanCtx ? ` Context: ${scanCtx.subject} (${scanCtx.level}).` : ''} Reply with one sentence only, under 20 words, no preamble.`,
+            },
+            { role: 'user', content: `Name the key parts of this expression: ${latex}` },
+          ],
+          max_tokens: 60,
+          temperature: 0.25,
+          stream: false,
+        }),
+      })
+      const data = await res.json()
+      const text = data.choices?.[0]?.message?.content?.trim() || 'Mathematical expression'
+      annotationCache.current[latex] = text
+      return text
+    } catch {
+      return 'Mathematical expression'
+    }
+  }, [scanCtx])
+
+  // U4 — extract H2 steps from all assistant messages for the sidebar
+  const steps = useMemo(() => extractDocSteps(messages), [messages])
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -972,6 +1261,7 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
+  <DocCtx.Provider value={{ getAnnotation }}>
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -1190,8 +1480,11 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
         {/* ── Right: Chat panel ────────────────────────────────────────────── */}
         <div style={{ flex: 1, display: isMobile && file && mobileTab === 'doc' ? 'none' : 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
 
+          {/* Messages + Step sidebar row */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0, overflow: 'hidden' }}>
+
           {/* Messages */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '22px 22px 8px', paddingBottom: isMobile ? 72 : 8, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
+          <div ref={messagesScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '22px 22px 8px', paddingBottom: isMobile ? 72 : 8, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
 
             {!file && (
               /* Empty state hint */
@@ -1234,7 +1527,7 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
                       border: '1px solid rgba(255,255,255,0.08)',
                       borderLeft: '2px solid rgba(99,102,241,0.45)',
                     }}>
-                      <DocMarkdown text={msg.content || '…'} />
+                      <DocMarkdown text={msg.content || '…'} messageIdx={i} />
                     </div>
                   </div>
                 )}
@@ -1254,6 +1547,13 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
 
             <div ref={bottomRef} />
           </div>
+
+          {/* Step sidebar (U4) — desktop: right column; mobile: floating pill */}
+          {steps.length >= 2 && (
+            <StepSidebar steps={steps} scrollRoot={messagesScrollRef} mobileTab={mobileTab} />
+          )}
+
+          </div>{/* end messages+sidebar row */}
 
           {/* Chips */}
           <AnimatePresence>
@@ -1375,5 +1675,6 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
         )}
       </div>
     </motion.div>
+  </DocCtx.Provider>
   )
 }
