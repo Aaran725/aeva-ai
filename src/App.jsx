@@ -195,7 +195,8 @@ Grading rules:
 - Equivalent answers: "2 m/s", "v=2", "2", "2.0 m/s" are all the same if 2 m/s is correct.
 - Do NOT penalise for missing units unless the question specifically asks for them.
 - Do NOT penalise for missing working — a correct bare answer like "x=5" gets "solid".
-- If student says "skip", "don't know", "idk", "pass" → "none".`,
+- If student says "skip", "don't know", "idk", "pass", or Japanese equivalents (スキップ・わからない・パス) → "none".
+- The student's answer may include Japanese text. Evaluate mathematical correctness only — language does not affect the grade.`,
           },
           {
             role: 'user',
@@ -5755,8 +5756,9 @@ function ChatView({ onBack }) {
   })
   const [calibResult, setCalibResult] = useState(null)       // final result object
   const calibFastLaneRef       = useRef({ active: false, bracketIdx: 0 })  // fast lane bracket state
-  const generatedQCache        = useRef({})   // C2: { `${nodeId}-${tier}` → generated question text }
-  const currentCalibQRef       = useRef(null) // always holds text of the question currently on screen
+  const generatedQCache         = useRef({})   // C2: { `${nodeId}-${tier}-${lang}` → generated question text }
+  const translationCache        = useRef({})   // Phase 2: { `${text}-${lang}` → translated text }
+  const currentCalibQRef        = useRef(null) // always holds text of the question currently on screen
   const pendingCalibLanguageRef = useRef('en') // language chosen in the picker, consumed by the effect
   // ── Dedicated calibration experience state ─────────────────────────────────
   const [currentCalibQuestion, setCurrentCalibQuestion] = useState(null)  // { text, nodeId, tier, qNum, isFastLane }
@@ -6594,8 +6596,33 @@ RULES:
   /** Build a brief acknowledgement prompt for calibration mode.
    *  Questions are now injected directly — the LLM only responds to the student's answer
    *  with a single warm sentence before the system injects the next question. */
-  const buildCalibAckPrompt = (subject, understanding) => {
+  const buildCalibAckPrompt = (subject, understanding, language = 'en') => {
     const nodeName = CALIBRATION_MAP[subject]?.[calibStateRef.current.currentNode]?.label || 'that'
+
+    if (language === 'ja') {
+      const jaExamples = {
+        solid:   '「正解です！」「よくできました。」「合っています！」',
+        mastery: '「素晴らしい！完璧です。」「見事な解答です！」',
+        partial: '「惜しい！もう少しです。」「考え方は合っています。」',
+        none:    '「今回は難しかったですね、続けましょう。」「次に進みましょう！」',
+      }
+      const ex = jaExamples[understanding] || jaExamples.none
+      return `あなたは${SUBJECT_LABELS[subject] || subject}の診断テストを実施している試験官です。
+
+生徒が「${nodeName}」に関する問題に回答しました。自動採点の結果: ${understanding.toUpperCase()}
+
+日本語で、生徒の回答を認める短い一文（最大10語）を書いてください:
+- solid / mastery → ${jaExamples.solid} / ${jaExamples.mastery}
+- partial → ${jaExamples.partial}
+- none → ${jaExamples.none}
+
+ルール:
+1. 一文のみ。説明・ヒント・教示は不要。
+2. 次の問題を聞かない（システムが自動的に送信します）。
+3. 「次の問題」「もう一問」などの表現は使わない。
+4. 温かく、短く。`
+    }
+
     return `You are an examiner running a calibration diagnostic for ${SUBJECT_LABELS[subject] || subject}.
 
 The student just answered a question on "${nodeName}". The automated assessment rated their answer: ${understanding.toUpperCase()}.
@@ -6654,13 +6681,53 @@ Rules:
   /** Set the next question in the CalibrationExperience overlay.
    *  Called after each calibAdvance() to show the next question card. */
   /**
-   * C2 — Generate a diagnostic question via AI when the static bank has no
-   * question at the requested tier. Results are cached per nodeId+tier so
-   * the same question is reused if the student revisits the node.
-   * Uses llama-3.1-8b-instant (fast, cheap — purely question authoring).
+   * Phase 2 — Translate a question into the target language.
+   * Cached by full question text + lang code so each string is only translated once.
+   * Falls back to original English on any error so the diagnostic never stalls.
    */
-  const generateCalibQuestion = async (nodeId, node, subject, tier) => {
-    const cacheKey = `${nodeId}-${tier}`
+  const translateQuestion = async (text, targetLang) => {
+    if (!targetLang || targetLang === 'en') return text
+    const cacheKey = `${text}__${targetLang}`
+    if (translationCache.current[cacheKey]) return translationCache.current[cacheKey]
+    try {
+      const res = await fetch(GROQ_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          messages: [
+            {
+              role: 'system',
+              content: targetLang === 'ja'
+                ? `あなたは数学の診断問題を翻訳するアシスタントです。
+以下の英語の問題文を自然な日本語に翻訳してください。
+数字・変数・方程式・数式は一切変更せず、そのまま残してください。
+翻訳した問題文のみを返してください。前置き・説明・引用符は不要です。`
+                : `Translate the following maths diagnostic question into ${targetLang}. Keep all numbers, variables, equations, and mathematical notation exactly as-is. Return only the translated question text — no explanation, no preamble.`,
+            },
+            { role: 'user', content: text },
+          ],
+          max_tokens: 300,
+          temperature: 0.2,
+          stream: false,
+        }),
+      })
+      const data = await res.json()
+      const translated = data.choices?.[0]?.message?.content?.trim()
+      if (translated) translationCache.current[cacheKey] = translated
+      return translated || text
+    } catch {
+      return text   // graceful fallback — diagnostic continues in English
+    }
+  }
+
+  /**
+   * C2 — Generate a diagnostic question via AI when the static bank has no
+   * question at the requested tier. When language='ja', generates directly in
+   * Japanese (no separate translation step needed). Cached per nodeId+tier+lang.
+   */
+  const generateCalibQuestion = async (nodeId, node, subject, tier, language = 'en') => {
+    const cacheKey = `${nodeId}-${tier}-${language}`
     if (generatedQCache.current[cacheKey]) return generatedQCache.current[cacheKey]
 
     const tierDesc = [
@@ -6673,16 +6740,18 @@ Rules:
     ][tier] || 'problem solving'
 
     const subjectLabel = SUBJECT_LABELS[subject] || subject
-    try {
-      const res = await fetch(GROQ_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
-        body: JSON.stringify({
-          model: 'llama-3.1-8b-instant',
-          messages: [
-            {
-              role: 'system',
-              content: `You write diagnostic questions for a student placement test.
+
+    const systemPrompt = language === 'ja'
+      ? `あなたは学力診断テストの問題作成者です。
+科目: ${subjectLabel}。トピック: ${node.label}。レベル: ${node.band}。
+難易度: ${tier}/5段階（${['','基礎的な記憶','標準的な応用','問題解決','習熟度の証明','発展・応用'][tier] || '問題解決'}）
+
+ルール:
+- 問題文のみを返してください。ラベル・前置き・説明は不要です。
+- 問題は単体で意味が通じるよう、完全な形で書いてください。
+- 数式はそのまま読める形で書いてください（例: x^2 + 3x - 10 = 0）。
+- 難易度 ${tier}/5 に正確に合わせてください。`
+      : `You write diagnostic questions for a student placement test.
 Subject: ${subjectLabel}. Topic: ${node.label}. Level: ${node.band}.
 Difficulty tier: ${tier}/5 — ${tierDesc}.
 
@@ -6690,11 +6759,19 @@ Rules:
 - Return ONLY the question text. No label, no preamble, no explanation.
 - The question must be self-contained and unambiguous.
 - Write all maths in plain readable format (e.g. x^2 + 3x - 10 = 0, not LaTeX).
-- Match the difficulty exactly: tier ${tier}/5.`,
-            },
-            { role: 'user', content: 'Write the question.' },
+- Match the difficulty exactly: tier ${tier}/5.`
+
+    try {
+      const res = await fetch(GROQ_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: language === 'ja' ? '問題を書いてください。' : 'Write the question.' },
           ],
-          max_tokens: 180,
+          max_tokens: 200,
           temperature: 0.72,
           stream: false,
         }),
@@ -6711,12 +6788,17 @@ Rules:
   const injectNextCalibQuestion = async () => {
     const cs = calibStateRef.current
 
-    // Still in fast lane?
+    const lang = cs.language || 'en'
+
+    // Still in fast lane? Translate the bracket question if needed.
     if (calibFastLaneRef.current.active && FAST_LANE[cs.subject]) {
       const bracket = FAST_LANE[cs.subject][calibFastLaneRef.current.bracketIdx]
       if (bracket) {
-        currentCalibQRef.current = bracket.q
-        setCurrentCalibQuestion({ text: bracket.q, nodeId: bracket.nodeId, tier: 0, qNum: cs.questionsAsked, isFastLane: true })
+        const qText = lang !== 'en'
+          ? await translateQuestion(bracket.q, lang)
+          : bracket.q
+        currentCalibQRef.current = qText
+        setCurrentCalibQuestion({ text: qText, nodeId: bracket.nodeId, tier: 0, qNum: cs.questionsAsked, isFastLane: true })
       }
       return
     }
@@ -6725,22 +6807,29 @@ Rules:
     const node = CALIBRATION_MAP[cs.subject]?.[cs.currentNode]
     if (!node) return
 
-    // ── Resolve question text: static bank first, AI generation as fallback ──
+    // ── Resolve question text: static bank → AI generation → fallback ────────
     const staticQ = node.questions?.find(qq => qq.tier === cs.tierAtNode)
     let questionText
+    let wasAiGenerated = false
 
     if (staticQ) {
-      questionText = staticQ.q
+      // Static question: translate if language is not English
+      questionText = lang !== 'en'
+        ? await translateQuestion(staticQ.q, lang)
+        : staticQ.q
     } else {
-      // C2: no static question at this tier — generate one via AI
-      const generated = await generateCalibQuestion(cs.currentNode, node, cs.subject, cs.tierAtNode)
+      // C2: no static question at this tier — generate directly in target language
+      const generated = await generateCalibQuestion(cs.currentNode, node, cs.subject, cs.tierAtNode, lang)
       if (generated) {
         questionText = generated
+        wasAiGenerated = true
       } else {
-        // Last resort: first available static question (different tier)
+        // Last resort: first available static question (different tier), then translate
         const fallback = node.questions?.[0]
         if (!fallback) return   // node has no questions at all — skip silently
-        questionText = fallback.q
+        questionText = lang !== 'en'
+          ? await translateQuestion(fallback.q, lang)
+          : fallback.q
       }
     }
 
@@ -7100,7 +7189,7 @@ Rules:
           note: calibCriticResult.note,
         }
         // Set systemPrompt here so streamGroq never gets an undefined system message
-        systemPrompt = buildCalibAckPrompt(calibStateRef.current.subject, calibCriticResult.understanding)
+        systemPrompt = buildCalibAckPrompt(calibStateRef.current.subject, calibCriticResult.understanding, calibStateRef.current.language || 'en')
         // Advance calibration state (fast lane bracket routing or normal node advance)
         const _cs = calibStateRef.current
         const _understanding = calibCriticResult.understanding
@@ -7263,7 +7352,7 @@ Rules:
           const passed = understanding === 'solid' || understanding === 'mastery'
 
           // Ack prompt: 1 sentence, 8b model, ~15 tokens
-          systemPrompt = buildCalibAckPrompt(cs.subject, understanding)
+          systemPrompt = buildCalibAckPrompt(cs.subject, understanding, cs.language || 'en')
 
           if (calibFastLaneRef.current.active) {
             // ── Fast lane bracket routing ──────────────────────────────────
