@@ -6,7 +6,7 @@ import 'katex/dist/katex.min.css'
 import 'mafs/core.css'
 import { Mafs, Coordinates, Plot } from 'mafs'
 import { compile as mathCompile } from 'mathjs'
-import { ArrowUp, ArrowRight, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, ChevronRight, ChevronDown, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Users, FileText, Palette, Home, Map, Clock, Trash2, Calendar, ScanSearch } from 'lucide-react'
+import { ArrowUp, ArrowRight, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, ChevronRight, ChevronDown, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Users, FileText, Palette, Home, Map, Clock, Trash2, Calendar, ScanSearch, ClipboardList } from 'lucide-react'
 import { useAppSettings, SECTION_BG_PRESETS, CARD_STYLES, FONT_STYLES } from './appSettings'
 import { useLanguageStore } from './languageStore'
 import { useT } from './translations'
@@ -7548,6 +7548,36 @@ If no clear changes: {"changes":[]}`
                           <div style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.80)' }}>Study Guide</div>
                           <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.28)', marginTop: 1 }}>Summarise this session</div>
                         </div>
+                      </button>
+
+                      {/* Worksheet */}
+                      <button
+                        onClick={() => {
+                          setToolsMenuOpen(false)
+                          if (!worksheetLoading && messages.length > 2) {
+                            setWorksheetLoading(true)
+                            generateWorksheet(messages, name, sessionConceptsRef.current)
+                              .then(ws => { setWorksheetLoading(false); if (ws) { setWorksheet(ws); setWorksheetOpen(true) } })
+                              .catch(() => setWorksheetLoading(false))
+                          }
+                        }}
+                        disabled={messages.length <= 2}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 10, cursor: messages.length > 2 ? 'pointer' : 'default', border: 'none', background: worksheetLoading ? 'rgba(52,211,153,0.08)' : 'transparent', transition: 'background 0.15s', opacity: messages.length <= 2 ? 0.4 : 1 }}
+                        onMouseEnter={e => { if (messages.length > 2 && !worksheetLoading) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+                        onMouseLeave={e => { if (!worksheetLoading) e.currentTarget.style.background = 'transparent' }}
+                      >
+                        <ClipboardList size={13} color={worksheetLoading ? '#34D399' : 'rgba(52,211,153,0.65)'} />
+                        <div style={{ flex: 1, textAlign: 'left' }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 600, color: worksheetLoading ? '#34D399' : 'rgba(255,255,255,0.80)' }}>
+                            {worksheetLoading ? 'Generating…' : 'Worksheet'}
+                          </div>
+                          <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.28)', marginTop: 1 }}>
+                            {messages.length <= 2 ? 'Chat first to generate a worksheet' : 'Practice questions from this session'}
+                          </div>
+                        </div>
+                        {worksheetLoading && (
+                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#34D399', flexShrink: 0, animation: 'pulse 1s infinite' }} />
+                        )}
                       </button>
 
                       {/* Feynman */}
