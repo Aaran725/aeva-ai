@@ -558,6 +558,14 @@ EXAMPLES (copy the format exactly — no backticks, nothing else on the line):
 [VIZ:formula|Quadratic Formula|x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}|Use when ax² + bx + c = 0]
 [VIZ:venn|Plants|Animals|Photosynthesis,Cell wall,Chloroplasts|Cells,DNA,Respiration,Mitosis|Movement,Nervous system,Heterotroph]
 
+SIDE-BY-SIDE COMPARISON — use when showing a common mistake next to the correct version:
+[SPLIT: wrong content here ||| correct content here]
+- Use ||| (triple pipe) as the separator between left and right
+- Left panel renders red-tinted (✗ Wrong), right panel green-tinted (✓ Correct)
+- Inline math $...$ works inside both panels
+- ONE [SPLIT] per response max. Use only for wrong-vs-right, not for general comparisons (use [VIZ:comparison] for those)
+✓ Example: [SPLIT: $(a+b)^2 = a^2 + b^2$ — missing the middle term ||| $(a+b)^2 = a^2 + 2ab + b^2$ — expand fully with FOIL]
+
 ━━━ PLATFORM COMMANDS — USE SPARINGLY ━━━
 MOST RESPONSES SHOULD HAVE NO CMD. Only fire a ⚡CMD when an explicit trigger condition below is met.
 At most ONE ⚡CMD per response. Executes silently — student never sees the tag.
@@ -3125,6 +3133,99 @@ function DashboardView({ onChatOpen, onSignOut }) {
   )
 }
 
+/* ═══ SYNTAX HIGHLIGHTER ══════════════════════════ */
+/** Find the first unquoted occurrence of `marker` in `line`. Returns -1 if not found inside a string. */
+function findCommentStart(line, marker) {
+  let inStr = null
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (!inStr) {
+      if (ch === '"' || ch === "'") { inStr = ch; continue }
+      if (line.slice(i, i + marker.length) === marker) return i
+    } else {
+      if (ch === '\\') { i++; continue }
+      if (ch === inStr) inStr = null
+    }
+  }
+  return -1
+}
+
+/**
+ * Simple regex-based syntax highlighter.
+ * Returns an HTML string with <span style="color:..."> wrappers.
+ * Handles Python, JavaScript/TypeScript, and Pseudocode.
+ * Falls back to plain HTML-escaped text for unknown languages.
+ */
+function highlightCode(code, lang, isLight) {
+  const l = (lang || '').toLowerCase()
+  const SUPPORTED = ['python', 'py', 'javascript', 'js', 'ts', 'typescript', 'pseudo', 'pseudocode']
+  const escHtml = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  if (!SUPPORTED.includes(l)) return escHtml(code)
+
+  // Colour palette
+  const C = isLight
+    ? { kw: '#7C3AED', str: '#059669', cmt: 'rgba(0,0,0,0.38)', num: '#B45309', blt: '#1D4ED8', def: 'rgba(0,0,0,0.82)' }
+    : { kw: '#C084FC', str: '#34D399', cmt: 'rgba(255,255,255,0.35)', num: '#FBBF24', blt: '#93C5FD', def: 'rgba(255,255,255,0.85)' }
+
+  const sp = (color, text) => `<span style="color:${color}">${text}</span>`
+
+  const LANGS = {
+    python: {
+      kw:  /\b(def|class|if|elif|else|for|while|return|import|from|True|False|None|and|or|not|in|is|try|except|finally|with|as|lambda|yield|pass|break|continue|raise|global|nonlocal|del|assert)\b/g,
+      blt: /\b(print|input|len|range|int|float|str|list|dict|set|tuple|bool|type|sum|min|max|abs|round|open|sorted|reversed|enumerate|zip|map|filter|any|all|isinstance|getattr|setattr|hasattr)\b/g,
+      str: /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|"""[\s\S]*?"""|'''[\s\S]*?''')/g,
+      cmt: '#',
+    },
+    js: {
+      kw:  /\b(const|let|var|function|return|if|else|for|while|class|extends|import|export|default|true|false|null|undefined|typeof|new|this|super|switch|case|break|continue|throw|try|catch|finally|async|await|of|in|instanceof|void|delete)\b/g,
+      blt: /\b(console|Math|Array|Object|String|Number|Boolean|Promise|fetch|document|window|JSON|parseInt|parseFloat|isNaN|isFinite|setTimeout|clearTimeout)\b/g,
+      str: /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)/g,
+      cmt: '//',
+    },
+    pseudo: {
+      kw:  /\b(IF|THEN|ELSE|ELIF|ENDIF|FOR|TO|STEP|NEXT|WHILE|DO|ENDWHILE|OUTPUT|PRINT|INPUT|PROCEDURE|FUNCTION|RETURN|ENDFUNCTION|ENDPROCEDURE|AND|OR|NOT|TRUE|FALSE|MOD|DIV|REPEAT|UNTIL|ARRAY|OF)\b/g,
+      blt: null,
+      str: /("(?:[^"\\]|\\.)*")/g,
+      cmt: null,
+    },
+  }
+
+  const langKey = ['python', 'py'].includes(l) ? 'python'
+    : ['javascript', 'js', 'ts', 'typescript'].includes(l) ? 'js'
+    : 'pseudo'
+
+  const cfg = LANGS[langKey]
+
+  return code.split('\n').map(line => {
+    // 1. Split off trailing comment
+    let codePart = line, commentPart = ''
+    if (cfg.cmt) {
+      const ci = findCommentStart(line, cfg.cmt)
+      if (ci !== -1) { codePart = line.slice(0, ci); commentPart = line.slice(ci) }
+    }
+
+    // 2. Extract string literals → placeholders to avoid double-processing
+    const stash = []
+    let p = codePart.replace(cfg.str, m => { stash.push(escHtml(m)); return `\x00${stash.length - 1}\x00` })
+
+    // 3. HTML-escape remaining text
+    p = escHtml(p)
+
+    // 4. Apply built-in, keyword, number coloring (order matters — builtins before keywords)
+    if (cfg.blt) p = p.replace(new RegExp(cfg.blt.source, cfg.blt.flags), m => sp(C.blt, m))
+    if (cfg.kw)  p = p.replace(new RegExp(cfg.kw.source,  cfg.kw.flags),  m => sp(C.kw,  m))
+    p = p.replace(/\b(\d+\.?\d*)\b/g, m => sp(C.num, m))
+
+    // 5. Restore string placeholders with green color
+    p = p.replace(/\x00(\d+)\x00/g, (_, idx) => sp(C.str, stash[+idx]))
+
+    // 6. Append comment
+    if (commentPart) p += sp(C.cmt, escHtml(commentPart))
+
+    return p
+  }).join('\n')
+}
+
 /* ═══ MARKDOWN RENDERER ═══════════════════════════ */
 function parseInline(text, isLight = false) {
   // Returns array of React elements for inline markdown
@@ -3897,10 +3998,14 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false, isDri
       }
       try {
         const html = katex.renderToString(mathContent.trim(), { throwOnError: false, displayMode: true })
+        // Adaptive sizing — smaller box for short formulas, larger for long ones
+        const mlen = mathContent.trim().length
+        const pad  = mlen < 20 ? '13px 20px' : mlen < 45 ? '18px 24px' : '24px 28px'
+        const fsz  = mlen < 20 ? 16 : mlen < 45 ? 17 : 19
         elements.push(
           <div key={`cimath-${i}`} style={{
-            overflowX: 'auto', margin: '12px 0', padding: '26px 28px',
-            textAlign: 'center', borderRadius: 16, fontSize: 19,
+            overflowX: 'auto', margin: '10px 0', padding: pad,
+            textAlign: 'center', borderRadius: 14, fontSize: fsz,
             background: isLight ? 'rgba(99,102,241,0.07)' : 'rgba(14,16,48,0.80)',
             border: isLight ? '1px solid rgba(99,102,241,0.22)' : '1px solid rgba(99,102,241,0.30)',
             boxShadow: isLight ? 'none' : '0 4px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(165,170,255,0.07)',
@@ -3918,6 +4023,39 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false, isDri
           </p>
         )
       }
+      i++; continue
+    }
+
+    // [SPLIT: left content ||| right content] — side-by-side two-panel comparison
+    // Use ||| as separator so | can appear freely in math and text on each side
+    const splitMatch = trimmed.match(/^\[SPLIT:\s*(.+?)\s*\|\|\|\s*(.+?)\s*\]$/)
+    if (splitMatch) {
+      flushList()
+      const [, leftRaw, rightRaw] = splitMatch
+      elements.push(
+        <div key={`split-${i}`} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, margin: '14px 0' }}>
+          <div style={{
+            padding: '13px 16px', borderRadius: 13, fontSize: 13.5, lineHeight: 1.7,
+            background: isLight ? 'rgba(248,113,113,0.07)' : 'rgba(248,113,113,0.10)',
+            border: isLight ? '1px solid rgba(248,113,113,0.28)' : '1px solid rgba(248,113,113,0.28)',
+            borderTop: '3px solid #F87171',
+            color: isLight ? 'rgba(0,0,0,0.84)' : 'rgba(255,255,255,0.88)',
+          }}>
+            <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.10em', textTransform: 'uppercase', color: '#F87171', marginBottom: 7 }}>✗ Wrong</div>
+            {parseInline(leftRaw, isLight)}
+          </div>
+          <div style={{
+            padding: '13px 16px', borderRadius: 13, fontSize: 13.5, lineHeight: 1.7,
+            background: isLight ? 'rgba(74,222,128,0.07)' : 'rgba(74,222,128,0.10)',
+            border: isLight ? '1px solid rgba(74,222,128,0.28)' : '1px solid rgba(74,222,128,0.28)',
+            borderTop: '3px solid #4ADE80',
+            color: isLight ? 'rgba(0,0,0,0.84)' : 'rgba(255,255,255,0.88)',
+          }}>
+            <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.10em', textTransform: 'uppercase', color: '#4ADE80', marginBottom: 7 }}>✓ Correct</div>
+            {parseInline(rightRaw, isLight)}
+          </div>
+        </div>
+      )
       i++; continue
     }
 
@@ -4141,9 +4279,9 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false, isDri
                 }}
               >Copy</button>
             </div>
-            <pre style={{ margin: 0, padding: '14px 16px', fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace', fontSize: 13, color: isLight ? '#1D4ED8' : '#93C5FD', lineHeight: 1.70, overflowX: 'auto', whiteSpace: 'pre' }}>
-              {codeStr}
-            </pre>
+            <pre style={{ margin: 0, padding: '14px 16px', fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace', fontSize: 13, color: isLight ? 'rgba(0,0,0,0.82)' : 'rgba(255,255,255,0.85)', lineHeight: 1.70, overflowX: 'auto', whiteSpace: 'pre' }}
+              dangerouslySetInnerHTML={{ __html: highlightCode(codeStr, lang, isLight) }}
+            />
           </div>
         )
       })()}
