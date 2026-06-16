@@ -459,9 +459,108 @@ function getStepColor(text) {
   return '#818CF8' // default indigo
 }
 
+// ─── Step expander (U3) — expandable full working per H2 step ────────────────
+
+function StepExpander({ stepTitle, color }) {
+  const ctx = useContext(DocCtx)
+  const [expanded, setExpanded]   = useState(false)
+  const [content, setContent]     = useState(null)  // null = not yet fetched
+  const [loading, setLoading]     = useState(false)
+
+  const handleToggle = async () => {
+    if (!expanded) {
+      setExpanded(true)
+      if (content === null) {
+        // Return cached content instantly if available
+        const cached = ctx?.expansionCache?.current?.[stepTitle]
+        if (cached) {
+          setContent(cached)
+        } else {
+          setLoading(true)
+          setContent('')
+          try {
+            let full = ''
+            for await (const token of ctx.getExpansionStream(stepTitle)) {
+              full += token
+              setContent(full)
+            }
+            if (ctx?.expansionCache) ctx.expansionCache.current[stepTitle] = full
+          } catch {
+            setContent('_Something went wrong — try again._')
+          }
+          setLoading(false)
+        }
+      }
+    } else {
+      setExpanded(false)
+    }
+  }
+
+  if (!ctx?.getExpansionStream) return null
+
+  return (
+    <div style={{ marginTop: -4, marginBottom: 8 }}>
+      <motion.button
+        onClick={handleToggle}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.96 }}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '5px 13px', borderRadius: 99,
+          background: expanded ? `${color}18` : 'rgba(255,255,255,0.04)',
+          border: `1px solid ${expanded ? color + '45' : 'rgba(255,255,255,0.10)'}`,
+          color: expanded ? color : 'rgba(255,255,255,0.32)',
+          fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
+          fontFamily: 'inherit', transition: 'all 0.18s',
+        }}
+      >
+        <span style={{ fontSize: 8, opacity: 0.75 }}>{expanded ? '▲' : '▶'}</span>
+        {expanded ? 'Hide working' : 'Show full working'}
+      </motion.button>
+
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            key="expander-body"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.22, ease: 'easeInOut' }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div style={{
+              margin: '10px 0 4px',
+              padding: '16px 20px',
+              borderRadius: 12,
+              background: `${color}08`,
+              border: `1px solid ${color}20`,
+              borderLeft: `3px solid ${color}55`,
+            }}>
+              {loading && !content ? (
+                /* Skeleton shimmer while streaming first tokens */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                  {[88, 72, 80, 55, 78].map((w, ii) => (
+                    <motion.div key={ii}
+                      animate={{ opacity: [0.15, 0.38, 0.15] }}
+                      transition={{ duration: 1.6, repeat: Infinity, delay: ii * 0.16 }}
+                      style={{ height: 10, borderRadius: 5, background: `${color}35`, width: `${w}%` }}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <DocMarkdown text={content || ''} noExpand />
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 // ─── DocMarkdown — same rendering engine as MarkdownRenderer in chat ─────────
 
-function DocMarkdown({ text, messageIdx = 0 }) {
+function DocMarkdown({ text, messageIdx = 0, noExpand = false }) {
   const lines = text.split('\n')
   const elements = []
   let i = 0
@@ -619,10 +718,10 @@ function DocMarkdown({ text, messageIdx = 0 }) {
       const h2Color = getStepColor(h2Text)
       const stepId  = `doc-step-${messageIdx}-${h2Counter++}`
       elements.push(
-        <div id={stepId} key={`h2-${i}`} style={{ marginTop: 34, marginBottom: 14 }}>
+        <div id={stepId} key={`h2-${i}`} style={{ marginTop: 34, marginBottom: 6 }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 12,
-            paddingBottom: 12,
+            paddingBottom: 10,
             borderBottom: `2px solid ${h2Color}28`,
           }}>
             <div style={{
@@ -638,6 +737,11 @@ function DocMarkdown({ text, messageIdx = 0 }) {
           </div>
         </div>
       )
+      if (!noExpand) {
+        elements.push(
+          <StepExpander key={`expander-${i}`} stepTitle={h2Text} color={h2Color} />
+        )
+      }
       i++; continue
     }
 
@@ -1037,7 +1141,8 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
   const messagesScrollRef = useRef(null)
   const base64Ref         = useRef(null) // store image base64 for context
   const mimeRef           = useRef(null)
-  const annotationCache   = useRef({})
+  const annotationCache  = useRef({})
+  const expansionCache   = useRef({})
 
   // U5 — lazy per-equation AI annotation, called once per unique LaTeX string
   const getAnnotation = useCallback(async (latex) => {
@@ -1067,6 +1172,32 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
     } catch {
       return 'Mathematical expression'
     }
+  }, [scanCtx])
+
+  // U3 — returns a streaming async generator for expanding a step's full working
+  const getExpansionStream = useCallback((stepTitle) => {
+    const subject = scanCtx?.subject || 'Mathematics'
+    const level   = scanCtx?.level && scanCtx.level !== 'Unknown' ? ` (${scanCtx.level})` : ''
+    const summary = scanCtx?.summary ? `\nDocument: ${scanCtx.summary}` : ''
+    return streamGroqDoc([
+      {
+        role: 'system',
+        content: `You are Aeva, an expert tutor showing the full intermediate working for one step in a solution.
+Subject: ${subject}${level}${summary}
+
+Rules:
+- Show EVERY intermediate line — nothing skipped
+- Wrap ALL maths in LaTeX: inline $...$ and display $$...$$
+- Use ### N: Sub-step title for numbered sub-steps
+- Use > **Note:** for important observations
+- Be thorough: a confused student must be able to follow every line
+- Stay focused on this single step only`,
+      },
+      {
+        role: 'user',
+        content: `Show the full intermediate working for this step, leaving nothing out:\n\n**${stepTitle}**`,
+      },
+    ], TEXT)
   }, [scanCtx])
 
   // U4 — extract H2 steps from all assistant messages for the sidebar
@@ -1261,7 +1392,7 @@ export default function AevaDoc({ onClose, name = 'Student' }) {
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-  <DocCtx.Provider value={{ getAnnotation }}>
+  <DocCtx.Provider value={{ getAnnotation, getExpansionStream, expansionCache }}>
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
