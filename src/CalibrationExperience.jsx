@@ -39,11 +39,15 @@ function getBand(score) {
 }
 
 // ── Inline math renderer (KaTeX, handles \n line-breaks) ─────────────────────
-function QuestionText({ text }) {
+// noMath=true skips KaTeX entirely — used for Reading where $ may appear in prose
+function QuestionText({ text, noMath = false }) {
   const lines = (text || '').split('\n')
   return (
     <span>
       {lines.map((line, li) => {
+        if (noMath) {
+          return <span key={li}>{li > 0 && <br />}{line}</span>
+        }
         const parts = line.split(/\$([^$\n]+)\$/)
         return (
           <span key={li}>
@@ -214,6 +218,39 @@ const UI_TEXT = {
   },
 }
 
+// ── Subject-aware UI text resolver ───────────────────────────────────────────
+// Reading needs different strings; all other subjects use the language base.
+function getUIText(language, subject) {
+  const base = UI_TEXT[language] || UI_TEXT.en
+  if (subject !== 'reading') return base
+
+  const readingOverrides = language === 'ja'
+    ? {
+        placeholder:     'あなたの回答 — パッセージから引用して説明してください（⌘ Enter で送信）',
+        placeholderEval: '回答を確認中…',
+        hint:            'パッセージから引用し、考えを説明してください — 部分的でも部分点が与えられます',
+        feedback: {
+          mastery: { label: '✦ 素晴らしい', sub: '鋭い読み取りです'          },
+          solid:   { label: '✓ よく読めた', sub: '良い解釈です'              },
+          partial: { label: '≈ もう少し',  sub: '方向性は合っています'       },
+          none:    { label: '✗ 惜しい',    sub: '続けましょう'              },
+        },
+      }
+    : {
+        placeholder:     'Your response — quote from the passage to support your answer  (⌘ Enter to submit)',
+        placeholderEval: 'Reading your response…',
+        hint:            'Quote from the passage and explain your reasoning — a supported interpretation earns partial credit',
+        feedback: {
+          mastery: { label: '✦ Excellent',    sub: 'Perceptive analysis'      },
+          solid:   { label: '✓ Well read',    sub: 'Good interpretation'      },
+          partial: { label: '≈ Almost there', sub: 'Right track, develop it'  },
+          none:    { label: '✗ Not quite',    sub: 'Keep going'               },
+        },
+      }
+
+  return { ...base, ...readingOverrides }
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 export function CalibrationExperience({
   question,           // { text, nodeId, tier, qNum, isFastLane }
@@ -230,7 +267,7 @@ export function CalibrationExperience({
   onSkip,             // () => void
   onExit,             // () => void
 }) {
-  const t = UI_TEXT[language] || UI_TEXT.en
+  const t = getUIText(language, subject)
   const [input, setInput]               = useState('')
   const [showFeedback, setShowFeedback] = useState(false)
   const [activeFeedback, setActiveFeedback] = useState(null)
@@ -368,7 +405,7 @@ export function CalibrationExperience({
                 fontSize: 16.5, lineHeight: 1.78, color: textCol, fontWeight: 440,
               }}
             >
-              <QuestionText text={question.text} />
+              <QuestionText text={question.text} noMath={subject === 'reading'} />
             </motion.div>
           </AnimatePresence>
 
