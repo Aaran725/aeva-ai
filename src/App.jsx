@@ -29,6 +29,7 @@ import WidgetToggle from './WidgetToggle'
 import FeatureSpotlight from './FeatureSpotlight'
 import { CHAT_THEMES } from './chatThemes'
 import { parseVizTag, VizComponent } from './ChatVisuals'
+import { CalibrationExperience, CalibResumeOffer } from './CalibrationExperience'
 
 // ── Lazy-loaded chunks (split by route / feature) ─────────────────────────────
 const ArcadeHub          = lazy(() => import('./ArcadeHub'))
@@ -5603,6 +5604,11 @@ function ChatView({ onBack }) {
   })
   const [calibResult, setCalibResult] = useState(null)       // final result object
   const calibFastLaneRef = useRef({ active: false, bracketIdx: 0 }) // fast lane bracket state
+  // ── Dedicated calibration experience state ─────────────────────────────────
+  const [currentCalibQuestion, setCurrentCalibQuestion] = useState(null)  // { text, nodeId, tier, qNum, isFastLane }
+  const [calibEvaluating, setCalibEvaluating]   = useState(false)         // critic is running
+  const [lastCalibFeedback, setLastCalibFeedback] = useState(null)        // { understanding, ts }
+  const [calibResumeOffer, setCalibResumeOffer]   = useState(null)        // checkpoint to offer resume for
   const [chatAppSettingsOpen, setChatAppSettingsOpen] = useState(false)
   const [chatSettings, saveChatSettings] = useChatSettings()
   const [chipEditMode, setChipEditMode] = useState(false)
@@ -5722,6 +5728,16 @@ function ChatView({ onBack }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length])
+
+  // Check for an in-progress calibration checkpoint on mount → offer resume
+  useEffect(() => {
+    const checkpoint = loadCalibCheckpoint()
+    if (checkpoint?.currentNode && checkpoint?.subject) {
+      setCalibResumeOffer(checkpoint)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
 
   useEffect(() => {
     const el = messagesScrollRef.current
@@ -6108,6 +6124,21 @@ RULES:
 
   const CALIB_TRIGGER = /\b(calibrat|diagnos|where am i|what level|test my level|placement test|skill check|what should i (learn|study))\b/i
 
+  // ── Checkpoint helpers (Phase 3: resume) ─────────────────────────────────
+  const CALIB_CHECKPOINT_KEY = 'aeva_calib_checkpoint_v1'
+  const saveCalibCheckpoint = () => {
+    try {
+      const cs = calibStateRef.current
+      localStorage.setItem(CALIB_CHECKPOINT_KEY, JSON.stringify({
+        ...cs,
+        fastLaneState: { ...calibFastLaneRef.current },
+        lastActiveAt: Date.now(),
+      }))
+    } catch {}
+  }
+  const clearCalibCheckpoint = () => { try { localStorage.removeItem(CALIB_CHECKPOINT_KEY) } catch {} }
+  const loadCalibCheckpoint  = () => { try { return JSON.parse(localStorage.getItem(CALIB_CHECKPOINT_KEY) || 'null') } catch { return null } }
+
   /** Pick the next skill node to test based on Critic result */
   const calibAdvance = (understanding) => {
     const cs = calibStateRef.current
@@ -6266,39 +6297,169 @@ Rules:
   }
 
   /** Inject a fast-lane bracket question directly into the chat */
+  /** Legacy: kept so stale references in the old sendWithText path don't crash.
+   *  The dedicated CalibrationExperience now handles question display instead. */
   const injectFastLaneBracket = (subject, bracketIdx) => {
     const bracket = FAST_LANE[subject]?.[bracketIdx]
     if (!bracket) return
-    setMessages(prev => [...prev, {
-      role: 'model', text: bracket.q, streaming: false,
-      isCalibQuestion: true, calibNodeId: bracket.nodeId,
-      calibQNum: 0,          // 0 = bracket (not counted in main Q counter)
-      isFastLane: true,
-      fastLaneLabel: bracket.label,
-    }])
+    setCurrentCalibQuestion({ text: bracket.q, nodeId: bracket.nodeId, tier: 0, qNum: calibStateRef.current.questionsAsked, isFastLane: true })
   }
 
-  /** Fire the first calibration question — DIRECT INJECT, no API call.
-   *  If a fast lane exists for this subject, starts with a bracket question
-   *  that quickly locates the right entry point (2 Qs max).
-   *  Otherwise injects the first node question from calibrationMap. */
-  const sendCalibFirstQuestion = (subject) => {
-    if (!calibModeRef.current) return
-    // Fast lane: inject bracket Q1
-    if (calibFastLaneRef.current.active && FAST_LANE[subject]) {
-      injectFastLaneBracket(subject, 0)
+  /** Set the next question in the CalibrationExperience overlay.
+   *  Called after each calibAdvance() to show the next question card. */
+  const injectNextCalibQuestion = () => {
+    const cs = calibStateRef.current
+
+    // Still in fast lane?
+    if (calibFastLaneRef.current.active && FAST_LANE[cs.subject]) {
+      const bracket = FAST_LANE[cs.subject][calibFastLaneRef.current.bracketIdx]
+      if (bracket) {
+        setCurrentCalibQuestion({ text: bracket.q, nodeId: bracket.nodeId, tier: 0, qNum: cs.questionsAsked, isFastLane: true })
+      }
       return
     }
-    // Normal: inject from calibration map
-    const cs = calibStateRef.current
+
     if (!cs.currentNode) return
-    const node = CALIBRATION_MAP[subject]?.[cs.currentNode]
-    const q = node?.questions?.find(q => q.tier === cs.tierAtNode) || node?.questions?.[0]
+    const node = CALIBRATION_MAP[cs.subject]?.[cs.currentNode]
+    if (!node) return
+    const q = node.questions?.find(qq => qq.tier === cs.tierAtNode) || node.questions?.[0]
     if (!q) return
-    setMessages(prev => [...prev, {
-      role: 'model', text: q.q, streaming: false,
-      isCalibQuestion: true, calibNodeId: cs.currentNode, calibQNum: 1,
-    }])
+
+    // Skip any question text that was already shown in the fast lane to avoid repeats
+    const fastLaneQs = new Set((FAST_LANE[cs.subject] || []).map(b => b.q))
+    if (fastLaneQs.has(q.q)) {
+      // Auto-advance: student already demonstrated this topic via fast lane, mark solid
+      const prevNode = cs.currentNode
+      const next = calibAdvance('solid')
+      const isRetry = next === prevNode
+      if (!isRetry) cs.nodeCount += 1
+      setCalibTick(t => t + 1)
+      if (cs.nodeCount >= 12 || !next) { clearCalibCheckpoint(); finishCalibration(); return }
+      saveCalibCheckpoint()
+      injectNextCalibQuestion()   // recurse to get the next non-duplicate question
+      return
+    }
+
+    setCurrentCalibQuestion({ text: q.q, nodeId: cs.currentNode, tier: cs.tierAtNode, qNum: cs.questionsAsked, isFastLane: false })
+  }
+
+  /** Start: fire the first question into the CalibrationExperience overlay. */
+  const sendCalibFirstQuestion = (subject) => {
+    if (!calibModeRef.current) return
+    injectNextCalibQuestion()
+  }
+
+  /** Handle a student's submitted answer within CalibrationExperience. */
+  const handleCalibAnswer = async (answerText) => {
+    if (calibEvaluating) return
+    setCalibEvaluating(true)
+
+    const cs = calibStateRef.current
+
+    try {
+      // ── Determine what question was on screen ──────────────────────────
+      let questionText
+      if (calibFastLaneRef.current.active && FAST_LANE[cs.subject]) {
+        const bracket = FAST_LANE[cs.subject][calibFastLaneRef.current.bracketIdx]
+        questionText = bracket?.q || ''
+      } else {
+        const node = CALIBRATION_MAP[cs.subject]?.[cs.currentNode]
+        const q = node?.questions?.find(qq => qq.tier === cs.tierAtNode) || node?.questions?.[0]
+        questionText = q?.q || ''
+      }
+
+      // ── Score via calibration critic ────────────────────────────────────
+      const result = await runCalibCritic(questionText, answerText)
+      const understanding = result.understanding
+
+      // ── Instant feedback flash ──────────────────────────────────────────
+      setLastCalibFeedback({ understanding, ts: Date.now() })
+
+      // ── Advance state ───────────────────────────────────────────────────
+      const passed = understanding === 'solid' || understanding === 'mastery'
+
+      if (calibFastLaneRef.current.active && FAST_LANE[cs.subject]) {
+        // Fast lane routing (mirrors existing sendWithText logic)
+        const fl      = FAST_LANE[cs.subject]
+        const bracket = fl[calibFastLaneRef.current.bracketIdx]
+
+        if (bracket) {
+          cs.skillMap[bracket.nodeId] = passed ? 'solid' : 'shaky'
+
+          if (passed && bracket.onPass) {
+            cs.currentNode = bracket.onPass
+            calibFastLaneRef.current = { active: false, bracketIdx: 0 }
+          } else if (!passed && bracket.onFail === null) {
+            const nextIdx = calibFastLaneRef.current.bracketIdx + 1
+            if (nextIdx < fl.length) {
+              calibFastLaneRef.current = { active: true, bracketIdx: nextIdx }
+            } else {
+              cs.currentNode = fl[fl.length - 1].onFail || ENTRY_NODES[cs.subject]
+              calibFastLaneRef.current = { active: false, bracketIdx: 0 }
+            }
+          } else {
+            cs.currentNode = bracket.onFail || ENTRY_NODES[cs.subject]
+            calibFastLaneRef.current = { active: false, bracketIdx: 0 }
+          }
+        } else {
+          calibFastLaneRef.current = { active: false, bracketIdx: 0 }
+        }
+
+        cs.questionsAsked += 1
+        setCalibTick(t => t + 1)
+        saveCalibCheckpoint()
+        injectNextCalibQuestion()
+
+      } else {
+        // Normal calibration: use calibAdvance (handles tier escalation)
+        const prevNode = cs.currentNode
+        const next     = calibAdvance(understanding)
+        const isRetry  = next === prevNode
+
+        cs.questionsAsked += 1
+        if (!isRetry) cs.nodeCount += 1
+        setCalibTick(t => t + 1)
+
+        const shouldStop = cs.nodeCount >= 12 || !next
+        if (shouldStop) {
+          clearCalibCheckpoint()
+          finishCalibration()
+        } else {
+          saveCalibCheckpoint()
+          injectNextCalibQuestion()
+        }
+      }
+
+    } catch (err) {
+      console.error('[calib answer]', err)
+    }
+
+    setCalibEvaluating(false)
+  }
+
+  /** Resume calibration from a saved localStorage checkpoint. */
+  const resumeFromCheckpoint = (checkpoint) => {
+    const { fastLaneState, lastActiveAt, ...cs } = checkpoint
+    calibStateRef.current = {
+      subject:       cs.subject       || null,
+      currentNode:   cs.currentNode   || null,
+      skillMap:      cs.skillMap      || {},
+      nodeCount:     cs.nodeCount     || 0,
+      questionsAsked: cs.questionsAsked || 0,
+      tierAtNode:    cs.tierAtNode    || 1,
+      partialAtNode: cs.partialAtNode || false,
+      masteryProbed: cs.masteryProbed || false,
+      nodesVisited:  cs.nodesVisited  || [],
+      startTime:     cs.startTime     || Date.now(),
+    }
+    calibFastLaneRef.current = fastLaneState || { active: false, bracketIdx: 0 }
+    calibModeRef.current = true
+    setCalibMode(true)
+    setCalibSubject(cs.subject)
+    setCalibResult(null)
+    setCalibTick(0)
+    setCalibResumeOffer(null)
+    injectNextCalibQuestion()
   }
 
   /** Finish calibration and show result */
@@ -6311,12 +6472,14 @@ Rules:
       skillMap,
       band,
       nextTopic,
-      questionsAsked: cs.questionCount,
+      questionsAsked: cs.questionsAsked,
       durationMs: Date.now() - (cs.startTime || Date.now()),
     }
+    clearCalibCheckpoint()    // session complete — remove checkpoint
     calibrationStore.saveResult(cs.subject, result)
     setCalibResult({ ...result, subject: cs.subject })
-    calibModeRef.current = false  // clear ref synchronously
+    setCurrentCalibQuestion(null)
+    calibModeRef.current = false
     setCalibMode(false)
     setCalibSubject(null)
   }
@@ -10167,6 +10330,24 @@ export default function App() {
     setView('dashboard')
   }
 
+  // Live calibration score — recomputes after each question (calibTick increments)
+  // Used by CalibrationExperience to animate the level arc
+  const liveCalibScore = useMemo(() => {
+    if (!calibMode) return null
+    const cs = calibStateRef.current
+    const subjectMap = CALIBRATION_MAP[cs.subject] || {}
+    const entries = Object.entries(cs.skillMap || {})
+    if (!entries.length) return null
+    let wSum = 0, wTotal = 0
+    for (const [id, status] of entries) {
+      const bo = subjectMap[id]?.bandOrder ?? -6
+      const w  = status === 'mastery' ? 3 : status === 'solid' ? 2 : status === 'shaky' ? 1 : 0
+      wSum += bo * w; wTotal += w
+    }
+    return wTotal === 0 ? null : wSum / wTotal
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calibTick, calibMode])
+
   return (
     <UserContext.Provider value={userValue}>
       <Suspense fallback={null}>
@@ -10190,6 +10371,47 @@ export default function App() {
       <StudyWithMe />
       {/* Exam Simulator — always mounted so it can intercept aeva:open-exam events */}
       <ExamSimulator />
+
+      {/* ── Calibration dedicated experience (Phase 0-2) ──────────────────── */}
+      <AnimatePresence>
+        {calibMode && currentCalibQuestion && (
+          <CalibrationExperience
+            key="calib-exp"
+            question={currentCalibQuestion}
+            liveScore={liveCalibScore}
+            nodeCount={calibStateRef.current.nodeCount}
+            questionsAsked={calibStateRef.current.questionsAsked}
+            subject={calibStateRef.current.subject}
+            isEvaluating={calibEvaluating}
+            lastFeedback={lastCalibFeedback}
+            isLight={isLight}
+            onAnswer={handleCalibAnswer}
+            onSkip={() => handleCalibAnswer('skip')}
+            onExit={() => {
+              // Save checkpoint, close overlay — student can resume later
+              saveCalibCheckpoint()
+              calibModeRef.current = false
+              setCalibMode(false)
+              setCalibSubject(null)
+              setCurrentCalibQuestion(null)
+              setCalibEvaluating(false)
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── Resume offer banner (Phase 3) ─────────────────────────────────── */}
+      <AnimatePresence>
+        {calibResumeOffer && !calibMode && (
+          <CalibResumeOffer
+            key="resume-offer"
+            checkpoint={calibResumeOffer}
+            isLight={isLight}
+            onResume={() => resumeFromCheckpoint(calibResumeOffer)}
+            onDismiss={() => { setCalibResumeOffer(null); clearCalibCheckpoint() }}
+          />
+        )}
+      </AnimatePresence>
       {/* Study Room — always mounted so live session survives navigation */}
       <StudyRoom />
       <AnimatePresence mode="wait" initial={false}>

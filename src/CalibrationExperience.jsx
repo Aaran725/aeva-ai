@@ -1,0 +1,477 @@
+/**
+ * CalibrationExperience.jsx
+ * Full-screen diagnostic overlay — replaces the in-chat calibration UX.
+ * Phases 0-2: dedicated UI, live level arc, animated question cards.
+ */
+import { useState, useEffect, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { X, ChevronRight } from 'lucide-react'
+import katex from 'katex'
+import { SUBJECT_LABELS, SUBJECT_ICONS } from './calibrationMap'
+
+// ── Band definitions (high → low so getBand() finds the right one first) ──────
+const BANDS = [
+  { label: 'A-Level',          min:  8,   color: '#C084FC' },
+  { label: 'GCSE Higher',      min:  6,   color: '#818CF8' },
+  { label: 'GCSE Foundation',  min:  4,   color: '#60A5FA' },
+  { label: 'Foundation',       min:  1,   color: '#34D399' },
+  { label: 'Grade 7–8',        min:  0,   color: '#4ADE80' },
+  { label: 'Grade 5–6',        min: -1,   color: '#FBBF24' },
+  { label: 'Grade 3–4',        min: -3,   color: '#FB923C' },
+  { label: 'Grade 1–2',        min: -6,   color: '#F87171' },
+]
+
+const SCORE_MIN = -6
+const SCORE_MAX = 9
+const toPos = score => Math.max(0, Math.min(1, (score - SCORE_MIN) / (SCORE_MAX - SCORE_MIN)))
+
+function getBand(score) {
+  for (const b of BANDS) if (score >= b.min) return b
+  return BANDS[BANDS.length - 1]
+}
+
+// ── Inline math renderer (KaTeX, handles \n line-breaks) ─────────────────────
+function QuestionText({ text }) {
+  const lines = (text || '').split('\n')
+  return (
+    <span>
+      {lines.map((line, li) => {
+        const parts = line.split(/\$([^$\n]+)\$/)
+        return (
+          <span key={li}>
+            {li > 0 && <br />}
+            {parts.map((part, pi) => {
+              if (pi % 2 === 1) {
+                try {
+                  const html = katex.renderToString(part, { throwOnError: false, displayMode: false })
+                  return <span key={pi} dangerouslySetInnerHTML={{ __html: html }} />
+                } catch {
+                  return <code key={pi}>{part}</code>
+                }
+              }
+              return <span key={pi}>{part}</span>
+            })}
+          </span>
+        )
+      })}
+    </span>
+  )
+}
+
+// ── Vertical level arc ────────────────────────────────────────────────────────
+function LevelArc({ liveScore, nodeCount, isLight }) {
+  const HEIGHT = 320
+  const hasScore = liveScore !== null && liveScore !== undefined
+
+  const position   = hasScore ? toPos(liveScore) : 0
+  const markerY    = HEIGHT * (1 - position)
+
+  // Confidence band: wide at start, narrows as more nodes are assessed
+  const halfRange  = Math.max(0.025, 0.20 - nodeCount * 0.013)
+  const topY       = Math.max(0,      HEIGHT * (1 - Math.min(1, position + halfRange)))
+  const bottomY    = Math.min(HEIGHT, HEIGHT * (1 - Math.max(0, position - halfRange)))
+
+  const currentBand = hasScore ? getBand(liveScore) : null
+
+  const trackCol = isLight ? 'rgba(0,0,0,0.08)'  : 'rgba(255,255,255,0.08)'
+  const mutedCol = isLight ? 'rgba(0,0,0,0.28)'  : 'rgba(255,255,255,0.28)'
+  const tickCol  = isLight ? 'rgba(0,0,0,0.12)'  : 'rgba(255,255,255,0.10)'
+
+  return (
+    <div style={{ width: 168, flexShrink: 0, userSelect: 'none' }}>
+      <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', color: mutedCol, textTransform: 'uppercase', marginBottom: 16, textAlign: 'center' }}>
+        Your Level
+      </div>
+
+      <div style={{ position: 'relative', height: HEIGHT }}>
+        {/* Track */}
+        <div style={{ position: 'absolute', left: 62, top: 0, bottom: 0, width: 3, background: trackCol, borderRadius: 2 }} />
+
+        {/* Band ticks + labels */}
+        {BANDS.map(band => {
+          const y      = HEIGHT * (1 - toPos(band.min))
+          const active = currentBand?.label === band.label
+          return (
+            <div key={band.label} style={{ position: 'absolute', top: y, left: 0, right: 0, display: 'flex', alignItems: 'center', transform: 'translateY(-50%)' }}>
+              {/* tick left of dot */}
+              <div style={{ width: 10, height: 1.5, background: active ? band.color : tickCol, borderRadius: 1, marginRight: 4, marginLeft: 46, flexShrink: 0, transition: 'background 0.4s' }} />
+              {/* dot */}
+              <div style={{
+                width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                background: active ? band.color : tickCol,
+                boxShadow: active ? `0 0 8px ${band.color}88` : 'none',
+                transition: 'all 0.4s',
+              }} />
+              {/* label */}
+              <div style={{ paddingLeft: 9, fontSize: 9.5, fontWeight: active ? 800 : 500, color: active ? band.color : mutedCol, whiteSpace: 'nowrap', transition: 'all 0.35s' }}>
+                {band.label}
+              </div>
+            </div>
+          )
+        })}
+
+        {/* Confidence glow band */}
+        {hasScore && (
+          <div style={{
+            position: 'absolute', left: 56, top: topY, height: bottomY - topY, width: 14,
+            background: `${currentBand?.color || '#818CF8'}26`, borderRadius: 7,
+            transition: 'background 0.4s',
+          }} />
+        )}
+
+        {/* Animated glowing marker */}
+        {hasScore && (
+          <motion.div
+            animate={{ top: markerY }}
+            transition={{ type: 'spring', stiffness: 90, damping: 16 }}
+            style={{ position: 'absolute', left: 63, transform: 'translate(-50%, -50%)', zIndex: 2 }}
+          >
+            <motion.div
+              animate={{ boxShadow: [`0 0 12px ${currentBand?.color}99`, `0 0 20px ${currentBand?.color}44`, `0 0 12px ${currentBand?.color}99`] }}
+              transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+              style={{
+                width: 20, height: 20, borderRadius: '50%',
+                background: currentBand?.color || '#818CF8',
+                border: '2.5px solid rgba(255,255,255,0.95)',
+              }}
+            />
+          </motion.div>
+        )}
+      </div>
+
+      {/* Band label below arc */}
+      <div style={{ marginTop: 16, textAlign: 'center', minHeight: 38 }}>
+        <AnimatePresence mode="wait">
+          {currentBand ? (
+            <motion.div key={currentBand.label} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} transition={{ duration: 0.22 }}>
+              <div style={{ fontSize: 11.5, fontWeight: 800, color: currentBand.color }}>{currentBand.label}</div>
+              <div style={{ fontSize: 9.5, color: mutedCol, marginTop: 3, fontWeight: 500 }}>estimated level</div>
+            </motion.div>
+          ) : (
+            <motion.div key="wait" initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ fontSize: 10, color: mutedCol, marginTop: 4 }}>
+              Calibrating…
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  )
+}
+
+// ── Feedback flash configs ────────────────────────────────────────────────────
+const FEEDBACK_CFG = {
+  mastery: { color: '#C084FC', bg: 'rgba(192,132,252,0.11)', border: 'rgba(192,132,252,0.28)', label: '✦ Excellent',   sub: 'Mastery demonstrated' },
+  solid:   { color: '#4ADE80', bg: 'rgba(74,222,128,0.10)',  border: 'rgba(74,222,128,0.28)',  label: '✓ Correct',     sub: 'Well done' },
+  partial: { color: '#FBBF24', bg: 'rgba(251,191,36,0.10)',  border: 'rgba(251,191,36,0.28)',  label: '≈ Almost there', sub: 'Right idea, small gap' },
+  none:    { color: '#F87171', bg: 'rgba(248,113,113,0.10)', border: 'rgba(248,113,113,0.28)', label: '✗ Not quite',   sub: 'Keep going' },
+}
+
+// ── Main export ───────────────────────────────────────────────────────────────
+export function CalibrationExperience({
+  question,           // { text, nodeId, tier, qNum, isFastLane }
+  liveScore,          // weighted band average score (null until first node assessed)
+  nodeCount,          // distinct nodes assessed so far
+  questionsAsked,     // total questions (including retries)
+  subject,
+  isEvaluating,       // critic is running — disable input
+  lastFeedback,       // { understanding, ts } — triggers flash
+  isLight,
+  onAnswer,           // (text: string) => void
+  onSkip,             // () => void
+  onExit,             // () => void
+}) {
+  const [input, setInput]               = useState('')
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [activeFeedback, setActiveFeedback] = useState(null)
+  const inputRef = useRef(null)
+
+  const subjectLabel = SUBJECT_LABELS[subject] || subject
+  const subjectIcon  = SUBJECT_ICONS[subject]  || '📚'
+
+  // Feedback flash: triggers whenever lastFeedback.ts changes
+  useEffect(() => {
+    if (!lastFeedback) return
+    setActiveFeedback(lastFeedback)
+    setShowFeedback(true)
+    const t = setTimeout(() => setShowFeedback(false), 1700)
+    return () => clearTimeout(t)
+  }, [lastFeedback?.ts])
+
+  // Clear input and re-focus when question changes
+  useEffect(() => {
+    setInput('')
+    const t = setTimeout(() => inputRef.current?.focus(), 180)
+    return () => clearTimeout(t)
+  }, [question?.text])
+
+  const handleSubmit = () => {
+    const text = input.trim()
+    if (!text || isEvaluating) return
+    onAnswer(text)
+    setInput('')
+  }
+
+  const handleKeyDown = e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleSubmit()
+  }
+
+  // ── Theme tokens ────────────────────────────────────────────────────────────
+  const bg          = isLight ? '#f4f5fa' : '#0d0e16'
+  const cardBg      = isLight ? '#ffffff' : '#161826'
+  const borderCol   = isLight ? 'rgba(0,0,0,0.07)'  : 'rgba(255,255,255,0.07)'
+  const inputBorder = isLight ? 'rgba(0,0,0,0.10)'  : 'rgba(255,255,255,0.10)'
+  const textCol     = isLight ? '#0f1117'            : 'rgba(255,255,255,0.88)'
+  const mutedCol    = isLight ? 'rgba(0,0,0,0.36)'  : 'rgba(255,255,255,0.32)'
+
+  if (!question) return null
+
+  const fbCfg  = activeFeedback ? (FEEDBACK_CFG[activeFeedback.understanding] || FEEDBACK_CFG.partial) : null
+  const segCount = Math.max(nodeCount + 2, 12)
+
+  return (
+    <motion.div
+      key="calib-exp"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18 }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 2000,
+        background: bg,
+        display: 'flex', flexDirection: 'column',
+        fontFamily: "'Inter', system-ui, sans-serif",
+        overflow: 'hidden',
+      }}
+    >
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '14px 28px', borderBottom: `1px solid ${borderCol}`, flexShrink: 0,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 20, lineHeight: 1 }}>{subjectIcon}</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: textCol }}>{subjectLabel}</span>
+          <div style={{ width: 1, height: 14, background: borderCol }} />
+          {question.isFastLane
+            ? <span style={{ fontSize: 10.5, fontWeight: 700, color: '#FBBF24', letterSpacing: '0.05em' }}>⚡ Quick Placement</span>
+            : <span style={{ fontSize: 11, color: mutedCol, fontWeight: 600 }}>Diagnostic · Q{questionsAsked + 1}</span>
+          }
+        </div>
+        <button
+          onClick={onExit}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: mutedCol, display: 'flex', alignItems: 'center', gap: 6,
+            fontSize: 12, fontWeight: 600, padding: '6px 10px', borderRadius: 8,
+          }}
+        >
+          <X size={13} /> Save & Exit
+        </button>
+      </div>
+
+      {/* ── Progress bar ────────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', gap: 3, padding: '10px 28px 0', flexShrink: 0 }}>
+        {Array.from({ length: segCount }).map((_, i) => (
+          <div key={i} style={{
+            height: 3, flex: 1, borderRadius: 2, maxWidth: 40,
+            background: i < nodeCount
+              ? '#818CF8'
+              : i === nodeCount
+              ? 'rgba(129,140,248,0.32)'
+              : borderCol,
+            transition: 'background 0.3s',
+          }} />
+        ))}
+      </div>
+
+      {/* ── Main content ────────────────────────────────────────────────────── */}
+      <div style={{
+        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '24px 32px', gap: 44, overflow: 'hidden',
+        maxWidth: 1100, margin: '0 auto', width: '100%', boxSizing: 'border-box',
+      }}>
+
+        {/* ── Left: question + answer ───────────────────────────────────────── */}
+        <div style={{ flex: 1, maxWidth: 620, display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+          {/* Question card — slides in from right on each new question */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={question.text}
+              initial={{ opacity: 0, x: 40, filter: 'blur(3px)' }}
+              animate={{ opacity: 1, x: 0,  filter: 'blur(0px)' }}
+              exit={  { opacity: 0, x: -40, filter: 'blur(3px)' }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+              style={{
+                background: cardBg, border: `1px solid ${borderCol}`, borderRadius: 18,
+                padding: '28px 32px',
+                fontSize: 16.5, lineHeight: 1.78, color: textCol, fontWeight: 440,
+              }}
+            >
+              <QuestionText text={question.text} />
+            </motion.div>
+          </AnimatePresence>
+
+          {/* Feedback flash */}
+          <AnimatePresence>
+            {showFeedback && fbCfg && (
+              <motion.div
+                initial={{ opacity: 0, y: -10, scale: 0.97 }}
+                animate={{ opacity: 1,  y: 0,   scale: 1    }}
+                exit={  { opacity: 0,           scale: 0.97 }}
+                transition={{ duration: 0.16 }}
+                style={{
+                  background: fbCfg.bg, border: `1px solid ${fbCfg.border}`,
+                  borderRadius: 12, padding: '10px 18px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                }}
+              >
+                <span style={{ fontSize: 13.5, fontWeight: 700, color: fbCfg.color }}>{fbCfg.label}</span>
+                <span style={{ fontSize: 11, color: fbCfg.color, opacity: 0.65 }}>{fbCfg.sub}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Answer textarea */}
+          <div style={{ position: 'relative' }}>
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={isEvaluating ? 'Checking your answer…' : 'Your answer — show working if needed  (⌘ Enter to submit)'}
+              disabled={isEvaluating}
+              rows={4}
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                background: cardBg, border: `1.5px solid ${inputBorder}`,
+                borderRadius: 14, padding: '16px 20px',
+                fontSize: 15, lineHeight: 1.65, color: textCol,
+                resize: 'vertical', outline: 'none', minHeight: 110,
+                fontFamily: "'Inter', system-ui, sans-serif",
+                opacity: isEvaluating ? 0.5 : 1,
+                transition: 'border-color 0.15s, opacity 0.2s',
+              }}
+              onFocus={e => { e.target.style.borderColor = '#818CF8' }}
+              onBlur={e  => { e.target.style.borderColor = inputBorder }}
+            />
+            {isEvaluating && (
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 14 }}>
+                <motion.span
+                  animate={{ opacity: [0.5, 1, 0.5] }}
+                  transition={{ duration: 1.1, repeat: Infinity }}
+                  style={{ fontSize: 12, fontWeight: 700, color: '#818CF8' }}
+                >
+                  Checking…
+                </motion.span>
+              </div>
+            )}
+          </div>
+
+          {/* Action row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <button
+              onClick={onSkip}
+              disabled={isEvaluating}
+              style={{
+                background: 'none', border: 'none', padding: 0,
+                cursor: isEvaluating ? 'default' : 'pointer',
+                fontSize: 12, color: mutedCol, fontWeight: 600,
+                opacity: isEvaluating ? 0.35 : 1,
+              }}
+            >
+              Skip this one
+            </button>
+
+            <button
+              onClick={handleSubmit}
+              disabled={!input.trim() || isEvaluating}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                background: input.trim() && !isEvaluating ? '#818CF8' : isLight ? 'rgba(129,140,248,0.14)' : 'rgba(129,140,248,0.16)',
+                border: 'none', borderRadius: 12, padding: '12px 24px',
+                fontSize: 13.5, fontWeight: 700, letterSpacing: '0.01em',
+                color: input.trim() && !isEvaluating ? '#fff' : 'rgba(129,140,248,0.4)',
+                cursor: input.trim() && !isEvaluating ? 'pointer' : 'default',
+                transition: 'all 0.15s',
+              }}
+            >
+              Submit <ChevronRight size={14} />
+            </button>
+          </div>
+
+          {/* Hint */}
+          <div style={{ textAlign: 'center', fontSize: 10.5, color: mutedCol, marginTop: -4 }}>
+            Show your working — partial credit awarded for correct approach
+          </div>
+        </div>
+
+        {/* ── Right: live level arc ─────────────────────────────────────────── */}
+        <LevelArc liveScore={liveScore} nodeCount={nodeCount} isLight={isLight} />
+      </div>
+    </motion.div>
+  )
+}
+
+// ── Resume offer banner (shown when a checkpoint exists) ──────────────────────
+export function CalibResumeOffer({ checkpoint, onResume, onDismiss, isLight }) {
+  if (!checkpoint) return null
+  const subjectLabel = SUBJECT_LABELS[checkpoint.subject] || checkpoint.subject
+  const subjectIcon  = SUBJECT_ICONS[checkpoint.subject]  || '📚'
+  const qNum         = (checkpoint.questionsAsked || 0) + 1
+
+  // Time since last active
+  const minsAgo = checkpoint.lastActiveAt
+    ? Math.round((Date.now() - checkpoint.lastActiveAt) / 60000)
+    : null
+  const timeStr = minsAgo === null ? '' : minsAgo < 2 ? 'just now' : minsAgo < 60 ? `${minsAgo}m ago` : `${Math.round(minsAgo / 60)}h ago`
+
+  const bg     = isLight ? '#ffffff'                    : 'rgba(22,24,38,0.98)'
+  const border = isLight ? 'rgba(129,140,248,0.25)'    : 'rgba(129,140,248,0.22)'
+  const text   = isLight ? '#0f1117'                   : 'rgba(255,255,255,0.88)'
+  const muted  = isLight ? 'rgba(0,0,0,0.4)'          : 'rgba(255,255,255,0.35)'
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.22 }}
+      style={{
+        position: 'fixed', top: 72, left: '50%', transform: 'translateX(-50%)',
+        zIndex: 1800,
+        background: bg, border: `1px solid ${border}`, borderRadius: 14,
+        padding: '13px 18px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+        display: 'flex', alignItems: 'center', gap: 14,
+        fontFamily: "'Inter', system-ui, sans-serif",
+        maxWidth: 420, width: 'calc(100vw - 48px)',
+      }}
+    >
+      <span style={{ fontSize: 22 }}>{subjectIcon}</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: text }}>
+          Resume {subjectLabel} diagnostic
+        </div>
+        <div style={{ fontSize: 11, color: muted, marginTop: 1 }}>
+          Left at Q{qNum}{timeStr ? ` · ${timeStr}` : ''}
+        </div>
+      </div>
+      <button
+        onClick={onResume}
+        style={{
+          background: '#818CF8', border: 'none', borderRadius: 9, padding: '8px 14px',
+          fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        Resume →
+      </button>
+      <button
+        onClick={onDismiss}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', color: muted, padding: 4, display: 'flex' }}
+      >
+        <X size={13} />
+      </button>
+    </motion.div>
+  )
+}
