@@ -6877,7 +6877,7 @@ Rules:
       })()
 
       // ── Score via calibration critic (rubric mode for Humanities) ─────────
-      const isHumanities = ['history', 'english-lit'].includes(cs.subject)
+      const isHumanities = ['history', 'english-lit', 'reading'].includes(cs.subject)
       const result = isHumanities
         ? await runCalibCriticRubric(questionText, answerText)
         : await runCalibCritic(questionText, answerText)

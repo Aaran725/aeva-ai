@@ -1528,6 +1528,436 @@ const COMPUTER_SCIENCE = {
   },
 }
 
+// ─── READING ───────────────────────────────────────────────────────────────────
+// bandOrder scale matches maths: -6=Grade 1 → 0=Grade 7 → 4=Grade 10 → 8=AP Year 1 → 9=AP Year 2
+// All questions embed any needed passage directly in the question text.
+// Rubric critic is used (like History / English Lit) — answers are interpretive.
+const READING = {
+
+  // ── FOUNDATIONS (Grade 1–2) ───────────────────────────────────────────────
+
+  'phonics-decoding': {
+    label: 'Phonics & Decoding',
+    subject: 'reading', band: 'Grade 1', bandOrder: -6,
+    prerequisites: [],
+    nextSkills: ['sight-words-fluency', 'basic-sentence-comp'],
+    questions: [
+      { q: 'Read these words and write them: "ship", "chin", "thin". What sound do the letters "sh", "ch", and "th" each make?', tier: 1 },
+      { q: 'Sound out this word letter by letter — c-l-o-u-d — and write what it says. Now write a sentence using that word.', tier: 2 },
+      { q: 'These words all have a silent letter. Identify the silent letter in each: "knee", "write", "lamb". What spelling rule can you write about silent letters?', tier: 3 },
+    ],
+  },
+
+  'sight-words-fluency': {
+    label: 'Sight Words & Fluency',
+    subject: 'reading', band: 'Grade 1', bandOrder: -6,
+    prerequisites: ['phonics-decoding'],
+    nextSkills: ['basic-sentence-comp'],
+    questions: [
+      { q: 'Read this sentence and answer: "The big brown dog ran fast down the street." What did the dog do? Where did it go?', tier: 1 },
+      { q: 'Read this passage and tell what happens:\n"Sam woke up early. She ate breakfast quickly. Then she ran to catch the bus before it left."\nPut the events in order.', tier: 2 },
+      { q: 'Read this passage:\n"Every morning, Luis fed his fish before school. One day he forgot. When he came home, the fish swam in circles near the top of the tank."\nWhy do you think the fish swam near the top? Use the passage to explain.', tier: 3 },
+    ],
+  },
+
+  'basic-sentence-comp': {
+    label: 'Basic Sentence Comprehension',
+    subject: 'reading', band: 'Grade 2', bandOrder: -5,
+    prerequisites: ['sight-words-fluency'],
+    nextSkills: ['main-idea-details', 'sequence-retell'],
+    questions: [
+      { q: 'Read this sentence: "The sleepy kitten curled up on the warm, soft blanket."\nName TWO things we learn about the kitten or where it is.', tier: 1 },
+      { q: 'Read these two sentences: "Maria wanted a dog for her birthday. Instead, she got a book about dogs."\nHow do you think Maria feels? Use the sentences to explain your answer.', tier: 2 },
+      { q: 'Read this: "The tiny seed pushed through the dark soil. First came a thin green shoot, then two leaves, and finally a bright yellow flower."\nPut the events in order and explain what the passage is describing. What clues helped you?', tier: 3 },
+    ],
+  },
+
+  // ── PRIMARY COMPREHENSION (Grade 3–4) ─────────────────────────────────────
+
+  'main-idea-details': {
+    label: 'Main Idea & Supporting Details',
+    subject: 'reading', band: 'Grade 3', bandOrder: -4,
+    prerequisites: ['basic-sentence-comp'],
+    nextSkills: ['sequence-retell', 'context-clues-basic', 'grammar-mechanics'],
+    questions: [
+      { q: 'Read this passage:\n"Dolphins are very intelligent animals. They can learn tricks and follow instructions. Dolphins also communicate with each other using clicks and whistles. Scientists believe dolphins even have their own names."\nWhat is the MAIN IDEA of this passage? Give one detail that supports it.', tier: 1 },
+      { q: 'Read this passage:\n"In autumn, many trees lose their leaves. Shorter days mean less sunlight, so the trees cannot make enough food. They drop their leaves to save energy for winter. In spring, when sunlight returns, new leaves grow."\nState the main idea and list TWO supporting details.', tier: 2 },
+      { q: 'Read this passage:\n"Ada Lovelace is often called the world\'s first computer programmer. She worked with mathematician Charles Babbage in the 1800s on his Analytical Engine. Lovelace wrote an algorithm for this machine — making her a pioneer of computing over 100 years before modern computers were invented."\nState the main idea and explain how two supporting details strengthen it.', tier: 3 },
+    ],
+  },
+
+  'sequence-retell': {
+    label: 'Sequence & Retelling',
+    subject: 'reading', band: 'Grade 3', bandOrder: -4,
+    prerequisites: ['basic-sentence-comp'],
+    nextSkills: ['context-clues-basic', 'narrative-structure'],
+    questions: [
+      { q: 'Read this passage:\n"First, Mia mixed flour and butter. Next, she added sugar and eggs. Then she poured the batter into a tin. Finally, she put it in the oven."\nPut these steps in order: add eggs · mix flour and butter · put tin in oven · add sugar. What is Mia making?', tier: 1 },
+      { q: 'Read this story:\n"Olu found a lost puppy in the rain. He dried it off and gave it water. He made posters and put them around the neighbourhood. Two days later, a woman called and said the puppy was hers."\nRetell the story in your own words using: first, then, next, finally.', tier: 2 },
+      { q: 'Read this passage:\n"The caterpillar ate for several weeks, growing fat. Then it formed a hard shell called a chrysalis. Inside, its body completely changed. Two weeks later, a butterfly pushed its way out, dried its wings, and flew away."\nExplain the sequence of events AND explain WHY the chrysalis stage is important.', tier: 3 },
+    ],
+  },
+
+  'context-clues-basic': {
+    label: 'Context Clues',
+    subject: 'reading', band: 'Grade 4', bandOrder: -3,
+    prerequisites: ['main-idea-details'],
+    nextSkills: ['vocabulary-in-context', 'grammar-mechanics'],
+    questions: [
+      { q: 'Read this sentence: "The enormous elephant was so large it knocked down a small tree just by walking past."\nWhat does "enormous" mean? Use the sentence to explain your answer.', tier: 1 },
+      { q: 'Read this: "Zara was famished after the long hike. She hadn\'t eaten since breakfast, and her stomach growled loudly as she smelled the soup."\nWhat does "famished" mean? What clues in the passage helped you work it out?', tier: 2 },
+      { q: 'Read this: "The explorer navigated through the dense, impenetrable jungle — the trees grew so close together that sunlight barely reached the ground."\nWhat does "impenetrable" mean? Explain TWO context clues that helped you, and explain what effect this description creates on the reader.', tier: 3 },
+    ],
+  },
+
+  'grammar-mechanics': {
+    label: 'Grammar & Sentence Structure',
+    subject: 'reading', band: 'Grade 4', bandOrder: -3,
+    prerequisites: ['basic-sentence-comp'],
+    nextSkills: ['vocabulary-in-context', 'text-structure'],
+    questions: [
+      { q: 'Read this sentence: "Running quickly, the girl caught the bus just in time."\nIdentify: (a) the verb, (b) what "Running quickly" tells us about the girl.', tier: 1 },
+      { q: 'Take these two sentences: "The dog barked. The mailman arrived."\nCombine them into one sentence using a connective (because / when / as / although). Write TWO different versions and explain how the meaning changes.', tier: 2 },
+      { q: 'Read this: "Despite the rain, the match continued. The players, soaked through but determined, pressed on."\nExplain how the commas in the second sentence change how we read it. What would be lost if you removed the phrase between the commas?', tier: 3 },
+    ],
+  },
+
+  // ── VOCABULARY & STRATEGIES (Grade 5–6) ───────────────────────────────────
+
+  'vocabulary-in-context': {
+    label: 'Vocabulary in Context',
+    subject: 'reading', band: 'Grade 5', bandOrder: -2,
+    prerequisites: ['context-clues-basic'],
+    nextSkills: ['authors-purpose', 'inference-basic', 'nonfiction-features'],
+    questions: [
+      { q: 'Read this sentence: "The scientist\'s hypothesis was proven wrong by the experiment."\nWhat does "hypothesis" most likely mean? (a) a guess or prediction  (b) a result  (c) a method  (d) a conclusion. Explain your choice.', tier: 1 },
+      { q: 'Read this: "The politician\'s speech was eloquent — every word carefully chosen, the rhythm flowing, the argument building steadily to a powerful conclusion."\nWhat does "eloquent" mean? Give TWO clues from the sentence that helped you.', tier: 2 },
+      { q: 'Read this: "After years of obscurity, the painter\'s work finally gained recognition — her canvases began appearing in galleries, critics wrote glowing reviews, and collectors competed to own her pieces."\nExplain what "obscurity" means and identify TWO context clues. Then explain how the contrast between the two halves of the sentence creates meaning.', tier: 3 },
+    ],
+  },
+
+  'authors-purpose': {
+    label: "Author's Purpose",
+    subject: 'reading', band: 'Grade 5', bandOrder: -2,
+    prerequisites: ['main-idea-details'],
+    nextSkills: ['inference-basic', 'text-structure', 'argument-structure'],
+    questions: [
+      { q: 'Read this: "Littering is destroying our parks. Every year, tonnes of rubbish are left behind. We all have a responsibility to keep public spaces clean."\nWhat is the author\'s main purpose? (a) to inform  (b) to persuade  (c) to entertain. Give one phrase from the text that shows this.', tier: 1 },
+      { q: 'Read this: "The deep ocean is the least explored place on Earth. More than 80% has never been mapped. Strange creatures live in total darkness miles below the surface — some produce their own light, others have jaws that can swallow prey larger than themselves."\nWhat is the author\'s purpose? How does the language support this purpose?', tier: 2 },
+      { q: 'Read this: "Fresh air is free. Gym memberships are not. Every morning, thousands of people drive to a building to walk on a machine — inside — while the sun shines and the park sits empty outside."\nIdentify the author\'s purpose. Explain TWO specific techniques used to achieve it (contrast, irony, repetition, etc.). What effect do they create on the reader?', tier: 3 },
+    ],
+  },
+
+  'nonfiction-features': {
+    label: 'Nonfiction Text Features',
+    subject: 'reading', band: 'Grade 5', bandOrder: -2,
+    prerequisites: ['main-idea-details'],
+    nextSkills: ['text-structure', 'compare-contrast-texts'],
+    questions: [
+      { q: 'A nonfiction book contains: a table of contents, chapter headings, a glossary, and an index. What is the PURPOSE of each feature?', tier: 1 },
+      { q: 'A science article includes a bar chart showing annual rainfall in five cities. The caption reads: "London receives less rain than Seattle, despite its reputation."\nWhat does the chart add that the written text cannot? Why might the author include this?', tier: 2 },
+      { q: 'Explain how a journalist would use headings, pull-quotes, and infographics DIFFERENTLY from an academic textbook on the same topic. What does each format assume about its reader?', tier: 3 },
+    ],
+  },
+
+  'inference-basic': {
+    label: 'Making Inferences',
+    subject: 'reading', band: 'Grade 6', bandOrder: -1,
+    prerequisites: ['vocabulary-in-context', 'authors-purpose'],
+    nextSkills: ['character-analysis', 'theme-identification', 'inference-advanced'],
+    questions: [
+      { q: 'Read this: "Jake walked into the exam hall, sat down, and immediately turned the paper over. He stared at the first question, put his pen down, and rubbed his eyes."\nHow is Jake feeling? He doesn\'t say it directly — use TWO details from the text to support your inference.', tier: 1 },
+      { q: 'Read this: "Nadia put on her coat and called out \'Goodbye!\' No one answered. She stood in the hallway for a moment, then quietly closed the door behind her."\nWhat can you infer about Nadia\'s situation? What two details support your inference?', tier: 2 },
+      { q: 'Read this: "The old man set two cups on the table every morning. He filled one with tea and left the other empty. He never moved the empty cup."\nWhat can you infer from this passage? Explain your inference fully, and discuss what the author has deliberately NOT said — and why that technique is effective.', tier: 3 },
+    ],
+  },
+
+  'text-structure': {
+    label: 'Text Structure',
+    subject: 'reading', band: 'Grade 6', bandOrder: -1,
+    prerequisites: ['authors-purpose', 'sequence-retell'],
+    nextSkills: ['character-analysis', 'inference-advanced', 'text-structure-analysis'],
+    questions: [
+      { q: 'Read this: "Dogs and cats make popular pets. Dogs need daily walks and enjoy company, while cats are more independent. Both animals, however, need food, water, and regular vet visits."\nWhat text structure is this? (a) cause and effect  (b) compare and contrast  (c) problem and solution  (d) chronological', tier: 1 },
+      { q: 'Read this: "Rising sea levels threaten coastal cities. As ice caps melt due to warming temperatures, water levels rise and storm surges reach further inland. Engineers are designing higher sea walls and flood barriers to protect low-lying areas."\nIdentify the text structure and explain how the structure helps the author communicate the topic.', tier: 2 },
+      { q: 'Read this: "Before the internet, people wrote letters. Writing a letter forced careful thought — you couldn\'t unsend it. Today, a message takes seconds. Yet studies show handwritten letters are remembered more fondly by recipients."\nIdentify the text structure and explain how it shapes the reader\'s understanding. What would be lost if the same information were organised differently?', tier: 3 },
+    ],
+  },
+
+  // ── LITERARY ELEMENTS (Grade 7–8) ─────────────────────────────────────────
+
+  'character-analysis': {
+    label: 'Character Analysis',
+    subject: 'reading', band: 'Grade 7', bandOrder: 0,
+    prerequisites: ['inference-basic'],
+    nextSkills: ['theme-identification', 'narrative-structure', 'point-of-view'],
+    questions: [
+      { q: 'Read this: "Mr. Greer never smiled. He marked every assignment with red pen and handed it back without a word. Yet on the last day of school, he left a folded note on each student\'s desk."\nDescribe Mr. Greer\'s character. What does his action at the end suggest about him?', tier: 1 },
+      { q: 'Read this: "Elena had always been the best in class — the first to raise her hand, the last to leave the library. But when she saw the exam paper, she went pale. She had studied the wrong chapters."\nHow does Elena\'s character change in this moment? What does this reveal about her? Use specific evidence.', tier: 2 },
+      { q: 'Read this: "Thomas spoke loudly in meetings and took credit for the team\'s ideas. But when the project failed, he was the first to volunteer for the next one — working quietly, arriving early, leaving late."\nAnalyse Thomas\'s character. Identify the contradiction in his behaviour and explain what the author wants us to understand about him.', tier: 3 },
+    ],
+  },
+
+  'theme-identification': {
+    label: 'Theme Identification',
+    subject: 'reading', band: 'Grade 7', bandOrder: 0,
+    prerequisites: ['character-analysis', 'inference-basic'],
+    nextSkills: ['figurative-language', 'literary-devices-advanced', 'tone-mood'],
+    questions: [
+      { q: 'Read this: "Rosa worked all summer to buy a bicycle. The day she brought it home, her younger brother cried because he wanted one too. Rosa looked at her bike, then at her brother, and sighed."\nWhat is the THEME? (a) jealousy  (b) sacrifice  (c) hard work  (d) fairness. Explain with evidence.', tier: 1 },
+      { q: 'Read this: "The old fisherman had won every competition for twenty years. This year, a teenager beat him by two seconds. The old man shook the teenager\'s hand and said, \'Come back next year. I\'ll be ready.\'\"\nWhat is the theme? How does the dialogue specifically develop it?', tier: 2 },
+      { q: 'Read this: "Every morning the girl watched the astronaut from her window. He jogged past at 6am, in all weather. When she asked him why he ran so early, he said, \'Because the work is done before breakfast, or it isn\'t done at all.\'\"\nIdentify the theme and explain how the author develops it through BOTH character action and dialogue. Why is the astronaut\'s job significant to the theme?', tier: 3 },
+    ],
+  },
+
+  'figurative-language': {
+    label: 'Figurative Language',
+    subject: 'reading', band: 'Grade 8', bandOrder: 1,
+    prerequisites: ['theme-identification'],
+    nextSkills: ['literary-devices-advanced', 'authors-craft'],
+    questions: [
+      { q: 'Read this: "The classroom was a zoo before the teacher arrived — students were swinging from their chairs, howling with laughter, and stampeding between the desks."\nIdentify the type of figurative language and explain what it means.', tier: 1 },
+      { q: 'Read this: "Hope is a thing with feathers / That perches in the soul / And sings the tune without the words / And never stops at all."\nIdentify the figurative language. What qualities of hope does the poet suggest through this comparison? Be specific.', tier: 2 },
+      { q: 'Read this: "The sun was a furnace. The road shimmered and buckled in the heat. Even the shadows felt hot."\nIdentify every figurative device used and explain the precise effect of each. Then explain how the three sentences work together to build a single impression.', tier: 3 },
+    ],
+  },
+
+  'point-of-view': {
+    label: 'Point of View & Narrator',
+    subject: 'reading', band: 'Grade 8', bandOrder: 1,
+    prerequisites: ['character-analysis'],
+    nextSkills: ['inference-advanced', 'tone-mood'],
+    questions: [
+      { q: 'Read this: "I walked into the room first. No one noticed me — they were all looking at Daniel, as usual."\nWhat point of view is this? What does the narrator seem to feel about Daniel? Give evidence.', tier: 1 },
+      { q: 'Read this: "She watched her sister win the trophy and clapped loudly with the rest. Later, alone, she sat on the stairs in the dark."\nThis is third person. What do we NOT know that we would know in first person? Why might the author choose this distance?', tier: 2 },
+      { q: 'Read this: "The hero arrived. From the villagers\' windows they watched him ride in — tall, gleaming, confident. From the hill at the edge of town, the old woman watched too. She had seen heroes before."\nExplain how point of view shifts in this passage. What does the old woman\'s perspective add that the villagers\' view cannot? What is the author implying?', tier: 3 },
+    ],
+  },
+
+  'inference-advanced': {
+    label: 'Advanced Inference',
+    subject: 'reading', band: 'Grade 8', bandOrder: 1,
+    prerequisites: ['inference-basic', 'text-structure'],
+    nextSkills: ['tone-mood', 'argument-structure', 'close-reading'],
+    questions: [
+      { q: 'Read this: "The factory had been closed for ten years. In the town, the bakery shut, then the pub, then the school. The bus stopped coming."\nWhat can you infer happened to this town? Name TWO details that support your inference.', tier: 1 },
+      { q: 'Read this: "The letter had sat unopened on the mantelpiece for six months. Each morning, Margaret dusted around it carefully. Each evening, she turned off the light without looking at it."\nWhat can you infer about Margaret\'s feelings? Why does she dust around the letter rather than moving it? What does the author imply about avoidance?', tier: 2 },
+      { q: 'Read this: "The politician spoke warmly of \'getting back to basics\' and \'the values that made us great.\' She did not specify which basics, or which values, or when greatness was. The crowd applauded."\nWhat is the author inferring about the politician\'s language? What is implied about the crowd? Name the technique being used and explain its effect.', tier: 3 },
+    ],
+  },
+
+  'narrative-structure': {
+    label: 'Narrative Structure',
+    subject: 'reading', band: 'Grade 8', bandOrder: 1,
+    prerequisites: ['sequence-retell', 'character-analysis'],
+    nextSkills: ['literary-devices-advanced', 'text-structure-analysis'],
+    questions: [
+      { q: 'Explain these plot terms with a brief example for each: exposition, rising action, climax, falling action, resolution.', tier: 1 },
+      { q: 'Read this: "Tom had dreamed of winning the race for years. He trained every morning, even in snow. On race day, he tripped at the starting line. He got up, finished last — and signed up for the next month\'s race."\nIdentify the climax and resolution. How does the resolution affect the overall meaning?', tier: 2 },
+      { q: 'Some stories begin at the ending and work backwards (in medias res). Explain why an author might choose this structure instead of chronological order. What is gained and what is lost? Use a specific story or film as an example.', tier: 3 },
+    ],
+  },
+
+  // ── CRITICAL ANALYSIS (Grade 9–10) ────────────────────────────────────────
+
+  'tone-mood': {
+    label: 'Tone & Mood',
+    subject: 'reading', band: 'Grade 9', bandOrder: 2,
+    prerequisites: ['inference-advanced', 'point-of-view'],
+    nextSkills: ['argument-structure', 'rhetoric-introduction', 'literary-devices-advanced'],
+    questions: [
+      { q: 'Read this: "The abandoned playground sat rusting under the grey sky. A single swing creaked in the wind. No children came here anymore."\nWhat is the MOOD of this passage? Give TWO words that create it. What is the TONE — is the narrator sad, angry, or neutral?', tier: 1 },
+      { q: 'Read this: "The new CEO walked the factory floor smiling, shaking hands, asking workers their names. He remembered each one. The workers smiled back — though a few exchanged glances."\nIdentify the tone and mood. What is the gap between what the CEO SHOWS and what the passage IMPLIES? How does the author create this gap?', tier: 2 },
+      { q: 'Read this: "She described the hospital waiting room in precise, clinical terms: the linoleum floor, the number of chairs, the make of the vending machine. She did not describe her mother in the next room."\nAnalyse how deliberate avoidance of emotion creates tone and mood. What effect does clinical detail produce here? What is left unsaid, and why is that more powerful?', tier: 3 },
+    ],
+  },
+
+  'argument-structure': {
+    label: 'Claims, Evidence & Reasoning',
+    subject: 'reading', band: 'Grade 9', bandOrder: 2,
+    prerequisites: ['inference-advanced', 'authors-purpose'],
+    nextSkills: ['rhetoric-introduction', 'counterargument', 'complex-argumentation'],
+    questions: [
+      { q: 'Read this: "Schools should start later. Research shows teenagers\' brains are biologically set to sleep later. Early starts reduce academic performance and mental wellbeing."\nIdentify: (a) the CLAIM  (b) one piece of EVIDENCE  (c) the REASONING that connects them.', tier: 1 },
+      { q: 'Read this: "Social media causes anxiety in teenagers. A 2022 study found students who used social media more than 3 hours daily were 40% more likely to report anxiety. When students took a two-week break, anxiety scores dropped significantly."\nEvaluate the argument. Is the evidence sufficient? What question would you ask to test the reasoning?', tier: 2 },
+      { q: 'Read this: "We should ban cars from city centres. Cities with car-free zones — Oslo, Amsterdam — have seen falls in pollution, rises in retail footfall, and improvements in resident wellbeing. Critics say it hurts business; the data says otherwise."\nMap the full argument: claim, evidence, reasoning, counterargument, and rebuttal. What evidence is still missing to make this argument fully convincing?', tier: 3 },
+    ],
+  },
+
+  'literary-devices-advanced': {
+    label: 'Advanced Literary Devices',
+    subject: 'reading', band: 'Grade 10', bandOrder: 4,
+    prerequisites: ['figurative-language', 'theme-identification', 'tone-mood'],
+    nextSkills: ['authors-craft', 'close-reading', 'rhetorical-analysis'],
+    questions: [
+      { q: 'Read this: "The torch of liberty must never be extinguished — even if we have to fight to keep it burning."\nIdentify: (a) the literary device  (b) what "torch of liberty" represents  (c) the effect this creates.', tier: 1 },
+      { q: 'Read this: "It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of foolishness."\nIdentify the device. Explain how repetition of structure creates meaning. Why might an author begin a novel this way?', tier: 2 },
+      { q: 'Read this: "The captain steered his ship of state through treacherous waters. Below deck, the passengers argued about the colour of the curtains."\nIdentify ALL literary devices and explain how each contributes to the overall meaning. What is the author implying about politics or leadership?', tier: 3 },
+    ],
+  },
+
+  'rhetoric-introduction': {
+    label: 'Rhetoric: Ethos, Pathos, Logos',
+    subject: 'reading', band: 'Grade 10', bandOrder: 3,
+    prerequisites: ['argument-structure', 'tone-mood'],
+    nextSkills: ['rhetorical-analysis', 'counterargument'],
+    questions: [
+      { q: 'Read this: "As a doctor who has treated thousands of patients, I know that smoking causes irreversible lung damage. Every cigarette is a step toward a shorter life."\nIdentify whether this uses ethos, pathos, or logos — and explain why.', tier: 1 },
+      { q: 'Read this: "For just £1 a day — less than a cup of coffee — you can provide clean water for a family of four. Millions of children walk miles every morning so their family can survive. You can help."\nIdentify ALL THREE rhetorical appeals (ethos, pathos, logos) with evidence for each.', tier: 2 },
+      { q: 'Read this: "Experts agree that exercise extends lifespan. Studies across 50 countries confirm it. And yet we sit. We scroll. We tell ourselves we\'ll start on Monday."\nAnalyse the rhetoric. Identify each appeal. Then explain how the final three short sentences function differently from the rest of the passage — and what effect this creates.', tier: 3 },
+    ],
+  },
+
+  'text-structure-analysis': {
+    label: 'How Structure Shapes Meaning',
+    subject: 'reading', band: 'Grade 10', bandOrder: 4,
+    prerequisites: ['text-structure', 'narrative-structure', 'literary-devices-advanced'],
+    nextSkills: ['close-reading', 'compare-contrast-texts'],
+    questions: [
+      { q: 'A poem has four four-line stanzas and then a final single line standing alone.\nWhy might a poet isolate the last line? What effect does this structural choice create?', tier: 1 },
+      { q: 'A speech moves in this order: statistics → personal story → call to action.\nWhy is this order more persuasive than the reverse? What psychological principle does this sequence use?', tier: 2 },
+      { q: 'A novel alternates between two timelines — 1944 and 2005 — with chapters switching between them.\nExplain TWO reasons an author might choose this structure. How does it create suspense? What risks does it carry? Give an example from a novel or film that uses this technique.', tier: 3 },
+    ],
+  },
+
+  'compare-contrast-texts': {
+    label: 'Comparing Texts',
+    subject: 'reading', band: 'Grade 10', bandOrder: 4,
+    prerequisites: ['text-structure-analysis', 'argument-structure'],
+    nextSkills: ['synthesising-sources', 'close-reading'],
+    questions: [
+      { q: 'Text A: "Technology is making us smarter — access to information has never been easier."\nText B: "Technology is making us lazier — we no longer need to remember anything."\nWhat is the KEY DIFFERENCE in their arguments? What do both texts agree on?', tier: 1 },
+      { q: 'Text A (1960): "Space exploration is the greatest achievement of human civilisation."\nText B (2020): "Space exploration diverts billions from poverty, climate, and healthcare."\nCompare the texts on: (a) their claim  (b) their likely audience  (c) the historical context that shapes each view.', tier: 2 },
+      { q: 'Text A: rising property prices benefit homeowners and boost the local economy (cities are becoming more equal).\nText B: rising property prices displace low-income residents who built the community (cities are becoming less equal).\nBoth texts use economic data. How can the same type of evidence support opposite conclusions? What does this tell us about how to evaluate sources?', tier: 3 },
+    ],
+  },
+
+  // ── ADVANCED ANALYSIS (Grade 11–12) ───────────────────────────────────────
+
+  'close-reading': {
+    label: 'Close Reading',
+    subject: 'reading', band: 'Grade 11', bandOrder: 5,
+    prerequisites: ['literary-devices-advanced', 'inference-advanced', 'text-structure-analysis'],
+    nextSkills: ['rhetorical-analysis', 'authors-craft', 'complex-inference'],
+    questions: [
+      { q: 'Read this three-word sentence: "The light failed."\nExplain how word choice and sentence structure contribute to its potential meanings. What literary techniques are at work even in three words?', tier: 1 },
+      { q: 'Read this: "She had been beautiful, once — before the war made her face into a geography of loss."\nClose read this sentence: identify EVERY technique (metaphor, juxtaposition, diction, etc.) and explain the precise effect of each word or phrase.', tier: 2 },
+      { q: 'Read this: "Nothing was lost. Nothing was found. Everything was exactly as it had always been, which was the worst thing of all."\nConduct a full close reading: identify every literary and structural technique. Explain how repetition, paradox, and the final clause work together. What does "the worst thing of all" imply?', tier: 3 },
+    ],
+  },
+
+  'rhetorical-analysis': {
+    label: 'Rhetorical Analysis',
+    subject: 'reading', band: 'Grade 11', bandOrder: 5,
+    prerequisites: ['rhetoric-introduction', 'tone-mood', 'argument-structure'],
+    nextSkills: ['close-reading', 'complex-argumentation', 'authors-craft'],
+    questions: [
+      { q: 'Read this: "We are the first generation to feel the effects of climate change and the last generation that can do something about it."\nIdentify the rhetorical techniques (e.g. anaphora, antithesis, inclusive language). What emotional and logical effect does each create?', tier: 1 },
+      { q: 'Read this: "They told us to be patient. They told our parents to be patient. They told our grandparents to be patient. Patience has a cost."\nAnalyse: identify the device across the first three sentences and explain its cumulative effect. Then analyse the final sentence — why is it structurally different, and what effect does that create?', tier: 2 },
+      { q: 'Read this: "This government has presided over the longest period of wage stagnation in living memory. They have watched homelessness double, foodbank use triple, and NHS waiting lists reach historic highs. And yet — they stand here today and ask for your trust."\nWrite a full rhetorical analysis: purpose, audience, tone, rhetorical appeals, specific techniques. Explain how the structure of the final sentence amplifies the effect.', tier: 3 },
+    ],
+  },
+
+  'complex-inference': {
+    label: 'Complex & Critical Inference',
+    subject: 'reading', band: 'Grade 11', bandOrder: 6,
+    prerequisites: ['inference-advanced', 'close-reading'],
+    nextSkills: ['authors-craft', 'complex-argumentation'],
+    questions: [
+      { q: 'Read this: "He corrected her pronunciation. He offered to carry her bag. He told her she was very \'well-spoken\' for someone from where she came from."\nWhat is being implied about this character\'s behaviour? What do these actions reveal about his assumptions?', tier: 1 },
+      { q: 'Read this: "The travel writer described the village as \'unspoiled\', the people as \'simple but happy\', and the food as \'surprisingly refined\'." What do these word choices imply about the writer\'s perspective and assumptions? What is problematic about each phrase?', tier: 2 },
+      { q: 'Read this: "The memoir describes the author\'s childhood home as always warm, always full of food, always smelling of bread. She never mentions her father directly — only the absence of his coat on the hook."\nWhat is inferred about the father? How does absence function as a narrative device here? What does "the coat on the hook" imply about loss, memory, and what is left unsaid in memoir?', tier: 3 },
+    ],
+  },
+
+  'authors-craft': {
+    label: "Author's Craft & Diction",
+    subject: 'reading', band: 'Grade 11', bandOrder: 6,
+    prerequisites: ['figurative-language', 'close-reading', 'tone-mood'],
+    nextSkills: ['complex-inference', 'ap-literary-analysis'],
+    questions: [
+      { q: '"She walked into the room" vs "She swept into the room" vs "She crept into the room."\nAll say the same thing happened. What is DIFFERENT about each? What does word choice — diction — reveal about character and tone?', tier: 1 },
+      { q: 'Read this: "The soldiers filed out. One by one. Quiet. No drums. No flags."\nExplain how sentence LENGTH and STRUCTURE create meaning. What would be lost if you rewrote this as one grammatically complete sentence?', tier: 2 },
+      { q: 'Read this: "The charity report spoke of \'addressing food insecurity\' and \'supporting vulnerable populations\'. The family it described ate bread twice a day. The children wore their cousins\' old shoes."\nAnalyse the juxtaposition of institutional language and concrete detail as a craft technique. What is the author\'s argument about language itself? What effect does the final image create?', tier: 3 },
+    ],
+  },
+
+  'counterargument': {
+    label: 'Counterargument & Rebuttal',
+    subject: 'reading', band: 'Grade 11', bandOrder: 6,
+    prerequisites: ['argument-structure', 'rhetoric-introduction'],
+    nextSkills: ['complex-argumentation', 'synthesising-sources'],
+    questions: [
+      { q: 'Claim: "Homework should be banned."\nWrite ONE counterargument. Then write a rebuttal — a response that defends the original claim against your counterargument.', tier: 1 },
+      { q: 'Read this: "Some argue zoos are cruel — animals are confined unnaturally. However, modern zoos fund conservation of endangered species and educate millions about wildlife."\nEvaluate the rebuttal. Does it fully answer the counterargument? What is it NOT addressing?', tier: 2 },
+      { q: 'Read this: "Critics of universal basic income argue it will discourage people from working. But evidence from pilot schemes in Finland and Kenya suggests recipients were MORE likely to seek employment — freed from the fear of complete destitution."\nAnalyse the structure of this argument. How does the counterargument actually strengthen the original claim? Name the rhetorical technique. Evaluate whether the evidence is sufficient.', tier: 3 },
+    ],
+  },
+
+  'synthesising-sources': {
+    label: 'Synthesising Multiple Sources',
+    subject: 'reading', band: 'Grade 12', bandOrder: 7,
+    prerequisites: ['compare-contrast-texts', 'counterargument'],
+    nextSkills: ['ap-language-analysis', 'research-synthesis'],
+    questions: [
+      { q: 'You have three sources on climate change: Source A (scientific report), Source B (newspaper article), Source C (social media post).\nRank them by reliability and give ONE reason per source.', tier: 1 },
+      { q: 'Source A: "Exercise reduces dementia risk by 30%."\nSource B: "Correlation between exercise and cognitive health is clear, but causation is unproven."\nHow do these sources BOTH inform and complicate each other? What would a careful writer say when synthesising them?', tier: 2 },
+      { q: 'Three historians describe the same event: one emphasises economic causes, one political failures, one individual leaders.\nExplain how a synthesis essay should handle competing interpretations. What is "synthesis" as opposed to summary? How do you write about sources that disagree without simply picking a side?', tier: 3 },
+    ],
+  },
+
+  // ── AP LEVEL (bandOrder 8–9) ───────────────────────────────────────────────
+
+  'ap-language-analysis': {
+    label: 'AP Language & Composition',
+    subject: 'reading', band: 'AP · Year 1', bandOrder: 8,
+    prerequisites: ['rhetorical-analysis', 'synthesising-sources'],
+    nextSkills: ['complex-argumentation', 'research-synthesis'],
+    questions: [
+      { q: 'Read this: "In the long run, we are all dead. Economists set themselves too easy, too useless a task if in tempestuous seasons they can only tell us that when the storm is past, the ocean is flat again." (Keynes)\nIdentify the rhetorical strategy in the first sentence. What argument does the analogy in the second sentence make?', tier: 1 },
+      { q: 'Read this: "Education is not the filling of a pail, but the lighting of a fire." (attributed to Yeats)\nFull rhetorical analysis of this single sentence: identify the antithesis, explain both metaphors, evaluate which is more effective and why, explain the argument about education being made.', tier: 2 },
+      { q: 'Read this: "We do not read and write poetry because it is cute. We read and write poetry because we are members of the human race. And the human race is filled with passion. Medicine, law, business, engineering — these are noble pursuits and necessary to sustain life. But poetry, beauty, romance, love — these are what we stay alive for."\nFull AP Language rhetorical analysis: purpose, audience, tone, argument, and THREE specific techniques with effects. Evaluate the strengths and potential weaknesses of the argument.', tier: 3 },
+    ],
+  },
+
+  'ap-literary-analysis': {
+    label: 'AP Literature Close Reading',
+    subject: 'reading', band: 'AP · Year 1', bandOrder: 8,
+    prerequisites: ['close-reading', 'authors-craft', 'complex-inference'],
+    nextSkills: ['research-synthesis'],
+    questions: [
+      { q: 'Read this: "I\'m Nobody! Who are you? / Are you — Nobody — too?" (Dickinson)\nIdentify the devices used. What does the speaker mean by "nobody"? What is the effect of addressing the reader directly?', tier: 1 },
+      { q: 'Read this opening line: "It was a bright cold day in April, and the clocks were striking thirteen." (Orwell, 1984)\nClose literary analysis: identify the dissonance and explain its effect. What expectations does Orwell set up and immediately subvert? What does "thirteen" do to the reader?', tier: 2 },
+      { q: 'Read this: "So we beat on, boats against the current, borne back ceaselessly into the past." (Fitzgerald, The Great Gatsby)\nFull AP Literary analysis: identify and explain the extended metaphor, analyse phonetic and syntactic effects, explain what the sentence argues about the American Dream, and evaluate how it functions as a closing line.', tier: 3 },
+    ],
+  },
+
+  'complex-argumentation': {
+    label: 'Complex Argumentation',
+    subject: 'reading', band: 'AP · Year 2', bandOrder: 9,
+    prerequisites: ['ap-language-analysis', 'counterargument', 'complex-inference'],
+    nextSkills: ['research-synthesis'],
+    questions: [
+      { q: 'What is the difference between an ARGUMENT and a PERSUASIVE TEXT? Can a text be persuasive without being a good argument? Give an example.', tier: 1 },
+      { q: 'A philosopher argues: "If you cannot imagine a piece of evidence that would change your mind, you are not making an argument — you are expressing a belief."\nExplain this claim. Do you agree? Give one example of a falsifiable argument and one that is NOT.', tier: 2 },
+      { q: 'Read this: "Every reasonable person wants a fair society. A fair society rewards hard work. Therefore, any policy that redistributes wealth earned through hard work is unfair."\nIdentify the logical fallacy or weak link. Reconstruct it as a stronger syllogism. What evidence would be needed to make the original claim defensible?', tier: 3 },
+    ],
+  },
+
+  'research-synthesis': {
+    label: 'Research & Synthesis',
+    subject: 'reading', band: 'AP · Year 2', bandOrder: 9,
+    prerequisites: ['synthesising-sources', 'ap-language-analysis', 'complex-argumentation'],
+    nextSkills: [],
+    questions: [
+      { q: 'What is the difference between a PRIMARY SOURCE and a SECONDARY SOURCE? Give one example of each for the topic of the Second World War.', tier: 1 },
+      { q: 'You are writing a research essay. Three sources support your thesis; two contradict it.\nWhy MUST a strong essay engage with the two contradicting sources? What is the risk of ignoring them? What is the academic term for ignoring contradictory evidence?', tier: 2 },
+      { q: 'A student\'s essay opens: "Many scholars have argued about climate change for years. Some say it is real, others are not sure. This essay will look at both sides."\nIdentify FOUR specific weaknesses in this introduction from a research-writing perspective. Rewrite the opening paragraph as it should appear in a high-level academic essay.', tier: 3 },
+    ],
+  },
+
+}
+
 // ─── CLUSTER MAP (Maths) ──────────────────────────────────────────────────────
 // Maps every Maths node ID → one of 5 topic clusters.
 // Used by calibAdvance() to ensure the diagnostic samples across all clusters
@@ -1706,6 +2136,49 @@ export const NODE_CLUSTERS = {
     'complexity':               'data',
     'algorithms':               'data',
   },
+
+  // ─── READING ────────────────────────────────────────────────────────────────
+  reading: {
+    // ── Foundations ───────────────────────────────────────────────────────────
+    'phonics-decoding':         'foundations',
+    'sight-words-fluency':      'foundations',
+    'basic-sentence-comp':      'foundations',
+    // ── Comprehension ─────────────────────────────────────────────────────────
+    'main-idea-details':        'comprehension',
+    'sequence-retell':          'comprehension',
+    'context-clues-basic':      'comprehension',
+    'grammar-mechanics':        'comprehension',
+    'vocabulary-in-context':    'comprehension',
+    'authors-purpose':          'comprehension',
+    'nonfiction-features':      'comprehension',
+    'inference-basic':          'comprehension',
+    'text-structure':           'comprehension',
+    // ── Literary Elements ─────────────────────────────────────────────────────
+    'character-analysis':       'literary',
+    'theme-identification':     'literary',
+    'figurative-language':      'literary',
+    'point-of-view':            'literary',
+    'inference-advanced':       'literary',
+    'narrative-structure':      'literary',
+    // ── Analysis ──────────────────────────────────────────────────────────────
+    'tone-mood':                'analysis',
+    'argument-structure':       'analysis',
+    'literary-devices-advanced':'analysis',
+    'rhetoric-introduction':    'analysis',
+    'text-structure-analysis':  'analysis',
+    'compare-contrast-texts':   'analysis',
+    // ── Advanced & AP ─────────────────────────────────────────────────────────
+    'close-reading':            'advanced',
+    'rhetorical-analysis':      'advanced',
+    'complex-inference':        'advanced',
+    'authors-craft':            'advanced',
+    'counterargument':          'advanced',
+    'synthesising-sources':     'advanced',
+    'ap-language-analysis':     'advanced',
+    'ap-literary-analysis':     'advanced',
+    'complex-argumentation':    'advanced',
+    'research-synthesis':       'advanced',
+  },
 }
 
 /** Human-readable label for each cluster key, per subject */
@@ -1754,6 +2227,13 @@ export const CLUSTER_LABELS = {
     programming:  'Programming',
     data:         'Data & Algorithms',
   },
+  reading: {
+    foundations:   'Foundations',
+    comprehension: 'Comprehension',
+    literary:      'Literary Elements',
+    analysis:      'Analysis',
+    advanced:      'Advanced & AP',
+  },
 }
 
 // ─── MASTER MAP ───────────────────────────────────────────────────────────────
@@ -1766,6 +2246,7 @@ export const CALIBRATION_MAP = {
   'english-lit': ENGLISH_LIT,
   economics: ECONOMICS,
   'computer-science': COMPUTER_SCIENCE,
+  reading: READING,
 }
 
 // Entry node per subject — where the diagnostic starts
@@ -1780,6 +2261,7 @@ export const ENTRY_NODES = {
   'english-lit':    'pee-structure',
   economics:        'supply-demand',
   'computer-science': 'variables-datatypes',
+  reading:          'inference-basic',
 }
 
 // Display labels for subjects
@@ -1792,6 +2274,7 @@ export const SUBJECT_LABELS = {
   'english-lit':    'English Lit',
   economics:        'Economics',
   'computer-science': 'Computer Science',
+  reading:          'Reading',
 }
 
 export const SUBJECT_ICONS = {
@@ -1803,6 +2286,7 @@ export const SUBJECT_ICONS = {
   'english-lit':    '📖',
   economics:        '📊',
   'computer-science': '💻',
+  reading:          '📚',
 }
 
 /**
@@ -1922,6 +2406,30 @@ export const FAST_LANE = {
       nodeId: 'supply-demand',
       onPass: 'market-failure',  // solid → skip Foundation, enter at GCSE Higher
       onFail: 'supply-demand',
+    },
+  ],
+
+  // ── READING — two-bracket ladder ──────────────────────────────────────────
+  // Bracket 1 (Grade 8–9): inference + rhetorical device recognition
+  //   ✅ Pass → enter at literary-devices-advanced (Grade 10)
+  //   ❌ Fail → Bracket 2
+  // Bracket 2 (Grade 5): main idea + context clues
+  //   ✅ Pass → enter at character-analysis (Grade 7)
+  //   ❌ Fail → enter at main-idea-details (Grade 3)
+  reading: [
+    {
+      label: 'Quick Check 1',
+      q: 'Two quick checks — answer both:\n(a) Read this: "The letter had sat unopened on the desk for weeks. Each morning she dusted around it." What can you INFER about the person\'s feelings toward the letter? Explain your reasoning.\n(b) Read this: "The sun was a furnace." What type of figurative language is this, and what does it suggest about the heat?',
+      nodeId: 'inference-advanced',
+      onPass: 'literary-devices-advanced',  // solid → skip to Grade 10 entry
+      onFail: null,                          // not solid → try bracket 2
+    },
+    {
+      label: 'Quick Check 2',
+      q: 'Two quick checks — answer both:\n(a) Read this passage: "Dolphins are intelligent animals. They can learn tricks, communicate with clicks and whistles, and scientists believe they even have their own names." What is the MAIN IDEA?\n(b) Read this: "Zara was famished after the long hike — she hadn\'t eaten since breakfast." What does "famished" mean? What clue in the sentence helped you?',
+      nodeId: 'main-idea-details',
+      onPass: 'character-analysis',  // solid → Grade 7 entry
+      onFail: 'main-idea-details',   // not solid → Grade 3 start
     },
   ],
 }
