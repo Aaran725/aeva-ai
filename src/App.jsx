@@ -6395,22 +6395,22 @@ RULES:
       // ── Advance ────────────────────────────────────────────────────────────
 
       // Step 1: Cluster jump — after 3 consecutive questions in the same cluster,
-      // leap to the least-assessed cluster to improve breadth.
-      // Only fires when clusterMap exists (maths) and there's a real alternative.
+      // leap to a different cluster to improve breadth.
+      // FIX: try clusters in order (least assessed first); only use one if the
+      // closest available node is within ±2.5 bandOrder steps of the student's
+      // current estimate. This prevents a Grade 7 student jumping to AP nodes.
+      const CLUSTER_JUMP_MAX_DELTA = 2.5
       if (clusterMap && nodeCluster && (cs.clusterStreak || 0) >= 3) {
         const allClusters   = [...new Set(Object.values(clusterMap))]
-        const otherClusters = allClusters.filter(c => c !== nodeCluster)
-        // Pick the cluster assessed the fewest times (0 = completely untouched)
-        const targetCluster = otherClusters.sort((a, b) =>
-          (cs.clustersAssessed[a] || 0) - (cs.clustersAssessed[b] || 0)
-        )[0]
+        const otherClusters = allClusters
+          .filter(c => c !== nodeCluster)
+          .sort((a, b) => (cs.clustersAssessed[a] || 0) - (cs.clustersAssessed[b] || 0))
 
-        if (targetCluster) {
-          // Find the unvisited node in that cluster closest to current estimated level
+        for (const candidate of otherClusters) {
           const jumpTarget = Object.entries(subjectMap)
-            .filter(([id, n]) =>
-              clusterMap[id] === targetCluster &&
-              !cs.skillMap[id]          &&
+            .filter(([id]) =>
+              clusterMap[id] === candidate &&
+              !cs.skillMap[id] &&
               !cs.nodesVisited.includes(id) &&
               id !== cs.currentNode
             )
@@ -6419,11 +6419,12 @@ RULES:
               Math.abs((b.bandOrder ?? 0) - estimatedBandOrder)
             )[0]
 
-          if (jumpTarget) {
+          if (jumpTarget && Math.abs((jumpTarget[1].bandOrder ?? 0) - estimatedBandOrder) <= CLUSTER_JUMP_MAX_DELTA) {
             nextNode = jumpTarget[0]
-            // Reset streak — we've just jumped clusters
             cs.clusterStreak = 0
+            break  // found a reachable cluster — stop searching
           }
+          // Closest node in this cluster is too far away — try next least-assessed cluster
         }
       }
 
@@ -6448,12 +6449,19 @@ RULES:
         !cs.skillMap[id] && !cs.nodesVisited.includes(id) && subjectMap[id]
       )
       nextNode = prereqs[0] || null
-      // If all prereqs tested, try a sibling at or below current band
+      // FIX: if all prereqs tested, pick the closest-level sibling rather than
+      // insertion-order first. Sort by bandOrder proximity to current estimated
+      // level so retreat lands at the nearest unvisited node, not a random one.
       if (!nextNode) {
-        const siblingCandidates = Object.keys(subjectMap).filter(id =>
-          !cs.skillMap[id] && !cs.nodesVisited.includes(id) &&
-          subjectMap[id].bandOrder <= (node.bandOrder || 5)
-        )
+        const siblingCandidates = Object.keys(subjectMap)
+          .filter(id =>
+            !cs.skillMap[id] && !cs.nodesVisited.includes(id) &&
+            (subjectMap[id].bandOrder ?? 0) <= (node.bandOrder ?? 5)
+          )
+          .sort((a, b) =>
+            Math.abs((subjectMap[a].bandOrder ?? 0) - estimatedBandOrder) -
+            Math.abs((subjectMap[b].bandOrder ?? 0) - estimatedBandOrder)
+          )
         nextNode = siblingCandidates[0] || null
       }
     }
