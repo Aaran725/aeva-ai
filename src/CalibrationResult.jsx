@@ -9,13 +9,20 @@ import { SUBJECT_LABELS, SUBJECT_ICONS, CALIBRATION_MAP } from './calibrationMap
 
 // ── Band ordering for progress comparisons ────────────────────────────────────
 const BAND_ORDER = {
-  'Grade 1–2': 0, 'Grade 3–4': 1, 'Grade 5–6': 2, 'Grade 7–8': 3,
-  Foundation: 4, 'GCSE Foundation': 5, 'GCSE Higher': 6, 'A-Level': 7,
+  'Grade 1': 0, 'Grade 2': 1, 'Grade 3': 2, 'Grade 4': 3,
+  'Grade 5': 4, 'Grade 6': 5, 'Grade 7': 6, 'Grade 8': 7,
+  'Grade 9': 8, 'Grade 9+': 9, 'Grade 10': 10, 'Grade 10+': 11,
+  'Grade 11': 12, 'Grade 11+': 13, 'AP · Year 1': 14, 'AP · Year 2': 15,
 }
 const BAND_COLORS = {
-  'Grade 1–2': '#F87171', 'Grade 3–4': '#FB923C', 'Grade 5–6': '#FBBF24',
-  'Grade 7–8': '#4ADE80', Foundation: '#34D399',
-  'GCSE Foundation': '#60A5FA', 'GCSE Higher': '#818CF8', 'A-Level': '#C084FC',
+  'Grade 1':      '#F87171', 'Grade 2':      '#F87171',
+  'Grade 3':      '#FB923C', 'Grade 4':      '#FB923C',
+  'Grade 5':      '#FBBF24', 'Grade 6':      '#60D0A0',
+  'Grade 7':      '#4ADE80', 'Grade 8':      '#34D399',
+  'Grade 9':      '#A78BFA', 'Grade 9+':     '#9B75F5',
+  'Grade 10':     '#8B5CF6', 'Grade 10+':    '#7C52E8',
+  'Grade 11':     '#6366F1', 'Grade 11+':    '#5558D9',
+  'AP · Year 1':  '#E9A364', 'AP · Year 2':  '#F59E0B',
 }
 
 // ── Status config for skill breakdown ─────────────────────────────────────────

@@ -11,14 +11,22 @@ import { SUBJECT_LABELS, SUBJECT_ICONS } from './calibrationMap'
 
 // ── Band definitions (high → low so getBand() finds the right one first) ──────
 const BANDS = [
-  { label: 'A-Level',          min:  8,   color: '#C084FC' },
-  { label: 'GCSE Higher',      min:  6,   color: '#818CF8' },
-  { label: 'GCSE Foundation',  min:  4,   color: '#60A5FA' },
-  { label: 'Foundation',       min:  1,   color: '#34D399' },
-  { label: 'Grade 7–8',        min:  0,   color: '#4ADE80' },
-  { label: 'Grade 5–6',        min: -1,   color: '#FBBF24' },
-  { label: 'Grade 3–4',        min: -3,   color: '#FB923C' },
-  { label: 'Grade 1–2',        min: -6,   color: '#F87171' },
+  { label: 'AP · Year 2',  min:  8.5, color: '#F59E0B' },
+  { label: 'AP · Year 1',  min:  7.5, color: '#E9A364' },
+  { label: 'Grade 11+',    min:  6.5, color: '#5558D9' },
+  { label: 'Grade 11',     min:  5.5, color: '#6366F1' },
+  { label: 'Grade 10+',    min:  4.5, color: '#7C52E8' },
+  { label: 'Grade 10',     min:  3.5, color: '#8B5CF6' },
+  { label: 'Grade 9+',     min:  2.5, color: '#9B75F5' },
+  { label: 'Grade 9',      min:  1.5, color: '#A78BFA' },
+  { label: 'Grade 8',      min:  0.5, color: '#34D399' },
+  { label: 'Grade 7',      min: -0.5, color: '#4ADE80' },
+  { label: 'Grade 6',      min: -1.5, color: '#60D0A0' },
+  { label: 'Grade 5',      min: -2.5, color: '#FBBF24' },
+  { label: 'Grade 4',      min: -3.5, color: '#FB923C' },
+  { label: 'Grade 3',      min: -4.5, color: '#FD7B44' },
+  { label: 'Grade 2',      min: -5.5, color: '#F87171' },
+  { label: 'Grade 1',      min: -6,   color: '#F87171' },
 ]
 
 const SCORE_MIN = -6

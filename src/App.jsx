@@ -6457,11 +6457,11 @@ RULES:
 
   /** Determine curriculum band from skill map using weighted bandOrder average.
    *  mastery=3pts, solid=2pts, shaky=1pt, gap=0pts (gaps don't inflate the band).
-   *  This prevents a single shaky A-Level node from inflating a mostly-GCSE student. */
+   *  Returns US Grade 1-12 / AP labels that match calibrationMap band values. */
   const calibBand = (skillMap, subject) => {
     const subjectMap = CALIBRATION_MAP[subject] || {}
     const entries = Object.entries(skillMap)
-    if (!entries.length) return 'Grade 1–2'
+    if (!entries.length) return 'Grade 1'
 
     let weightedSum = 0, totalWeight = 0
     for (const [id, status] of entries) {
@@ -6471,17 +6471,25 @@ RULES:
       totalWeight += w
     }
     // All gaps → no weight → beginner
-    if (totalWeight === 0) return 'Grade 1–2'
+    if (totalWeight === 0) return 'Grade 1'
 
     const avg = weightedSum / totalWeight
-    if (avg >= 8)  return 'A-Level'
-    if (avg >= 6)  return 'GCSE Higher'
-    if (avg >= 4)  return 'GCSE Foundation'
-    if (avg >= 1)  return 'Foundation'
-    if (avg >= 0)  return 'Grade 7–8'
-    if (avg >= -1) return 'Grade 5–6'
-    if (avg >= -3) return 'Grade 3–4'
-    return 'Grade 1–2'
+    if (avg >= 8.5) return 'AP · Year 2'
+    if (avg >= 7.5) return 'AP · Year 1'
+    if (avg >= 6.5) return 'Grade 11+'
+    if (avg >= 5.5) return 'Grade 11'
+    if (avg >= 4.5) return 'Grade 10+'
+    if (avg >= 3.5) return 'Grade 10'
+    if (avg >= 2.5) return 'Grade 9+'
+    if (avg >= 1.5) return 'Grade 9'
+    if (avg >= 0.5) return 'Grade 8'
+    if (avg >= -0.5) return 'Grade 7'
+    if (avg >= -1.5) return 'Grade 6'
+    if (avg >= -2.5) return 'Grade 5'
+    if (avg >= -3.5) return 'Grade 4'
+    if (avg >= -4.5) return 'Grade 3'
+    if (avg >= -5.5) return 'Grade 2'
+    return 'Grade 1'
   }
 
   /** Find the first gap skill to suggest as "start here" */

@@ -15,7 +15,7 @@
  */
 
 // ─── MATHS ────────────────────────────────────────────────────────────────────
-// bandOrder scale (maths): -6=Grade 1 → 0=Grade 7-8 → 1-9=GCSE/A-Level
+// bandOrder scale: -6=Grade 1 → 0=Grade 7 → 1=Grade 8 → 4=Grade 10 → 8=AP Year 1 → 9=AP Year 2
 const MATHS = {
 
   // ── PRIMARY (Grade 1–6 / Year 1–6) ─────────────────────────────────────────
@@ -36,7 +36,7 @@ const MATHS = {
 
   'addition-subtraction': {
     label: 'Addition & Subtraction',
-    subject: 'maths', band: 'Grade 1–2', bandOrder: -5,
+    subject: 'maths', band: 'Grade 2', bandOrder: -5,
     prerequisites: ['counting-number'],
     nextSkills: ['place-value', 'times-tables'],
     questions: [
@@ -50,7 +50,7 @@ const MATHS = {
 
   'place-value': {
     label: 'Place Value',
-    subject: 'maths', band: 'Grade 2–3', bandOrder: -5,
+    subject: 'maths', band: 'Grade 2', bandOrder: -5,
     prerequisites: ['addition-subtraction'],
     nextSkills: ['times-tables', 'multiplication-division'],
     questions: [
@@ -92,7 +92,7 @@ const MATHS = {
 
   'basic-fractions': {
     label: 'Intro to Fractions',
-    subject: 'maths', band: 'Grade 3–4', bandOrder: -3,
+    subject: 'maths', band: 'Grade 4', bandOrder: -3,
     prerequisites: ['times-tables'],
     nextSkills: ['fractions-equivalent', 'decimals-intro'],
     questions: [
@@ -106,7 +106,7 @@ const MATHS = {
 
   'fractions-equivalent': {
     label: 'Equivalent Fractions & Mixed Numbers',
-    subject: 'maths', band: 'Grade 4–5', bandOrder: -2,
+    subject: 'maths', band: 'Grade 5', bandOrder: -2,
     prerequisites: ['basic-fractions'],
     nextSkills: ['decimals-intro', 'number-basics'],
     questions: [
@@ -120,7 +120,7 @@ const MATHS = {
 
   'decimals-intro': {
     label: 'Decimals',
-    subject: 'maths', band: 'Grade 4–5', bandOrder: -2,
+    subject: 'maths', band: 'Grade 5', bandOrder: -2,
     prerequisites: ['fractions-equivalent'],
     nextSkills: ['negative-numbers', 'number-basics'],
     questions: [
@@ -134,7 +134,7 @@ const MATHS = {
 
   'negative-numbers': {
     label: 'Negative Numbers',
-    subject: 'maths', band: 'Grade 5–6', bandOrder: -1,
+    subject: 'maths', band: 'Grade 6', bandOrder: -1,
     prerequisites: ['decimals-intro'],
     nextSkills: ['number-basics', 'basic-algebra'],
     questions: [
@@ -148,7 +148,7 @@ const MATHS = {
 
   'basic-area-perimeter': {
     label: 'Area & Perimeter',
-    subject: 'maths', band: 'Grade 4–5', bandOrder: -2,
+    subject: 'maths', band: 'Grade 5', bandOrder: -2,
     prerequisites: ['multiplication-division'],
     nextSkills: ['angles-shapes'],
     questions: [
@@ -162,7 +162,7 @@ const MATHS = {
 
   'angles-shapes': {
     label: 'Angles & 2D Shapes',
-    subject: 'maths', band: 'Grade 5–6', bandOrder: -1,
+    subject: 'maths', band: 'Grade 6', bandOrder: -1,
     prerequisites: ['basic-area-perimeter'],
     nextSkills: ['statistics-basics'],
     questions: [
@@ -176,7 +176,7 @@ const MATHS = {
 
   'statistics-basics': {
     label: 'Statistics & Data',
-    subject: 'maths', band: 'Grade 5–6', bandOrder: -1,
+    subject: 'maths', band: 'Grade 6', bandOrder: -1,
     prerequisites: ['angles-shapes'],
     nextSkills: ['coordinates-intro'],
     questions: [
@@ -190,7 +190,7 @@ const MATHS = {
 
   'coordinates-intro': {
     label: 'Coordinates & Graphs',
-    subject: 'maths', band: 'Grade 6', bandOrder: 0,
+    subject: 'maths', band: 'Grade 7', bandOrder: 0,
     prerequisites: ['statistics-basics', 'negative-numbers'],
     nextSkills: ['algebra-intro', 'straight-line-graphs'],
     questions: [
@@ -204,7 +204,7 @@ const MATHS = {
 
   'algebra-intro': {
     label: 'Introduction to Algebra',
-    subject: 'maths', band: 'Grade 7–8', bandOrder: 0,
+    subject: 'maths', band: 'Grade 7', bandOrder: 0,
     prerequisites: ['coordinates-intro'],
     nextSkills: ['basic-algebra', 'linear-equations'],
     questions: [
@@ -220,7 +220,7 @@ const MATHS = {
 
   'number-basics': {
     label: 'Number & Place Value',
-    subject: 'maths', band: 'Foundation', bandOrder: 1,
+    subject: 'maths', band: 'Grade 8', bandOrder: 1,
     prerequisites: ['decimals-intro', 'negative-numbers'],
     nextSkills: ['fractions', 'percentages'],
     questions: [
@@ -234,7 +234,7 @@ const MATHS = {
 
   'fractions': {
     label: 'Fractions',
-    subject: 'maths', band: 'GCSE Foundation', bandOrder: 2,
+    subject: 'maths', band: 'Grade 9', bandOrder: 2,
     prerequisites: ['number-basics'],
     nextSkills: ['percentages', 'ratio'],
     questions: [
@@ -248,7 +248,7 @@ const MATHS = {
 
   'percentages': {
     label: 'Percentages',
-    subject: 'maths', band: 'GCSE Foundation', bandOrder: 2,
+    subject: 'maths', band: 'Grade 9', bandOrder: 2,
     prerequisites: ['fractions'],
     nextSkills: ['ratio', 'basic-algebra'],
     questions: [
@@ -262,7 +262,7 @@ const MATHS = {
 
   'ratio': {
     label: 'Ratio & Proportion',
-    subject: 'maths', band: 'GCSE Foundation', bandOrder: 3,
+    subject: 'maths', band: 'Grade 9+', bandOrder: 3,
     prerequisites: ['fractions'],
     nextSkills: ['basic-algebra'],
     questions: [
@@ -276,7 +276,7 @@ const MATHS = {
 
   'basic-algebra': {
     label: 'Basic Algebra',
-    subject: 'maths', band: 'GCSE Foundation', bandOrder: 3,
+    subject: 'maths', band: 'Grade 9+', bandOrder: 3,
     prerequisites: ['number-basics'],
     nextSkills: ['linear-equations', 'expanding-brackets'],
     questions: [
@@ -290,7 +290,7 @@ const MATHS = {
 
   'linear-equations': {
     label: 'Linear Equations',
-    subject: 'maths', band: 'GCSE Foundation', bandOrder: 4,
+    subject: 'maths', band: 'Grade 10', bandOrder: 4,
     prerequisites: ['basic-algebra'],
     nextSkills: ['simultaneous-equations', 'inequalities', 'expanding-brackets'],
     questions: [
@@ -304,7 +304,7 @@ const MATHS = {
 
   'expanding-brackets': {
     label: 'Expanding & Factorising',
-    subject: 'maths', band: 'GCSE Foundation', bandOrder: 4,
+    subject: 'maths', band: 'Grade 10', bandOrder: 4,
     prerequisites: ['basic-algebra'],
     nextSkills: ['quadratic-factorising', 'completing-the-square'],
     questions: [
@@ -318,7 +318,7 @@ const MATHS = {
 
   'inequalities': {
     label: 'Inequalities',
-    subject: 'maths', band: 'GCSE Higher', bandOrder: 5,
+    subject: 'maths', band: 'Grade 10+', bandOrder: 5,
     prerequisites: ['linear-equations'],
     nextSkills: ['quadratic-inequalities'],
     questions: [
@@ -332,7 +332,7 @@ const MATHS = {
 
   'simultaneous-equations': {
     label: 'Simultaneous Equations',
-    subject: 'maths', band: 'GCSE Higher', bandOrder: 5,
+    subject: 'maths', band: 'Grade 10+', bandOrder: 5,
     prerequisites: ['linear-equations'],
     nextSkills: ['quadratic-simultaneous'],
     questions: [
@@ -346,7 +346,7 @@ const MATHS = {
 
   'quadratic-factorising': {
     label: 'Quadratic Factorising',
-    subject: 'maths', band: 'GCSE Higher', bandOrder: 5,
+    subject: 'maths', band: 'Grade 10+', bandOrder: 5,
     prerequisites: ['expanding-brackets'],
     nextSkills: ['completing-the-square', 'quadratic-formula'],
     questions: [
@@ -360,7 +360,7 @@ const MATHS = {
 
   'completing-the-square': {
     label: 'Completing the Square',
-    subject: 'maths', band: 'GCSE Higher', bandOrder: 6,
+    subject: 'maths', band: 'Grade 11', bandOrder: 6,
     prerequisites: ['quadratic-factorising'],
     nextSkills: ['quadratic-formula', 'quadratic-graphs'],
     questions: [
@@ -374,7 +374,7 @@ const MATHS = {
 
   'quadratic-formula': {
     label: 'Quadratic Formula',
-    subject: 'maths', band: 'GCSE Higher', bandOrder: 6,
+    subject: 'maths', band: 'Grade 11', bandOrder: 6,
     prerequisites: ['completing-the-square'],
     nextSkills: ['discriminant', 'quadratic-simultaneous'],
     questions: [
@@ -388,7 +388,7 @@ const MATHS = {
 
   'discriminant': {
     label: 'Discriminant',
-    subject: 'maths', band: 'GCSE Higher', bandOrder: 7,
+    subject: 'maths', band: 'Grade 11+', bandOrder: 7,
     prerequisites: ['quadratic-formula'],
     nextSkills: ['further-algebra'],
     questions: [
@@ -402,7 +402,7 @@ const MATHS = {
 
   'quadratic-graphs': {
     label: 'Quadratic Graphs',
-    subject: 'maths', band: 'GCSE Higher', bandOrder: 6,
+    subject: 'maths', band: 'Grade 11', bandOrder: 6,
     prerequisites: ['quadratic-factorising'],
     nextSkills: ['discriminant', 'transformations'],
     questions: [
@@ -416,7 +416,7 @@ const MATHS = {
 
   'straight-line-graphs': {
     label: 'Straight Line Graphs',
-    subject: 'maths', band: 'GCSE Foundation', bandOrder: 4,
+    subject: 'maths', band: 'Grade 10', bandOrder: 4,
     prerequisites: ['linear-equations'],
     nextSkills: ['quadratic-graphs', 'transformations'],
     questions: [
@@ -430,7 +430,7 @@ const MATHS = {
 
   'trigonometry': {
     label: 'Trigonometry (SOH CAH TOA)',
-    subject: 'maths', band: 'GCSE Higher', bandOrder: 6,
+    subject: 'maths', band: 'Grade 11', bandOrder: 6,
     prerequisites: ['straight-line-graphs'],
     nextSkills: ['sine-cosine-rule', 'trig-identities'],
     questions: [
@@ -444,7 +444,7 @@ const MATHS = {
 
   'sine-cosine-rule': {
     label: 'Sine & Cosine Rule',
-    subject: 'maths', band: 'GCSE Higher', bandOrder: 7,
+    subject: 'maths', band: 'Grade 11+', bandOrder: 7,
     prerequisites: ['trigonometry'],
     nextSkills: ['trig-identities', 'vectors'],
     questions: [
@@ -458,7 +458,7 @@ const MATHS = {
 
   'surds': {
     label: 'Surds',
-    subject: 'maths', band: 'GCSE Higher', bandOrder: 6,
+    subject: 'maths', band: 'Grade 11', bandOrder: 6,
     prerequisites: ['basic-algebra'],
     nextSkills: ['further-algebra'],
     questions: [
@@ -472,7 +472,7 @@ const MATHS = {
 
   'trig-identities': {
     label: 'Trig Identities',
-    subject: 'maths', band: 'GCSE Higher', bandOrder: 7,
+    subject: 'maths', band: 'Grade 11+', bandOrder: 7,
     prerequisites: ['trigonometry'],
     nextSkills: ['further-trig', 'sine-cosine-rule'],
     questions: [
@@ -486,7 +486,7 @@ const MATHS = {
 
   'further-algebra': {
     label: 'Further Algebra',
-    subject: 'maths', band: 'A-Level', bandOrder: 8,
+    subject: 'maths', band: 'AP · Year 1', bandOrder: 8,
     prerequisites: ['discriminant', 'surds'],
     nextSkills: ['calculus-intro', 'binomial-expansion'],
     questions: [
@@ -500,7 +500,7 @@ const MATHS = {
 
   'calculus-intro': {
     label: 'Differentiation',
-    subject: 'maths', band: 'A-Level', bandOrder: 8,
+    subject: 'maths', band: 'AP · Year 1', bandOrder: 8,
     prerequisites: ['further-algebra'],
     nextSkills: ['integration', 'calculus-applications'],
     questions: [
@@ -514,7 +514,7 @@ const MATHS = {
 
   'integration': {
     label: 'Integration',
-    subject: 'maths', band: 'A-Level', bandOrder: 9,
+    subject: 'maths', band: 'AP · Year 2', bandOrder: 9,
     prerequisites: ['calculus-intro'],
     nextSkills: ['calculus-applications'],
     questions: [
@@ -528,7 +528,7 @@ const MATHS = {
 
   'vectors': {
     label: 'Vectors',
-    subject: 'maths', band: 'A-Level', bandOrder: 9,
+    subject: 'maths', band: 'AP · Year 2', bandOrder: 9,
     prerequisites: ['sine-cosine-rule'],
     nextSkills: [],
     questions: [
@@ -544,7 +544,7 @@ const MATHS = {
 
   'logarithms': {
     label: 'Logarithms & Exponentials',
-    subject: 'maths', band: 'A-Level', bandOrder: 8,
+    subject: 'maths', band: 'AP · Year 1', bandOrder: 8,
     prerequisites: ['further-algebra'],
     nextSkills: ['calculus-intro', 'sequences-series'],
     questions: [
@@ -558,7 +558,7 @@ const MATHS = {
 
   'binomial-expansion': {
     label: 'Binomial Expansion',
-    subject: 'maths', band: 'A-Level', bandOrder: 8,
+    subject: 'maths', band: 'AP · Year 1', bandOrder: 8,
     prerequisites: ['further-algebra'],
     nextSkills: ['sequences-series'],
     questions: [
@@ -572,7 +572,7 @@ const MATHS = {
 
   'sequences-series': {
     label: 'Sequences & Series',
-    subject: 'maths', band: 'A-Level', bandOrder: 8,
+    subject: 'maths', band: 'AP · Year 1', bandOrder: 8,
     prerequisites: ['further-algebra'],
     nextSkills: [],
     questions: [
@@ -586,7 +586,7 @@ const MATHS = {
 
   'mathematical-proof': {
     label: 'Mathematical Proof',
-    subject: 'maths', band: 'A-Level', bandOrder: 8,
+    subject: 'maths', band: 'AP · Year 1', bandOrder: 8,
     prerequisites: ['further-algebra'],
     nextSkills: [],
     questions: [
@@ -600,7 +600,7 @@ const MATHS = {
 
   'further-trig': {
     label: 'Further Trigonometry',
-    subject: 'maths', band: 'A-Level', bandOrder: 9,
+    subject: 'maths', band: 'AP · Year 2', bandOrder: 9,
     prerequisites: ['trigonometry', 'trig-identities'],
     nextSkills: ['integration'],
     questions: [
@@ -614,7 +614,7 @@ const MATHS = {
 
   'quadratic-simultaneous': {
     label: 'Quadratic Simultaneous Equations',
-    subject: 'maths', band: 'GCSE Higher', bandOrder: 6,
+    subject: 'maths', band: 'Grade 11', bandOrder: 6,
     prerequisites: ['simultaneous-equations', 'quadratic-factorising'],
     nextSkills: ['discriminant'],
     questions: [
@@ -628,7 +628,7 @@ const MATHS = {
 
   'quadratic-inequalities': {
     label: 'Quadratic Inequalities',
-    subject: 'maths', band: 'GCSE Higher', bandOrder: 6,
+    subject: 'maths', band: 'Grade 11', bandOrder: 6,
     prerequisites: ['inequalities', 'quadratic-factorising'],
     nextSkills: ['further-algebra'],
     questions: [
@@ -642,7 +642,7 @@ const MATHS = {
 
   'transformations': {
     label: 'Graph Transformations',
-    subject: 'maths', band: 'GCSE Higher', bandOrder: 5,
+    subject: 'maths', band: 'Grade 10+', bandOrder: 5,
     prerequisites: ['straight-line-graphs', 'quadratic-graphs'],
     nextSkills: ['trigonometry', 'further-trig'],
     questions: [
@@ -656,7 +656,7 @@ const MATHS = {
 
   'calculus-applications': {
     label: 'Calculus Applications',
-    subject: 'maths', band: 'A-Level', bandOrder: 9,
+    subject: 'maths', band: 'AP · Year 2', bandOrder: 9,
     prerequisites: ['calculus-intro', 'integration'],
     nextSkills: [],
     questions: [
@@ -670,7 +670,7 @@ const MATHS = {
 
   'parametric': {
     label: 'Parametric Equations',
-    subject: 'maths', band: 'A-Level', bandOrder: 9,
+    subject: 'maths', band: 'AP · Year 2', bandOrder: 9,
     prerequisites: ['calculus-intro', 'completing-the-square'],
     nextSkills: [],
     questions: [
@@ -690,7 +690,7 @@ const PHYSICS = {
 
   'pushes-pulls': {
     label: 'Pushes, Pulls & Friction',
-    subject: 'physics', band: 'Grade 3–4', bandOrder: -4,
+    subject: 'physics', band: 'Grade 3', bandOrder: -4,
     prerequisites: [],
     nextSkills: ['forces-motion-primary'],
     questions: [
@@ -703,7 +703,7 @@ const PHYSICS = {
 
   'forces-motion-primary': {
     label: 'Speed, Motion & Simple Forces',
-    subject: 'physics', band: 'Grade 5–6', bandOrder: -2,
+    subject: 'physics', band: 'Grade 5', bandOrder: -2,
     prerequisites: ['pushes-pulls'],
     nextSkills: ['forces-basics'],
     questions: [
@@ -716,7 +716,7 @@ const PHYSICS = {
 
   'forces-basics': {
     label: 'Forces & Newton\'s Laws',
-    subject: 'physics', band: 'GCSE Foundation', bandOrder: 2,
+    subject: 'physics', band: 'Grade 9', bandOrder: 2,
     prerequisites: [],
     nextSkills: ['momentum', 'energy'],
     questions: [
@@ -728,7 +728,7 @@ const PHYSICS = {
 
   'energy': {
     label: 'Energy & Work',
-    subject: 'physics', band: 'GCSE Foundation', bandOrder: 3,
+    subject: 'physics', band: 'Grade 9+', bandOrder: 3,
     prerequisites: ['forces-basics'],
     nextSkills: ['waves', 'electricity-basics'],
     questions: [
@@ -740,7 +740,7 @@ const PHYSICS = {
 
   'momentum': {
     label: 'Momentum & Impulse',
-    subject: 'physics', band: 'GCSE Higher', bandOrder: 4,
+    subject: 'physics', band: 'Grade 10', bandOrder: 4,
     prerequisites: ['forces-basics'],
     nextSkills: ['circular-motion'],
     questions: [
@@ -752,7 +752,7 @@ const PHYSICS = {
 
   'electricity-basics': {
     label: 'Electricity & Circuits',
-    subject: 'physics', band: 'GCSE Foundation', bandOrder: 3,
+    subject: 'physics', band: 'Grade 9+', bandOrder: 3,
     prerequisites: [],
     nextSkills: ['electromagnetism', 'ac-dc'],
     questions: [
@@ -764,7 +764,7 @@ const PHYSICS = {
 
   'waves': {
     label: 'Waves',
-    subject: 'physics', band: 'GCSE Foundation', bandOrder: 3,
+    subject: 'physics', band: 'Grade 9+', bandOrder: 3,
     prerequisites: ['energy'],
     nextSkills: ['optics', 'quantum'],
     questions: [
@@ -776,7 +776,7 @@ const PHYSICS = {
 
   'atomic-structure': {
     label: 'Atomic Structure & Radioactivity',
-    subject: 'physics', band: 'GCSE Higher', bandOrder: 5,
+    subject: 'physics', band: 'Grade 10+', bandOrder: 5,
     prerequisites: ['electricity-basics'],
     nextSkills: ['quantum', 'nuclear'],
     questions: [
@@ -788,7 +788,7 @@ const PHYSICS = {
 
   'electromagnetism': {
     label: 'Electromagnetism',
-    subject: 'physics', band: 'GCSE Higher', bandOrder: 5,
+    subject: 'physics', band: 'Grade 10+', bandOrder: 5,
     prerequisites: ['electricity-basics'],
     nextSkills: ['ac-dc'],
     questions: [
@@ -800,7 +800,7 @@ const PHYSICS = {
 
   'circular-motion': {
     label: 'Circular Motion',
-    subject: 'physics', band: 'A-Level', bandOrder: 7,
+    subject: 'physics', band: 'Grade 11+', bandOrder: 7,
     prerequisites: ['momentum', 'forces-basics'],
     nextSkills: ['simple-harmonic', 'gravitation'],
     questions: [
@@ -812,7 +812,7 @@ const PHYSICS = {
 
   'simple-harmonic': {
     label: 'Simple Harmonic Motion',
-    subject: 'physics', band: 'A-Level', bandOrder: 8,
+    subject: 'physics', band: 'AP · Year 1', bandOrder: 8,
     prerequisites: ['circular-motion'],
     nextSkills: ['gravitation'],
     questions: [
@@ -824,7 +824,7 @@ const PHYSICS = {
 
   'optics': {
     label: 'Optics & Light',
-    subject: 'physics', band: 'GCSE Higher', bandOrder: 4,
+    subject: 'physics', band: 'Grade 10', bandOrder: 4,
     prerequisites: ['waves'],
     nextSkills: ['quantum'],
     questions: [
@@ -836,7 +836,7 @@ const PHYSICS = {
 
   'quantum': {
     label: 'Quantum Physics',
-    subject: 'physics', band: 'A-Level', bandOrder: 7,
+    subject: 'physics', band: 'Grade 11+', bandOrder: 7,
     prerequisites: ['waves', 'atomic-structure'],
     nextSkills: [],
     questions: [
@@ -848,7 +848,7 @@ const PHYSICS = {
 
   'nuclear': {
     label: 'Nuclear Physics',
-    subject: 'physics', band: 'A-Level', bandOrder: 7,
+    subject: 'physics', band: 'Grade 11+', bandOrder: 7,
     prerequisites: ['atomic-structure'],
     nextSkills: [],
     questions: [
@@ -860,7 +860,7 @@ const PHYSICS = {
 
   'ac-dc': {
     label: 'AC & DC Electricity',
-    subject: 'physics', band: 'GCSE Higher', bandOrder: 5,
+    subject: 'physics', band: 'Grade 10+', bandOrder: 5,
     prerequisites: ['electricity-basics', 'electromagnetism'],
     nextSkills: [],
     questions: [
@@ -872,7 +872,7 @@ const PHYSICS = {
 
   'gravitation': {
     label: 'Gravitation',
-    subject: 'physics', band: 'A-Level', bandOrder: 8,
+    subject: 'physics', band: 'AP · Year 1', bandOrder: 8,
     prerequisites: ['circular-motion'],
     nextSkills: [],
     questions: [
@@ -890,7 +890,7 @@ const CHEMISTRY = {
 
   'materials-properties': {
     label: 'Materials & Their Properties',
-    subject: 'chemistry', band: 'Grade 3–4', bandOrder: -4,
+    subject: 'chemistry', band: 'Grade 3', bandOrder: -4,
     prerequisites: [],
     nextSkills: ['changes-matter'],
     questions: [
@@ -903,7 +903,7 @@ const CHEMISTRY = {
 
   'changes-matter': {
     label: 'Changing States & Simple Reactions',
-    subject: 'chemistry', band: 'Grade 5–6', bandOrder: -2,
+    subject: 'chemistry', band: 'Grade 5', bandOrder: -2,
     prerequisites: ['materials-properties'],
     nextSkills: ['atomic-structure-chem'],
     questions: [
@@ -916,7 +916,7 @@ const CHEMISTRY = {
 
   'atomic-structure-chem': {
     label: 'Atomic Structure',
-    subject: 'chemistry', band: 'GCSE Foundation', bandOrder: 1,
+    subject: 'chemistry', band: 'Grade 8', bandOrder: 1,
     prerequisites: [],
     nextSkills: ['periodic-table', 'bonding'],
     questions: [
@@ -928,7 +928,7 @@ const CHEMISTRY = {
 
   'periodic-table': {
     label: 'Periodic Table & Trends',
-    subject: 'chemistry', band: 'GCSE Foundation', bandOrder: 2,
+    subject: 'chemistry', band: 'Grade 9', bandOrder: 2,
     prerequisites: ['atomic-structure-chem'],
     nextSkills: ['bonding', 'reactions'],
     questions: [
@@ -940,7 +940,7 @@ const CHEMISTRY = {
 
   'bonding': {
     label: 'Chemical Bonding',
-    subject: 'chemistry', band: 'GCSE Higher', bandOrder: 3,
+    subject: 'chemistry', band: 'Grade 9+', bandOrder: 3,
     prerequisites: ['periodic-table'],
     nextSkills: ['structure-properties', 'reactions'],
     questions: [
@@ -952,7 +952,7 @@ const CHEMISTRY = {
 
   'moles': {
     label: 'Moles & Calculations',
-    subject: 'chemistry', band: 'GCSE Higher', bandOrder: 4,
+    subject: 'chemistry', band: 'Grade 10', bandOrder: 4,
     prerequisites: ['atomic-structure-chem'],
     nextSkills: ['reactions', 'concentration'],
     questions: [
@@ -964,7 +964,7 @@ const CHEMISTRY = {
 
   'reactions': {
     label: 'Chemical Reactions & Energy',
-    subject: 'chemistry', band: 'GCSE Higher', bandOrder: 4,
+    subject: 'chemistry', band: 'Grade 10', bandOrder: 4,
     prerequisites: ['bonding', 'moles'],
     nextSkills: ['rates', 'equilibrium'],
     questions: [
@@ -976,7 +976,7 @@ const CHEMISTRY = {
 
   'rates': {
     label: 'Rates of Reaction',
-    subject: 'chemistry', band: 'GCSE Higher', bandOrder: 5,
+    subject: 'chemistry', band: 'Grade 10+', bandOrder: 5,
     prerequisites: ['reactions'],
     nextSkills: ['equilibrium'],
     questions: [
@@ -988,7 +988,7 @@ const CHEMISTRY = {
 
   'structure-properties': {
     label: 'Structure & Properties',
-    subject: 'chemistry', band: 'GCSE Higher', bandOrder: 4,
+    subject: 'chemistry', band: 'Grade 10', bandOrder: 4,
     prerequisites: ['bonding'],
     nextSkills: ['rates'],
     questions: [
@@ -1000,7 +1000,7 @@ const CHEMISTRY = {
 
   'concentration': {
     label: 'Concentration & Solutions',
-    subject: 'chemistry', band: 'GCSE Higher', bandOrder: 4,
+    subject: 'chemistry', band: 'Grade 10', bandOrder: 4,
     prerequisites: ['moles'],
     nextSkills: ['reactions'],
     questions: [
@@ -1012,7 +1012,7 @@ const CHEMISTRY = {
 
   'equilibrium': {
     label: 'Equilibrium & Le Chatelier',
-    subject: 'chemistry', band: 'A-Level', bandOrder: 7,
+    subject: 'chemistry', band: 'Grade 11+', bandOrder: 7,
     prerequisites: ['rates'],
     nextSkills: [],
     questions: [
@@ -1030,7 +1030,7 @@ const BIOLOGY = {
 
   'living-things': {
     label: 'Living Things & Life Processes',
-    subject: 'biology', band: 'Grade 3–4', bandOrder: -4,
+    subject: 'biology', band: 'Grade 3', bandOrder: -4,
     prerequisites: [],
     nextSkills: ['body-health'],
     questions: [
@@ -1043,7 +1043,7 @@ const BIOLOGY = {
 
   'body-health': {
     label: 'The Human Body & Health',
-    subject: 'biology', band: 'Grade 5–6', bandOrder: -2,
+    subject: 'biology', band: 'Grade 5', bandOrder: -2,
     prerequisites: ['living-things'],
     nextSkills: ['cell-structure'],
     questions: [
@@ -1056,7 +1056,7 @@ const BIOLOGY = {
 
   'cell-structure': {
     label: 'Cell Structure',
-    subject: 'biology', band: 'GCSE Foundation', bandOrder: 1,
+    subject: 'biology', band: 'Grade 8', bandOrder: 1,
     prerequisites: [],
     nextSkills: ['cell-transport', 'dna-genetics'],
     questions: [
@@ -1068,7 +1068,7 @@ const BIOLOGY = {
 
   'cell-transport': {
     label: 'Cell Transport',
-    subject: 'biology', band: 'GCSE Foundation', bandOrder: 2,
+    subject: 'biology', band: 'Grade 9', bandOrder: 2,
     prerequisites: ['cell-structure'],
     nextSkills: ['enzymes', 'breathing'],
     questions: [
@@ -1080,7 +1080,7 @@ const BIOLOGY = {
 
   'enzymes': {
     label: 'Enzymes',
-    subject: 'biology', band: 'GCSE Foundation', bandOrder: 3,
+    subject: 'biology', band: 'Grade 9+', bandOrder: 3,
     prerequisites: ['cell-transport'],
     nextSkills: ['digestion', 'dna-genetics'],
     questions: [
@@ -1092,7 +1092,7 @@ const BIOLOGY = {
 
   'dna-genetics': {
     label: 'DNA & Inheritance',
-    subject: 'biology', band: 'GCSE Higher', bandOrder: 5,
+    subject: 'biology', band: 'Grade 10+', bandOrder: 5,
     prerequisites: ['cell-structure'],
     nextSkills: ['evolution', 'genetic-engineering'],
     questions: [
@@ -1104,7 +1104,7 @@ const BIOLOGY = {
 
   'breathing': {
     label: 'Breathing & Gas Exchange',
-    subject: 'biology', band: 'GCSE Foundation', bandOrder: 2,
+    subject: 'biology', band: 'Grade 9', bandOrder: 2,
     prerequisites: ['cell-transport'],
     nextSkills: ['enzymes'],
     questions: [
@@ -1116,7 +1116,7 @@ const BIOLOGY = {
 
   'digestion': {
     label: 'Digestion & Nutrition',
-    subject: 'biology', band: 'GCSE Foundation', bandOrder: 3,
+    subject: 'biology', band: 'Grade 9+', bandOrder: 3,
     prerequisites: ['enzymes'],
     nextSkills: ['dna-genetics'],
     questions: [
@@ -1128,7 +1128,7 @@ const BIOLOGY = {
 
   'genetic-engineering': {
     label: 'Genetic Engineering',
-    subject: 'biology', band: 'GCSE Higher', bandOrder: 6,
+    subject: 'biology', band: 'Grade 11', bandOrder: 6,
     prerequisites: ['dna-genetics'],
     nextSkills: [],
     questions: [
@@ -1140,7 +1140,7 @@ const BIOLOGY = {
 
   'evolution': {
     label: 'Evolution & Natural Selection',
-    subject: 'biology', band: 'GCSE Higher', bandOrder: 5,
+    subject: 'biology', band: 'Grade 10+', bandOrder: 5,
     prerequisites: ['dna-genetics'],
     nextSkills: [],
     questions: [
@@ -1155,7 +1155,7 @@ const BIOLOGY = {
 const HISTORY = {
   'source-analysis': {
     label: 'Source Analysis',
-    subject: 'history', band: 'Foundation', bandOrder: 1,
+    subject: 'history', band: 'Grade 8', bandOrder: 1,
     prerequisites: [],
     nextSkills: ['causation', 'significance'],
     questions: [
@@ -1167,7 +1167,7 @@ const HISTORY = {
 
   'causation': {
     label: 'Causation & Consequence',
-    subject: 'history', band: 'Foundation', bandOrder: 2,
+    subject: 'history', band: 'Grade 9', bandOrder: 2,
     prerequisites: ['source-analysis'],
     nextSkills: ['ww1-causes', 'ww2-causes'],
     questions: [
@@ -1179,7 +1179,7 @@ const HISTORY = {
 
   'ww1-causes': {
     label: 'Causes of World War One',
-    subject: 'history', band: 'GCSE', bandOrder: 3,
+    subject: 'history', band: 'Grade 9+', bandOrder: 3,
     prerequisites: ['causation'],
     nextSkills: ['ww1-trench', 'versailles'],
     questions: [
@@ -1191,7 +1191,7 @@ const HISTORY = {
 
   'versailles': {
     label: 'Treaty of Versailles',
-    subject: 'history', band: 'GCSE', bandOrder: 4,
+    subject: 'history', band: 'Grade 10', bandOrder: 4,
     prerequisites: ['ww1-causes'],
     nextSkills: ['weimar', 'ww2-causes'],
     questions: [
@@ -1203,7 +1203,7 @@ const HISTORY = {
 
   'ww1-trench': {
     label: 'WW1 — Trench Warfare',
-    subject: 'history', band: 'GCSE', bandOrder: 4,
+    subject: 'history', band: 'Grade 10', bandOrder: 4,
     prerequisites: ['ww1-causes'],
     nextSkills: ['versailles'],
     questions: [
@@ -1215,7 +1215,7 @@ const HISTORY = {
 
   'weimar': {
     label: 'Weimar Republic',
-    subject: 'history', band: 'GCSE', bandOrder: 5,
+    subject: 'history', band: 'Grade 10+', bandOrder: 5,
     prerequisites: ['versailles'],
     nextSkills: ['ww2-causes'],
     questions: [
@@ -1227,7 +1227,7 @@ const HISTORY = {
 
   'ww2-causes': {
     label: 'Causes of World War Two',
-    subject: 'history', band: 'GCSE', bandOrder: 5,
+    subject: 'history', band: 'Grade 10+', bandOrder: 5,
     prerequisites: ['versailles', 'causation'],
     nextSkills: [],
     questions: [
@@ -1239,7 +1239,7 @@ const HISTORY = {
 
   'significance': {
     label: 'Significance & Change',
-    subject: 'history', band: 'Foundation', bandOrder: 2,
+    subject: 'history', band: 'Grade 9', bandOrder: 2,
     prerequisites: ['source-analysis'],
     nextSkills: ['causation'],
     questions: [
@@ -1254,7 +1254,7 @@ const HISTORY = {
 const ENGLISH_LIT = {
   'pee-structure': {
     label: 'PEE / PEEL Paragraphs',
-    subject: 'english-lit', band: 'Foundation', bandOrder: 1,
+    subject: 'english-lit', band: 'Grade 8', bandOrder: 1,
     prerequisites: [],
     nextSkills: ['language-analysis', 'context'],
     questions: [
@@ -1266,7 +1266,7 @@ const ENGLISH_LIT = {
 
   'language-analysis': {
     label: 'Language Analysis',
-    subject: 'english-lit', band: 'GCSE', bandOrder: 3,
+    subject: 'english-lit', band: 'Grade 9+', bandOrder: 3,
     prerequisites: ['pee-structure'],
     nextSkills: ['context', 'structure-form'],
     questions: [
@@ -1278,7 +1278,7 @@ const ENGLISH_LIT = {
 
   'context': {
     label: 'Historical Context',
-    subject: 'english-lit', band: 'GCSE', bandOrder: 3,
+    subject: 'english-lit', band: 'Grade 9+', bandOrder: 3,
     prerequisites: ['pee-structure'],
     nextSkills: ['themes-comparison'],
     questions: [
@@ -1290,7 +1290,7 @@ const ENGLISH_LIT = {
 
   'structure-form': {
     label: 'Structure & Form',
-    subject: 'english-lit', band: 'GCSE Higher', bandOrder: 5,
+    subject: 'english-lit', band: 'Grade 10+', bandOrder: 5,
     prerequisites: ['language-analysis'],
     nextSkills: ['themes-comparison'],
     questions: [
@@ -1302,7 +1302,7 @@ const ENGLISH_LIT = {
 
   'themes-comparison': {
     label: 'Themes & Comparison',
-    subject: 'english-lit', band: 'GCSE Higher', bandOrder: 6,
+    subject: 'english-lit', band: 'Grade 11', bandOrder: 6,
     prerequisites: ['context', 'structure-form'],
     nextSkills: [],
     questions: [
@@ -1317,7 +1317,7 @@ const ENGLISH_LIT = {
 const ECONOMICS = {
   'supply-demand': {
     label: 'Supply & Demand',
-    subject: 'economics', band: 'GCSE Foundation', bandOrder: 1,
+    subject: 'economics', band: 'Grade 8', bandOrder: 1,
     prerequisites: [],
     nextSkills: ['market-failure', 'elasticity'],
     questions: [
@@ -1329,7 +1329,7 @@ const ECONOMICS = {
 
   'elasticity': {
     label: 'Elasticity',
-    subject: 'economics', band: 'GCSE Higher', bandOrder: 3,
+    subject: 'economics', band: 'Grade 9+', bandOrder: 3,
     prerequisites: ['supply-demand'],
     nextSkills: ['market-failure', 'firms-revenue'],
     questions: [
@@ -1341,7 +1341,7 @@ const ECONOMICS = {
 
   'market-failure': {
     label: 'Market Failure',
-    subject: 'economics', band: 'GCSE Higher', bandOrder: 4,
+    subject: 'economics', band: 'Grade 10', bandOrder: 4,
     prerequisites: ['supply-demand'],
     nextSkills: ['government-intervention'],
     questions: [
@@ -1353,7 +1353,7 @@ const ECONOMICS = {
 
   'firms-revenue': {
     label: 'Firms, Costs & Revenue',
-    subject: 'economics', band: 'GCSE Higher', bandOrder: 4,
+    subject: 'economics', band: 'Grade 10', bandOrder: 4,
     prerequisites: ['elasticity'],
     nextSkills: ['market-failure'],
     questions: [
@@ -1365,7 +1365,7 @@ const ECONOMICS = {
 
   'government-intervention': {
     label: 'Government Intervention',
-    subject: 'economics', band: 'GCSE Higher', bandOrder: 5,
+    subject: 'economics', band: 'Grade 10+', bandOrder: 5,
     prerequisites: ['market-failure'],
     nextSkills: ['macroeconomics'],
     questions: [
@@ -1377,7 +1377,7 @@ const ECONOMICS = {
 
   'fiscal-monetary': {
     label: 'Fiscal & Monetary Policy',
-    subject: 'economics', band: 'GCSE Higher', bandOrder: 6,
+    subject: 'economics', band: 'Grade 11', bandOrder: 6,
     prerequisites: ['macroeconomics'],
     nextSkills: [],
     questions: [
@@ -1389,7 +1389,7 @@ const ECONOMICS = {
 
   'macroeconomics': {
     label: 'Macroeconomic Objectives',
-    subject: 'economics', band: 'GCSE Higher', bandOrder: 5,
+    subject: 'economics', band: 'Grade 10+', bandOrder: 5,
     prerequisites: ['supply-demand'],
     nextSkills: ['fiscal-monetary'],
     questions: [
@@ -1407,7 +1407,7 @@ const COMPUTER_SCIENCE = {
 
   'what-is-computing': {
     label: 'What is Computing?',
-    subject: 'computer-science', band: 'Grade 3–4', bandOrder: -4,
+    subject: 'computer-science', band: 'Grade 3', bandOrder: -4,
     prerequisites: [],
     nextSkills: ['algorithms-logic'],
     questions: [
@@ -1420,7 +1420,7 @@ const COMPUTER_SCIENCE = {
 
   'algorithms-logic': {
     label: 'Algorithms & Logical Thinking',
-    subject: 'computer-science', band: 'Grade 5–6', bandOrder: -2,
+    subject: 'computer-science', band: 'Grade 5', bandOrder: -2,
     prerequisites: ['what-is-computing'],
     nextSkills: ['variables-datatypes'],
     questions: [
@@ -1433,7 +1433,7 @@ const COMPUTER_SCIENCE = {
 
   'variables-datatypes': {
     label: 'Variables & Data Types',
-    subject: 'computer-science', band: 'GCSE Foundation', bandOrder: 1,
+    subject: 'computer-science', band: 'Grade 8', bandOrder: 1,
     prerequisites: [],
     nextSkills: ['selection-iteration', 'data-structures'],
     questions: [
@@ -1445,7 +1445,7 @@ const COMPUTER_SCIENCE = {
 
   'selection-iteration': {
     label: 'Selection & Iteration',
-    subject: 'computer-science', band: 'GCSE Foundation', bandOrder: 2,
+    subject: 'computer-science', band: 'Grade 9', bandOrder: 2,
     prerequisites: ['variables-datatypes'],
     nextSkills: ['subroutines', 'algorithms'],
     questions: [
@@ -1457,7 +1457,7 @@ const COMPUTER_SCIENCE = {
 
   'subroutines': {
     label: 'Subroutines & Functions',
-    subject: 'computer-science', band: 'GCSE Higher', bandOrder: 4,
+    subject: 'computer-science', band: 'Grade 10', bandOrder: 4,
     prerequisites: ['selection-iteration'],
     nextSkills: ['algorithms', 'oop'],
     questions: [
@@ -1469,7 +1469,7 @@ const COMPUTER_SCIENCE = {
 
   'data-structures': {
     label: 'Data Structures',
-    subject: 'computer-science', band: 'GCSE Foundation', bandOrder: 2,
+    subject: 'computer-science', band: 'Grade 9', bandOrder: 2,
     prerequisites: ['variables-datatypes'],
     nextSkills: ['algorithms'],
     questions: [
@@ -1481,7 +1481,7 @@ const COMPUTER_SCIENCE = {
 
   'oop': {
     label: 'Object-Oriented Programming',
-    subject: 'computer-science', band: 'GCSE Higher', bandOrder: 5,
+    subject: 'computer-science', band: 'Grade 10+', bandOrder: 5,
     prerequisites: ['subroutines'],
     nextSkills: ['algorithms'],
     questions: [
@@ -1493,7 +1493,7 @@ const COMPUTER_SCIENCE = {
 
   'sorting': {
     label: 'Sorting Algorithms',
-    subject: 'computer-science', band: 'GCSE Higher', bandOrder: 6,
+    subject: 'computer-science', band: 'Grade 11', bandOrder: 6,
     prerequisites: ['algorithms'],
     nextSkills: ['complexity'],
     questions: [
@@ -1505,7 +1505,7 @@ const COMPUTER_SCIENCE = {
 
   'complexity': {
     label: 'Computational Complexity',
-    subject: 'computer-science', band: 'A-Level', bandOrder: 7,
+    subject: 'computer-science', band: 'Grade 11+', bandOrder: 7,
     prerequisites: ['algorithms', 'sorting'],
     nextSkills: [],
     questions: [
@@ -1517,7 +1517,7 @@ const COMPUTER_SCIENCE = {
 
   'algorithms': {
     label: 'Algorithms & Searching',
-    subject: 'computer-science', band: 'GCSE Higher', bandOrder: 5,
+    subject: 'computer-science', band: 'Grade 10+', bandOrder: 5,
     prerequisites: ['subroutines'],
     nextSkills: ['sorting', 'complexity'],
     questions: [
