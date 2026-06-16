@@ -6623,6 +6623,29 @@ RULES:
 4. 温かく、短く。`
     }
 
+    if (subject === 'reading') {
+      const readingEx = {
+        solid:   '"Sharp thinking!" / "Good analysis." / "Well reasoned." / "Exactly right." / "Strong response."',
+        mastery: '"Excellent — really perceptive." / "Impressive analysis." / "That\'s a sophisticated reading."',
+        partial: '"You\'re on the right track." / "Partially there — good effort." / "Some good ideas there."',
+        none:    '"Tricky one, let\'s move on." / "Not quite, but keep going." / "That one was tough — no worries."',
+      }
+      return `You are an examiner running a Reading diagnostic.
+
+The student just answered a question on "${nodeName}". Automated assessment: ${understanding.toUpperCase()}.
+
+Write EXACTLY ONE short sentence (max 10 words) acknowledging their answer:
+- solid / mastery → ${readingEx.solid} / ${readingEx.mastery}
+- partial         → ${readingEx.partial}
+- none            → ${readingEx.none}
+
+Rules:
+1. ONE sentence only. No explanations, hints, or corrections.
+2. Do NOT ask another question — the system sends it automatically.
+3. Do NOT say "next question" or "let's try another".
+4. Warm but brief. Vary wording — don't repeat the same phrase every time.`
+    }
+
     return `You are an examiner running a calibration diagnostic for ${SUBJECT_LABELS[subject] || subject}.
 
 The student just answered a question on "${nodeName}". The automated assessment rated their answer: ${understanding.toUpperCase()}.
@@ -6730,7 +6753,21 @@ Rules:
     const cacheKey = `${nodeId}-${tier}-${language}`
     if (generatedQCache.current[cacheKey]) return generatedQCache.current[cacheKey]
 
-    const tierDesc = [
+    const subjectLabel = SUBJECT_LABELS[subject] || subject
+    const isReading = subject === 'reading'
+
+    // ── Reading-specific tier descriptors ────────────────────────────────────
+    const readingTierDesc = [
+      '',
+      'literal — the answer is directly stated in the passage; test basic retrieval',
+      'interpretive — answer requires reading between the lines using textual evidence',
+      'analytical — requires explaining technique, effect, or evaluating evidence with reasoning',
+      'evaluative — synthesise, critique, or compare; requires developed analytical response',
+      'extension — highest difficulty; nuanced argument, synthesis, or original critical insight',
+    ][tier] || 'analytical'
+
+    // ── STEM / other subjects tier descriptors ────────────────────────────────
+    const stemTierDesc = [
       '',
       'basic recall — definitions, simple facts, direct computation with no steps',
       'routine application — solve a standard problem using a single known method',
@@ -6739,10 +6776,75 @@ Rules:
       'extension — highest difficulty, open-ended reasoning or novel application',
     ][tier] || 'problem solving'
 
-    const subjectLabel = SUBJECT_LABELS[subject] || subject
+    // ── Reading: passage-first format ────────────────────────────────────────
+    // Nodes that need a passage vs nodes that work with an example quote/sentence
+    const passageNodes = new Set([
+      'sight-words-fluency','basic-sentence-comp','main-idea-details','sequence-retell',
+      'inference-basic','inference-advanced','character-analysis','theme-identification',
+      'tone-mood','text-structure','text-structure-analysis','narrative-structure',
+      'compare-contrast-texts','close-reading','rhetorical-analysis','complex-inference',
+      'authors-craft','argument-structure','synthesising-sources','counterargument',
+      'ap-language-analysis','ap-literary-analysis','complex-argumentation','research-synthesis',
+    ])
+    const needsPassage = passageNodes.has(nodeId)
 
-    const systemPrompt = language === 'ja'
-      ? `あなたは学力診断テストの問題作成者です。
+    // Passage length guidance per band
+    const passageLengthHint = node.bandOrder <= -3
+      ? '2–3 simple sentences, short words, elementary vocabulary'
+      : node.bandOrder <= 0
+      ? '3–5 sentences, everyday vocabulary, one clear idea'
+      : node.bandOrder <= 4
+      ? '4–6 sentences with some complexity, varied sentence structure'
+      : '5–8 sentences, sophisticated vocabulary, complex ideas appropriate for advanced readers'
+
+    let systemPrompt
+    if (isReading && language === 'ja') {
+      // ── Japanese reading ──────────────────────────────────────────────────
+      systemPrompt = `あなたは英語読解の診断テスト（日本語版）の問題作成者です。
+科目: 英語読解。トピック: ${node.label}。レベル: ${node.band}。
+難易度: ${tier}/5段階（${['','文字通りの内容','読み取り・推論','分析・根拠説明','評価・批判的思考','発展・総合'][tier] || '分析'}）
+
+${needsPassage ? `作成手順:
+1. 日本語で${passageLengthHint.replace('simple sentences', '短い文').replace('sentences', '文')}の英文パッセージを作成してください。
+   ※ パッセージ自体は英語で、問題文・質問は日本語で書いてください。
+2. パッセージの後に、${node.label}のスキルを問う質問を1つ日本語で書いてください。
+3. 形式: 「次のパッセージを読んで、質問に答えてください：\n"[英文パッセージ]"\n[日本語の質問]」` :
+`作成手順:
+- ${node.label}に関する短い例文または引用（英語）を含め、それに関する質問を日本語で書いてください。
+- 形式: 「次の文を読んでください：\n"[英文例]"\n[日本語の質問]"`}
+
+ルール:
+- 問題文のみを返してください。ラベル・前置き・解説は不要です。
+- 難易度 ${tier}/5 に正確に合わせてください。
+- 字数制限: 300字以内。`
+
+    } else if (isReading) {
+      // ── English reading ───────────────────────────────────────────────────
+      systemPrompt = `You write reading diagnostic questions for a student placement test.
+Topic: ${node.label}. Reading level: ${node.band}.
+Difficulty tier: ${tier}/5 — ${readingTierDesc}.
+
+${needsPassage ? `Format — REQUIRED:
+1. Write an original passage (${passageLengthHint}). Use natural, authentic prose — not textbook-like.
+2. Follow it with ONE question that tests "${node.label}" at this difficulty tier.
+3. Layout: Read this passage:\n"[your passage]"\n[your question]
+
+The question must require the student to engage with YOUR passage — not general knowledge.` :
+`Format:
+- Include a short quoted sentence or phrase as an example (2–3 lines max).
+- Follow it with ONE question testing "${node.label}".
+- Layout: Read this:\n"[your example]"\n[your question]`}
+
+Rules:
+- Return ONLY the question text. No label, preamble, or explanation.
+- No multiple-choice unless the tier is 1 (literal). Tiers 2+ should be open-ended.
+- The passage and question must both be appropriate for ${node.band} reading level.
+- Match difficulty exactly: tier ${tier}/5 — ${readingTierDesc}.
+- Keep total length under 200 words.`
+
+    } else if (language === 'ja') {
+      // ── Japanese STEM ─────────────────────────────────────────────────────
+      systemPrompt = `あなたは学力診断テストの問題作成者です。
 科目: ${subjectLabel}。トピック: ${node.label}。レベル: ${node.band}。
 難易度: ${tier}/5段階（${['','基礎的な記憶','標準的な応用','問題解決','習熟度の証明','発展・応用'][tier] || '問題解決'}）
 
@@ -6751,15 +6853,23 @@ Rules:
 - 問題は単体で意味が通じるよう、完全な形で書いてください。
 - 数式はそのまま読める形で書いてください（例: x^2 + 3x - 10 = 0）。
 - 難易度 ${tier}/5 に正確に合わせてください。`
-      : `You write diagnostic questions for a student placement test.
+
+    } else {
+      // ── English STEM / other subjects ─────────────────────────────────────
+      systemPrompt = `You write diagnostic questions for a student placement test.
 Subject: ${subjectLabel}. Topic: ${node.label}. Level: ${node.band}.
-Difficulty tier: ${tier}/5 — ${tierDesc}.
+Difficulty tier: ${tier}/5 — ${stemTierDesc}.
 
 Rules:
 - Return ONLY the question text. No label, no preamble, no explanation.
 - The question must be self-contained and unambiguous.
 - Write all maths in plain readable format (e.g. x^2 + 3x - 10 = 0, not LaTeX).
 - Match the difficulty exactly: tier ${tier}/5.`
+    }
+
+    const userMsg = language === 'ja' ? '問題を書いてください。' : 'Write the question.'
+    // Reading passages need more tokens; STEM stays at 200
+    const maxTokens = isReading ? 350 : 200
 
     try {
       const res = await fetch(GROQ_URL, {
@@ -6769,9 +6879,9 @@ Rules:
           model: 'llama-3.1-8b-instant',
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: language === 'ja' ? '問題を書いてください。' : 'Write the question.' },
+            { role: 'user', content: userMsg },
           ],
-          max_tokens: 200,
+          max_tokens: maxTokens,
           temperature: 0.72,
           stream: false,
         }),
