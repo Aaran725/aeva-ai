@@ -216,12 +216,12 @@ Grading rules:
   }
 }
 
-/** Generate 3 personalised insight sentences from a completed calibration result (Phase 4). */
-async function generateCalibInsights(result, subject) {
+/** Generate 3 personalised insight sentences from a completed calibration result (Phase 4).
+ *  Uses the statically-imported CALIBRATION_MAP / SUBJECT_LABELS — no dynamic import. */
+async function generateCalibInsights(result, subject, calibrationMap, subjectLabels) {
   try {
-    const { CALIBRATION_MAP: CM, SUBJECT_LABELS: SL } = await import('./calibrationMap')
-    const subjectMap = CM[subject] || {}
-    const label      = SL[subject] || subject
+    const subjectMap = calibrationMap[subject] || {}
+    const label      = subjectLabels[subject] || subject
     const fmt = status => Object.entries(result.skillMap || {}).filter(([,v]) => v === status).map(([id]) => subjectMap[id]?.label || id).join(', ') || 'none'
     const prompt = `You are Aeva, a sharp AI tutor. A student just completed a ${label} diagnostic.
 
@@ -6521,7 +6521,7 @@ Rules:
     // Phase 4: open the result screen and start generating insights asynchronously
     setCalibInsights(null)
     setCalibResultOpen(true)
-    generateCalibInsights(result, cs.subject).then(insights => setCalibInsights(insights))
+    generateCalibInsights(result, cs.subject, CALIBRATION_MAP, SUBJECT_LABELS).then(insights => setCalibInsights(insights))
   }
 
   /** Called after each Critic result during calibration */
@@ -7478,6 +7478,23 @@ If no clear changes: {"changes":[]}`
     : { background: 'linear-gradient(145deg, rgba(99,102,241,0.90) 0%, rgba(139,92,246,0.80) 100%)', border: '1.5px solid rgba(99,102,241,0.55)', boxShadow: isLight ? '0 4px 14px rgba(99,102,241,0.25)' : '0 4px 18px rgba(139,143,255,0.35)' }
 
   const sendIconColor = 'rgba(255,255,255,0.95)'
+
+  // Live calibration score for the level arc (Phase 2) — must be inside ChatView where calibTick lives
+  const liveCalibScore = useMemo(() => {
+    if (!calibMode) return null
+    const cs = calibStateRef.current
+    const subjectMap = CALIBRATION_MAP[cs.subject] || {}
+    const entries = Object.entries(cs.skillMap || {})
+    if (!entries.length) return null
+    let wSum = 0, wTotal = 0
+    for (const [id, status] of entries) {
+      const bo = subjectMap[id]?.bandOrder ?? -6
+      const w  = status === 'mastery' ? 3 : status === 'solid' ? 2 : status === 'shaky' ? 1 : 0
+      wSum += bo * w; wTotal += w
+    }
+    return wTotal === 0 ? null : wSum / wTotal
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calibTick, calibMode])
 
   return (
     <motion.div
@@ -9366,6 +9383,79 @@ If no clear changes: {"changes":[]}`
           <Home size={16} />
         </motion.button>
       )}
+
+      {/* ── Calibration dedicated experience (Phase 0-2) ──────────────────── */}
+      <AnimatePresence>
+        {calibMode && currentCalibQuestion && (
+          <CalibrationExperience
+            key="calib-exp"
+            question={currentCalibQuestion}
+            liveScore={liveCalibScore}
+            nodeCount={calibStateRef.current.nodeCount}
+            questionsAsked={calibStateRef.current.questionsAsked}
+            subject={calibStateRef.current.subject}
+            isEvaluating={calibEvaluating}
+            lastFeedback={lastCalibFeedback}
+            isLight={isLight}
+            onAnswer={handleCalibAnswer}
+            onSkip={() => handleCalibAnswer('skip')}
+            onExit={() => {
+              saveCalibCheckpoint()
+              calibModeRef.current = false
+              setCalibMode(false)
+              setCalibSubject(null)
+              setCurrentCalibQuestion(null)
+              setCalibEvaluating(false)
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── Full-screen result overlay (Phase 4 & 5) ──────────────────────── */}
+      <AnimatePresence>
+        {calibResultOpen && calibResult && (
+          <CalibrationResult
+            key="calib-result"
+            result={calibResult}
+            subject={calibResult.subject}
+            history={calibrationStore.getHistory(calibResult.subject)}
+            insights={calibInsights}
+            isLight={isLight}
+            onClose={() => setCalibResultOpen(false)}
+            onStartTopic={(topicId, subj) => {
+              setCalibResultOpen(false)
+              const node = CALIBRATION_MAP[subj]?.[topicId]
+              if (node) setTimeout(() => sendWithText(`Let's study ${node.label}`), 250)
+            }}
+            onRecalibrate={() => {
+              const subj = calibResult.subject
+              setCalibResultOpen(false)
+              setCalibResult(null)
+              startCalibration(subj)
+              setTimeout(() => sendCalibFirstQuestion(subj), 200)
+            }}
+            onAnotherSubject={() => {
+              setCalibResultOpen(false)
+              setCalibResult(null)
+              setCalibSubjectPicker(true)
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── Resume offer banner (Phase 3) ─────────────────────────────────── */}
+      <AnimatePresence>
+        {calibResumeOffer && !calibMode && !calibResultOpen && (
+          <CalibResumeOffer
+            key="resume-offer"
+            checkpoint={calibResumeOffer}
+            isLight={isLight}
+            onResume={() => resumeFromCheckpoint(calibResumeOffer)}
+            onDismiss={() => { setCalibResumeOffer(null); clearCalibCheckpoint() }}
+          />
+        )}
+      </AnimatePresence>
+
     </motion.div>
   )
 }
@@ -10349,24 +10439,6 @@ export default function App() {
     setView('dashboard')
   }
 
-  // Live calibration score — recomputes after each question (calibTick increments)
-  // Used by CalibrationExperience to animate the level arc
-  const liveCalibScore = useMemo(() => {
-    if (!calibMode) return null
-    const cs = calibStateRef.current
-    const subjectMap = CALIBRATION_MAP[cs.subject] || {}
-    const entries = Object.entries(cs.skillMap || {})
-    if (!entries.length) return null
-    let wSum = 0, wTotal = 0
-    for (const [id, status] of entries) {
-      const bo = subjectMap[id]?.bandOrder ?? -6
-      const w  = status === 'mastery' ? 3 : status === 'solid' ? 2 : status === 'shaky' ? 1 : 0
-      wSum += bo * w; wTotal += w
-    }
-    return wTotal === 0 ? null : wSum / wTotal
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calibTick, calibMode])
-
   return (
     <UserContext.Provider value={userValue}>
       <Suspense fallback={null}>
@@ -10391,78 +10463,7 @@ export default function App() {
       {/* Exam Simulator — always mounted so it can intercept aeva:open-exam events */}
       <ExamSimulator />
 
-      {/* ── Calibration dedicated experience (Phase 0-2) ──────────────────── */}
-      <AnimatePresence>
-        {calibMode && currentCalibQuestion && (
-          <CalibrationExperience
-            key="calib-exp"
-            question={currentCalibQuestion}
-            liveScore={liveCalibScore}
-            nodeCount={calibStateRef.current.nodeCount}
-            questionsAsked={calibStateRef.current.questionsAsked}
-            subject={calibStateRef.current.subject}
-            isEvaluating={calibEvaluating}
-            lastFeedback={lastCalibFeedback}
-            isLight={isLight}
-            onAnswer={handleCalibAnswer}
-            onSkip={() => handleCalibAnswer('skip')}
-            onExit={() => {
-              // Save checkpoint, close overlay — student can resume later
-              saveCalibCheckpoint()
-              calibModeRef.current = false
-              setCalibMode(false)
-              setCalibSubject(null)
-              setCurrentCalibQuestion(null)
-              setCalibEvaluating(false)
-            }}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* ── Resume offer banner (Phase 3) ─────────────────────────────────── */}
-      <AnimatePresence>
-        {calibResumeOffer && !calibMode && !calibResultOpen && (
-          <CalibResumeOffer
-            key="resume-offer"
-            checkpoint={calibResumeOffer}
-            isLight={isLight}
-            onResume={() => resumeFromCheckpoint(calibResumeOffer)}
-            onDismiss={() => { setCalibResumeOffer(null); clearCalibCheckpoint() }}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* ── Full-screen result overlay (Phase 4 & 5) ──────────────────────── */}
-      <AnimatePresence>
-        {calibResultOpen && calibResult && (
-          <CalibrationResult
-            key="calib-result"
-            result={calibResult}
-            subject={calibResult.subject}
-            history={calibrationStore.getHistory(calibResult.subject)}
-            insights={calibInsights}
-            isLight={isLight}
-            onClose={() => setCalibResultOpen(false)}
-            onStartTopic={(topicId, subj) => {
-              setCalibResultOpen(false)
-              const node = CALIBRATION_MAP[subj]?.[topicId]
-              if (node) setTimeout(() => sendWithText(`Let's study ${node.label}`), 250)
-            }}
-            onRecalibrate={() => {
-              const subj = calibResult.subject
-              setCalibResultOpen(false)
-              setCalibResult(null)
-              startCalibration(subj)
-              setTimeout(() => sendCalibFirstQuestion(subj), 200)
-            }}
-            onAnotherSubject={() => {
-              setCalibResultOpen(false)
-              setCalibResult(null)
-              setCalibSubjectPicker(true)
-            }}
-          />
-        )}
-      </AnimatePresence>
+      {/* Calibration overlays are rendered inside ChatView (where calibTick etc. are in scope) */}
       {/* Study Room — always mounted so live session survives navigation */}
       <StudyRoom />
       <AnimatePresence mode="wait" initial={false}>
