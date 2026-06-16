@@ -203,8 +203,15 @@ function parseInline(text) {
         if (mathMatch[1]) parts.push(<span key={key++}>{mathMatch[1]}</span>)
         try {
           const html = katex.renderToString(mc, { throwOnError: false, displayMode: false })
-          parts.push(<span key={key++} dangerouslySetInnerHTML={{ __html: html }} style={{ verticalAlign: 'middle', display: 'inline-block', padding: '0 2px', fontSize: '1.15em', lineHeight: 1 }} />)
-        } catch { parts.push(<span key={key++} style={{ fontFamily: 'monospace', fontSize: '0.9em' }}>{mc}</span>) }
+          parts.push(<span key={key++} dangerouslySetInnerHTML={{ __html: html }} style={{
+            verticalAlign: 'middle', display: 'inline-block',
+            padding: '1px 6px', fontSize: '1.05em', lineHeight: 1.3,
+            color: '#A5B4FC',
+            background: 'rgba(99,102,241,0.13)',
+            borderRadius: 5,
+            border: '1px solid rgba(99,102,241,0.20)',
+          }} />)
+        } catch { parts.push(<span key={key++} style={{ fontFamily: 'monospace', fontSize: '0.9em', color: '#A5B4FC' }}>{mc}</span>) }
         remaining = remaining.slice(mathMatch[0].length); continue
       } else {
         if (mathMatch[1]) parts.push(<span key={key++}>{mathMatch[1]}</span>)
@@ -301,6 +308,27 @@ function DocTable({ rows }) {
   )
 }
 
+// ─── Step type → colour (U1) ─────────────────────────────────────────────────
+
+const STEP_KEYWORDS = [
+  { kw: ['simplif','expand','factoris','factori','distribut','multiply','collect'],  color: '#6366F1' }, // indigo  — algebra ops
+  { kw: ['substitut','replac','plug','let ','put '],                                  color: '#38BDF8' }, // sky     — substitution
+  { kw: ['solve','find','calculat','evaluat','comput','work out','determine'],        color: '#8B5CF6' }, // violet  — solving
+  { kw: ['prove','show that','verif','check','confirm','test'],                       color: '#4ADE80' }, // green   — verification
+  { kw: ['defin','note','recall','remember','given that','given:'],                   color: '#2DD4BF' }, // teal    — definitions
+  { kw: ['example','illustrat','demonstrat','consider'],                              color: '#F59E0B' }, // amber   — examples
+  { kw: ['express','writ','rewrite','rearrang','convert'],                            color: '#A78BFA' }, // purple  — rewriting
+  { kw: ['integrat','differentiat','deriv'],                                          color: '#F472B6' }, // pink    — calculus
+]
+
+function getStepColor(text) {
+  const lo = text.toLowerCase()
+  for (const { kw, color } of STEP_KEYWORDS) {
+    if (kw.some(k => lo.includes(k))) return color
+  }
+  return '#818CF8' // default indigo
+}
+
 // ─── DocMarkdown — same rendering engine as MarkdownRenderer in chat ─────────
 
 function DocMarkdown({ text }) {
@@ -308,7 +336,8 @@ function DocMarkdown({ text }) {
   const elements = []
   let i = 0
   let listItems = []
-  let listType = null
+  let listType  = null
+  let eqCounter = 0  // F1: equation numbering
 
   const flushList = () => {
     if (!listItems.length) return
@@ -371,14 +400,29 @@ function DocMarkdown({ text }) {
       const mathContent = mathLines.join('\n').trim()
       try {
         const html = katex.renderToString(mathContent, { throwOnError: false, displayMode: true })
+        eqCounter++
+        const eqNum = eqCounter
         elements.push(
-          <div key={`dm-${startI}`} style={{
-            overflowX: 'auto', margin: '16px 0', padding: '26px 28px',
-            textAlign: 'center', borderRadius: 16, fontSize: 19,
-            background: 'rgba(14,16,48,0.80)',
-            border: '1px solid rgba(99,102,241,0.30)',
-            boxShadow: '0 4px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(165,170,255,0.07)',
-          }} dangerouslySetInnerHTML={{ __html: html }} />
+          <div key={`dm-${startI}`} style={{ position: 'relative', margin: '16px 0' }}>
+            <div style={{
+              overflowX: 'auto', padding: '18px 24px',
+              textAlign: 'center', borderRadius: 12, fontSize: 18,
+              background: 'rgba(99,102,241,0.07)',
+              border: '1px solid rgba(99,102,241,0.22)',
+              borderLeft: '3px solid #6366F1',
+              boxShadow: '0 2px 16px rgba(99,102,241,0.10)',
+              color: '#E0E7FF',
+            }} dangerouslySetInnerHTML={{ __html: html }} />
+            <span style={{
+              position: 'absolute', top: 8, right: 10,
+              fontSize: 10, fontWeight: 700,
+              color: 'rgba(99,102,241,0.60)',
+              background: 'rgba(99,102,241,0.12)',
+              border: '1px solid rgba(99,102,241,0.20)',
+              padding: '2px 8px', borderRadius: 99,
+              letterSpacing: '0.05em',
+            }}>eq. {eqNum}</span>
+          </div>
         )
       } catch { elements.push(<p key={`dm-${startI}`} style={{ fontFamily: 'monospace', color: 'rgba(255,255,255,0.86)' }}>{mathContent}</p>) }
       continue
@@ -415,25 +459,70 @@ function DocMarkdown({ text }) {
       continue
     }
 
-    // H3 ###
+    // H3 ### — inner sub-step or sub-section (F3 + F4 + U1)
     if (/^###\s/.test(trimmed)) {
       flushList()
-      elements.push(
-        <div key={`h3-${i}`} style={{ fontWeight: 700, fontSize: 13.5, marginTop: 18, marginBottom: 4, color: '#A78BFA', letterSpacing: '-0.01em', lineHeight: 1.4, paddingLeft: 10, borderLeft: '3px solid #7C3AED' }}>
-          {parseInline(trimmed.replace(/^###\s/, ''))}
-        </div>
-      )
+      const h3Text = trimmed.replace(/^###\s/, '')
+      // F3: if the H3 text is actually a numbered step (e.g. "5: Solve for a and b")
+      const h3StepMatch = h3Text.match(/^(?:Step\s+)?(\d+):\s+(.+)$/)
+      if (h3StepMatch) {
+        const stepColor = getStepColor(h3StepMatch[2])
+        elements.push(
+          <div key={`h3step-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 22, marginBottom: 8 }}>
+            <div style={{
+              flexShrink: 0, width: 28, height: 28, borderRadius: 9,
+              background: `${stepColor}28`,
+              border: `1px solid ${stepColor}50`,
+              boxShadow: `0 2px 8px ${stepColor}30`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 12, fontWeight: 900, color: stepColor,
+            }}>
+              {h3StepMatch[1]}
+            </div>
+            <span style={{ fontWeight: 700, fontSize: 14.5, color: 'rgba(255,255,255,0.95)', lineHeight: 1.3, letterSpacing: '-0.015em' }}>
+              {parseInline(h3StepMatch[2])}
+            </span>
+          </div>
+        )
+      } else {
+        // Regular H3 — sub-section, lighter than H2
+        const h3Color = getStepColor(h3Text)
+        elements.push(
+          <div key={`h3-${i}`} style={{
+            fontWeight: 700, fontSize: 13, marginTop: 16, marginBottom: 4,
+            color: `${h3Color}cc`,
+            letterSpacing: '-0.01em', lineHeight: 1.4,
+            paddingLeft: 10, borderLeft: `2px solid ${h3Color}55`,
+          }}>
+            {parseInline(h3Text)}
+          </div>
+        )
+      }
       i++; continue
     }
 
-    // H2 ##
+    // H2 ## — outer step / section (F4 + U1)
     if (/^##\s/.test(trimmed)) {
       flushList()
+      const h2Text  = trimmed.replace(/^##\s/, '')
+      const h2Color = getStepColor(h2Text)
       elements.push(
-        <div key={`h2-${i}`} style={{ marginTop: 26, marginBottom: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingBottom: 8, borderBottom: '2px solid rgba(139,143,255,0.20)' }}>
-            <div style={{ width: 4, height: 18, borderRadius: 2, background: '#818CF8', flexShrink: 0 }} />
-            <span style={{ fontWeight: 800, fontSize: 16, color: 'rgba(255,255,255,0.97)', letterSpacing: '-0.03em', lineHeight: 1.3 }}>{parseInline(trimmed.replace(/^##\s/, ''))}</span>
+        <div key={`h2-${i}`} style={{ marginTop: 34, marginBottom: 14 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            paddingBottom: 12,
+            borderBottom: `2px solid ${h2Color}28`,
+          }}>
+            <div style={{
+              width: 5, height: 24, borderRadius: 3,
+              background: h2Color, flexShrink: 0,
+              boxShadow: `0 0 14px ${h2Color}70`,
+            }} />
+            <span style={{
+              fontWeight: 900, fontSize: 17.5,
+              color: 'rgba(255,255,255,0.98)',
+              letterSpacing: '-0.03em', lineHeight: 1.3,
+            }}>{parseInline(h2Text)}</span>
           </div>
         </div>
       )
@@ -499,16 +588,30 @@ function DocMarkdown({ text }) {
       continue
     }
 
-    // Step heading "1: Title" or "Step 1: Title"
+    // Step heading "1: Title" or "Step 1: Title" (F4 + U1)
     const stepMatch = trimmed.match(/^(?:\*\*)?(?:Step\s+)?(\d+):\s+(.+?)(?:\*\*)?$/)
     if (stepMatch && trimmed.replace(/\*\*/g, '').length < 100) {
       flushList()
+      const stepColor = getStepColor(stepMatch[2])
       elements.push(
-        <div key={`step-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 13, marginTop: 24, marginBottom: 8 }}>
-          <div style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 10, background: 'linear-gradient(135deg,rgba(99,102,241,0.40),rgba(79,70,229,0.28))', border: '1px solid rgba(139,143,255,0.50)', boxShadow: '0 2px 8px rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 900, color: '#C4B5FD', letterSpacing: '-0.02em' }}>
+        <div key={`step-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 13, marginTop: 26, marginBottom: 10 }}>
+          <div style={{
+            flexShrink: 0, width: 32, height: 32, borderRadius: 10,
+            background: `${stepColor}22`,
+            border: `1.5px solid ${stepColor}55`,
+            boxShadow: `0 2px 10px ${stepColor}35`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 13, fontWeight: 900, color: stepColor, letterSpacing: '-0.02em',
+          }}>
             {stepMatch[1]}
           </div>
-          <span style={{ fontWeight: 700, fontSize: 15, color: 'rgba(255,255,255,0.97)', lineHeight: 1.3, letterSpacing: '-0.015em' }}>{parseInline(stepMatch[2])}</span>
+          <span style={{
+            fontWeight: 700, fontSize: 15,
+            color: 'rgba(255,255,255,0.97)',
+            lineHeight: 1.3, letterSpacing: '-0.015em',
+          }}>
+            {parseInline(stepMatch[2])}
+          </span>
         </div>
       )
       i++; continue
