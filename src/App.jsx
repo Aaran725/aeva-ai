@@ -6455,25 +6455,27 @@ RULES:
     return nextNode
   }
 
+  /** Raw weighted bandOrder average — used by both calibBand() and calibBandAvg(). */
+  const calibRawAvg = (skillMap, subject) => {
+    const subjectMap = CALIBRATION_MAP[subject] || {}
+    const entries = Object.entries(skillMap)
+    if (!entries.length) return -6
+    let wSum = 0, wTotal = 0
+    for (const [id, status] of entries) {
+      const bo = subjectMap[id]?.bandOrder ?? -6
+      const w = status === 'mastery' ? 3 : status === 'solid' ? 2 : status === 'shaky' ? 1 : 0
+      wSum += bo * w
+      wTotal += w
+    }
+    return wTotal ? wSum / wTotal : -6
+  }
+
   /** Determine curriculum band from skill map using weighted bandOrder average.
    *  mastery=3pts, solid=2pts, shaky=1pt, gap=0pts (gaps don't inflate the band).
    *  Returns US Grade 1-12 / AP labels that match calibrationMap band values. */
   const calibBand = (skillMap, subject) => {
-    const subjectMap = CALIBRATION_MAP[subject] || {}
-    const entries = Object.entries(skillMap)
-    if (!entries.length) return 'Grade 1'
-
-    let weightedSum = 0, totalWeight = 0
-    for (const [id, status] of entries) {
-      const bo = subjectMap[id]?.bandOrder ?? -6
-      const w = status === 'mastery' ? 3 : status === 'solid' ? 2 : status === 'shaky' ? 1 : 0
-      weightedSum += bo * w
-      totalWeight += w
-    }
-    // All gaps → no weight → beginner
-    if (totalWeight === 0) return 'Grade 1'
-
-    const avg = weightedSum / totalWeight
+    if (!Object.keys(skillMap).length) return 'Grade 1'
+    const avg = calibRawAvg(skillMap, subject)
     if (avg >= 8.5) return 'AP · Year 2'
     if (avg >= 7.5) return 'AP · Year 1'
     if (avg >= 6.5) return 'Grade 11+'
@@ -6733,10 +6735,12 @@ Rules:
     const cs = calibStateRef.current
     const skillMap = cs.skillMap
     const band = calibBand(skillMap, cs.subject)
+    const bandAvg = calibRawAvg(skillMap, cs.subject)
     const nextTopic = calibNextTopic(skillMap, cs.subject)
     const result = {
       skillMap,
       band,
+      bandAvg,
       nextTopic,
       questionsAsked: cs.questionsAsked,
       durationMs: Date.now() - (cs.startTime || Date.now()),

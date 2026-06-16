@@ -7,6 +7,27 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, RotateCcw, ChevronRight, Layers } from 'lucide-react'
 import { SUBJECT_LABELS, SUBJECT_ICONS, CALIBRATION_MAP } from './calibrationMap'
 
+// ── Lower-bound threshold for each band (mirrors calibBand thresholds in App.jsx) ──
+// Used to compute position-within-band for the sub-level indicator.
+const BAND_LOWER = {
+  'AP · Year 2':  8.5,
+  'AP · Year 1':  7.5,
+  'Grade 11+':    6.5,
+  'Grade 11':     5.5,
+  'Grade 10+':    4.5,
+  'Grade 10':     3.5,
+  'Grade 9+':     2.5,
+  'Grade 9':      1.5,
+  'Grade 8':      0.5,
+  'Grade 7':     -0.5,
+  'Grade 6':     -1.5,
+  'Grade 5':     -2.5,
+  'Grade 4':     -3.5,
+  'Grade 3':     -4.5,
+  'Grade 2':     -5.5,
+  'Grade 1':     -6.5,
+}
+
 // ── Band ordering for progress comparisons ────────────────────────────────────
 const BAND_ORDER = {
   'Grade 1': 0, 'Grade 2': 1, 'Grade 3': 2, 'Grade 4': 3,
@@ -23,6 +44,66 @@ const BAND_COLORS = {
   'Grade 10':     '#8B5CF6', 'Grade 10+':    '#7C52E8',
   'Grade 11':     '#6366F1', 'Grade 11+':    '#5558D9',
   'AP · Year 1':  '#E9A364', 'AP · Year 2':  '#F59E0B',
+}
+
+// ── Sub-band indicator ────────────────────────────────────────────────────────
+function SubBandIndicator({ band, bandAvg, bandColor, isLight }) {
+  if (bandAvg == null) return null
+  const lower = BAND_LOWER[band] ?? -6.5
+  const pos = Math.max(0, Math.min(1, bandAvg - lower))
+  const pct = Math.round(pos * 100)
+  const subLabel = pos < 0.35 ? 'Developing' : pos < 0.70 ? 'Solid' : 'Strong'
+  const subDesc  = pos < 0.35
+    ? 'You\'re building this level'
+    : pos < 0.70
+    ? 'You\'re comfortably here'
+    : 'Ready to move up'
+  const trackBg = isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.07)'
+  const mutedCol = isLight ? 'rgba(0,0,0,0.38)' : 'rgba(255,255,255,0.35)'
+
+  return (
+    <div style={{ marginTop: 18 }}>
+      {/* Label row */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{
+            fontSize: 11, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase',
+            color: bandColor,
+            background: `${bandColor}18`,
+            border: `1px solid ${bandColor}38`,
+            padding: '3px 9px', borderRadius: 99,
+          }}>
+            {subLabel}
+          </span>
+          <span style={{ fontSize: 11.5, color: mutedCol }}>{subDesc}</span>
+        </div>
+        <span style={{ fontSize: 11, color: mutedCol, fontWeight: 600 }}>{pct}%</span>
+      </div>
+      {/* Bar */}
+      <div style={{ height: 6, borderRadius: 99, background: trackBg, overflow: 'hidden', position: 'relative' }}>
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ delay: 0.25, duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
+          style={{
+            height: '100%', borderRadius: 99,
+            background: `linear-gradient(90deg, ${bandColor}99, ${bandColor})`,
+            boxShadow: `0 0 10px ${bandColor}66`,
+          }}
+        />
+        {/* Next-level marker at 100% */}
+        <div style={{
+          position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)',
+          width: 2, height: 10, borderRadius: 1,
+          background: isLight ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.18)',
+        }} />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
+        <span style={{ fontSize: 10, color: mutedCol }}>Start of {band}</span>
+        <span style={{ fontSize: 10, color: mutedCol }}>Next level →</span>
+      </div>
+    </div>
+  )
 }
 
 // ── Status config for skill breakdown ─────────────────────────────────────────
@@ -298,11 +379,17 @@ export default function CalibrationResult({
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.1, type: 'spring', stiffness: 250, damping: 22 }}
-                style={{ fontSize: 38, fontWeight: 900, color: bandColor, lineHeight: 1, letterSpacing: '-0.02em', marginBottom: 10 }}
+                style={{ fontSize: 38, fontWeight: 900, color: bandColor, lineHeight: 1, letterSpacing: '-0.02em', marginBottom: 4 }}
               >
                 {result.band || 'Calibrated'}
               </motion.div>
-              <div style={{ fontSize: 12.5, color: mutedCol, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+              <SubBandIndicator
+                band={result.band}
+                bandAvg={result.bandAvg}
+                bandColor={bandColor}
+                isLight={isLight}
+              />
+              <div style={{ fontSize: 12.5, color: mutedCol, display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 16 }}>
                 <span>{result.questionsAsked || '?'} questions</span>
                 {mins !== null && <span>{mins} min{mins !== 1 ? 's' : ''}</span>}
                 <span>{Object.keys(result.skillMap || {}).length} skills assessed</span>

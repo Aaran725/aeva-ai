@@ -13,6 +13,26 @@ import { useUITheme } from './uiThemeStore'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
+// Lower threshold for each band — mirrors calibBand() thresholds in App.jsx
+const BAND_LOWER = {
+  'AP · Year 2':  8.5,
+  'AP · Year 1':  7.5,
+  'Grade 11+':    6.5,
+  'Grade 11':     5.5,
+  'Grade 10+':    4.5,
+  'Grade 10':     3.5,
+  'Grade 9+':     2.5,
+  'Grade 9':      1.5,
+  'Grade 8':      0.5,
+  'Grade 7':     -0.5,
+  'Grade 6':     -1.5,
+  'Grade 5':     -2.5,
+  'Grade 4':     -3.5,
+  'Grade 3':     -4.5,
+  'Grade 2':     -5.5,
+  'Grade 1':     -6.5,
+}
+
 const BAND_COLORS = {
   'Grade 1':       '#94A3B8',
   'Grade 2':       '#94A3B8',
@@ -197,6 +217,21 @@ function ProgressPanel({ history, currentBand }) {
                   {entry.questionsAsked > 0 && (
                     <span style={{ opacity: 0.6 }}>· {entry.questionsAsked}Q</span>
                   )}
+                  {entry.bandAvg != null && (() => {
+                    const lower = BAND_LOWER[entry.band] ?? -6.5
+                    const pos   = Math.max(0, Math.min(1, entry.bandAvg - lower))
+                    const lbl   = pos < 0.35 ? 'Dev' : pos < 0.70 ? 'Solid' : 'Strong'
+                    return (
+                      <span style={{
+                        fontSize: 9.5, fontWeight: 700, padding: '1px 6px', borderRadius: 99,
+                        background: `${color}18`,
+                        color: isLatest ? color : 'rgba(255,255,255,0.38)',
+                        letterSpacing: '0.03em',
+                      }}>
+                        {lbl} {Math.round(pos * 100)}%
+                      </span>
+                    )
+                  })()}
                 </div>
               </div>
             </div>
@@ -268,6 +303,30 @@ function SubjectCard({ subject, result, history, accent, onStart, index, expande
             }} />
             <span style={{ fontSize: 12, fontWeight: 700, color: bandColor }}>{band}</span>
           </div>
+
+          {/* Sub-band mini bar */}
+          {result?.bandAvg != null && (() => {
+            const lower = BAND_LOWER[band] ?? -6.5
+            const pos   = Math.max(0, Math.min(1, result.bandAvg - lower))
+            const lbl   = pos < 0.35 ? 'Developing' : pos < 0.70 ? 'Solid' : 'Strong'
+            return (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: `${bandColor}cc`, letterSpacing: '0.04em', textTransform: 'uppercase' }}>{lbl}</span>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)' }}>{Math.round(pos * 100)}%</span>
+                </div>
+                <div style={{ height: 3, borderRadius: 99, background: 'rgba(255,255,255,0.08)' }}>
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${pos * 100}%` }}
+                    transition={{ delay: 0.15, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                    style={{ height: '100%', borderRadius: 99, background: `${bandColor}cc` }}
+                  />
+                </div>
+              </div>
+            )
+          })()}
+
           {lastAt && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: 4,
