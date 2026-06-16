@@ -1,6 +1,6 @@
 /**
  * calibrationStore.js
- * Persists per-subject calibration results.
+ * Persists per-subject calibration results + full history (Phase 5).
  */
 import { create } from 'zustand'
 import { CALIBRATION_MAP, SUBJECT_LABELS } from './calibrationMap'
@@ -10,24 +10,34 @@ const load = () => { try { return JSON.parse(localStorage.getItem(KEY) || 'null'
 const save = s => { try { localStorage.setItem(KEY, JSON.stringify(s)) } catch {} }
 
 export const useCalibrationStore = create((set, get) => ({
-  // { [subject]: { level, band, calibratedAt, strengths, gaps, notYet, nextTopic, skillMap } }
+  // Latest result per subject
   results: load()?.results || {},
+
+  // Full history per subject — array of timestamped results (max 20 per subject, Phase 5)
+  history: load()?.history || {},
 
   saveResult: (subject, result) => {
     set(s => {
-      const next = { ...s.results, [subject]: { ...result, calibratedAt: Date.now() } }
-      save({ results: next })
-      return { results: next }
+      const stamped  = { ...result, calibratedAt: Date.now() }
+      const nextRes  = { ...s.results, [subject]: stamped }
+
+      // Append to history, keep last 20 entries per subject
+      const prevHist = s.history[subject] || []
+      const nextHist = { ...s.history, [subject]: [...prevHist, stamped].slice(-20) }
+
+      save({ results: nextRes, history: nextHist })
+      return { results: nextRes, history: nextHist }
     })
   },
 
-  getResult: (subject) => get().results[subject] || null,
+  getResult:  (subject) => get().results[subject] || null,
+  getHistory: (subject) => get().history[subject] || [],
 
   clearResult: (subject) => {
     set(s => {
       const next = { ...s.results }
       delete next[subject]
-      save({ results: next })
+      save({ results: next, history: s.history })
       return { results: next }
     })
   },
@@ -36,8 +46,7 @@ export const useCalibrationStore = create((set, get) => ({
 
   /**
    * Build a calibration profile block to inject into Aeva's system prompt.
-   * activeSubject — if provided, only injects that subject's result (when we know what they're studying).
-   *                 If null, injects all calibrated subjects.
+   * activeSubject — if provided, only injects that subject's result.
    * Returns empty string if no calibration results exist.
    */
   buildCalibBlock: (activeSubject = null) => {

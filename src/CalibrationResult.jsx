@@ -1,143 +1,199 @@
 /**
  * CalibrationResult.jsx
- * Inline result card rendered in chat after calibration convergence.
- * Phase 6: visual grade ladder replaces flat pill list at the top.
+ * Phase 4 & 5: Full-screen result overlay with AI insights + history timeline.
+ * Replaces the old inline chat card.
  */
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
+import { X, RotateCcw, ChevronRight, Layers } from 'lucide-react'
 import { SUBJECT_LABELS, SUBJECT_ICONS, CALIBRATION_MAP } from './calibrationMap'
 
-const STATUS_CONFIG = {
-  solid:   { icon: '✅', label: 'Solid',    color: '#4ADE80', bg: 'rgba(74,222,128,0.10)',  border: 'rgba(74,222,128,0.22)' },
-  shaky:   { icon: '⚠️',  label: 'Shaky',   color: '#FBBF24', bg: 'rgba(251,191,36,0.10)',  border: 'rgba(251,191,36,0.22)' },
-  gap:     { icon: '❌', label: 'Gap',      color: '#F87171', bg: 'rgba(248,113,113,0.10)', border: 'rgba(248,113,113,0.22)' },
-  untested:{ icon: '⬜', label: 'Untested', color: 'rgba(255,255,255,0.30)', bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.08)' },
+// ── Band ordering for progress comparisons ────────────────────────────────────
+const BAND_ORDER = {
+  'Grade 1–2': 0, 'Grade 3–4': 1, 'Grade 5–6': 2, 'Grade 7–8': 3,
+  Foundation: 4, 'GCSE Foundation': 5, 'GCSE Higher': 6, 'A-Level': 7,
+}
+const BAND_COLORS = {
+  'Grade 1–2': '#F87171', 'Grade 3–4': '#FB923C', 'Grade 5–6': '#FBBF24',
+  'Grade 7–8': '#4ADE80', Foundation: '#34D399',
+  'GCSE Foundation': '#60A5FA', 'GCSE Higher': '#818CF8', 'A-Level': '#C084FC',
 }
 
-// Grade ladder segments — ordered from lowest to highest
-const LADDER_SEGMENTS = [
-  { label: 'Grade 1–2',      short: 'Gr 1–2', minOrder: -99, maxOrder: -4, color: '#60A5FA', bg: 'rgba(96,165,250,0.18)' },
-  { label: 'Grade 3–4',      short: 'Gr 3–4', minOrder: -4,  maxOrder: -2, color: '#34D399', bg: 'rgba(52,211,153,0.18)' },
-  { label: 'Grade 5–8',      short: 'Gr 5–8', minOrder: -2,  maxOrder: 1,  color: '#A78BFA', bg: 'rgba(167,139,250,0.18)' },
-  { label: 'Foundation',     short: 'Fdn',    minOrder: 1,   maxOrder: 4,  color: '#F59E0B', bg: 'rgba(245,158,11,0.18)' },
-  { label: 'GCSE Foundation',short: 'GCSE F', minOrder: 4,   maxOrder: 6,  color: '#FB923C', bg: 'rgba(251,146,60,0.18)' },
-  { label: 'GCSE Higher',    short: 'GCSE H', minOrder: 6,   maxOrder: 8,  color: '#EF4444', bg: 'rgba(239,68,68,0.18)' },
-  { label: 'A-Level',        short: 'A-Lvl',  minOrder: 8,   maxOrder: 99, color: '#8B5CF6', bg: 'rgba(139,92,246,0.18)' },
-]
-
-function getSegmentForOrder(order) {
-  return LADDER_SEGMENTS.find(s => order >= s.minOrder && order < s.maxOrder) || LADDER_SEGMENTS[0]
+// ── Status config for skill breakdown ─────────────────────────────────────────
+const STATUS = {
+  mastery: { dot: '#C084FC', label: 'Mastery',  chip: 'rgba(192,132,252,0.12)', border: 'rgba(192,132,252,0.28)' },
+  solid:   { dot: '#4ADE80', label: 'Solid',    chip: 'rgba(74,222,128,0.10)',  border: 'rgba(74,222,128,0.26)'  },
+  shaky:   { dot: '#FBBF24', label: 'Shaky',    chip: 'rgba(251,191,36,0.10)',  border: 'rgba(251,191,36,0.26)'  },
+  gap:     { dot: '#F87171', label: 'Gap',       chip: 'rgba(248,113,113,0.10)', border: 'rgba(248,113,113,0.26)' },
 }
 
-function GradeLadder({ skillMap, subjectMap }) {
-  if (!skillMap || Object.keys(skillMap).length === 0) return null
+// ── Skill breakdown section ───────────────────────────────────────────────────
+function SkillBreakdown({ skillMap, subjectMap, isLight }) {
+  const groups = ['mastery', 'solid', 'shaky', 'gap']
+    .map(s => ({ status: s, skills: Object.entries(skillMap || {}).filter(([, v]) => v === s) }))
+    .filter(g => g.skills.length > 0)
 
-  // Find highest solid/shaky bandOrder (student's level)
-  const solidShaky = Object.entries(skillMap)
-    .filter(([, v]) => v === 'solid' || v === 'shaky')
-    .map(([id]) => subjectMap[id]?.bandOrder ?? -99)
-  const maxSolidOrder = solidShaky.length > 0 ? Math.max(...solidShaky) : -99
-
-  // Find lowest gap bandOrder
-  const gaps = Object.entries(skillMap)
-    .filter(([, v]) => v === 'gap')
-    .map(([id]) => subjectMap[id]?.bandOrder ?? -99)
-  const minGapOrder = gaps.length > 0 ? Math.min(...gaps) : null
-
-  // Current segment
-  const currentSegment = getSegmentForOrder(maxSolidOrder)
-  const currentSegIdx = LADDER_SEGMENTS.indexOf(currentSegment)
+  const text   = isLight ? '#0f1117'            : 'rgba(255,255,255,0.88)'
+  const label  = isLight ? 'rgba(0,0,0,0.42)'  : 'rgba(255,255,255,0.35)'
 
   return (
-    <div style={{ marginBottom: 18 }}>
-      {/* Section label */}
-      <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 10 }}>
-        YOUR LEVEL
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.10em', color: label, textTransform: 'uppercase' }}>
+        Skill Breakdown
       </div>
-
-      {/* Ladder bar */}
-      <div style={{ display: 'flex', gap: 3, alignItems: 'stretch', height: 36, borderRadius: 12, overflow: 'hidden' }}>
-        {LADDER_SEGMENTS.map((seg, idx) => {
-          const isCurrent = idx === currentSegIdx
-          const isPast    = idx < currentSegIdx
-          const isFuture  = idx > currentSegIdx
-
-          return (
-            <motion.div
-              key={seg.label}
-              initial={{ opacity: 0, scaleY: 0.6 }}
-              animate={{ opacity: 1, scaleY: 1 }}
-              transition={{ delay: idx * 0.06, type: 'spring', stiffness: 280, damping: 24 }}
-              style={{
-                flex: isCurrent ? 1.6 : 1,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                borderRadius: idx === 0 ? '10px 0 0 10px' : idx === LADDER_SEGMENTS.length - 1 ? '0 10px 10px 0' : 4,
-                background: isCurrent ? seg.bg
-                  : isPast ? 'rgba(74,222,128,0.12)'
-                  : 'rgba(255,255,255,0.04)',
-                border: isCurrent ? `1.5px solid ${seg.color}` : isPast ? '1.5px solid rgba(74,222,128,0.25)' : '1.5px solid rgba(255,255,255,0.06)',
-                position: 'relative',
-                transition: 'flex 0.4s ease',
-                cursor: 'default',
-              }}
-              title={seg.label}
-            >
-              {isCurrent && (
+      {groups.map(({ status, skills }) => {
+        const cfg = STATUS[status]
+        return (
+          <div key={status}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.dot, flexShrink: 0, boxShadow: `0 0 6px ${cfg.dot}88` }} />
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: cfg.dot, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                {cfg.label}
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {skills.map(([id]) => (
                 <motion.div
-                  animate={{ opacity: [0.5, 1, 0.5] }}
-                  transition={{ duration: 1.8, repeat: Infinity }}
+                  key={id}
+                  initial={{ opacity: 0, scale: 0.88 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 24 }}
                   style={{
-                    position: 'absolute', top: -1, left: '50%', transform: 'translateX(-50%)',
-                    width: 6, height: 6, borderRadius: '50%', background: seg.color,
-                    boxShadow: `0 0 8px ${seg.color}`,
+                    padding: '5px 13px', borderRadius: 99,
+                    background: cfg.chip, border: `1px solid ${cfg.border}`,
+                    fontSize: 12, fontWeight: 600, color: cfg.dot,
                   }}
-                />
-              )}
-              <span style={{
-                fontSize: isCurrent ? 10 : 9,
-                fontWeight: isCurrent ? 800 : 500,
-                color: isCurrent ? seg.color : isPast ? 'rgba(74,222,128,0.60)' : 'rgba(255,255,255,0.18)',
-                letterSpacing: '0.02em',
-                userSelect: 'none',
-              }}>
-                {isCurrent ? seg.label : seg.short}
-              </span>
-            </motion.div>
-          )
-        })}
+                >
+                  {subjectMap[id]?.label || id}
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── AI Insights section ───────────────────────────────────────────────────────
+function InsightsPanel({ insights, isLight }) {
+  const cardBg  = isLight ? 'rgba(99,102,241,0.06)' : 'rgba(99,102,241,0.10)'
+  const border  = isLight ? 'rgba(99,102,241,0.18)' : 'rgba(99,102,241,0.22)'
+  const label   = isLight ? 'rgba(0,0,0,0.4)'      : 'rgba(255,255,255,0.35)'
+  const textCol = isLight ? '#0f1117'               : 'rgba(255,255,255,0.82)'
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.10em', color: label, textTransform: 'uppercase' }}>
+        Aeva's Insights
       </div>
 
-      {/* Pointer label below current segment */}
-      <div style={{ display: 'flex', marginTop: 8, paddingLeft: `${(currentSegIdx / LADDER_SEGMENTS.length) * 100}%` }}>
-        <div style={{
-          fontSize: 10, fontWeight: 700, color: currentSegment.color,
-          display: 'flex', alignItems: 'center', gap: 4,
-        }}>
-          <span style={{ fontSize: 12 }}>▲</span>
-          You are here
-          {minGapOrder !== null && (
-            <span style={{ color: 'rgba(255,255,255,0.30)', fontWeight: 500 }}>
-              {' '}· gap at {getSegmentForOrder(minGapOrder).label}
-            </span>
-          )}
+      {!insights && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px', borderRadius: 12, background: cardBg, border: `1px solid ${border}` }}>
+          <motion.div
+            animate={{ opacity: [0.4, 1, 0.4] }}
+            transition={{ duration: 1.3, repeat: Infinity }}
+            style={{ width: 7, height: 7, borderRadius: '50%', background: '#818CF8', flexShrink: 0 }}
+          />
+          <span style={{ fontSize: 12.5, color: label }}>Generating insights…</span>
         </div>
+      )}
+
+      {insights && insights.length === 0 && (
+        <div style={{ fontSize: 12.5, color: label, fontStyle: 'italic' }}>
+          Complete the diagnostic to see personalised insights.
+        </div>
+      )}
+
+      {insights && insights.map((insight, i) => (
+        <motion.div
+          key={i}
+          initial={{ opacity: 0, x: -12 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: i * 0.12, duration: 0.22 }}
+          style={{
+            display: 'flex', gap: 12, alignItems: 'flex-start',
+            padding: '13px 16px', borderRadius: 12,
+            background: cardBg, border: `1px solid ${border}`,
+          }}
+        >
+          <span style={{ fontSize: 13, flexShrink: 0, marginTop: 0.5 }}>
+            {i === 0 ? '🔗' : i === 1 ? '🎯' : '→'}
+          </span>
+          <span style={{ fontSize: 13, lineHeight: 1.6, color: textCol }}>{insight}</span>
+        </motion.div>
+      ))}
+    </div>
+  )
+}
+
+// ── History timeline (Phase 5) ────────────────────────────────────────────────
+function HistoryTimeline({ history, currentBand, isLight }) {
+  if (!history || history.length < 2) return null
+
+  // Show last 5 entries (current last = newest)
+  const recent = history.slice(-5)
+  const label  = isLight ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.35)'
+
+  // Detect net improvement vs first entry
+  const firstBandOrder   = BAND_ORDER[recent[0].band] ?? -1
+  const currentBandOrder = BAND_ORDER[currentBand]    ?? -1
+  const improved = currentBandOrder > firstBandOrder
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.10em', color: label, textTransform: 'uppercase' }}>
+          Your Progress
+        </div>
+        {improved && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            style={{
+              fontSize: 10.5, fontWeight: 800, color: '#4ADE80',
+              background: 'rgba(74,222,128,0.10)', border: '1px solid rgba(74,222,128,0.25)',
+              padding: '3px 10px', borderRadius: 99,
+            }}
+          >
+            ↑ {recent[0].band} → {currentBand}
+          </motion.div>
+        )}
       </div>
 
-      {/* Stats row */}
-      <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
-        {[
-          { key: 'solid',    label: 'Solid',    color: '#4ADE80' },
-          { key: 'shaky',   label: 'Shaky',    color: '#FBBF24' },
-          { key: 'gap',     label: 'Gaps',     color: '#F87171' },
-          { key: 'untested',label: 'Untested', color: 'rgba(255,255,255,0.30)' },
-        ].map(({ key, label, color }) => {
-          const count = Object.values(skillMap).filter(v => v === key).length
-          if (count === 0) return null
+      {/* Timeline dots */}
+      <div style={{ position: 'relative', paddingLeft: 20 }}>
+        {/* Vertical connector line */}
+        <div style={{ position: 'absolute', left: 6, top: 8, bottom: 8, width: 1.5, background: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)', borderRadius: 1 }} />
+
+        {recent.map((entry, i) => {
+          const isLatest   = i === recent.length - 1
+          const bandColor  = BAND_COLORS[entry.band] || '#818CF8'
+          const textColor  = isLight ? '#0f1117' : 'rgba(255,255,255,0.85)'
+          const dateStr    = entry.calibratedAt
+            ? new Date(entry.calibratedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })
+            : ''
+
           return (
-            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <div style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0 }} />
-              <span style={{ fontSize: 10.5, fontWeight: 600, color: 'rgba(255,255,255,0.45)' }}>
-                <span style={{ color, fontWeight: 800 }}>{count}</span> {label}
-              </span>
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: i < recent.length - 1 ? 14 : 0 }}>
+              {/* Dot */}
+              <div style={{
+                width: isLatest ? 13 : 9, height: isLatest ? 13 : 9,
+                borderRadius: '50%',
+                background: isLatest ? bandColor : (isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)'),
+                border: isLatest ? `2px solid ${bandColor}` : 'none',
+                boxShadow: isLatest ? `0 0 8px ${bandColor}88` : 'none',
+                flexShrink: 0,
+                marginLeft: isLatest ? -2 : 0,
+                transition: 'all 0.3s',
+              }} />
+              {/* Label */}
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flex: 1 }}>
+                <span style={{ fontSize: isLatest ? 13 : 12, fontWeight: isLatest ? 800 : 500, color: isLatest ? bandColor : label }}>
+                  {entry.band}
+                </span>
+                {isLatest && <span style={{ fontSize: 10.5, color: bandColor, opacity: 0.7, fontWeight: 600 }}>← now</span>}
+                <span style={{ fontSize: 10.5, color: label, marginLeft: 'auto' }}>{dateStr}</span>
+              </div>
             </div>
           )
         })}
@@ -146,168 +202,205 @@ function GradeLadder({ skillMap, subjectMap }) {
   )
 }
 
-export default function CalibrationResult({ result, subject, onStartTopic, onRecalibrate, onAnotherSubject }) {
+// ── Main export — full-screen result overlay ──────────────────────────────────
+export default function CalibrationResult({
+  result,
+  subject,
+  history,
+  insights,
+  isLight,
+  onStartTopic,
+  onRecalibrate,
+  onAnotherSubject,
+  onClose,
+}) {
   const subjectLabel = SUBJECT_LABELS[subject] || subject
   const subjectIcon  = SUBJECT_ICONS[subject]  || '📚'
   const subjectMap   = CALIBRATION_MAP[subject] || {}
 
-  const solid    = result.skillMap ? Object.entries(result.skillMap).filter(([, v]) => v === 'solid')    : []
-  const shaky    = result.skillMap ? Object.entries(result.skillMap).filter(([, v]) => v === 'shaky')    : []
-  const gap      = result.skillMap ? Object.entries(result.skillMap).filter(([, v]) => v === 'gap')      : []
-  const untested = result.skillMap ? Object.entries(result.skillMap).filter(([, v]) => v === 'untested') : []
+  const bandColor = BAND_COLORS[result?.band] || '#818CF8'
+  const mins      = result?.durationMs ? Math.round(result.durationMs / 60000) : null
+  const nextLabel = result?.nextTopic ? (subjectMap[result.nextTopic]?.label || result.nextTopic) : null
 
-  const getLabel = (skillId) => subjectMap[skillId]?.label || skillId
+  // ── Theme tokens ─────────────────────────────────────────────────────────
+  const bg         = isLight ? '#f4f5fa'                  : '#0d0e16'
+  const cardBg     = isLight ? '#ffffff'                  : '#161826'
+  const panelBg    = isLight ? 'rgba(0,0,0,0.03)'        : 'rgba(255,255,255,0.03)'
+  const borderCol  = isLight ? 'rgba(0,0,0,0.08)'        : 'rgba(255,255,255,0.07)'
+  const textCol    = isLight ? '#0f1117'                  : 'rgba(255,255,255,0.88)'
+  const mutedCol   = isLight ? 'rgba(0,0,0,0.38)'        : 'rgba(255,255,255,0.35)'
 
-  const mins = result.durationMs ? Math.round(result.durationMs / 60000) : null
+  if (!result) return null
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16, scale: 0.97 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ type: 'spring', stiffness: 320, damping: 28, delay: 0.1 }}
+      key="calib-result"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
       style={{
-        margin: '20px 0',
-        borderRadius: 20,
-        background: 'rgba(8,10,28,0.96)',
-        border: '1px solid rgba(139,143,255,0.22)',
-        boxShadow: '0 8px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(99,102,241,0.10)',
-        overflow: 'hidden',
+        position: 'fixed', inset: 0, zIndex: 1900,
+        background: bg,
+        display: 'flex', flexDirection: 'column',
         fontFamily: "'Inter', system-ui, sans-serif",
+        overflow: 'hidden',
       }}
     >
-      {/* Header */}
+      {/* ── Header ────────────────────────────────────────────────────────── */}
       <div style={{
-        padding: '18px 22px',
-        background: 'linear-gradient(135deg, rgba(99,102,241,0.18) 0%, rgba(139,92,246,0.10) 100%)',
-        borderBottom: '1px solid rgba(139,143,255,0.14)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '14px 28px', borderBottom: `1px solid ${borderCol}`, flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 22 }}>{subjectIcon}</span>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 900, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.01em' }}>
-              {subjectLabel} Calibration
-            </div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 2 }}>
-              {result.questionsAsked} questions
-              {mins ? ` · ${mins} min` : ''}
-              {result.band ? ` · ${result.band}` : ''}
-            </div>
-          </div>
+          <span style={{ fontSize: 20 }}>{subjectIcon}</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: textCol }}>{subjectLabel}</span>
+          <div style={{ width: 1, height: 14, background: borderCol }} />
+          <span style={{ fontSize: 11, color: mutedCol, fontWeight: 600 }}>Diagnostic Complete</span>
         </div>
-        <div style={{
-          padding: '6px 14px', borderRadius: 99,
-          background: 'rgba(99,102,241,0.22)', border: '1px solid rgba(139,143,255,0.35)',
-          fontSize: 11, fontWeight: 800, color: '#A5B4FC', letterSpacing: '0.05em',
-        }}>
-          {result.band || 'Calibrated'}
-        </div>
+        <button
+          onClick={onClose}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: mutedCol, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, padding: '6px 10px', borderRadius: 8 }}
+        >
+          <X size={13} /> Back to Chat
+        </button>
       </div>
 
-      {/* Grade ladder + skill map */}
-      <div style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* ── Scrollable content ─────────────────────────────────────────────── */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '28px 28px 40px' }}>
+        <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', gap: 28, alignItems: 'flex-start' }}>
 
-        {/* Visual grade ladder */}
-        <GradeLadder skillMap={result.skillMap} subjectMap={subjectMap} />
+          {/* ── LEFT: band headline + skill breakdown + history ──────────── */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 24 }}>
 
-        {/* Divider */}
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '2px 0' }} />
-
-        {/* Skill map pills grouped by status */}
-        <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.10em', textTransform: 'uppercase' }}>
-          SKILL BREAKDOWN
-        </div>
-
-        {[
-          { status: 'solid',    entries: solid    },
-          { status: 'shaky',   entries: shaky    },
-          { status: 'gap',     entries: gap      },
-          { status: 'untested',entries: untested },
-        ].filter(g => g.entries.length > 0).map(({ status, entries }) => {
-          const cfg = STATUS_CONFIG[status]
-          return (
-            <div key={status}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: cfg.color, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>
-                {cfg.icon}  {cfg.label}
+            {/* Band headline card */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.28 }}
+              style={{
+                background: cardBg, border: `1px solid ${borderCol}`, borderRadius: 20,
+                padding: '28px 30px',
+                borderTop: `3px solid ${bandColor}`,
+              }}
+            >
+              <div style={{ fontSize: 11, fontWeight: 700, color: bandColor, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+                Your Level
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {entries.map(([skillId]) => (
-                  <div key={skillId} style={{
-                    padding: '5px 12px', borderRadius: 99,
-                    background: cfg.bg, border: `1px solid ${cfg.border}`,
-                    fontSize: 12, fontWeight: 600, color: cfg.color,
-                  }}>
-                    {getLabel(skillId)}
-                  </div>
-                ))}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.1, type: 'spring', stiffness: 250, damping: 22 }}
+                style={{ fontSize: 38, fontWeight: 900, color: bandColor, lineHeight: 1, letterSpacing: '-0.02em', marginBottom: 10 }}
+              >
+                {result.band || 'Calibrated'}
+              </motion.div>
+              <div style={{ fontSize: 12.5, color: mutedCol, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                <span>{result.questionsAsked || '?'} questions</span>
+                {mins !== null && <span>{mins} min{mins !== 1 ? 's' : ''}</span>}
+                <span>{Object.keys(result.skillMap || {}).length} skills assessed</span>
               </div>
-            </div>
-          )
-        })}
-      </div>
+            </motion.div>
 
-      {/* Next step */}
-      {result.nextTopic && (
-        <div style={{
-          margin: '0 22px 18px',
-          padding: '14px 16px',
-          borderRadius: 14,
-          background: 'linear-gradient(135deg, rgba(99,102,241,0.14), rgba(139,92,246,0.08))',
-          border: '1px solid rgba(139,143,255,0.22)',
-        }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(139,143,255,0.70)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 6 }}>
-            START HERE
+            {/* Skill breakdown card */}
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.12, duration: 0.26 }}
+              style={{ background: cardBg, border: `1px solid ${borderCol}`, borderRadius: 20, padding: '24px 28px' }}
+            >
+              <SkillBreakdown skillMap={result.skillMap} subjectMap={subjectMap} isLight={isLight} />
+            </motion.div>
+
+            {/* History timeline (Phase 5) */}
+            {history && history.length >= 2 && (
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.22, duration: 0.26 }}
+                style={{ background: cardBg, border: `1px solid ${borderCol}`, borderRadius: 20, padding: '24px 28px' }}
+              >
+                <HistoryTimeline history={history} currentBand={result.band} isLight={isLight} />
+              </motion.div>
+            )}
           </div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.90)' }}>
-            {getLabel(result.nextTopic)}
+
+          {/* ── RIGHT: insights + next step + actions ───────────────────── */}
+          <div style={{ width: 320, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+            {/* AI Insights card */}
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.18, duration: 0.26 }}
+              style={{ background: cardBg, border: `1px solid ${borderCol}`, borderRadius: 20, padding: '24px 24px' }}
+            >
+              <InsightsPanel insights={insights} isLight={isLight} />
+            </motion.div>
+
+            {/* Next topic card */}
+            {nextLabel && (
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.24, duration: 0.24 }}
+                style={{
+                  background: cardBg, borderRadius: 20,
+                  border: `1px solid ${borderCol}`,
+                  borderLeft: `3px solid ${bandColor}`,
+                  padding: '20px 22px',
+                }}
+              >
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.10em', color: mutedCol, textTransform: 'uppercase', marginBottom: 10 }}>
+                  Start Here
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: textCol, marginBottom: 4 }}>{nextLabel}</div>
+                {subjectMap[result.nextTopic]?.band && (
+                  <div style={{ fontSize: 11.5, color: mutedCol, marginBottom: 14 }}>{subjectMap[result.nextTopic].band}</div>
+                )}
+                <button
+                  onClick={() => onStartTopic?.(result.nextTopic, subject)}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    background: bandColor, border: 'none', borderRadius: 12, padding: '12px 18px',
+                    fontSize: 13.5, fontWeight: 700, color: '#fff', cursor: 'pointer',
+                  }}
+                >
+                  Study {nextLabel} <ChevronRight size={14} />
+                </button>
+              </motion.div>
+            )}
+
+            {/* Secondary actions */}
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.30, duration: 0.22 }}
+              style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+            >
+              <button
+                onClick={() => onAnotherSubject?.()}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  background: panelBg, border: `1px solid ${borderCol}`, borderRadius: 12, padding: '11px 16px',
+                  fontSize: 12.5, fontWeight: 600, color: mutedCol, cursor: 'pointer',
+                }}
+              >
+                <Layers size={13} /> Calibrate another subject
+              </button>
+              <button
+                onClick={() => onRecalibrate?.()}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  background: 'none', border: `1px solid ${borderCol}`, borderRadius: 12, padding: '11px 16px',
+                  fontSize: 12.5, fontWeight: 600, color: mutedCol, cursor: 'pointer',
+                }}
+              >
+                <RotateCcw size={13} /> Re-run this diagnostic
+              </button>
+            </motion.div>
           </div>
-          {subjectMap[result.nextTopic]?.nextSkills?.length > 0 && (
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>
-              Unlocks: {subjectMap[result.nextTopic].nextSkills.map(s => subjectMap[s]?.label || s).join(', ')}
-            </div>
-          )}
         </div>
-      )}
-
-      {/* Actions */}
-      <div style={{ padding: '0 22px 20px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {result.nextTopic && (
-          <motion.button
-            whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-            onClick={() => onStartTopic?.(result.nextTopic, subject)}
-            style={{
-              flex: 1, minWidth: 160,
-              padding: '11px 18px', borderRadius: 12, cursor: 'pointer', border: 'none',
-              background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
-              color: 'white', fontSize: 13, fontWeight: 700,
-              boxShadow: '0 4px 20px rgba(99,102,241,0.40)',
-            }}
-          >
-            → Start: {getLabel(result.nextTopic)}
-          </motion.button>
-        )}
-        <motion.button
-          whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-          onClick={() => onAnotherSubject?.()}
-          style={{
-            padding: '11px 16px', borderRadius: 12, cursor: 'pointer',
-            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
-            color: 'rgba(255,255,255,0.60)', fontSize: 12, fontWeight: 600,
-          }}
-        >
-          Calibrate another subject
-        </motion.button>
-        <motion.button
-          whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-          onClick={() => onRecalibrate?.()}
-          style={{
-            padding: '11px 16px', borderRadius: 12, cursor: 'pointer',
-            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-            color: 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: 600,
-          }}
-        >
-          Re-calibrate
-        </motion.button>
       </div>
     </motion.div>
   )

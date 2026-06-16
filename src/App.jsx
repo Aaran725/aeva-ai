@@ -216,6 +216,39 @@ Grading rules:
   }
 }
 
+/** Generate 3 personalised insight sentences from a completed calibration result (Phase 4). */
+async function generateCalibInsights(result, subject) {
+  try {
+    const { CALIBRATION_MAP: CM, SUBJECT_LABELS: SL } = await import('./calibrationMap')
+    const subjectMap = CM[subject] || {}
+    const label      = SL[subject] || subject
+    const fmt = status => Object.entries(result.skillMap || {}).filter(([,v]) => v === status).map(([id]) => subjectMap[id]?.label || id).join(', ') || 'none'
+    const prompt = `You are Aeva, a sharp AI tutor. A student just completed a ${label} diagnostic.
+
+Level: ${result.band}
+Mastery: ${fmt('mastery')}
+Solid: ${fmt('solid')}
+Shaky: ${fmt('shaky')}
+Gaps: ${fmt('gap')}
+
+Write exactly 3 insights for this student — each one sentence, specific and concrete.
+Insight 1: a pattern or connection you notice in what they know.
+Insight 2: the single most important gap to address and why.
+Insight 3: a specific next action they should take.
+Return ONLY valid JSON: {"insights":["...","...","..."]}`
+
+    const res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
+      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }], temperature: 0.55, max_tokens: 320, response_format: { type: 'json_object' } }),
+    })
+    if (!res.ok) return []
+    const json   = await res.json()
+    const parsed = JSON.parse(json.choices?.[0]?.message?.content || '{}')
+    return Array.isArray(parsed.insights) ? parsed.insights.slice(0, 3) : []
+  } catch { return [] }
+}
+
 async function runCritic(history, userMessage) {
   try {
     const context = history.slice(-4).map(m => ({
@@ -5609,6 +5642,8 @@ function ChatView({ onBack }) {
   const [calibEvaluating, setCalibEvaluating]   = useState(false)         // critic is running
   const [lastCalibFeedback, setLastCalibFeedback] = useState(null)        // { understanding, ts }
   const [calibResumeOffer, setCalibResumeOffer]   = useState(null)        // checkpoint to offer resume for
+  const [calibInsights, setCalibInsights]         = useState(null)        // AI insights for result screen (Phase 4)
+  const [calibResultOpen, setCalibResultOpen]     = useState(false)       // show full-screen result overlay
   const [chatAppSettingsOpen, setChatAppSettingsOpen] = useState(false)
   const [chatSettings, saveChatSettings] = useChatSettings()
   const [chipEditMode, setChipEditMode] = useState(false)
@@ -6462,7 +6497,7 @@ Rules:
     injectNextCalibQuestion()
   }
 
-  /** Finish calibration and show result */
+  /** Finish calibration: save result, open full-screen result overlay, generate insights. */
   const finishCalibration = () => {
     const cs = calibStateRef.current
     const skillMap = cs.skillMap
@@ -6475,13 +6510,18 @@ Rules:
       questionsAsked: cs.questionsAsked,
       durationMs: Date.now() - (cs.startTime || Date.now()),
     }
-    clearCalibCheckpoint()    // session complete — remove checkpoint
+    clearCalibCheckpoint()
     calibrationStore.saveResult(cs.subject, result)
-    setCalibResult({ ...result, subject: cs.subject })
+    const fullResult = { ...result, subject: cs.subject }
+    setCalibResult(fullResult)
     setCurrentCalibQuestion(null)
     calibModeRef.current = false
     setCalibMode(false)
     setCalibSubject(null)
+    // Phase 4: open the result screen and start generating insights asynchronously
+    setCalibInsights(null)
+    setCalibResultOpen(true)
+    generateCalibInsights(result, cs.subject).then(insights => setCalibInsights(insights))
   }
 
   /** Called after each Critic result during calibration */
@@ -8529,28 +8569,7 @@ If no clear changes: {"changes":[]}`
                   />
                 )}
 
-                {/* Calibration result card */}
-                {calibResult && !calibMode && (
-                  <CalibrationResult
-                    result={calibResult}
-                    subject={calibResult.subject}
-                    onStartTopic={(topicId, subject) => {
-                      setCalibResult(null)
-                      const node = CALIBRATION_MAP[subject]?.[topicId]
-                      if (node) sendWithText(`Let's start: ${node.label}`)
-                    }}
-                    onRecalibrate={() => {
-                      const subj = calibResult.subject
-                      setCalibResult(null)
-                      startCalibration(subj)
-                      setTimeout(() => sendCalibFirstQuestion(subj), 200)
-                    }}
-                    onAnotherSubject={() => {
-                      setCalibResult(null)
-                      setCalibSubjectPicker(true)
-                    }}
-                  />
-                )}
+                {/* Calibration result: full-screen overlay rendered at top level */}
 
                 {/* Worksheet generating indicator */}
                 {worksheetLoading && (
@@ -10402,13 +10421,45 @@ export default function App() {
 
       {/* ── Resume offer banner (Phase 3) ─────────────────────────────────── */}
       <AnimatePresence>
-        {calibResumeOffer && !calibMode && (
+        {calibResumeOffer && !calibMode && !calibResultOpen && (
           <CalibResumeOffer
             key="resume-offer"
             checkpoint={calibResumeOffer}
             isLight={isLight}
             onResume={() => resumeFromCheckpoint(calibResumeOffer)}
             onDismiss={() => { setCalibResumeOffer(null); clearCalibCheckpoint() }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── Full-screen result overlay (Phase 4 & 5) ──────────────────────── */}
+      <AnimatePresence>
+        {calibResultOpen && calibResult && (
+          <CalibrationResult
+            key="calib-result"
+            result={calibResult}
+            subject={calibResult.subject}
+            history={calibrationStore.getHistory(calibResult.subject)}
+            insights={calibInsights}
+            isLight={isLight}
+            onClose={() => setCalibResultOpen(false)}
+            onStartTopic={(topicId, subj) => {
+              setCalibResultOpen(false)
+              const node = CALIBRATION_MAP[subj]?.[topicId]
+              if (node) setTimeout(() => sendWithText(`Let's study ${node.label}`), 250)
+            }}
+            onRecalibrate={() => {
+              const subj = calibResult.subject
+              setCalibResultOpen(false)
+              setCalibResult(null)
+              startCalibration(subj)
+              setTimeout(() => sendCalibFirstQuestion(subj), 200)
+            }}
+            onAnotherSubject={() => {
+              setCalibResultOpen(false)
+              setCalibResult(null)
+              setCalibSubjectPicker(true)
+            }}
           />
         )}
       </AnimatePresence>
