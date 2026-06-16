@@ -211,9 +211,70 @@ Grading rules:
     const json = await res.json()
     const parsed = JSON.parse(json.choices?.[0]?.message?.content || '{}')
     const understanding = ['none', 'partial', 'solid'].includes(parsed.understanding) ? parsed.understanding : 'partial'
+
+    // Fix 2: second-opinion check when verdict is "none" on a substantive answer.
+    // Catches ~5-10% of false "wrong" verdicts from model arithmetic errors.
+    // Skips verification for obvious give-ups ("skip", "idk", etc.) to save a call.
+    if (understanding === 'none' && !CALIB_SKIP_WORDS.test(userAnswer.trim())) {
+      const check = await verifyCriticNone(questionText, userAnswer)
+      if (!check.confirmed_wrong) {
+        return { understanding: 'partial', correct: false, note: check.note || 'Method shown — partial credit.' }
+      }
+    }
+
     return { understanding, correct: understanding === 'solid', note: parsed.note || '' }
   } catch {
     return { understanding: 'partial', correct: false, note: '' }
+  }
+}
+
+// Words that unambiguously signal the student gave up — no need to verify these
+const CALIB_SKIP_WORDS = /^(skip|idk|i don'?t know|pass|no idea|dunno|\?+|-)$/i
+
+/** Second-opinion verifier — only called when runCalibCritic returns "none" on a
+ *  substantive answer. Catches ~5-10% of false "wrong" verdicts caused by model
+ *  arithmetic errors. Returns { confirmed_wrong: boolean }. */
+async function verifyCriticNone(questionText, userAnswer) {
+  try {
+    const res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a second-opinion answer verifier. A previous AI marked a student's answer as WRONG (zero marks). Your job is to independently verify this verdict.
+
+STEP 1 — Solve the question yourself from scratch. Show your full working carefully.
+STEP 2 — Read the student's answer.
+STEP 3 — Decide: is it definitely wrong, or might the previous AI have made an arithmetic or reasoning error?
+
+Return ONLY valid JSON:
+{"confirmed_wrong": true|false, "note": "<one sentence>"}
+
+Rules:
+- confirmed_wrong = false if the student showed the right method with a minor slip, OR if their answer is actually correct.
+- confirmed_wrong = true only if the answer is clearly wrong with no redeemable reasoning.
+- Be generous: doubt the previous verdict when in doubt.`,
+          },
+          {
+            role: 'user',
+            content: `Question: ${questionText}\n\nStudent's answer: ${userAnswer}\n\nA previous AI marked this WRONG. Do you agree?`,
+          },
+        ],
+        temperature: 0,
+        max_tokens: 300,
+        response_format: { type: 'json_object' },
+      }),
+    })
+    if (!res.ok) return { confirmed_wrong: true }
+    const json   = await res.json()
+    const parsed = JSON.parse(json.choices?.[0]?.message?.content || '{}')
+    // Default to confirmed_wrong=true if the field is missing (trust original on parse failure)
+    return { confirmed_wrong: parsed.confirmed_wrong !== false, note: parsed.note || '' }
+  } catch {
+    return { confirmed_wrong: true }
   }
 }
 
@@ -6241,6 +6302,20 @@ RULES:
   const clearCalibCheckpoint = () => { try { localStorage.removeItem(CALIB_CHECKPOINT_KEY) } catch {} }
   const loadCalibCheckpoint  = () => { try { return JSON.parse(localStorage.getItem(CALIB_CHECKPOINT_KEY) || 'null') } catch { return null } }
 
+  /** Cluster-aware stop condition (Fix 3).
+   *  Soft cap 12: exit only when ≥3 clusters have been assessed (Maths).
+   *  Hard cap 16: always exit. Non-cluster subjects exit at 12 as before. */
+  const shouldCalibStop = (cs, next) => {
+    if (!next) return true
+    if (cs.nodeCount >= 16) return true
+    if (cs.nodeCount >= 12) {
+      if (!NODE_CLUSTERS[cs.subject]) return true   // non-maths: old behaviour
+      const clustersHit = Object.keys(cs.clustersAssessed || {}).length
+      return clustersHit >= 3                        // 3+ clusters → sufficient breadth
+    }
+    return false
+  }
+
   /** Pick the next skill node to test based on Critic result */
   const calibAdvance = (understanding) => {
     const cs = calibStateRef.current
@@ -6512,7 +6587,7 @@ Rules:
       const isRetry = next === prevNode
       if (!isRetry) cs.nodeCount += 1
       setCalibTick(t => t + 1)
-      if (cs.nodeCount >= 12 || !next) { clearCalibCheckpoint(); finishCalibration(); return }
+      if (shouldCalibStop(cs, next)) { clearCalibCheckpoint(); finishCalibration(); return }
       saveCalibCheckpoint()
       injectNextCalibQuestion()   // recurse to get the next non-duplicate question
       return
@@ -6601,8 +6676,7 @@ Rules:
         if (!isRetry) cs.nodeCount += 1
         setCalibTick(t => t + 1)
 
-        const shouldStop = cs.nodeCount >= 12 || !next
-        if (shouldStop) {
+        if (shouldCalibStop(cs, next)) {
           clearCalibCheckpoint()
           finishCalibration()
         } else {
@@ -6685,8 +6759,7 @@ Rules:
 
     setCalibTick(t => t + 1)          // force progress UI re-render (refs don't trigger it)
 
-    const shouldStop = cs.nodeCount >= 12 || !next
-    if (shouldStop) { finishCalibration(); return }
+    if (shouldCalibStop(cs, next)) { finishCalibration(); return }
   }
 
   // ── END CALIBRATION HELPERS ───────────────────────────────────────────────
@@ -7642,6 +7715,18 @@ If no clear changes: {"changes":[]}`
       wSum += bo * w; wTotal += w
     }
     return wTotal === 0 ? null : wSum / wTotal
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calibTick, calibMode])
+
+  // Fix 3: cluster coverage info — shown in CalibrationExperience header for Maths
+  const liveClusterInfo = useMemo(() => {
+    if (!calibMode) return null
+    const cs = calibStateRef.current
+    const clusterMap = NODE_CLUSTERS[cs.subject]
+    if (!clusterMap) return null
+    const total = new Set(Object.values(clusterMap)).size
+    const hit   = Object.keys(cs.clustersAssessed || {}).length
+    return { hit, total }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calibTick, calibMode])
 
@@ -9546,6 +9631,7 @@ If no clear changes: {"changes":[]}`
             isEvaluating={calibEvaluating}
             lastFeedback={lastCalibFeedback}
             isLight={isLight}
+            clusterInfo={liveClusterInfo}
             onAnswer={handleCalibAnswer}
             onSkip={() => handleCalibAnswer('skip')}
             onExit={() => {

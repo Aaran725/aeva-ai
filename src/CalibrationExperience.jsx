@@ -176,6 +176,7 @@ export function CalibrationExperience({
   isEvaluating,       // critic is running — disable input
   lastFeedback,       // { understanding, ts } — triggers flash
   isLight,
+  clusterInfo,        // { hit, total } — cluster coverage for maths (null for other subjects)
   onAnswer,           // (text: string) => void
   onSkip,             // () => void
   onExit,             // () => void
@@ -254,7 +255,16 @@ export function CalibrationExperience({
           <div style={{ width: 1, height: 14, background: borderCol }} />
           {question.isFastLane
             ? <span style={{ fontSize: 10.5, fontWeight: 700, color: '#FBBF24', letterSpacing: '0.05em' }}>⚡ Quick Placement</span>
-            : <span style={{ fontSize: 11, color: mutedCol, fontWeight: 600 }}>Diagnostic · Q{questionsAsked + 1}</span>
+            : (
+              <span style={{ fontSize: 11, color: mutedCol, fontWeight: 600 }}>
+                Diagnostic · Q{questionsAsked + 1}
+                {clusterInfo && clusterInfo.hit > 0 && (
+                  <span style={{ marginLeft: 6, color: clusterInfo.hit >= 3 ? '#4ADE80' : mutedCol }}>
+                    · {clusterInfo.hit}/{clusterInfo.total} topics
+                  </span>
+                )}
+              </span>
+            )
           }
         </div>
         <button
