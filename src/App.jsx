@@ -62,7 +62,7 @@ const CalibrationHub     = lazy(() => import('./CalibrationHub'))
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
 import { useCalibrationStore } from './calibrationStore'
 import { lookupAnalogy } from './analogyBank'
-import { CALIBRATION_MAP, ENTRY_NODES, SUBJECT_LABELS, SUBJECT_ICONS, FAST_LANE } from './calibrationMap'
+import { CALIBRATION_MAP, ENTRY_NODES, SUBJECT_LABELS, SUBJECT_ICONS, FAST_LANE, NODE_CLUSTERS } from './calibrationMap'
 import CalibrationResult from './CalibrationResult'
 import { useEchoStore } from './echoStore'
 import { useMemoryStore } from './memoryStore'
@@ -6283,15 +6283,87 @@ RULES:
     cs.masteryProbed = false
     cs.tierAtNode = 1
 
+    // ── Cluster tracking (maths — and any subject with NODE_CLUSTERS entries) ──
+    const clusterMap  = NODE_CLUSTERS[cs.subject]
+    const nodeCluster = clusterMap?.[cs.currentNode]
+    if (nodeCluster) {
+      cs.clustersAssessed[nodeCluster] = (cs.clustersAssessed[nodeCluster] || 0) + 1
+      cs.clusterStreak = (cs.lastCluster === nodeCluster) ? (cs.clusterStreak || 0) + 1 : 1
+      cs.lastCluster   = nodeCluster
+    }
+
+    // ── Estimated band order — used to target cluster jumps at the right level ─
+    const estimatedBandOrder = (() => {
+      const entries = Object.entries(cs.skillMap)
+      if (!entries.length) return node.bandOrder ?? 0
+      let wSum = 0, wTotal = 0
+      for (const [id, st] of entries) {
+        const bo = subjectMap[id]?.bandOrder ?? 0
+        const w  = st === 'mastery' ? 3 : st === 'solid' ? 2 : st === 'shaky' ? 1 : 0
+        wSum += bo * w; wTotal += w
+      }
+      return wTotal ? wSum / wTotal : node.bandOrder ?? 0
+    })()
+
     // ── Choose next node ─────────────────────────────────────────────────────
     let nextNode = null
-    if (isGood || isPartial || cs.tierAtNode >= 4) {
-      // Advance: pick first untested nextSkill that actually exists in the map
-      const candidates = (node.nextSkills || []).filter(id => !cs.skillMap[id] && !cs.nodesVisited.includes(id) && subjectMap[id])
-      nextNode = candidates[0] || null
+
+    if (isGood || isPartial) {
+      // ── Advance ────────────────────────────────────────────────────────────
+
+      // Step 1: Cluster jump — after 3 consecutive questions in the same cluster,
+      // leap to the least-assessed cluster to improve breadth.
+      // Only fires when clusterMap exists (maths) and there's a real alternative.
+      if (clusterMap && nodeCluster && (cs.clusterStreak || 0) >= 3) {
+        const allClusters   = [...new Set(Object.values(clusterMap))]
+        const otherClusters = allClusters.filter(c => c !== nodeCluster)
+        // Pick the cluster assessed the fewest times (0 = completely untouched)
+        const targetCluster = otherClusters.sort((a, b) =>
+          (cs.clustersAssessed[a] || 0) - (cs.clustersAssessed[b] || 0)
+        )[0]
+
+        if (targetCluster) {
+          // Find the unvisited node in that cluster closest to current estimated level
+          const jumpTarget = Object.entries(subjectMap)
+            .filter(([id, n]) =>
+              clusterMap[id] === targetCluster &&
+              !cs.skillMap[id]          &&
+              !cs.nodesVisited.includes(id) &&
+              id !== cs.currentNode
+            )
+            .sort(([, a], [, b]) =>
+              Math.abs((a.bandOrder ?? 0) - estimatedBandOrder) -
+              Math.abs((b.bandOrder ?? 0) - estimatedBandOrder)
+            )[0]
+
+          if (jumpTarget) {
+            nextNode = jumpTarget[0]
+            // Reset streak — we've just jumped clusters
+            cs.clusterStreak = 0
+          }
+        }
+      }
+
+      // Step 2: No cluster jump → pick from nextSkills.
+      // When multiple candidates exist, prefer the one from the least-assessed cluster.
+      if (!nextNode) {
+        const candidates = (node.nextSkills || []).filter(id =>
+          !cs.skillMap[id] && !cs.nodesVisited.includes(id) && subjectMap[id]
+        )
+        if (clusterMap && candidates.length > 1) {
+          candidates.sort((a, b) =>
+            (cs.clustersAssessed[clusterMap[a]] || 0) -
+            (cs.clustersAssessed[clusterMap[b]] || 0)
+          )
+        }
+        nextNode = candidates[0] || null
+      }
+
     } else {
-      // Retreat: go to first untested prerequisite that actually exists in the map
-      const prereqs = (node.prerequisites || []).filter(id => !cs.skillMap[id] && !cs.nodesVisited.includes(id) && subjectMap[id])
+      // ── Retreat (gap / none) ───────────────────────────────────────────────
+      const prereqs = (node.prerequisites || []).filter(id =>
+        !cs.skillMap[id] && !cs.nodesVisited.includes(id) && subjectMap[id]
+      )
       nextNode = prereqs[0] || null
       // If all prereqs tested, try a sibling at or below current band
       if (!nextNode) {
@@ -6386,6 +6458,10 @@ Rules:
       skillMap: {}, nodeCount: 0, questionsAsked: 0,
       tierAtNode: 1, partialAtNode: false, masteryProbed: false,
       nodesVisited: [], startTime: Date.now(),
+      // Cluster-aware traversal (Fix 1)
+      clustersAssessed: {},  // { cluster → count of nodes assessed }
+      clusterStreak:    0,   // consecutive questions in the same cluster
+      lastCluster:      null,
     }
     // Initialise fast lane if this subject has one
     calibFastLaneRef.current = FAST_LANE[subject]
@@ -6546,16 +6622,19 @@ Rules:
   const resumeFromCheckpoint = (checkpoint) => {
     const { fastLaneState, lastActiveAt, ...cs } = checkpoint
     calibStateRef.current = {
-      subject:       cs.subject       || null,
-      currentNode:   cs.currentNode   || null,
-      skillMap:      cs.skillMap      || {},
-      nodeCount:     cs.nodeCount     || 0,
-      questionsAsked: cs.questionsAsked || 0,
-      tierAtNode:    cs.tierAtNode    || 1,
-      partialAtNode: cs.partialAtNode || false,
-      masteryProbed: cs.masteryProbed || false,
-      nodesVisited:  cs.nodesVisited  || [],
-      startTime:     cs.startTime     || Date.now(),
+      subject:          cs.subject          || null,
+      currentNode:      cs.currentNode      || null,
+      skillMap:         cs.skillMap         || {},
+      nodeCount:        cs.nodeCount        || 0,
+      questionsAsked:   cs.questionsAsked   || 0,
+      tierAtNode:       cs.tierAtNode       || 1,
+      partialAtNode:    cs.partialAtNode    || false,
+      masteryProbed:    cs.masteryProbed    || false,
+      nodesVisited:     cs.nodesVisited     || [],
+      startTime:        cs.startTime        || Date.now(),
+      clustersAssessed: cs.clustersAssessed || {},
+      clusterStreak:    cs.clusterStreak    || 0,
+      lastCluster:      cs.lastCluster      || null,
     }
     calibFastLaneRef.current = fastLaneState || { active: false, bracketIdx: 0 }
     calibModeRef.current = true

@@ -1528,6 +1528,68 @@ const COMPUTER_SCIENCE = {
   },
 }
 
+// ─── CLUSTER MAP (Maths) ──────────────────────────────────────────────────────
+// Maps every Maths node ID → one of 5 topic clusters.
+// Used by calibAdvance() to ensure the diagnostic samples across all clusters
+// instead of following a single chain through one branch of the graph.
+// Other subjects don't have cluster assignments (cluster jumps are maths-only).
+export const NODE_CLUSTERS = {
+  maths: {
+    // ── Number ────────────────────────────────────────────────────────────────
+    'counting-number':          'number',
+    'addition-subtraction':     'number',
+    'place-value':              'number',
+    'times-tables':             'number',
+    'multiplication-division':  'number',
+    'basic-fractions':          'number',
+    'fractions-equivalent':     'number',
+    'decimals-intro':           'number',
+    'negative-numbers':         'number',
+    'number-basics':            'number',
+    'fractions':                'number',
+    'percentages':              'number',
+    'ratio':                    'number',
+    'surds':                    'number',
+    // ── Algebra ───────────────────────────────────────────────────────────────
+    'algebra-intro':            'algebra',
+    'basic-algebra':            'algebra',
+    'linear-equations':         'algebra',
+    'expanding-brackets':       'algebra',
+    'inequalities':             'algebra',
+    'simultaneous-equations':   'algebra',
+    'quadratic-factorising':    'algebra',
+    'completing-the-square':    'algebra',
+    'quadratic-formula':        'algebra',
+    'discriminant':             'algebra',
+    'further-algebra':          'algebra',
+    'logarithms':               'algebra',
+    'binomial-expansion':       'algebra',
+    'sequences-series':         'algebra',
+    'mathematical-proof':       'algebra',
+    'quadratic-simultaneous':   'algebra',
+    'quadratic-inequalities':   'algebra',
+    // ── Geometry ──────────────────────────────────────────────────────────────
+    'basic-area-perimeter':     'geometry',
+    'angles-shapes':            'geometry',
+    'coordinates-intro':        'geometry',
+    'straight-line-graphs':     'geometry',
+    'quadratic-graphs':         'geometry',
+    'trigonometry':             'geometry',
+    'sine-cosine-rule':         'geometry',
+    'trig-identities':          'geometry',
+    'further-trig':             'geometry',
+    'vectors':                  'geometry',
+    'transformations':          'geometry',
+    'parametric':               'geometry',
+    // ── Statistics ────────────────────────────────────────────────────────────
+    'statistics-basics':        'statistics',
+    // ── Calculus ──────────────────────────────────────────────────────────────
+    'calculus-intro':           'calculus',
+    'integration':              'calculus',
+    'calculus-applications':    'calculus',
+  },
+}
+
 // ─── MASTER MAP ───────────────────────────────────────────────────────────────
 export const CALIBRATION_MAP = {
   maths: MATHS,
