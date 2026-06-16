@@ -5754,7 +5754,9 @@ function ChatView({ onBack }) {
     startTime: null,
   })
   const [calibResult, setCalibResult] = useState(null)       // final result object
-  const calibFastLaneRef = useRef({ active: false, bracketIdx: 0 }) // fast lane bracket state
+  const calibFastLaneRef  = useRef({ active: false, bracketIdx: 0 })  // fast lane bracket state
+  const generatedQCache   = useRef({})  // C2: { `${nodeId}-${tier}` → generated question text }
+  const currentCalibQRef  = useRef(null) // always holds text of the question currently on screen
   // ── Dedicated calibration experience state ─────────────────────────────────
   const [currentCalibQuestion, setCurrentCalibQuestion] = useState(null)  // { text, nodeId, tier, qNum, isFastLane }
   const [calibEvaluating, setCalibEvaluating]   = useState(false)         // critic is running
@@ -6633,18 +6635,75 @@ Rules:
   const injectFastLaneBracket = (subject, bracketIdx) => {
     const bracket = FAST_LANE[subject]?.[bracketIdx]
     if (!bracket) return
+    currentCalibQRef.current = bracket.q
     setCurrentCalibQuestion({ text: bracket.q, nodeId: bracket.nodeId, tier: 0, qNum: calibStateRef.current.questionsAsked, isFastLane: true })
   }
 
   /** Set the next question in the CalibrationExperience overlay.
    *  Called after each calibAdvance() to show the next question card. */
-  const injectNextCalibQuestion = () => {
+  /**
+   * C2 — Generate a diagnostic question via AI when the static bank has no
+   * question at the requested tier. Results are cached per nodeId+tier so
+   * the same question is reused if the student revisits the node.
+   * Uses llama-3.1-8b-instant (fast, cheap — purely question authoring).
+   */
+  const generateCalibQuestion = async (nodeId, node, subject, tier) => {
+    const cacheKey = `${nodeId}-${tier}`
+    if (generatedQCache.current[cacheKey]) return generatedQCache.current[cacheKey]
+
+    const tierDesc = [
+      '',
+      'basic recall — definitions, simple facts, direct computation with no steps',
+      'routine application — solve a standard problem using a single known method',
+      'problem solving — multi-step or unfamiliar context; some reasoning required',
+      'mastery probe — justify, prove, or explain why a method works; conceptual depth',
+      'extension — highest difficulty, open-ended reasoning or novel application',
+    ][tier] || 'problem solving'
+
+    const subjectLabel = SUBJECT_LABELS[subject] || subject
+    try {
+      const res = await fetch(GROQ_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          messages: [
+            {
+              role: 'system',
+              content: `You write diagnostic questions for a student placement test.
+Subject: ${subjectLabel}. Topic: ${node.label}. Level: ${node.band}.
+Difficulty tier: ${tier}/5 — ${tierDesc}.
+
+Rules:
+- Return ONLY the question text. No label, no preamble, no explanation.
+- The question must be self-contained and unambiguous.
+- Write all maths in plain readable format (e.g. x^2 + 3x - 10 = 0, not LaTeX).
+- Match the difficulty exactly: tier ${tier}/5.`,
+            },
+            { role: 'user', content: 'Write the question.' },
+          ],
+          max_tokens: 180,
+          temperature: 0.72,
+          stream: false,
+        }),
+      })
+      const data = await res.json()
+      const text = data.choices?.[0]?.message?.content?.trim() || null
+      if (text) generatedQCache.current[cacheKey] = text
+      return text
+    } catch {
+      return null
+    }
+  }
+
+  const injectNextCalibQuestion = async () => {
     const cs = calibStateRef.current
 
     // Still in fast lane?
     if (calibFastLaneRef.current.active && FAST_LANE[cs.subject]) {
       const bracket = FAST_LANE[cs.subject][calibFastLaneRef.current.bracketIdx]
       if (bracket) {
+        currentCalibQRef.current = bracket.q
         setCurrentCalibQuestion({ text: bracket.q, nodeId: bracket.nodeId, tier: 0, qNum: cs.questionsAsked, isFastLane: true })
       }
       return
@@ -6653,13 +6712,29 @@ Rules:
     if (!cs.currentNode) return
     const node = CALIBRATION_MAP[cs.subject]?.[cs.currentNode]
     if (!node) return
-    const q = node.questions?.find(qq => qq.tier === cs.tierAtNode) || node.questions?.[0]
-    if (!q) return
 
-    // Skip any question text that was already shown in the fast lane to avoid repeats
+    // ── Resolve question text: static bank first, AI generation as fallback ──
+    const staticQ = node.questions?.find(qq => qq.tier === cs.tierAtNode)
+    let questionText
+
+    if (staticQ) {
+      questionText = staticQ.q
+    } else {
+      // C2: no static question at this tier — generate one via AI
+      const generated = await generateCalibQuestion(cs.currentNode, node, cs.subject, cs.tierAtNode)
+      if (generated) {
+        questionText = generated
+      } else {
+        // Last resort: first available static question (different tier)
+        const fallback = node.questions?.[0]
+        if (!fallback) return   // node has no questions at all — skip silently
+        questionText = fallback.q
+      }
+    }
+
+    // Skip any question text already shown in the fast lane (avoids exact repeats)
     const fastLaneQs = new Set((FAST_LANE[cs.subject] || []).map(b => b.q))
-    if (fastLaneQs.has(q.q)) {
-      // Auto-advance: student already demonstrated this topic via fast lane, mark solid
+    if (fastLaneQs.has(questionText)) {
       const prevNode = cs.currentNode
       const next = calibAdvance('solid')
       const isRetry = next === prevNode
@@ -6667,11 +6742,12 @@ Rules:
       setCalibTick(t => t + 1)
       if (shouldCalibStop(cs, next)) { clearCalibCheckpoint(); finishCalibration(); return }
       saveCalibCheckpoint()
-      injectNextCalibQuestion()   // recurse to get the next non-duplicate question
+      await injectNextCalibQuestion()
       return
     }
 
-    setCurrentCalibQuestion({ text: q.q, nodeId: cs.currentNode, tier: cs.tierAtNode, qNum: cs.questionsAsked, isFastLane: false })
+    currentCalibQRef.current = questionText
+    setCurrentCalibQuestion({ text: questionText, nodeId: cs.currentNode, tier: cs.tierAtNode, qNum: cs.questionsAsked, isFastLane: false })
   }
 
   /** Start: fire the first question into the CalibrationExperience overlay. */
@@ -6689,15 +6765,15 @@ Rules:
 
     try {
       // ── Determine what question was on screen ──────────────────────────
-      let questionText
-      if (calibFastLaneRef.current.active && FAST_LANE[cs.subject]) {
-        const bracket = FAST_LANE[cs.subject][calibFastLaneRef.current.bracketIdx]
-        questionText = bracket?.q || ''
-      } else {
+      // Use currentCalibQRef (always current) so AI-generated questions are
+      // passed correctly to the critic, not the static bank fallback.
+      const questionText = currentCalibQRef.current || (() => {
+        if (calibFastLaneRef.current.active && FAST_LANE[cs.subject]) {
+          return FAST_LANE[cs.subject][calibFastLaneRef.current.bracketIdx]?.q || ''
+        }
         const node = CALIBRATION_MAP[cs.subject]?.[cs.currentNode]
-        const q = node?.questions?.find(qq => qq.tier === cs.tierAtNode) || node?.questions?.[0]
-        questionText = q?.q || ''
-      }
+        return node?.questions?.find(qq => qq.tier === cs.tierAtNode)?.q || node?.questions?.[0]?.q || ''
+      })()
 
       // ── Score via calibration critic (rubric mode for Humanities) ─────────
       const isHumanities = ['history', 'english-lit'].includes(cs.subject)
@@ -6993,15 +7069,14 @@ Rules:
         // Use the ACTUAL question that was shown to the student:
         // - During fast lane: use the bracket's full question text (not the node Q, which is only part a)
         // - During normal calibration: use the node question for the current tier
-        let questionText
-        if (calibFastLaneRef.current.active) {
-          const activeBracket = FAST_LANE[cs.subject]?.[calibFastLaneRef.current.bracketIdx]
-          questionText = activeBracket?.q || 'the previous question'
-        } else {
+        // currentCalibQRef always holds the exact text shown (incl. AI-generated questions)
+        const questionText = currentCalibQRef.current || (() => {
+          if (calibFastLaneRef.current.active) {
+            return FAST_LANE[cs.subject]?.[calibFastLaneRef.current.bracketIdx]?.q || 'the previous question'
+          }
           const node = CALIBRATION_MAP[cs.subject]?.[cs.currentNode]
-          const q = node?.questions?.find(q => q.tier === cs.tierAtNode) || node?.questions?.[0]
-          questionText = q?.q || node?.label || 'the previous question'
-        }
+          return node?.questions?.find(q => q.tier === cs.tierAtNode)?.q || node?.questions?.[0]?.q || node?.label || 'the previous question'
+        })()
         const node = CALIBRATION_MAP[cs.subject]?.[cs.currentNode]
         const calibCriticResult = await runCalibCritic(questionText, userText)
         criticResult = {
