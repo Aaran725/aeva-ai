@@ -6,7 +6,7 @@
  */
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, ChevronDown, ArrowRight, Clock, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { ChevronLeft, ChevronDown, ArrowRight, Clock, TrendingUp, TrendingDown, Minus, X } from 'lucide-react'
 import { useCalibrationStore } from './calibrationStore'
 import { CALIBRATION_MAP, SUBJECT_LABELS, SUBJECT_ICONS } from './calibrationMap'
 import { useUITheme } from './uiThemeStore'
@@ -439,6 +439,106 @@ function SubjectCard({ subject, result, history, accent, onStart, index, expande
   )
 }
 
+// ── Language picker modal ─────────────────────────────────────────────────────
+
+const LANG_OPTIONS = [
+  { code: 'en', flag: '🇬🇧', label: 'English',  sub: 'Questions in English' },
+  { code: 'ja', flag: '🇯🇵', label: '日本語',    sub: '問題を日本語で表示'   },
+]
+
+function LanguagePicker({ subject, onSelect, onClose }) {
+  const subjectLabel = SUBJECT_LABELS[subject] || subject
+  const subjectIcon  = CALIBRATION_MAP[subject] ? (SUBJECT_LABELS[subject] ? '📚' : '📚') : '📚'
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.16 }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 500,
+        background: 'rgba(0,0,0,0.65)',
+        backdropFilter: 'blur(6px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 24,
+      }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.93, y: 12 }}
+        animate={{ opacity: 1, scale: 1,    y: 0  }}
+        exit={{    opacity: 0, scale: 0.93, y: 8  }}
+        transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: '#161826', border: '1px solid rgba(255,255,255,0.10)',
+          borderRadius: 22, padding: '28px 28px 24px',
+          width: '100%', maxWidth: 380,
+          boxShadow: '0 24px 80px rgba(0,0,0,0.60)',
+          fontFamily: "'Inter', system-ui, sans-serif",
+          position: 'relative',
+        }}
+      >
+        {/* Close */}
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute', top: 16, right: 16,
+            width: 28, height: 28, borderRadius: 8,
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.09)',
+            color: 'rgba(255,255,255,0.40)', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <X size={13} />
+        </button>
+
+        {/* Header */}
+        <div style={{ marginBottom: 22 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.30)', letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 6 }}>
+            Choose language · 言語を選択
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', letterSpacing: '-0.02em' }}>
+            {subjectLabel} Diagnostic
+          </div>
+        </div>
+
+        {/* Language buttons */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {LANG_OPTIONS.map(opt => (
+            <motion.button
+              key={opt.code}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => onSelect(opt.code)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 14,
+                padding: '14px 18px', borderRadius: 14,
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.10)',
+                cursor: 'pointer', textAlign: 'left', width: '100%',
+                transition: 'border-color 0.15s, background 0.15s',
+                fontFamily: 'inherit',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(129,140,248,0.45)'; e.currentTarget.style.background = 'rgba(99,102,241,0.10)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+            >
+              <span style={{ fontSize: 26, lineHeight: 1 }}>{opt.flag}</span>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 2 }}>{opt.label}</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)' }}>{opt.sub}</div>
+              </div>
+              <ArrowRight size={14} color="rgba(255,255,255,0.25)" style={{ marginLeft: 'auto', flexShrink: 0 }} />
+            </motion.button>
+          ))}
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export default function CalibrationHub({ onBack, onStartCalib }) {
@@ -446,6 +546,7 @@ export default function CalibrationHub({ onBack, onStartCalib }) {
   const accent           = useUITheme(s => s.accent)
   const subjects         = Object.keys(CALIBRATION_MAP)
   const [expandedSubject, setExpandedSubject] = useState(null)
+  const [pendingSubject,  setPendingSubject]  = useState(null)
 
   const toggleProgress = (subject) =>
     setExpandedSubject(prev => prev === subject ? null : subject)
@@ -543,7 +644,7 @@ export default function CalibrationHub({ onBack, onStartCalib }) {
                   result={calibStore.results[subject]}
                   history={calibStore.getHistory(subject)}
                   accent={accent}
-                  onStart={onStartCalib}
+                  onStart={setPendingSubject}
                   index={i}
                   expanded={expandedSubject === subject}
                   onToggleProgress={toggleProgress}
@@ -575,7 +676,7 @@ export default function CalibrationHub({ onBack, onStartCalib }) {
                   result={null}
                   history={[]}
                   accent={accent}
-                  onStart={onStartCalib}
+                  onStart={setPendingSubject}
                   index={calibrated.length + i}
                   expanded={false}
                   onToggleProgress={toggleProgress}
@@ -605,6 +706,20 @@ export default function CalibrationHub({ onBack, onStartCalib }) {
           </div>
         </div>
       </div>
+
+      {/* Language picker modal */}
+      <AnimatePresence>
+        {pendingSubject && (
+          <LanguagePicker
+            subject={pendingSubject}
+            onSelect={(lang) => {
+              onStartCalib(pendingSubject, lang)
+              setPendingSubject(null)
+            }}
+            onClose={() => setPendingSubject(null)}
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }

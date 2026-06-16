@@ -168,10 +168,50 @@ function LevelArc({ liveScore, nodeCount, isLight }) {
 
 // ── Feedback flash configs ────────────────────────────────────────────────────
 const FEEDBACK_CFG = {
-  mastery: { color: '#C084FC', bg: 'rgba(192,132,252,0.11)', border: 'rgba(192,132,252,0.28)', label: '✦ Excellent',   sub: 'Mastery demonstrated' },
-  solid:   { color: '#4ADE80', bg: 'rgba(74,222,128,0.10)',  border: 'rgba(74,222,128,0.28)',  label: '✓ Correct',     sub: 'Well done' },
-  partial: { color: '#FBBF24', bg: 'rgba(251,191,36,0.10)',  border: 'rgba(251,191,36,0.28)',  label: '≈ Almost there', sub: 'Right idea, small gap' },
-  none:    { color: '#F87171', bg: 'rgba(248,113,113,0.10)', border: 'rgba(248,113,113,0.28)', label: '✗ Not quite',   sub: 'Keep going' },
+  mastery: { color: '#C084FC', bg: 'rgba(192,132,252,0.11)', border: 'rgba(192,132,252,0.28)' },
+  solid:   { color: '#4ADE80', bg: 'rgba(74,222,128,0.10)',  border: 'rgba(74,222,128,0.28)'  },
+  partial: { color: '#FBBF24', bg: 'rgba(251,191,36,0.10)',  border: 'rgba(251,191,36,0.28)'  },
+  none:    { color: '#F87171', bg: 'rgba(248,113,113,0.10)', border: 'rgba(248,113,113,0.28)' },
+}
+
+// ── UI text — English and Japanese ───────────────────────────────────────────
+const UI_TEXT = {
+  en: {
+    fastLaneLabel:   '⚡ Quick Placement',
+    diagnosticLabel: (q) => `Diagnostic · Q${q}`,
+    topicsLabel:     (hit, total) => `· ${hit}/${total} topics`,
+    saveExit:        'Save & Exit',
+    placeholder:     'Your answer — show working if needed  (⌘ Enter to submit)',
+    placeholderEval: 'Checking your answer…',
+    checking:        'Checking…',
+    skip:            'Skip this one',
+    submit:          'Submit',
+    hint:            'Show your working — partial credit awarded for correct approach',
+    feedback: {
+      mastery: { label: '✦ Excellent',    sub: 'Mastery demonstrated'   },
+      solid:   { label: '✓ Correct',      sub: 'Well done'              },
+      partial: { label: '≈ Almost there', sub: 'Right idea, small gap'  },
+      none:    { label: '✗ Not quite',    sub: 'Keep going'             },
+    },
+  },
+  ja: {
+    fastLaneLabel:   '⚡ 速度配置',
+    diagnosticLabel: (q) => `診断 · Q${q}`,
+    topicsLabel:     (hit, total) => `· ${hit}/${total} トピック`,
+    saveExit:        '保存して終了',
+    placeholder:     '回答を入力 — 途中式も書いてください（⌘ Enter で送信）',
+    placeholderEval: '回答を確認中…',
+    checking:        '確認中…',
+    skip:            'スキップ',
+    submit:          '提出',
+    hint:            '途中式を書いてください — 正しいアプローチには部分点が与えられます',
+    feedback: {
+      mastery: { label: '✦ 素晴らしい', sub: '完全習得'               },
+      solid:   { label: '✓ 正解',       sub: 'よくできました'          },
+      partial: { label: '≈ もう少し',   sub: '考え方は合っています'    },
+      none:    { label: '✗ 惜しい',     sub: '続けましょう'            },
+    },
+  },
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
@@ -181,6 +221,7 @@ export function CalibrationExperience({
   nodeCount,          // distinct nodes assessed so far
   questionsAsked,     // total questions (including retries)
   subject,
+  language = 'en',    // 'en' | 'ja'
   isEvaluating,       // critic is running — disable input
   lastFeedback,       // { understanding, ts } — triggers flash
   isLight,
@@ -189,6 +230,7 @@ export function CalibrationExperience({
   onSkip,             // () => void
   onExit,             // () => void
 }) {
+  const t = UI_TEXT[language] || UI_TEXT.en
   const [input, setInput]               = useState('')
   const [showFeedback, setShowFeedback] = useState(false)
   const [activeFeedback, setActiveFeedback] = useState(null)
@@ -262,13 +304,13 @@ export function CalibrationExperience({
           <span style={{ fontSize: 14, fontWeight: 700, color: textCol }}>{subjectLabel}</span>
           <div style={{ width: 1, height: 14, background: borderCol }} />
           {question.isFastLane
-            ? <span style={{ fontSize: 10.5, fontWeight: 700, color: '#FBBF24', letterSpacing: '0.05em' }}>⚡ Quick Placement</span>
+            ? <span style={{ fontSize: 10.5, fontWeight: 700, color: '#FBBF24', letterSpacing: '0.05em' }}>{t.fastLaneLabel}</span>
             : (
               <span style={{ fontSize: 11, color: mutedCol, fontWeight: 600 }}>
-                Diagnostic · Q{questionsAsked + 1}
+                {t.diagnosticLabel(questionsAsked + 1)}
                 {clusterInfo && clusterInfo.hit > 0 && (
                   <span style={{ marginLeft: 6, color: clusterInfo.hit >= 3 ? '#4ADE80' : mutedCol }}>
-                    · {clusterInfo.hit}/{clusterInfo.total} topics
+                    {t.topicsLabel(clusterInfo.hit, clusterInfo.total)}
                   </span>
                 )}
               </span>
@@ -283,7 +325,7 @@ export function CalibrationExperience({
             fontSize: 12, fontWeight: 600, padding: '6px 10px', borderRadius: 8,
           }}
         >
-          <X size={13} /> Save & Exit
+          <X size={13} /> {t.saveExit}
         </button>
       </div>
 
@@ -344,8 +386,8 @@ export function CalibrationExperience({
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 }}
               >
-                <span style={{ fontSize: 13.5, fontWeight: 700, color: fbCfg.color }}>{fbCfg.label}</span>
-                <span style={{ fontSize: 11, color: fbCfg.color, opacity: 0.65 }}>{fbCfg.sub}</span>
+                <span style={{ fontSize: 13.5, fontWeight: 700, color: fbCfg.color }}>{t.feedback[activeFeedback?.understanding]?.label}</span>
+                <span style={{ fontSize: 11, color: fbCfg.color, opacity: 0.65 }}>{t.feedback[activeFeedback?.understanding]?.sub}</span>
               </motion.div>
             )}
           </AnimatePresence>
@@ -357,7 +399,7 @@ export function CalibrationExperience({
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={isEvaluating ? 'Checking your answer…' : 'Your answer — show working if needed  (⌘ Enter to submit)'}
+              placeholder={isEvaluating ? t.placeholderEval : t.placeholder}
               disabled={isEvaluating}
               rows={4}
               style={{
@@ -380,7 +422,7 @@ export function CalibrationExperience({
                   transition={{ duration: 1.1, repeat: Infinity }}
                   style={{ fontSize: 12, fontWeight: 700, color: '#818CF8' }}
                 >
-                  Checking…
+                  {t.checking}
                 </motion.span>
               </div>
             )}
@@ -398,7 +440,7 @@ export function CalibrationExperience({
                 opacity: isEvaluating ? 0.35 : 1,
               }}
             >
-              Skip this one
+              {t.skip}
             </button>
 
             <button
@@ -414,13 +456,13 @@ export function CalibrationExperience({
                 transition: 'all 0.15s',
               }}
             >
-              Submit <ChevronRight size={14} />
+              {t.submit} <ChevronRight size={14} />
             </button>
           </div>
 
           {/* Hint */}
           <div style={{ textAlign: 'center', fontSize: 10.5, color: mutedCol, marginTop: -4 }}>
-            Show your working — partial credit awarded for correct approach
+            {t.hint}
           </div>
         </div>
 

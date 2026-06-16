@@ -5754,9 +5754,10 @@ function ChatView({ onBack }) {
     startTime: null,
   })
   const [calibResult, setCalibResult] = useState(null)       // final result object
-  const calibFastLaneRef  = useRef({ active: false, bracketIdx: 0 })  // fast lane bracket state
-  const generatedQCache   = useRef({})  // C2: { `${nodeId}-${tier}` → generated question text }
-  const currentCalibQRef  = useRef(null) // always holds text of the question currently on screen
+  const calibFastLaneRef       = useRef({ active: false, bracketIdx: 0 })  // fast lane bracket state
+  const generatedQCache        = useRef({})   // C2: { `${nodeId}-${tier}` → generated question text }
+  const currentCalibQRef       = useRef(null) // always holds text of the question currently on screen
+  const pendingCalibLanguageRef = useRef('en') // language chosen in the picker, consumed by the effect
   // ── Dedicated calibration experience state ─────────────────────────────────
   const [currentCalibQuestion, setCurrentCalibQuestion] = useState(null)  // { text, nodeId, tier, qNum, isFastLane }
   const [calibEvaluating, setCalibEvaluating]   = useState(false)         // critic is running
@@ -5968,7 +5969,9 @@ function ChatView({ onBack }) {
   useEffect(() => {
     if (!pendingCalibSubject) return
     useAevaControlStore.getState().clearPendingCalibSubject()
-    startCalibration(pendingCalibSubject)
+    const lang = pendingCalibLanguageRef.current || 'en'
+    pendingCalibLanguageRef.current = 'en'  // reset for next use
+    startCalibration(pendingCalibSubject, lang)
     setTimeout(() => sendCalibFirstQuestion(pendingCalibSubject), 200)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingCalibSubject])
@@ -6612,16 +6615,17 @@ Rules:
   // Keep old name as alias so any stray references don't break
   const buildCalibPrompt = buildCalibAckPrompt
 
-  /** Start calibration for a given subject */
-  const startCalibration = (subject) => {
+  /** Start calibration for a given subject and language ('en' | 'ja') */
+  const startCalibration = (subject, language = 'en') => {
     const entryNode = ENTRY_NODES[subject]
     if (!entryNode) return
     calibStateRef.current = {
-      subject, currentNode: entryNode,
+      subject, language,
+      currentNode: entryNode,
       skillMap: {}, nodeCount: 0, questionsAsked: 0,
       tierAtNode: 1, partialAtNode: false, masteryProbed: false,
       nodesVisited: [], startTime: Date.now(),
-      // Cluster-aware traversal (Fix 1)
+      // Cluster-aware traversal
       clustersAssessed: {},  // { cluster → count of nodes assessed }
       clusterStreak:    0,   // consecutive questions in the same cluster
       lastCluster:      null,
@@ -9827,6 +9831,7 @@ If no clear changes: {"changes":[]}`
             nodeCount={calibStateRef.current.nodeCount}
             questionsAsked={calibStateRef.current.questionsAsked}
             subject={calibStateRef.current.subject}
+            language={calibStateRef.current.language || 'en'}
             isEvaluating={calibEvaluating}
             lastFeedback={lastCalibFeedback}
             isLight={isLight}
@@ -10913,7 +10918,8 @@ export default function App() {
             ? <CalibrationHub
                 key="calibration"
                 onBack={() => setView('dashboard')}
-                onStartCalib={(subject) => {
+                onStartCalib={(subject, language = 'en') => {
+                  pendingCalibLanguageRef.current = language
                   useAevaControlStore.getState().setPendingCalibSubject(subject)
                   setView('chat')
                 }}
