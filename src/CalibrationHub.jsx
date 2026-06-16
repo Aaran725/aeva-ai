@@ -1,33 +1,18 @@
 /**
- * CalibrationHub.jsx — Phase 7: Subject card grid (Option 3)
+ * CalibrationHub.jsx — Phase 7 + progress view
  *
- * Shows all 8 subjects as cards. Each card displays the current calibrated
- * level (if any) and a "Start diagnostic" / "Re-run" CTA.
- * Tapping a card calls onStartCalib(subject), which sets pendingCalibSubject
- * in aevaControlStore and navigates to ChatView where the diagnostic fires.
+ * Subject card grid with per-card expandable history timeline.
+ * "View progress" appears on any calibrated subject.
  */
-import React from 'react'
-import { motion } from 'framer-motion'
-import { ChevronLeft, ArrowRight, Clock } from 'lucide-react'
+import React, { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { ChevronLeft, ChevronDown, ArrowRight, Clock, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { useCalibrationStore } from './calibrationStore'
 import { CALIBRATION_MAP, SUBJECT_LABELS, SUBJECT_ICONS } from './calibrationMap'
 import { useUITheme } from './uiThemeStore'
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
 
-function formatDate(ts) {
-  if (!ts) return null
-  const d = new Date(ts)
-  const now = new Date()
-  const diffDays = Math.floor((now - d) / 86400000)
-  if (diffDays === 0) return 'Today'
-  if (diffDays === 1) return 'Yesterday'
-  if (diffDays < 7) return `${diffDays} days ago`
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-}
-
-// Matches CalibrationResult.jsx colours for consistency
 const BAND_COLORS = {
   'Grade 1':          '#94A3B8',
   'Grade 1–2':        '#94A3B8',
@@ -45,14 +30,188 @@ const BAND_COLORS = {
   'A-Level':          '#E9A364',
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// Numeric order for comparing bands (higher = more advanced)
+const BAND_ORDER = {
+  'Grade 1':          0,
+  'Grade 1–2':        0,
+  'Grade 3':          1,
+  'Grade 3–4':        1,
+  'Grade 4':          2,
+  'Grade 4–5':        2,
+  'Grade 5–6':        3,
+  'Grade 6':          3,
+  'Grade 7–8':        4,
+  'Foundation':       5,
+  'GCSE Foundation':  5,
+  'GCSE':             6,
+  'GCSE Higher':      7,
+  'A-Level':          8,
+}
 
-function SubjectCard({ subject, result, accent, onStart, index }) {
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatDate(ts) {
+  if (!ts) return null
+  const d = new Date(ts)
+  const now = new Date()
+  const diffDays = Math.floor((now - d) / 86400000)
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays < 7) return `${diffDays}d ago`
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: diffDays > 365 ? 'numeric' : undefined })
+}
+
+function formatDateFull(ts) {
+  if (!ts) return ''
+  return new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function bandDiff(earlier, later) {
+  const a = BAND_ORDER[earlier] ?? -1
+  const b = BAND_ORDER[later]  ?? -1
+  return b - a
+}
+
+// ── Progress panel (inline, inside card) ──────────────────────────────────────
+
+function ProgressPanel({ history, currentBand }) {
+  // Show up to 5 most recent, newest first
+  const entries = [...history].sort((a, b) => b.calibratedAt - a.calibratedAt).slice(0, 5)
+  const oldest  = entries[entries.length - 1]
+  const newest  = entries[0]
+  const diff    = oldest && newest && oldest !== newest
+    ? bandDiff(oldest.band, newest.band)
+    : 0
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      exit={{ opacity: 0, height: 0 }}
+      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+      style={{ overflow: 'hidden' }}
+    >
+      {/* Divider */}
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '14px 0 16px' }} />
+
+      {/* Overall improvement callout */}
+      {entries.length >= 2 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '8px 12px', borderRadius: 10, marginBottom: 14,
+          background: diff > 0
+            ? 'rgba(74,222,128,0.08)'
+            : diff < 0
+              ? 'rgba(248,113,113,0.08)'
+              : 'rgba(255,255,255,0.05)',
+          border: `1px solid ${diff > 0 ? 'rgba(74,222,128,0.2)' : diff < 0 ? 'rgba(248,113,113,0.2)' : 'rgba(255,255,255,0.08)'}`,
+        }}>
+          {diff > 0
+            ? <TrendingUp  size={13} color="#4ADE80" style={{ flexShrink: 0 }} />
+            : diff < 0
+              ? <TrendingDown size={13} color="#F87171" style={{ flexShrink: 0 }} />
+              : <Minus size={13} color="rgba(255,255,255,0.35)" style={{ flexShrink: 0 }} />
+          }
+          <span style={{
+            fontSize: 11, fontWeight: 600,
+            color: diff > 0 ? '#4ADE80' : diff < 0 ? '#F87171' : 'rgba(255,255,255,0.40)',
+          }}>
+            {diff > 0
+              ? `↑ ${oldest.band} → ${newest.band}`
+              : diff < 0
+                ? `↓ ${oldest.band} → ${newest.band}`
+                : `No change — still ${newest.band}`
+            }
+          </span>
+        </div>
+      )}
+
+      {/* Timeline rows */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        {entries.map((entry, i) => {
+          const color    = BAND_COLORS[entry.band] || '#A78BFA'
+          const isLatest = i === 0
+          const prevBand = entries[i + 1]?.band
+          const rowDiff  = prevBand ? bandDiff(prevBand, entry.band) : 0
+
+          return (
+            <div key={entry.calibratedAt} style={{ display: 'flex', alignItems: 'stretch', gap: 12, minHeight: 42 }}>
+              {/* Timeline track */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 14, flexShrink: 0, paddingTop: 4 }}>
+                <div style={{
+                  width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
+                  background: isLatest ? color : 'rgba(255,255,255,0.20)',
+                  boxShadow: isLatest ? `0 0 8px ${color}99` : 'none',
+                  border: isLatest ? `2px solid ${color}` : '2px solid rgba(255,255,255,0.15)',
+                  transition: 'all 0.2s',
+                }} />
+                {i < entries.length - 1 && (
+                  <div style={{ flex: 1, width: 1, background: 'rgba(255,255,255,0.10)', marginTop: 4 }} />
+                )}
+              </div>
+
+              {/* Row content */}
+              <div style={{ flex: 1, paddingBottom: i < entries.length - 1 ? 12 : 0, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                  {/* Band chip */}
+                  <span style={{
+                    fontSize: 12, fontWeight: 700,
+                    color: isLatest ? color : 'rgba(255,255,255,0.55)',
+                  }}>
+                    {entry.band}
+                  </span>
+
+                  {/* Change vs previous */}
+                  {prevBand && rowDiff !== 0 && (
+                    <span style={{
+                      fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 99,
+                      background: rowDiff > 0 ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)',
+                      color: rowDiff > 0 ? '#4ADE80' : '#F87171',
+                    }}>
+                      {rowDiff > 0 ? '↑' : '↓'}
+                    </span>
+                  )}
+
+                  {isLatest && (
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99,
+                      background: 'rgba(99,102,241,0.2)', color: 'rgba(165,180,252,0.85)',
+                      letterSpacing: '0.04em', textTransform: 'uppercase',
+                    }}>
+                      Latest
+                    </span>
+                  )}
+                </div>
+
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 5, marginTop: 2,
+                  fontSize: 11, color: 'rgba(255,255,255,0.28)',
+                }}>
+                  <Clock size={9} />
+                  {formatDateFull(entry.calibratedAt)}
+                  {entry.questionsAsked > 0 && (
+                    <span style={{ opacity: 0.6 }}>· {entry.questionsAsked}Q</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </motion.div>
+  )
+}
+
+// ── Subject card ──────────────────────────────────────────────────────────────
+
+function SubjectCard({ subject, result, history, accent, onStart, index, expanded, onToggleProgress }) {
   const band      = result?.band
   const lastAt    = result?.calibratedAt
   const label     = SUBJECT_LABELS[subject]
   const icon      = SUBJECT_ICONS[subject]
   const bandColor = band ? (BAND_COLORS[band] || '#A78BFA') : null
+  const hasHistory = history.length >= 1
 
   return (
     <motion.div
@@ -61,19 +220,23 @@ function SubjectCard({ subject, result, accent, onStart, index }) {
       transition={{ delay: index * 0.045, duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
       style={{
         background: 'rgba(255,255,255,0.04)',
-        border: `1px solid ${band ? `${bandColor}28` : 'rgba(255,255,255,0.08)'}`,
+        border: `1px solid ${band
+          ? expanded ? `${bandColor}45` : `${bandColor}28`
+          : 'rgba(255,255,255,0.08)'}`,
         borderRadius: 20,
         padding: '22px 22px 18px',
         display: 'flex', flexDirection: 'column',
         position: 'relative', overflow: 'hidden',
+        transition: 'border-color 0.2s',
       }}
     >
-      {/* Top colour bar for calibrated subjects */}
+      {/* Top colour bar */}
       {band && (
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, height: 2,
-          background: `linear-gradient(90deg, transparent, ${bandColor}70, transparent)`,
+          background: `linear-gradient(90deg, transparent, ${bandColor}${expanded ? 'aa' : '70'}, transparent)`,
           borderRadius: '20px 20px 0 0',
+          transition: 'opacity 0.2s',
         }} />
       )}
 
@@ -88,7 +251,7 @@ function SubjectCard({ subject, result, accent, onStart, index }) {
 
       {/* Level chip or placeholder */}
       {band ? (
-        <div style={{ marginBottom: 14 }}>
+        <div style={{ marginBottom: 12 }}>
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '4px 11px', borderRadius: 99,
@@ -97,8 +260,7 @@ function SubjectCard({ subject, result, accent, onStart, index }) {
           }}>
             <div style={{
               width: 6, height: 6, borderRadius: '50%',
-              background: bandColor,
-              boxShadow: `0 0 6px ${bandColor}`,
+              background: bandColor, boxShadow: `0 0 6px ${bandColor}`,
             }} />
             <span style={{ fontSize: 12, fontWeight: 700, color: bandColor }}>{band}</span>
           </div>
@@ -115,11 +277,43 @@ function SubjectCard({ subject, result, accent, onStart, index }) {
       ) : (
         <div style={{
           fontSize: 12, color: 'rgba(255,255,255,0.25)',
-          marginBottom: 14, fontStyle: 'italic', lineHeight: 1.5,
+          marginBottom: 12, fontStyle: 'italic', lineHeight: 1.5,
         }}>
           Not yet calibrated
         </div>
       )}
+
+      {/* "View progress" toggle */}
+      {hasHistory && (
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => onToggleProgress(subject)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: '4px 0', marginBottom: 12,
+            color: expanded ? bandColor || accent : 'rgba(255,255,255,0.38)',
+            fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+            transition: 'color 0.18s',
+          }}
+        >
+          <motion.span
+            animate={{ rotate: expanded ? 180 : 0 }}
+            transition={{ duration: 0.2 }}
+            style={{ display: 'flex' }}
+          >
+            <ChevronDown size={13} />
+          </motion.span>
+          {expanded ? 'Hide progress' : `View progress${history.length > 1 ? ` (${history.length} runs)` : ''}`}
+        </motion.button>
+      )}
+
+      {/* Inline progress panel */}
+      <AnimatePresence>
+        {expanded && hasHistory && (
+          <ProgressPanel history={history} currentBand={band} />
+        )}
+      </AnimatePresence>
 
       {/* CTA button */}
       <motion.button
@@ -151,9 +345,13 @@ function SubjectCard({ subject, result, accent, onStart, index }) {
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export default function CalibrationHub({ onBack, onStartCalib }) {
-  const calibStore = useCalibrationStore()
-  const accent     = useUITheme(s => s.accent)
-  const subjects   = Object.keys(CALIBRATION_MAP)
+  const calibStore       = useCalibrationStore()
+  const accent           = useUITheme(s => s.accent)
+  const subjects         = Object.keys(CALIBRATION_MAP)
+  const [expandedSubject, setExpandedSubject] = useState(null)
+
+  const toggleProgress = (subject) =>
+    setExpandedSubject(prev => prev === subject ? null : subject)
 
   const calibrated   = subjects.filter(s => calibStore.results[s])
   const uncalibrated = subjects.filter(s => !calibStore.results[s])
@@ -209,7 +407,6 @@ export default function CalibrationHub({ onBack, onStartCalib }) {
           </div>
         </div>
 
-        {/* Summary pill */}
         {calibrated.length > 0 && (
           <div style={{
             marginLeft: 'auto', flexShrink: 0,
@@ -227,7 +424,7 @@ export default function CalibrationHub({ onBack, onStartCalib }) {
       {/* ── Content ── */}
       <div style={{ maxWidth: 920, width: '100%', margin: '0 auto', padding: '28px 20px 100px' }}>
 
-        {/* Already calibrated subjects */}
+        {/* Calibrated subjects */}
         {calibrated.length > 0 && (
           <>
             <div style={{
@@ -247,16 +444,19 @@ export default function CalibrationHub({ onBack, onStartCalib }) {
                   key={subject}
                   subject={subject}
                   result={calibStore.results[subject]}
+                  history={calibStore.getHistory(subject)}
                   accent={accent}
                   onStart={onStartCalib}
                   index={i}
+                  expanded={expandedSubject === subject}
+                  onToggleProgress={toggleProgress}
                 />
               ))}
             </div>
           </>
         )}
 
-        {/* Not yet calibrated */}
+        {/* Uncalibrated subjects */}
         {uncalibrated.length > 0 && (
           <>
             <div style={{
@@ -276,16 +476,19 @@ export default function CalibrationHub({ onBack, onStartCalib }) {
                   key={subject}
                   subject={subject}
                   result={null}
+                  history={[]}
                   accent={accent}
                   onStart={onStartCalib}
                   index={calibrated.length + i}
+                  expanded={false}
+                  onToggleProgress={toggleProgress}
                 />
               ))}
             </div>
           </>
         )}
 
-        {/* How it works note */}
+        {/* How it works */}
         <div style={{
           marginTop: 44, padding: '18px 22px',
           background: 'rgba(99,102,241,0.07)',
