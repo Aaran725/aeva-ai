@@ -6303,15 +6303,21 @@ RULES:
   const loadCalibCheckpoint  = () => { try { return JSON.parse(localStorage.getItem(CALIB_CHECKPOINT_KEY) || 'null') } catch { return null } }
 
   /** Cluster-aware stop condition (Fix 3).
-   *  Soft cap 12: exit only when ≥3 clusters have been assessed (Maths).
-   *  Hard cap 16: always exit. Non-cluster subjects exit at 12 as before. */
+   *  Soft cap 12: extend to 16 only if fewer clusters covered than the minimum.
+   *    Maths/Physics (5 clusters): extend if <3 covered
+   *    Biology/History/CS (3 clusters): extend if <2 covered
+   *    English Lit/Economics (2 clusters): extend if <2 covered
+   *  Hard cap 16: always exit. */
   const shouldCalibStop = (cs, next) => {
     if (!next) return true
     if (cs.nodeCount >= 16) return true
     if (cs.nodeCount >= 12) {
-      if (!NODE_CLUSTERS[cs.subject]) return true   // non-maths: old behaviour
-      const clustersHit = Object.keys(cs.clustersAssessed || {}).length
-      return clustersHit >= 3                        // 3+ clusters → sufficient breadth
+      const clusterMap = NODE_CLUSTERS[cs.subject]
+      if (!clusterMap) return true                              // no cluster map → stop at 12
+      const totalClusters = new Set(Object.values(clusterMap)).size
+      const minToExtend   = Math.min(3, Math.max(2, Math.floor(totalClusters * 0.6)))
+      const clustersHit   = Object.keys(cs.clustersAssessed || {}).length
+      return clustersHit >= minToExtend
     }
     return false
   }

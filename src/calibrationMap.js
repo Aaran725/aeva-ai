@@ -1588,6 +1588,172 @@ export const NODE_CLUSTERS = {
     'integration':              'calculus',
     'calculus-applications':    'calculus',
   },
+
+  // ─── PHYSICS ────────────────────────────────────────────────────────────────
+  physics: {
+    // ── Forces & Motion ───────────────────────────────────────────────────────
+    'pushes-pulls':             'forces',
+    'forces-motion-primary':    'forces',
+    'forces-basics':            'forces',
+    'momentum':                 'forces',
+    'circular-motion':          'forces',
+    'gravitation':              'forces',
+    // ── Energy ────────────────────────────────────────────────────────────────
+    'energy':                   'energy',
+    'simple-harmonic':          'energy',
+    // ── Waves & Light ─────────────────────────────────────────────────────────
+    'waves':                    'waves',
+    'optics':                   'waves',
+    'ac-dc':                    'waves',
+    // ── Electricity ───────────────────────────────────────────────────────────
+    'electricity-basics':       'electricity',
+    'electromagnetism':         'electricity',
+    // ── Atomic & Nuclear ──────────────────────────────────────────────────────
+    'atomic-structure':         'atomic',
+    'quantum':                  'atomic',
+    'nuclear':                  'atomic',
+  },
+
+  // ─── CHEMISTRY ──────────────────────────────────────────────────────────────
+  chemistry: {
+    // ── Atomic Theory ─────────────────────────────────────────────────────────
+    'materials-properties':     'atomic',
+    'changes-matter':           'atomic',
+    'atomic-structure-chem':    'atomic',
+    'periodic-table':           'atomic',
+    // ── Bonding & Structure ───────────────────────────────────────────────────
+    'bonding':                  'bonding',
+    'structure-properties':     'bonding',
+    // ── Quantitative ──────────────────────────────────────────────────────────
+    'moles':                    'quantitative',
+    'concentration':            'quantitative',
+    // ── Reactions ─────────────────────────────────────────────────────────────
+    'reactions':                'reactions',
+    'rates':                    'reactions',
+    // ── Equilibrium ───────────────────────────────────────────────────────────
+    'equilibrium':              'equilibrium',
+  },
+
+  // ─── BIOLOGY ────────────────────────────────────────────────────────────────
+  biology: {
+    // ── Cells ─────────────────────────────────────────────────────────────────
+    'living-things':            'cells',
+    'body-health':              'cells',
+    'cell-structure':           'cells',
+    'cell-transport':           'cells',
+    'enzymes':                  'cells',
+    // ── Genetics ──────────────────────────────────────────────────────────────
+    'dna-genetics':             'genetics',
+    'genetic-engineering':      'genetics',
+    'evolution':                'genetics',
+    // ── Body Systems ──────────────────────────────────────────────────────────
+    'breathing':                'systems',
+    'digestion':                'systems',
+  },
+
+  // ─── HISTORY ────────────────────────────────────────────────────────────────
+  history: {
+    // ── Analysis Skills ───────────────────────────────────────────────────────
+    'source-analysis':          'skills',
+    'causation':                'skills',
+    'significance':             'skills',
+    // ── WW1 ───────────────────────────────────────────────────────────────────
+    'ww1-causes':               'ww1',
+    'versailles':               'ww1',
+    'ww1-trench':               'ww1',
+    // ── Interwar Period ───────────────────────────────────────────────────────
+    'weimar':                   'interwar',
+    'ww2-causes':               'interwar',
+  },
+
+  // ─── ENGLISH LIT ────────────────────────────────────────────────────────────
+  'english-lit': {
+    // ── Writing Skills ────────────────────────────────────────────────────────
+    'pee-structure':            'writing',
+    'language-analysis':        'writing',
+    // ── Literary Analysis ─────────────────────────────────────────────────────
+    'context':                  'analysis',
+    'structure-form':           'analysis',
+    'themes-comparison':        'analysis',
+  },
+
+  // ─── ECONOMICS ──────────────────────────────────────────────────────────────
+  economics: {
+    // ── Microeconomics ────────────────────────────────────────────────────────
+    'supply-demand':            'micro',
+    'elasticity':               'micro',
+    'market-failure':           'micro',
+    'firms-revenue':            'micro',
+    // ── Macroeconomics ────────────────────────────────────────────────────────
+    'government-intervention':  'macro',
+    'fiscal-monetary':          'macro',
+    'macroeconomics':           'macro',
+  },
+
+  // ─── COMPUTER SCIENCE ───────────────────────────────────────────────────────
+  'computer-science': {
+    // ── Fundamentals ──────────────────────────────────────────────────────────
+    'what-is-computing':        'fundamentals',
+    'algorithms-logic':         'fundamentals',
+    'variables-datatypes':      'fundamentals',
+    // ── Programming ───────────────────────────────────────────────────────────
+    'selection-iteration':      'programming',
+    'subroutines':              'programming',
+    'oop':                      'programming',
+    // ── Data & Algorithms ─────────────────────────────────────────────────────
+    'data-structures':          'data',
+    'sorting':                  'data',
+    'complexity':               'data',
+    'algorithms':               'data',
+  },
+}
+
+/** Human-readable label for each cluster key, per subject */
+export const CLUSTER_LABELS = {
+  maths: {
+    number:     'Number',
+    algebra:    'Algebra',
+    geometry:   'Geometry',
+    statistics: 'Statistics',
+    calculus:   'Calculus',
+  },
+  physics: {
+    forces:      'Forces & Motion',
+    energy:      'Energy',
+    waves:       'Waves & Light',
+    electricity: 'Electricity',
+    atomic:      'Atomic & Nuclear',
+  },
+  chemistry: {
+    atomic:       'Atomic Theory',
+    bonding:      'Bonding',
+    quantitative: 'Quantitative',
+    reactions:    'Reactions',
+    equilibrium:  'Equilibrium',
+  },
+  biology: {
+    cells:    'Cells',
+    genetics: 'Genetics',
+    systems:  'Body Systems',
+  },
+  history: {
+    skills:   'Analysis Skills',
+    ww1:      'WW1',
+    interwar: 'Interwar',
+  },
+  'english-lit': {
+    writing:  'Writing Skills',
+    analysis: 'Literary Analysis',
+  },
+  economics: {
+    micro: 'Microeconomics',
+    macro: 'Macroeconomics',
+  },
+  'computer-science': {
+    fundamentals: 'Fundamentals',
+    programming:  'Programming',
+    data:         'Data & Algorithms',
+  },
 }
 
 // ─── MASTER MAP ───────────────────────────────────────────────────────────────

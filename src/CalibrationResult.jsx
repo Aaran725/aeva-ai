@@ -5,7 +5,7 @@
  */
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, RotateCcw, ChevronRight, Layers } from 'lucide-react'
-import { SUBJECT_LABELS, SUBJECT_ICONS, CALIBRATION_MAP } from './calibrationMap'
+import { SUBJECT_LABELS, SUBJECT_ICONS, CALIBRATION_MAP, NODE_CLUSTERS, CLUSTER_LABELS } from './calibrationMap'
 
 // ── Lower-bound threshold for each band (mirrors calibBand thresholds in App.jsx) ──
 // Used to compute position-within-band for the sub-level indicator.
@@ -101,6 +101,111 @@ function SubBandIndicator({ band, bandAvg, bandColor, isLight }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
         <span style={{ fontSize: 10, color: mutedCol }}>Start of {band}</span>
         <span style={{ fontSize: 10, color: mutedCol }}>Next level →</span>
+      </div>
+    </div>
+  )
+}
+
+// ── Topic breakdown ───────────────────────────────────────────────────────────
+const TOPIC_STATUS = {
+  strong:     { icon: '✓', color: '#4ADE80', bg: 'rgba(74,222,128,0.08)',   border: 'rgba(74,222,128,0.22)',  label: 'Strong'     },
+  developing: { icon: '△', color: '#FBBF24', bg: 'rgba(251,191,36,0.08)',   border: 'rgba(251,191,36,0.22)',  label: 'Developing' },
+  weak:       { icon: '✗', color: '#F87171', bg: 'rgba(248,113,113,0.08)',  border: 'rgba(248,113,113,0.22)', label: 'Weak'       },
+  untested:   { icon: '—', color: 'rgba(255,255,255,0.25)', bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.10)', label: 'Not tested' },
+}
+
+function TopicBreakdown({ subject, skillMap, isLight }) {
+  const clusterMap  = NODE_CLUSTERS[subject]
+  const labelMap    = CLUSTER_LABELS[subject]
+  if (!clusterMap || !labelMap) return null
+
+  // Unique cluster keys in definition order
+  const clusterKeys = [...new Set(Object.values(clusterMap))]
+
+  const clusters = clusterKeys.map(key => {
+    const nodeIds  = Object.entries(clusterMap).filter(([, c]) => c === key).map(([id]) => id)
+    const assessed = nodeIds.filter(id => skillMap[id])
+    if (!assessed.length) return { key, status: 'untested', pct: 0, assessed: 0, total: nodeIds.length }
+
+    const scoreOf = s => s === 'mastery' ? 3 : s === 'solid' ? 2 : s === 'shaky' ? 1 : 0
+    const total   = assessed.length
+    const avg     = assessed.reduce((acc, id) => acc + scoreOf(skillMap[id]), 0) / total
+    const pct     = Math.round((avg / 3) * 100)
+    const status  = avg >= 2.0 ? 'strong' : avg >= 1.0 ? 'developing' : 'weak'
+    return { key, status, pct, assessed: total, total: nodeIds.length }
+  })
+
+  const mutedCol = isLight ? 'rgba(0,0,0,0.38)' : 'rgba(255,255,255,0.35)'
+  const testedCount = clusters.filter(c => c.status !== 'untested').length
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.10em', color: mutedCol, textTransform: 'uppercase' }}>
+          Topic Breakdown
+        </div>
+        <span style={{ fontSize: 10.5, color: mutedCol }}>
+          {testedCount}/{clusters.length} topics covered
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {clusters.map(({ key, status, pct, assessed, total }) => {
+          const cfg  = TOPIC_STATUS[status]
+          const name = labelMap[key] || key
+          return (
+            <motion.div
+              key={key}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.2 }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '10px 14px', borderRadius: 12,
+                background: cfg.bg, border: `1px solid ${cfg.border}`,
+              }}
+            >
+              {/* Icon */}
+              <span style={{ fontSize: 13, fontWeight: 800, color: cfg.color, width: 14, textAlign: 'center', flexShrink: 0 }}>
+                {cfg.icon}
+              </span>
+
+              {/* Name + status label */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: cfg.color }}>{name}</span>
+                  <span style={{ fontSize: 10.5, color: cfg.color, opacity: 0.7 }}>{cfg.label}</span>
+                </div>
+                {status !== 'untested' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5 }}>
+                    {/* Mini bar */}
+                    <div style={{ flex: 1, height: 3, borderRadius: 99, background: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${pct}%` }}
+                        transition={{ delay: 0.15, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+                        style={{ height: '100%', borderRadius: 99, background: cfg.color }}
+                      />
+                    </div>
+                    <span style={{ fontSize: 10, color: mutedCol, flexShrink: 0 }}>{assessed}/{total} nodes</span>
+                  </div>
+                )}
+                {status === 'untested' && (
+                  <div style={{ fontSize: 10.5, color: mutedCol, marginTop: 2 }}>
+                    Not reached in this diagnostic
+                  </div>
+                )}
+              </div>
+
+              {/* Score pct */}
+              {status !== 'untested' && (
+                <span style={{ fontSize: 12, fontWeight: 800, color: cfg.color, flexShrink: 0 }}>
+                  {pct}%
+                </span>
+              )}
+            </motion.div>
+          )
+        })}
       </div>
     </div>
   )
@@ -396,11 +501,23 @@ export default function CalibrationResult({
               </div>
             </motion.div>
 
+            {/* Topic breakdown card */}
+            {NODE_CLUSTERS[subject] && (
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.12, duration: 0.26 }}
+                style={{ background: cardBg, border: `1px solid ${borderCol}`, borderRadius: 20, padding: '24px 28px' }}
+              >
+                <TopicBreakdown subject={subject} skillMap={result.skillMap} isLight={isLight} />
+              </motion.div>
+            )}
+
             {/* Skill breakdown card */}
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.12, duration: 0.26 }}
+              transition={{ delay: 0.18, duration: 0.26 }}
               style={{ background: cardBg, border: `1px solid ${borderCol}`, borderRadius: 20, padding: '24px 28px' }}
             >
               <SkillBreakdown skillMap={result.skillMap} subjectMap={subjectMap} isLight={isLight} />
