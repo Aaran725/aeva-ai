@@ -10,8 +10,9 @@ const DEFAULT = {
   xpMultiplier: 1,
   activeIntervention: null, // { title, message, task, topic, triggeredAt }
   commandToast: null,       // { label, type, id } — shown briefly when Aeva fires a command
-  pendingChatPrompt: null,  // string — auto-sent to Aeva chat when set, cleared after send
-  pendingChatOpen:   false, // true → App navigates to ChatView (for Lab launches from roadmap)
+  pendingChatPrompt:   null,  // string — auto-sent to Aeva chat when set, cleared after send
+  pendingChatOpen:     false, // true → App navigates to ChatView (for Lab launches from roadmap)
+  pendingCalibSubject: null,  // subject key → App navigates to chat, ChatView starts calibration
 }
 
 export const useAevaControlStore = create((set, get) => ({
@@ -56,6 +57,10 @@ export const useAevaControlStore = create((set, get) => ({
   clearPendingChatPrompt: () => set({ pendingChatPrompt: null }),
   requestChatView: () => set({ pendingChatOpen: true }),
   clearChatView:   () => set({ pendingChatOpen: false }),
+
+  // Calibration hub → ChatView bridge
+  setPendingCalibSubject:   (subject) => set({ pendingCalibSubject: subject }),
+  clearPendingCalibSubject: ()        => set({ pendingCalibSubject: null }),
 
   showCommandToast: (label, type = 'action') => {
     set({ commandToast: { label, type, id: Date.now() } })

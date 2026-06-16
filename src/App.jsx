@@ -58,6 +58,7 @@ const WorksheetModal     = lazy(() => import('./WorksheetModal'))
 const SharedRoadmapView  = lazy(() => import('./SharedRoadmapView'))
 const YourUI             = lazy(() => import('./YourUI'))
 const RevisionCalendar   = lazy(() => import('./RevisionCalendar'))
+const CalibrationHub     = lazy(() => import('./CalibrationHub'))
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
 import { useCalibrationStore } from './calibrationStore'
 import { lookupAnalogy } from './analogyBank'
@@ -208,6 +209,55 @@ Grading rules:
     })
     if (!res.ok) return { understanding: 'partial', correct: false, note: '' }
     const json = await res.json()
+    const parsed = JSON.parse(json.choices?.[0]?.message?.content || '{}')
+    const understanding = ['none', 'partial', 'solid'].includes(parsed.understanding) ? parsed.understanding : 'partial'
+    return { understanding, correct: understanding === 'solid', note: parsed.note || '' }
+  } catch {
+    return { understanding: 'partial', correct: false, note: '' }
+  }
+}
+
+/** Rubric-based calibration critic for Humanities subjects (History, English Lit).
+ *  No single "correct" answer — scores on relevance, evidence use, and analytical depth. */
+async function runCalibCriticRubric(questionText, userAnswer) {
+  try {
+    const res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          {
+            role: 'system',
+            content: `You are evaluating a student's written answer for a Humanities diagnostic (History or English Literature).
+There is NO single correct answer — evaluate QUALITY across three criteria:
+
+1. RELEVANCE — does the response actually address the question asked?
+2. EVIDENCE — does the student use specific detail (examples, names, dates, quotes, textual reference)?
+3. ANALYSIS — do they explain WHY or WHAT EFFECT, not just describe what happened?
+
+Return ONLY valid JSON — no markdown, no text outside JSON:
+{"understanding":"solid"|"partial"|"none","note":"<one sentence: what they did well or the specific gap>"}
+
+Grading rules:
+- "solid" = clearly on topic + at least one specific piece of evidence/detail + analytical reasoning (why/effect/significance)
+- "partial" = on topic but vague (no concrete evidence), OR describes rather than analyses, OR only answers part of the question
+- "none" = off topic, blank, "skip", "idk", or so vague it shows no understanding
+- Do NOT penalise for spelling, grammar, or writing style — this is a diagnostic, not an exam
+- A short but precise answer CAN score "solid" if it hits all three criteria`,
+          },
+          {
+            role: 'user',
+            content: `Question: ${questionText}\n\nStudent's answer: ${userAnswer}`,
+          },
+        ],
+        temperature: 0.15,
+        max_tokens: 200,
+        response_format: { type: 'json_object' },
+      }),
+    })
+    if (!res.ok) return { understanding: 'partial', correct: false, note: '' }
+    const json   = await res.json()
     const parsed = JSON.parse(json.choices?.[0]?.message?.content || '{}')
     const understanding = ['none', 'partial', 'solid'].includes(parsed.understanding) ? parsed.understanding : 'partial'
     return { understanding, correct: understanding === 'solid', note: parsed.note || '' }
@@ -2394,7 +2444,7 @@ function PersonalProgressCard() {
 
 /* ═══ DASHBOARD VIEW ══════════════════════════════ */
 /* ═══ MOBILE DRAWER ══════════════════════════════ */
-function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings, onProfile, onShowEm, onDocs, onRoadmap, onYourUI, onMaps, onSignOut }) {
+function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings, onProfile, onShowEm, onDocs, onRoadmap, onYourUI, onMaps, onArcade, onSignOut }) {
   const T = useT()
   const accent = useUITheme(s => s.accent)
   const { name } = useUser()
@@ -2403,22 +2453,25 @@ function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings,
 
   const GROUPS = [
     { label: 'LEARN', items: [
-      { label: T.library,     icon: <BookOpen size={16} />,  action: onLibrary },
-      { label: T.secondBrain, icon: <Brain size={16} />,     action: onBrain },
-      { label: T.mirror,      icon: <Layers size={16} />,    action: onMirror },
+      { label: T.library,     icon: <BookOpen size={16} />,    action: onLibrary },
+      { label: T.secondBrain, icon: <Brain size={16} />,       action: onBrain },
+      { label: T.mirror,      icon: <Layers size={16} />,      action: onMirror },
     ]},
     { label: 'TRACK', items: [
-      { label: 'Roadmap',     icon: <Map size={16} />,       action: onRoadmap },
-      { label: 'Schedule',    icon: <Calendar size={16} />,  action: onMaps },
+      { label: 'Roadmap',     icon: <Map size={16} />,         action: onRoadmap },
+      { label: 'Schedule',    icon: <Calendar size={16} />,    action: onMaps },
+    ]},
+    { label: 'PLAY', items: [
+      { label: T.arcade,      icon: <Gamepad2 size={16} />,    action: onArcade },
     ]},
     { label: 'TOOLS', items: [
-      { label: 'Docs',        icon: <FileText size={16} />,  action: onDocs },
-      { label: 'Parents',     icon: <Users size={16} />,     action: onShowEm },
+      { label: 'Docs',        icon: <FileText size={16} />,    action: onDocs },
+      { label: 'Parents',     icon: <Users size={16} />,       action: onShowEm },
     ]},
     { label: 'YOU', items: [
-      { label: 'YOUR UI',     icon: <Palette size={16} />,   action: onYourUI },
-      { label: T.myProfile,   icon: <Star size={16} />,      action: onProfile },
-      { label: T.appearance,  icon: <Settings size={16} />,  action: onSettings },
+      { label: 'YOUR UI',     icon: <Palette size={16} />,     action: onYourUI },
+      { label: T.myProfile,   icon: <Star size={16} />,        action: onProfile },
+      { label: T.appearance,  icon: <Settings size={16} />,    action: onSettings },
     ]},
   ]
 
@@ -2522,15 +2575,15 @@ function MobileDrawer({ open, onClose, onLibrary, onBrain, onMirror, onSettings,
 }
 
 /* ═══ MOBILE BOTTOM BAR ══════════════════════════ */
-function MobileBottomBar({ onChat, onLab, onArcade, onDrillCount, activeTab = 'home', onHome, onMore }) {
+function MobileBottomBar({ onChat, onLab, onArcade, onCalibrate, onDrillCount, activeTab = 'home', onHome, onMore }) {
   const T = useT()
   const accent = useUITheme(s => s.accent)
   const tabs = [
-    { id: 'home',   label: 'Home',    icon: <Home size={20} />,          action: onHome  },
-    { id: 'chat',   label: T.chat,    icon: <MessageCircle size={20} />, action: onChat  },
-    { id: 'lab',    label: T.lab,     icon: <FlaskConical size={20} />,  action: onLab,  badge: onDrillCount > 0 ? onDrillCount : null },
-    { id: 'arcade', label: T.arcade,  icon: <Gamepad2 size={20} />,      action: onArcade },
-    { id: 'more',   label: 'More',    icon: <Menu size={20} />,          action: onMore },
+    { id: 'home',      label: 'Home',     icon: <Home size={20} />,          action: onHome      },
+    { id: 'chat',      label: T.chat,     icon: <MessageCircle size={20} />, action: onChat      },
+    { id: 'lab',       label: T.lab,      icon: <FlaskConical size={20} />,  action: onLab,      badge: onDrillCount > 0 ? onDrillCount : null },
+    { id: 'calibrate', label: 'Diagnose', icon: <ScanSearch size={20} />,    action: onCalibrate },
+    { id: 'more',      label: 'More',     icon: <Menu size={20} />,          action: onMore      },
   ]
   return (
     <div style={{
@@ -2643,7 +2696,7 @@ function SidebarNavItem({ Icon, label, tooltip, action, badge, accent, collapsed
   )
 }
 
-function LeftSidebar({ collapsed, onToggle, onChatOpen, onLibrary, onBrain, onMirror, onLab, onRoadmap, onSchedule, onArcade, onDocs, onParents, onProfile, onYourUI, onSettings, onSignOut, labBadge, brainTotal, sessionCount }) {
+function LeftSidebar({ collapsed, onToggle, onChatOpen, onLibrary, onBrain, onMirror, onLab, onRoadmap, onSchedule, onArcade, onCalibrate, onDocs, onParents, onProfile, onYourUI, onSettings, onSignOut, labBadge, brainTotal, sessionCount }) {
   const { name } = useUser()
   const W = collapsed ? 62 : 224
 
@@ -2656,6 +2709,7 @@ function LeftSidebar({ collapsed, onToggle, onChatOpen, onLibrary, onBrain, onMi
     { label: 'TRACK', items: [
       { Icon: Map,         label: 'Roadmap',  tooltip: 'Your personalised exam study path',       action: onRoadmap },
       { Icon: Calendar,    label: 'Schedule', tooltip: 'Daily study plan & upcoming sessions',    action: onSchedule },
+      { Icon: ScanSearch,  label: 'Diagnose', tooltip: 'Find your level — adaptive calibration',  action: onCalibrate },
     ]},
     { label: 'PLAY', items: [
       { Icon: Gamepad2,    label: 'Arcade',   tooltip: 'Drill challenges & timed practice arena', action: onArcade },
@@ -2800,7 +2854,7 @@ function LeftSidebar({ collapsed, onToggle, onChatOpen, onLibrary, onBrain, onMi
 }
 
 /* ═══ DASHBOARD VIEW ══════════════════════════════ */
-function DashboardView({ onChatOpen, onSignOut }) {
+function DashboardView({ onChatOpen, onSignOut, onCalibrate }) {
   const { openArcade } = useArcadeStore()
   const { openLab, orders: labOrders } = useLabStore()
   const { openRoadmapHub } = useRoadmapStore()
@@ -2888,6 +2942,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
           onRoadmap={openRoadmapHub}
           onSchedule={() => setMapsOpen(true)}
           onArcade={openArcade}
+          onCalibrate={onCalibrate}
           onDocs={() => setDocOpen(true)}
           onParents={() => setShowEmOpen(true)}
           onProfile={() => setProfileOpen(true)}
@@ -3041,6 +3096,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
           onShowEm={() => { setDrawerOpen(false); setShowEmOpen(true) }}
           onDocs={() => { setDrawerOpen(false); setDocOpen(true) }}
           onMaps={() => { setDrawerOpen(false); setMapsOpen(true) }}
+          onArcade={() => { setDrawerOpen(false); openArcade() }}
           onSignOut={onSignOut}
         />
       )}
@@ -3051,6 +3107,7 @@ function DashboardView({ onChatOpen, onSignOut }) {
           onChat={onChatOpen}
           onLab={openLab}
           onArcade={openArcade}
+          onCalibrate={onCalibrate}
           onHome={() => {}}
           onMore={() => setDrawerOpen(true)}
           activeTab="home"
@@ -5843,6 +5900,16 @@ function ChatView({ onBack }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingChatPrompt])
 
+  // Fire calibration when user taps a subject card in CalibrationHub (Phase 7)
+  const pendingCalibSubject = useAevaControlStore(s => s.pendingCalibSubject)
+  useEffect(() => {
+    if (!pendingCalibSubject) return
+    useAevaControlStore.getState().clearPendingCalibSubject()
+    startCalibration(pendingCalibSubject)
+    setTimeout(() => sendCalibFirstQuestion(pendingCalibSubject), 200)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingCalibSubject])
+
   // ── Challenge timer countdown ──────────────────────────────────────────────
   useEffect(() => {
     if (!challengeTimer) {
@@ -6403,8 +6470,11 @@ Rules:
         questionText = q?.q || ''
       }
 
-      // ── Score via calibration critic ────────────────────────────────────
-      const result = await runCalibCritic(questionText, answerText)
+      // ── Score via calibration critic (rubric mode for Humanities) ─────────
+      const isHumanities = ['history', 'english-lit'].includes(cs.subject)
+      const result = isHumanities
+        ? await runCalibCriticRubric(questionText, answerText)
+        : await runCalibCritic(questionText, answerText)
       const understanding = result.understanding
 
       // ── Instant feedback flash ──────────────────────────────────────────
@@ -10313,14 +10383,15 @@ export default function App() {
   }, [activeMode])
 
   // Navigate to ChatView when roadmap launches a node (Lab or Learn)
-  const _pendingChatOpen   = useAevaControlStore(s => s.pendingChatOpen)
-  const _pendingChatPrompt = useAevaControlStore(s => s.pendingChatPrompt)
+  const _pendingChatOpen    = useAevaControlStore(s => s.pendingChatOpen)
+  const _pendingChatPrompt  = useAevaControlStore(s => s.pendingChatPrompt)
+  const _pendingCalibSubject = useAevaControlStore(s => s.pendingCalibSubject)
   useEffect(() => {
-    if (_pendingChatOpen || _pendingChatPrompt) {
+    if (_pendingChatOpen || _pendingChatPrompt || _pendingCalibSubject) {
       setView('chat')
       if (_pendingChatOpen) useAevaControlStore.getState().clearChatView()
     }
-  }, [_pendingChatOpen, _pendingChatPrompt])
+  }, [_pendingChatOpen, _pendingChatPrompt, _pendingCalibSubject])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -10468,7 +10539,21 @@ export default function App() {
       <StudyRoom />
       <AnimatePresence mode="wait" initial={false}>
         {view === 'dashboard'
-          ? <DashboardView key="dashboard" onChatOpen={() => setView('chat')} onSignOut={() => supabase.auth.signOut()} />
+          ? <DashboardView
+              key="dashboard"
+              onChatOpen={() => setView('chat')}
+              onSignOut={() => supabase.auth.signOut()}
+              onCalibrate={() => setView('calibration')}
+            />
+          : view === 'calibration'
+            ? <CalibrationHub
+                key="calibration"
+                onBack={() => setView('dashboard')}
+                onStartCalib={(subject) => {
+                  useAevaControlStore.getState().setPendingCalibSubject(subject)
+                  setView('chat')
+                }}
+              />
           : activeMode === 'arena'
             ? <DebateArena key="arena" onBack={handleBack} />
             : <ChatView key="chat" onBack={handleBack} />

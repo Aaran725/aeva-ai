@@ -685,6 +685,35 @@ const MATHS = {
 
 // ─── PHYSICS ──────────────────────────────────────────────────────────────────
 const PHYSICS = {
+
+  // ── PRIMARY (Grade 3–6 / Year 3–6) ─────────────────────────────────────────
+
+  'pushes-pulls': {
+    label: 'Pushes, Pulls & Friction',
+    subject: 'physics', band: 'Grade 3–4', bandOrder: -4,
+    prerequisites: [],
+    nextSkills: ['forces-motion-primary'],
+    questions: [
+      { q: 'What is the difference between a push and a pull? Give one everyday example of each.', tier: 1 },
+      { q: 'A ball rolls across a carpet and slows down. What force is acting on it, and what causes this force?', tier: 2 },
+      { q: 'Explain why a football slows down on grass but would travel much further on a smooth icy surface. Name the force responsible.', tier: 3 },
+      { q: 'A book rests on a table without moving. Name the two forces acting on it and explain why they must be equal in size.', tier: 4 },
+    ],
+  },
+
+  'forces-motion-primary': {
+    label: 'Speed, Motion & Simple Forces',
+    subject: 'physics', band: 'Grade 5–6', bandOrder: -2,
+    prerequisites: ['pushes-pulls'],
+    nextSkills: ['forces-basics'],
+    questions: [
+      { q: 'A car travels 60 km in 2 hours. What is its average speed in km/h?', tier: 1 },
+      { q: 'Explain why a skydiver eventually stops accelerating and falls at a constant speed. What is this called?', tier: 2 },
+      { q: 'A cyclist travels 150 m in 30 seconds. Calculate their speed. Then describe one force that acts against their motion and explain its effect.', tier: 3 },
+      { q: 'Explain the difference between speed and velocity. Give a real-life example where something has constant speed but changing velocity.', tier: 4 },
+    ],
+  },
+
   'forces-basics': {
     label: 'Forces & Newton\'s Laws',
     subject: 'physics', band: 'GCSE Foundation', bandOrder: 2,
@@ -856,6 +885,35 @@ const PHYSICS = {
 
 // ─── CHEMISTRY ────────────────────────────────────────────────────────────────
 const CHEMISTRY = {
+
+  // ── PRIMARY ─────────────────────────────────────────────────────────────────
+
+  'materials-properties': {
+    label: 'Materials & Their Properties',
+    subject: 'chemistry', band: 'Grade 3–4', bandOrder: -4,
+    prerequisites: [],
+    nextSkills: ['changes-matter'],
+    questions: [
+      { q: 'Name one property that makes metal a good material for saucepans and one property that makes plastic good for bottles.', tier: 1 },
+      { q: 'Why is wood used to make furniture but metal used for saucepans? Think about the properties of each material.', tier: 2 },
+      { q: 'A student tests five materials to see which conducts electricity best. Predict the result for rubber, copper, and wood. Explain why for each.', tier: 3 },
+      { q: 'Explain why the same substance (water) can exist as a solid, liquid, or gas. What changes between the states at a particle level?', tier: 4 },
+    ],
+  },
+
+  'changes-matter': {
+    label: 'Changing States & Simple Reactions',
+    subject: 'chemistry', band: 'Grade 5–6', bandOrder: -2,
+    prerequisites: ['materials-properties'],
+    nextSkills: ['atomic-structure-chem'],
+    questions: [
+      { q: 'What happens to water when it is heated to 100°C? What is this change called?', tier: 1 },
+      { q: 'Explain the difference between melting and dissolving. Give one everyday example of each.', tier: 2 },
+      { q: 'Is burning paper a reversible or irreversible change? Explain how you know. Give one other example of an irreversible change.', tier: 3 },
+      { q: 'Explain what happens to water particles when water freezes. Why does this explain why ice floats on liquid water?', tier: 4 },
+    ],
+  },
+
   'atomic-structure-chem': {
     label: 'Atomic Structure',
     subject: 'chemistry', band: 'GCSE Foundation', bandOrder: 1,
@@ -967,6 +1025,35 @@ const CHEMISTRY = {
 
 // ─── BIOLOGY ──────────────────────────────────────────────────────────────────
 const BIOLOGY = {
+
+  // ── PRIMARY ─────────────────────────────────────────────────────────────────
+
+  'living-things': {
+    label: 'Living Things & Life Processes',
+    subject: 'biology', band: 'Grade 3–4', bandOrder: -4,
+    prerequisites: [],
+    nextSkills: ['body-health'],
+    questions: [
+      { q: 'Name three things that all living things need to survive.', tier: 1 },
+      { q: 'What is the difference between a vertebrate and an invertebrate? Give one example of each.', tier: 2 },
+      { q: 'Explain why plants are called producers and animals are called consumers. What would happen to all animals if every plant on Earth disappeared?', tier: 3 },
+      { q: 'Explain why a cactus is well adapted to surviving in a desert. Name three features and explain how each one helps survival.', tier: 4 },
+    ],
+  },
+
+  'body-health': {
+    label: 'The Human Body & Health',
+    subject: 'biology', band: 'Grade 5–6', bandOrder: -2,
+    prerequisites: ['living-things'],
+    nextSkills: ['cell-structure'],
+    questions: [
+      { q: 'Name the organ that pumps blood around the body. Name one substance blood carries to your muscles.', tier: 1 },
+      { q: 'Explain what happens to your breathing rate and heart rate when you exercise, and why this happens.', tier: 2 },
+      { q: 'Describe how food travels through your digestive system. Name at least three organs it passes through and describe what happens at each stage.', tier: 3 },
+      { q: 'Explain the difference between aerobic and anaerobic respiration. When does your body switch between them, and what is the by-product of each?', tier: 4 },
+    ],
+  },
+
   'cell-structure': {
     label: 'Cell Structure',
     subject: 'biology', band: 'GCSE Foundation', bandOrder: 1,
@@ -1315,6 +1402,35 @@ const ECONOMICS = {
 
 // ─── COMPUTER SCIENCE ─────────────────────────────────────────────────────────
 const COMPUTER_SCIENCE = {
+
+  // ── PRIMARY ─────────────────────────────────────────────────────────────────
+
+  'what-is-computing': {
+    label: 'What is Computing?',
+    subject: 'computer-science', band: 'Grade 3–4', bandOrder: -4,
+    prerequisites: [],
+    nextSkills: ['algorithms-logic'],
+    questions: [
+      { q: 'What is an algorithm? Give one everyday example (not a computer program).', tier: 1 },
+      { q: 'Write step-by-step instructions for making a jam sandwich. Why does the order of steps matter in an algorithm?', tier: 2 },
+      { q: 'Explain the difference between hardware and software. Give one example of each and explain how they work together.', tier: 3 },
+      { q: 'Your instructions for making toast don\'t mention plugging in the toaster. What kind of error is this, and why can computers not fix errors like this themselves?', tier: 4 },
+    ],
+  },
+
+  'algorithms-logic': {
+    label: 'Algorithms & Logical Thinking',
+    subject: 'computer-science', band: 'Grade 5–6', bandOrder: -2,
+    prerequisites: ['what-is-computing'],
+    nextSkills: ['variables-datatypes'],
+    questions: [
+      { q: 'What is a sequence in programming? Give a simple 2–3 step example.', tier: 1 },
+      { q: 'Look at this algorithm: Start with n = 10. While n > 0: print n, then subtract 3. What will it print? Will it ever stop?', tier: 2 },
+      { q: 'Explain what a bug is in a program. Describe one strategy you would use to find and fix a bug in code that is producing the wrong output.', tier: 3 },
+      { q: 'Explain the difference between a selection (if/else) and a loop (while/for). Write pseudocode that uses both to print "even" or "odd" for each number from 1 to 10.', tier: 4 },
+    ],
+  },
+
   'variables-datatypes': {
     label: 'Variables & Data Types',
     subject: 'computer-science', band: 'GCSE Foundation', bandOrder: 1,
@@ -1498,51 +1614,79 @@ export const FAST_LANE = {
     },
   ],
 
-  // ── PHYSICS — F=ma + energy concept ───────────────────────────────────────
+  // ── PHYSICS — two-bracket ladder ──────────────────────────────────────────
   physics: [
     {
-      label: 'Quick Check',
+      label: 'Quick Check 1',
       q: 'Two quick checks — answer both:\n(a) A 4 kg object accelerates at 3 m/s². What force acts on it?\n(b) A moving car doubles its speed. What happens to its kinetic energy — does it double, halve, or quadruple?',
       nodeId: 'forces-basics',
-      onPass: 'momentum',      // solid → skip Foundation, enter at GCSE Higher
-      onFail: 'forces-basics', // not solid → start from Foundation
+      onPass: 'momentum',   // solid → skip Foundation, enter at GCSE Higher
+      onFail: null,         // not solid → try bracket 2 (primary check)
+    },
+    {
+      label: 'Quick Check 2',
+      q: 'Two quick checks — answer both:\n(a) A ball rolls across a carpet and slows to a stop. What force is acting on it?\n(b) A cyclist travels 60 km in 2 hours. What is their average speed in km/h?',
+      nodeId: 'forces-motion-primary',
+      onPass: 'forces-basics',  // solid → GCSE Foundation start
+      onFail: 'pushes-pulls',   // not solid → primary start
     },
   ],
 
-  // ── CHEMISTRY — atomic structure + isotope calculation ────────────────────
+  // ── CHEMISTRY — two-bracket ladder ────────────────────────────────────────
   chemistry: [
     {
-      label: 'Quick Check',
+      label: 'Quick Check 1',
       q: 'Two quick checks — answer both:\n(a) How many protons, neutrons and electrons does Carbon-12 have?\n(b) Chlorine has two isotopes: ³⁵Cl (75%) and ³⁷Cl (25%). What is the approximate relative atomic mass?',
       nodeId: 'atomic-structure-chem',
-      onPass: 'bonding',             // solid → skip Foundation, enter at GCSE Higher
-      onFail: 'atomic-structure-chem',
+      onPass: 'bonding',   // solid → skip Foundation, enter at GCSE Higher
+      onFail: null,        // not solid → try bracket 2
+    },
+    {
+      label: 'Quick Check 2',
+      q: 'Two quick checks — answer both:\n(a) What happens to water when it is heated to 100°C? What is this change called?\n(b) Is burning paper a reversible or irreversible change? How do you know?',
+      nodeId: 'changes-matter',
+      onPass: 'atomic-structure-chem', // solid → GCSE Foundation start
+      onFail: 'materials-properties',  // not solid → primary start
     },
   ],
 
-  // ── BIOLOGY — cell structure + osmosis ────────────────────────────────────
+  // ── BIOLOGY — two-bracket ladder ──────────────────────────────────────────
   biology: [
     {
-      label: 'Quick Check',
+      label: 'Quick Check 1',
       q: 'Two quick checks — answer both:\n(a) Name two structures found in a plant cell but NOT in an animal cell.\n(b) In one sentence, what is osmosis?',
       nodeId: 'cell-structure',
       onPass: 'dna-genetics',  // solid → skip Foundation, enter at GCSE Higher
-      onFail: 'cell-structure',
+      onFail: null,            // not solid → try bracket 2
+    },
+    {
+      label: 'Quick Check 2',
+      q: 'Two quick checks — answer both:\n(a) Name the organ that pumps blood around your body. Name one thing blood carries to your muscles.\n(b) What is the difference between a vertebrate and an invertebrate? Give one example of each.',
+      nodeId: 'body-health',
+      onPass: 'cell-structure', // solid → GCSE Foundation start
+      onFail: 'living-things',  // not solid → primary start
     },
   ],
 
-  // ── COMPUTER SCIENCE — data types + loop ──────────────────────────────────
+  // ── COMPUTER SCIENCE — two-bracket ladder ─────────────────────────────────
   'computer-science': [
     {
-      label: 'Quick Check',
+      label: 'Quick Check 1',
       q: 'Two quick checks — answer both:\n(a) What is the difference between an integer and a float? Give one example of each.\n(b) Write pseudocode for a loop that prints the numbers 1 to 5.',
       nodeId: 'variables-datatypes',
-      onPass: 'subroutines',        // solid → skip Foundation, enter at GCSE Higher
-      onFail: 'variables-datatypes',
+      onPass: 'subroutines',  // solid → skip Foundation, enter at GCSE Higher
+      onFail: null,           // not solid → try bracket 2
+    },
+    {
+      label: 'Quick Check 2',
+      q: 'Two quick checks — answer both:\n(a) What is an algorithm? Give one everyday example (not a computer program).\n(b) Explain the difference between hardware and software. Give one example of each.',
+      nodeId: 'algorithms-logic',
+      onPass: 'variables-datatypes', // solid → GCSE Foundation start
+      onFail: 'what-is-computing',   // not solid → primary start
     },
   ],
 
-  // ── ECONOMICS — supply/demand + PED ───────────────────────────────────────
+  // ── ECONOMICS — single bracket (no primary level needed) ──────────────────
   economics: [
     {
       label: 'Quick Check',
