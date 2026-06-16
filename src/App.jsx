@@ -6461,7 +6461,7 @@ RULES:
     return nextNode
   }
 
-  /** Raw weighted bandOrder average — used by both calibBand() and calibBandAvg(). */
+  /** Raw weighted bandOrder average (unshrunken). mastery=3, solid=2, shaky=1, gap=0. */
   const calibRawAvg = (skillMap, subject) => {
     const subjectMap = CALIBRATION_MAP[subject] || {}
     const entries = Object.entries(skillMap)
@@ -6476,12 +6476,8 @@ RULES:
     return wTotal ? wSum / wTotal : -6
   }
 
-  /** Determine curriculum band from skill map using weighted bandOrder average.
-   *  mastery=3pts, solid=2pts, shaky=1pt, gap=0pts (gaps don't inflate the band).
-   *  Returns US Grade 1-12 / AP labels that match calibrationMap band values. */
-  const calibBand = (skillMap, subject) => {
-    if (!Object.keys(skillMap).length) return 'Grade 1'
-    const avg = calibRawAvg(skillMap, subject)
+  /** Convert a raw bandOrder average to a band label (threshold table). */
+  const avgToBand = (avg) => {
     if (avg >= 8.5) return 'AP · Year 2'
     if (avg >= 7.5) return 'AP · Year 1'
     if (avg >= 6.5) return 'Grade 11+'
@@ -6500,20 +6496,86 @@ RULES:
     return 'Grade 1'
   }
 
-  /** Find the first gap skill to suggest as "start here" */
-  const calibNextTopic = (skillMap, subject) => {
+  /** Determine curriculum band from skill map. Uses avgToBand on the raw average. */
+  const calibBand = (skillMap, subject) => {
+    if (!Object.keys(skillMap).length) return 'Grade 1'
+    return avgToBand(calibRawAvg(skillMap, subject))
+  }
+
+  /**
+   * Build a scored, ordered list of up to 3 topic recommendations.
+   * Replaces the old single-node calibNextTopic.
+   *
+   * Scoring per candidate (gap or shaky node):
+   *   prereqValue  — how many unmastered nodes list this as a prerequisite (× 2.0)
+   *   levelFit     — 0–1, closeness to student's current bandAvg            (× 1.5)
+   *   clusterNeed  — fraction of this cluster that is gap/shaky             (× 1.0)
+   *   isGap bonus  — gap outranks shaky by a fixed +0.5
+   *
+   * If fewer than 3 candidates exist, fills with "next step up" unlocks from solid nodes.
+   */
+  const calibRecommendations = (skillMap, subject, bandAvg) => {
     const subjectMap = CALIBRATION_MAP[subject] || {}
-    // Priority: gap → shaky → first solid's next skill
-    const gap = Object.entries(skillMap).find(([, v]) => v === 'gap')
-    if (gap) return gap[0]
-    const shaky = Object.entries(skillMap).find(([, v]) => v === 'shaky')
-    if (shaky) return shaky[0]
-    const solid = Object.entries(skillMap).filter(([, v]) => v === 'solid')
-    for (const [id] of solid) {
-      const nexts = (subjectMap[id]?.nextSkills || []).filter(nid => !skillMap[nid])
-      if (nexts.length) return nexts[0]
+    const clusterMap = NODE_CLUSTERS[subject]
+    const scored = []
+
+    for (const [id, status] of Object.entries(skillMap)) {
+      if (status !== 'gap' && status !== 'shaky') continue
+      const node = subjectMap[id]
+      if (!node) continue
+
+      // How many still-unmastered nodes require this one as a prerequisite
+      const prereqValue = Object.entries(subjectMap).filter(([nid, n]) =>
+        n.prerequisites?.includes(id) &&
+        (!skillMap[nid] || skillMap[nid] === 'gap' || skillMap[nid] === 'shaky')
+      ).length
+
+      // Prefer nodes at or near the student's current level
+      const levelFit = 1 - Math.min(1, Math.abs((node.bandOrder ?? 0) - bandAvg) / 6)
+
+      // Cluster weakness: fraction of same cluster that is gap/shaky
+      const cluster = clusterMap?.[id]
+      let clusterNeed = 0
+      if (cluster && clusterMap) {
+        const clusterIds = Object.entries(clusterMap).filter(([, c]) => c === cluster).map(([nid]) => nid)
+        const clusterGaps = clusterIds.filter(nid => skillMap[nid] === 'gap' || skillMap[nid] === 'shaky').length
+        clusterNeed = clusterIds.length > 0 ? clusterGaps / clusterIds.length : 0
+      }
+
+      // Human-readable reason (highest-priority signal wins)
+      let reason
+      if (prereqValue >= 3)       reason = `Unlocks ${prereqValue} other topics`
+      else if (prereqValue === 2)  reason = 'Unlocks 2 other topics'
+      else if (prereqValue === 1)  reason = 'Prerequisite for another topic'
+      else if (clusterNeed > 0.6) reason = 'Weakest topic area'
+      else if (status === 'gap')   reason = 'Gap identified in diagnostic'
+      else                         reason = 'Needs consolidation'
+
+      const priority = prereqValue * 2.0 + levelFit * 1.5 + clusterNeed * 1.0 + (status === 'gap' ? 0.5 : 0)
+      scored.push({ nodeId: id, label: node.label, cluster, bandOrder: node.bandOrder ?? 0, reason, priority, status })
     }
-    return null
+
+    scored.sort((a, b) => b.priority - a.priority)
+
+    // Pad with next-unlock suggestions if fewer than 3 gaps/shakys found
+    if (scored.length < 3) {
+      for (const [id, status] of Object.entries(skillMap)) {
+        if (status !== 'solid' && status !== 'mastery') continue
+        for (const nid of (subjectMap[id]?.nextSkills || [])) {
+          if (skillMap[nid] !== undefined || !subjectMap[nid]) continue
+          if (scored.find(c => c.nodeId === nid)) continue
+          const n = subjectMap[nid]
+          scored.push({ nodeId: nid, label: n.label, cluster: clusterMap?.[nid],
+            bandOrder: n.bandOrder ?? 0, reason: 'Next step up', priority: 0.3, status: 'next' })
+          if (scored.length >= 3) break
+        }
+        if (scored.length >= 3) break
+      }
+    }
+
+    // Deduplicate and cap at 3
+    const seen = new Set()
+    return scored.filter(c => { if (seen.has(c.nodeId)) return false; seen.add(c.nodeId); return true }).slice(0, 3)
   }
 
   /** Build a brief acknowledgement prompt for calibration mode.
@@ -6740,14 +6802,50 @@ Rules:
   const finishCalibration = () => {
     const cs = calibStateRef.current
     const skillMap = cs.skillMap
-    const band = calibBand(skillMap, cs.subject)
-    const bandAvg = calibRawAvg(skillMap, cs.subject)
-    const nextTopic = calibNextTopic(skillMap, cs.subject)
+    const n = Object.keys(skillMap).length
+
+    // ── Phase A: Bayesian shrinkage ───────────────────────────────────────────
+    // Pull small samples toward the entry-point prior so 3 lucky answers can't
+    // send a student to Grade 11. priorWeight decays to 0 at n ≥ 6 nodes assessed.
+    const rawAvg       = calibRawAvg(skillMap, cs.subject)
+    const priorBandOrd = CALIBRATION_MAP[cs.subject]?.[ENTRY_NODES[cs.subject]]?.bandOrder ?? 0
+    const priorWeight  = Math.max(0, 6 - n)
+    const shrunkAvg    = (n + priorWeight) > 0
+      ? (rawAvg * n + priorBandOrd * priorWeight) / (n + priorWeight)
+      : priorBandOrd
+
+    const band    = avgToBand(shrunkAvg)
+    const bandAvg = shrunkAvg
+
+    // ── Phase A: Confidence score (0–100) ─────────────────────────────────────
+    // Depth (60pts): how many nodes assessed vs max 12
+    // Breadth (40pts): how many clusters covered vs total
+    const clusterMap    = NODE_CLUSTERS[cs.subject]
+    const totalClusters = clusterMap ? new Set(Object.values(clusterMap)).size : 1
+    const clustersHit   = Object.keys(cs.clustersAssessed || {}).length
+    const confidence    = Math.round(
+      Math.min(1, n / 12) * 60 +
+      Math.min(1, clustersHit / Math.max(1, totalClusters)) * 40
+    )
+
+    // ── Phase A: Band range for low-confidence results ────────────────────────
+    let bandLow = null, bandHigh = null
+    if (confidence < 65) {
+      const spread = confidence < 40 ? 1.0 : 0.5
+      const lo = avgToBand(shrunkAvg - spread)
+      const hi = avgToBand(shrunkAvg + spread)
+      if (lo !== hi) { bandLow = lo; bandHigh = hi }
+    }
+
+    // ── Phase B: Scored recommendations ──────────────────────────────────────
+    const recommendations = calibRecommendations(skillMap, cs.subject, shrunkAvg)
+
     const result = {
       skillMap,
-      band,
-      bandAvg,
-      nextTopic,
+      band, bandAvg,
+      confidence, bandLow, bandHigh,
+      recommendations,
+      nextTopic: recommendations[0]?.nodeId ?? null,  // backward-compat alias
       questionsAsked: cs.questionsAsked,
       durationMs: Date.now() - (cs.startTime || Date.now()),
     }

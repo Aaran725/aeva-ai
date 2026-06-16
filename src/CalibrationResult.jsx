@@ -319,6 +319,91 @@ function InsightsPanel({ insights, isLight }) {
   )
 }
 
+// ── Recommendation cards (Phase B) ───────────────────────────────────────────
+const REC_STATUS = {
+  gap:  { icon: '✗', label: 'Gap',         color: '#F87171' },
+  shaky:{ icon: '△', label: 'Shaky',       color: '#FBBF24' },
+  next: { icon: '→', label: 'Next step',   color: '#4ADE80' },
+}
+
+function RecommendationCards({ recommendations, subjectMap, bandColor, isLight, onStartTopic, subject }) {
+  if (!recommendations?.length) return null
+  const cardBg    = isLight ? '#ffffff'               : '#161826'
+  const borderCol = isLight ? 'rgba(0,0,0,0.08)'     : 'rgba(255,255,255,0.07)'
+  const textCol   = isLight ? '#0f1117'               : 'rgba(255,255,255,0.88)'
+  const mutedCol  = isLight ? 'rgba(0,0,0,0.38)'     : 'rgba(255,255,255,0.35)'
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.24, duration: 0.24 }}
+      style={{ background: cardBg, borderRadius: 20, border: `1px solid ${borderCol}`, padding: '20px 22px' }}
+    >
+      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.10em', color: mutedCol, textTransform: 'uppercase', marginBottom: 14 }}>
+        What To Work On
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {recommendations.map((rec, i) => {
+          const isPrimary   = i === 0
+          const cfg         = REC_STATUS[rec.status] || { icon: '→', label: 'Topic', color: bandColor }
+          const statusColor = cfg.color
+          return (
+            <motion.div
+              key={rec.nodeId}
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.26 + i * 0.07, duration: 0.20 }}
+              style={{
+                padding: isPrimary ? '14px 16px' : '10px 14px',
+                borderRadius: 14,
+                background: isPrimary
+                  ? `${statusColor}12`
+                  : isLight ? 'rgba(0,0,0,0.025)' : 'rgba(255,255,255,0.025)',
+                border: `1px solid ${isPrimary ? statusColor + '35' : borderCol}`,
+                borderLeft: `3px solid ${isPrimary ? statusColor : (isLight ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.08)')}`,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {isPrimary && (
+                    <div style={{ fontSize: 9, fontWeight: 800, color: statusColor, letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 4 }}>
+                      Start Here
+                    </div>
+                  )}
+                  <div style={{ fontSize: isPrimary ? 14 : 12.5, fontWeight: isPrimary ? 800 : 600, color: textCol, marginBottom: 4, lineHeight: 1.3 }}>
+                    {rec.label}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 9.5, fontWeight: 700, color: statusColor }}>
+                      {cfg.icon} {cfg.label}
+                    </span>
+                    <span style={{ fontSize: 9.5, color: mutedCol }}>·</span>
+                    <span style={{ fontSize: 9.5, color: mutedCol }}>{rec.reason}</span>
+                  </div>
+                </div>
+                {isPrimary && (
+                  <button
+                    onClick={() => onStartTopic?.(rec.nodeId, subject)}
+                    style={{
+                      flexShrink: 0, padding: '8px 14px', borderRadius: 10,
+                      background: statusColor, border: 'none',
+                      fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 5,
+                    }}
+                  >
+                    Study <ChevronRight size={12} />
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          )
+        })}
+      </div>
+    </motion.div>
+  )
+}
+
 // ── History timeline (Phase 5) ────────────────────────────────────────────────
 function HistoryTimeline({ history, currentBand, isLight }) {
   if (!history || history.length < 2) return null
@@ -413,7 +498,9 @@ export default function CalibrationResult({
 
   const bandColor = BAND_COLORS[result?.band] || '#818CF8'
   const mins      = result?.durationMs ? Math.round(result.durationMs / 60000) : null
-  const nextLabel = result?.nextTopic ? (subjectMap[result.nextTopic]?.label || result.nextTopic) : null
+  const confidence = result?.confidence ?? null
+  const confColor  = confidence == null ? null
+    : confidence >= 75 ? '#4ADE80' : confidence >= 50 ? '#FBBF24' : '#F87171'
 
   // ── Theme tokens ─────────────────────────────────────────────────────────
   const bg         = isLight ? '#f4f5fa'                  : '#0d0e16'
@@ -484,20 +571,41 @@ export default function CalibrationResult({
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.1, type: 'spring', stiffness: 250, damping: 22 }}
-                style={{ fontSize: 38, fontWeight: 900, color: bandColor, lineHeight: 1, letterSpacing: '-0.02em', marginBottom: 4 }}
+                style={{ fontSize: 38, fontWeight: 900, color: bandColor, lineHeight: 1, letterSpacing: '-0.02em', marginBottom: 2 }}
               >
                 {result.band || 'Calibrated'}
               </motion.div>
+
+              {/* Band range (low confidence only) */}
+              {result.bandLow && result.bandHigh && (
+                <div style={{ fontSize: 12.5, color: mutedCol, marginBottom: 4, marginTop: 2 }}>
+                  Estimated range: {result.bandLow} – {result.bandHigh}
+                </div>
+              )}
+
               <SubBandIndicator
                 band={result.band}
                 bandAvg={result.bandAvg}
                 bandColor={bandColor}
                 isLight={isLight}
               />
-              <div style={{ fontSize: 12.5, color: mutedCol, display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 16 }}>
+
+              <div style={{ fontSize: 12.5, color: mutedCol, display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 16, alignItems: 'center' }}>
                 <span>{result.questionsAsked || '?'} questions</span>
                 {mins !== null && <span>{mins} min{mins !== 1 ? 's' : ''}</span>}
                 <span>{Object.keys(result.skillMap || {}).length} skills assessed</span>
+                {/* Confidence pill (Phase A) */}
+                {confidence != null && (
+                  <span style={{
+                    fontSize: 10, fontWeight: 800, padding: '2px 9px', borderRadius: 99,
+                    background: `${confColor}18`,
+                    color: confColor,
+                    border: `1px solid ${confColor}35`,
+                    letterSpacing: '0.03em',
+                  }}>
+                    {confidence}% confidence
+                  </span>
+                )}
               </div>
             </motion.div>
 
@@ -549,38 +657,15 @@ export default function CalibrationResult({
               <InsightsPanel insights={insights} isLight={isLight} />
             </motion.div>
 
-            {/* Next topic card */}
-            {nextLabel && (
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.24, duration: 0.24 }}
-                style={{
-                  background: cardBg, borderRadius: 20,
-                  border: `1px solid ${borderCol}`,
-                  borderLeft: `3px solid ${bandColor}`,
-                  padding: '20px 22px',
-                }}
-              >
-                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.10em', color: mutedCol, textTransform: 'uppercase', marginBottom: 10 }}>
-                  Start Here
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: textCol, marginBottom: 4 }}>{nextLabel}</div>
-                {subjectMap[result.nextTopic]?.band && (
-                  <div style={{ fontSize: 11.5, color: mutedCol, marginBottom: 14 }}>{subjectMap[result.nextTopic].band}</div>
-                )}
-                <button
-                  onClick={() => onStartTopic?.(result.nextTopic, subject)}
-                  style={{
-                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    background: bandColor, border: 'none', borderRadius: 12, padding: '12px 18px',
-                    fontSize: 13.5, fontWeight: 700, color: '#fff', cursor: 'pointer',
-                  }}
-                >
-                  Study {nextLabel} <ChevronRight size={14} />
-                </button>
-              </motion.div>
-            )}
+            {/* Recommendation cards (Phase B — replaces single next-topic) */}
+            <RecommendationCards
+              recommendations={result?.recommendations}
+              subjectMap={subjectMap}
+              bandColor={bandColor}
+              isLight={isLight}
+              onStartTopic={onStartTopic}
+              subject={subject}
+            />
 
             {/* Secondary actions */}
             <motion.div

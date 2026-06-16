@@ -232,6 +232,21 @@ function ProgressPanel({ history, currentBand }) {
                       </span>
                     )
                   })()}
+                  {/* Confidence chip */}
+                  {entry.confidence != null && (() => {
+                    const c = entry.confidence
+                    const cc = c >= 75 ? '#4ADE80' : c >= 50 ? '#FBBF24' : '#F87171'
+                    return (
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99,
+                        background: `${cc}14`, color: `${cc}cc`,
+                        border: `1px solid ${cc}28`,
+                        letterSpacing: '0.03em',
+                      }}>
+                        {c}%
+                      </span>
+                    )
+                  })()}
                 </div>
               </div>
             </div>
@@ -327,10 +342,29 @@ function SubjectCard({ subject, result, history, accent, onStart, index, expande
             )
           })()}
 
+          {/* Confidence indicator */}
+          {result?.confidence != null && (() => {
+            const c  = result.confidence
+            const cc = c >= 75 ? '#4ADE80' : c >= 50 ? '#FBBF24' : '#F87171'
+            const cl = c >= 75 ? 'High confidence' : c >= 50 ? 'Moderate confidence' : 'Low confidence'
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, marginBottom: 2 }}>
+                <div style={{
+                  flex: 1, height: 2, borderRadius: 99,
+                  background: 'rgba(255,255,255,0.07)',
+                  overflow: 'hidden',
+                }}>
+                  <div style={{ width: `${c}%`, height: '100%', borderRadius: 99, background: `${cc}90` }} />
+                </div>
+                <span style={{ fontSize: 9.5, fontWeight: 700, color: `${cc}99`, flexShrink: 0 }}>{c}%</span>
+              </div>
+            )
+          })()}
+
           {lastAt && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: 4,
-              fontSize: 11, color: 'rgba(255,255,255,0.28)', marginTop: 7,
+              fontSize: 11, color: 'rgba(255,255,255,0.28)', marginTop: 5,
             }}>
               <Clock size={10} />
               {formatDate(lastAt)}
