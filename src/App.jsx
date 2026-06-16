@@ -419,8 +419,15 @@ MATH (maths/science/physics/chemistry/stats — not casual topics):
 - ✓ $$\\text{Mode} = 4$$
   (since 4 appears twice, which is more than any other value) — CORRECT
 
-CALLOUT BLOCKS (1-2 per teaching response):
-> **Definition:** | > **Key Insight:** | > **Example:** | > **Note:** | > **Tip:** | > **Recall:**
+CALLOUT BLOCKS — rendered as coloured visual cards. Use 1-2 per teaching response. Pick the RIGHT type:
+> **Definition:** — the precise meaning of a new term (blue card). Use when you introduce a concept for the first time.
+> **Key Insight:** — the non-obvious "why" that changes how they see it (purple). Use for reframes and aha-moments.
+> **Example:** — a worked or concrete illustration (yellow). Use when abstract explanation needs a ground-truth instance.
+> **Note:** — a nuance or caveat worth flagging (indigo). Use for edge cases, "but only when...", precision caveats.
+> **Warning:** — a specific, common mistake (red). Use when students reliably misapply this concept in a predictable way.
+> **Tip:** — a practical shortcut or memory aid (green). Use for exam tricks or speed techniques.
+> **Recall:** — link to something they already know (amber). Use when the new concept IS a prior concept in disguise.
+Syntax: \`> **Label:** content on same line\`. No blank line after \`>\`. Never use plain blockquotes — always label them.
 
 FEEDBACK TAGS — use these when ${userName} attempts an answer or exercise:
 - If correct: start your response with \`[CORRECT: one sentence confirming what they got right]\`
@@ -3750,42 +3757,126 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false, isDri
     // Display math $$...$$
     if (/^\$\$/.test(trimmed)) {
       flushList()
-      const mathLines = []
       const startI = i
-      // Strip the opening $$
-      const afterOpen = trimmed.slice(2)
-      // Find any closing $$ within the rest of the line
-      const closeIdx = afterOpen.indexOf('$$')
-      if (closeIdx !== -1) {
-        // Inline form: $$equation$$ — extract only the math part (ignore any prose after closing $$)
-        mathLines.push(afterOpen.slice(0, closeIdx).trim())
-        i++
-      } else if (afterOpen.trim()) {
-        // Opening $$ with content on same line but no closing $$ — treat rest as math
-        mathLines.push(afterOpen.trim())
-        i++
-      } else {
-        // Multi-line form: $$\n...\n$$
-        i++
-        while (i < lines.length && !/^\$\$/.test(lines[i].trim())) { mathLines.push(lines[i]); i++ }
-        i++
+
+      // Helper: parse one $$...$$ block starting at current i, advance i, return content string
+      const parseMathBlock = () => {
+        const t = lines[i].trim()
+        const afterOpen = t.slice(2)
+        const mathLines = []
+        const closeIdx = afterOpen.indexOf('$$')
+        if (closeIdx !== -1) {
+          mathLines.push(afterOpen.slice(0, closeIdx).trim())
+          i++
+        } else if (afterOpen.trim()) {
+          mathLines.push(afterOpen.trim())
+          i++
+        } else {
+          i++
+          while (i < lines.length && !/^\$\$/.test(lines[i].trim())) { mathLines.push(lines[i]); i++ }
+          i++
+        }
+        return mathLines.join('\n').trim()
       }
-      const mathContent = mathLines.join('\n').trim()
-      try {
-        const html = katex.renderToString(mathContent, { throwOnError: false, displayMode: true })
+
+      // Collect first block
+      const items = [{ type: 'math', content: parseMathBlock() }]
+
+      // Look ahead: collect consecutive $$…$$ blocks with optional short interstitial labels
+      while (i < lines.length) {
+        const peek = lines[i].trim()
+        if (/^\$\$/.test(peek)) {
+          items.push({ type: 'math', content: parseMathBlock() })
+        } else if (peek === '') {
+          // Blank line — peek further to see if another $$ follows
+          let j = i + 1
+          while (j < lines.length && lines[j].trim() === '') j++
+          if (j < lines.length && /^\$\$/.test(lines[j].trim())) {
+            i = j  // skip gap, continue collecting
+          } else {
+            break  // real paragraph end
+          }
+        } else if (peek.length <= 60 && !/^[#\-*+>]/.test(peek) && items.length > 0 && items[items.length - 1].type === 'math') {
+          // Short interstitial text between math blocks (e.g. "Therefore:", "Substituting x = 3:")
+          items.push({ type: 'label', content: peek })
+          i++
+        } else {
+          break
+        }
+      }
+
+      const mathCount = items.filter(m => m.type === 'math').length
+
+      if (mathCount === 1) {
+        // Single block — original standalone box
+        const mathContent = items[0].content
+        try {
+          const html = katex.renderToString(mathContent, { throwOnError: false, displayMode: true })
+          elements.push(
+            <div key={`dmath-${startI}`} style={{
+              overflowX: 'auto', margin: '16px 0', padding: '26px 28px',
+              textAlign: 'center', borderRadius: 16, fontSize: 19,
+              background: isLight ? 'rgba(99,102,241,0.07)' : 'rgba(14,16,48,0.80)',
+              border: isLight ? '1px solid rgba(99,102,241,0.22)' : '1px solid rgba(99,102,241,0.30)',
+              boxShadow: isLight ? 'none' : '0 4px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(165,170,255,0.07)',
+            }}
+              dangerouslySetInnerHTML={{ __html: html }}
+            />
+          )
+        } catch {
+          elements.push(<p key={`dmath-${startI}`} style={{ fontFamily: 'monospace', color: txtBody }}>{mathContent}</p>)
+        }
+      } else {
+        // Multiple consecutive blocks — render as unified Working card
+        const cardStyle = {
+          margin: '16px 0', borderRadius: 16, overflow: 'hidden',
+          background: isLight ? 'rgba(99,102,241,0.06)' : 'rgba(14,16,48,0.80)',
+          border: isLight ? '1px solid rgba(99,102,241,0.22)' : '1px solid rgba(99,102,241,0.30)',
+          boxShadow: isLight ? 'none' : '0 4px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(165,170,255,0.07)',
+        }
+        const headerStyle = {
+          padding: '7px 16px',
+          background: isLight ? 'rgba(99,102,241,0.10)' : 'rgba(99,102,241,0.14)',
+          borderBottom: isLight ? '1px solid rgba(99,102,241,0.18)' : '1px solid rgba(99,102,241,0.20)',
+          display: 'flex', alignItems: 'center', gap: 7,
+        }
+        const dividerStyle = {
+          height: 1, margin: '0 24px',
+          background: isLight ? 'rgba(99,102,241,0.14)' : 'rgba(139,143,255,0.12)',
+        }
         elements.push(
-          <div key={`dmath-${startI}`} style={{
-            overflowX: 'auto', margin: '16px 0', padding: '26px 28px',
-            textAlign: 'center', borderRadius: 16, fontSize: 19,
-            background: isLight ? 'rgba(99,102,241,0.07)' : 'rgba(14,16,48,0.80)',
-            border: isLight ? '1px solid rgba(99,102,241,0.22)' : '1px solid rgba(99,102,241,0.30)',
-            boxShadow: isLight ? 'none' : '0 4px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(165,170,255,0.07)',
-          }}
-            dangerouslySetInnerHTML={{ __html: html }}
-          />
+          <div key={`wcard-${startI}`} style={cardStyle}>
+            <div style={headerStyle}>
+              <span style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.12em', textTransform: 'uppercase', color: isLight ? '#6366F1' : '#818CF8' }}>Working</span>
+            </div>
+            {items.map((item, idx) => {
+              if (item.type === 'math') {
+                let html = null
+                try { html = katex.renderToString(item.content, { throwOnError: false, displayMode: true }) } catch {}
+                return (
+                  <div key={idx}>
+                    {idx > 0 && <div style={dividerStyle} />}
+                    <div style={{ padding: '20px 28px', textAlign: 'center', fontSize: 18, overflowX: 'auto' }}
+                      {...(html ? { dangerouslySetInnerHTML: { __html: html } } : { children: <span style={{ fontFamily: 'monospace' }}>{item.content}</span> })}
+                    />
+                  </div>
+                )
+              }
+              if (item.type === 'label') {
+                return (
+                  <div key={idx} style={{
+                    textAlign: 'center', fontSize: 12, fontStyle: 'italic', letterSpacing: '0.01em',
+                    color: isLight ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.40)',
+                    padding: '4px 0 0',
+                  }}>
+                    {parseInline(item.content, isLight)}
+                  </div>
+                )
+              }
+              return null
+            })}
+          </div>
         )
-      } catch {
-        elements.push(<p key={`dmath-${startI}`} style={{ fontFamily: 'monospace', color: txtBody }}>{mathContent}</p>)
       }
       continue
     }
