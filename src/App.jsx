@@ -6557,17 +6557,17 @@ RULES:
         clusterNeed = clusterIds.length > 0 ? clusterGaps / clusterIds.length : 0
       }
 
-      // Human-readable reason (highest-priority signal wins)
-      let reason
-      if (prereqValue >= 3)       reason = `Unlocks ${prereqValue} other topics`
-      else if (prereqValue === 2)  reason = 'Unlocks 2 other topics'
-      else if (prereqValue === 1)  reason = 'Prerequisite for another topic'
-      else if (clusterNeed > 0.6) reason = 'Weakest topic area'
-      else if (status === 'gap')   reason = 'Gap identified in diagnostic'
-      else                         reason = 'Needs consolidation'
+      // Reason key (for localisation in result card) + English fallback string
+      let reasonKey, reasonN, reason
+      if (prereqValue >= 3)       { reasonKey = 'unlocksN'; reasonN = prereqValue; reason = `Unlocks ${prereqValue} other topics` }
+      else if (prereqValue === 2)  { reasonKey = 'unlocks2'; reason = 'Unlocks 2 other topics' }
+      else if (prereqValue === 1)  { reasonKey = 'unlocks1'; reason = 'Prerequisite for another topic' }
+      else if (clusterNeed > 0.6) { reasonKey = 'weakestArea'; reason = 'Weakest topic area' }
+      else if (status === 'gap')   { reasonKey = 'gapFound'; reason = 'Gap identified in diagnostic' }
+      else                         { reasonKey = 'consolidate'; reason = 'Needs consolidation' }
 
       const priority = prereqValue * 2.0 + levelFit * 1.5 + clusterNeed * 1.0 + (status === 'gap' ? 0.5 : 0)
-      scored.push({ nodeId: id, label: node.label, cluster, bandOrder: node.bandOrder ?? 0, reason, priority, status })
+      scored.push({ nodeId: id, label: node.label, cluster, bandOrder: node.bandOrder ?? 0, reason, reasonKey, reasonN, priority, status })
     }
 
     scored.sort((a, b) => b.priority - a.priority)
@@ -6581,7 +6581,7 @@ RULES:
           if (scored.find(c => c.nodeId === nid)) continue
           const n = subjectMap[nid]
           scored.push({ nodeId: nid, label: n.label, cluster: clusterMap?.[nid],
-            bandOrder: n.bandOrder ?? 0, reason: 'Next step up', priority: 0.3, status: 'next' })
+            bandOrder: n.bandOrder ?? 0, reason: 'Next step up', reasonKey: 'nextStep', priority: 0.3, status: 'next' })
           if (scored.length >= 3) break
         }
         if (scored.length >= 3) break
@@ -7023,6 +7023,7 @@ Rules:
       confidence, bandLow, bandHigh,
       recommendations,
       nextTopic: recommendations[0]?.nodeId ?? null,  // backward-compat alias
+      language: cs.language || 'en',
       questionsAsked: cs.questionsAsked,
       durationMs: Date.now() - (cs.startTime || Date.now()),
     }

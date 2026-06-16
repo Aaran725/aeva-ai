@@ -46,18 +46,106 @@ const BAND_COLORS = {
   'AP · Year 1':  '#E9A364', 'AP · Year 2':  '#F59E0B',
 }
 
+// ── Result UI text (English + Japanese) ──────────────────────────────────────
+const RESULT_TEXT = {
+  en: {
+    yourLevel:          'Your Level',
+    estimatedRange:     (lo, hi) => `Estimated range: ${lo} – ${hi}`,
+    subLabel:           (pos) => pos < 0.35 ? 'Developing' : pos < 0.70 ? 'Solid' : 'Strong',
+    subDesc:            (pos) => pos < 0.35 ? "You're building this level" : pos < 0.70 ? "You're comfortably here" : 'Ready to move up',
+    bandStart:          (b) => `Start of ${b}`,
+    nextLevel:          'Next level →',
+    topicBreakdown:     'Topic Breakdown',
+    topicsCovered:      (hit, total) => `${hit}/${total} topics covered`,
+    notReached:         'Not reached in this diagnostic',
+    topicStatus:        { strong: 'Strong', developing: 'Developing', weak: 'Weak', untested: 'Not tested' },
+    skillBreakdown:     'Skill Breakdown',
+    skillStatus:        { mastery: 'Mastery', solid: 'Solid', shaky: 'Shaky', gap: 'Gap' },
+    aevaInsights:       "Aeva's Insights",
+    generatingInsights: 'Generating insights…',
+    yourProgress:       'Your Progress',
+    now:                '← now',
+    whatToWorkOn:       'What To Work On',
+    startHere:          'Start Here',
+    study:              'Study',
+    recStatus:          {
+      gap:   { icon: '✗', label: 'Gap'      },
+      shaky: { icon: '△', label: 'Shaky'    },
+      next:  { icon: '→', label: 'Next step' },
+    },
+    resolveReason: (reasonKey, reasonN) => {
+      if (reasonKey === 'unlocksN') return `Unlocks ${reasonN} other topics`
+      if (reasonKey === 'unlocks2') return 'Unlocks 2 other topics'
+      if (reasonKey === 'unlocks1') return 'Prerequisite for another topic'
+      if (reasonKey === 'weakestArea') return 'Weakest topic area'
+      if (reasonKey === 'gapFound') return 'Gap identified in diagnostic'
+      if (reasonKey === 'consolidate') return 'Needs consolidation'
+      return 'Next step up'
+    },
+    diagnosticComplete: 'Diagnostic Complete',
+    backToChat:         'Back to Chat',
+    statsQ:             (n) => `${n} questions`,
+    statsMins:          (n) => `${n} min${n !== 1 ? 's' : ''}`,
+    statsSkills:        (n) => `${n} skills assessed`,
+    confidence:         (n) => `${n}% confidence`,
+    calibrateAnother:   'Calibrate another subject',
+    reRun:              'Re-run this diagnostic',
+  },
+  ja: {
+    yourLevel:          'あなたのレベル',
+    estimatedRange:     (lo, hi) => `推定範囲: ${lo} – ${hi}`,
+    subLabel:           (pos) => pos < 0.35 ? '発展中' : pos < 0.70 ? '習得' : '得意',
+    subDesc:            (pos) => pos < 0.35 ? 'このレベルを構築中です' : pos < 0.70 ? 'このレベルは安定しています' : '次のレベルへ進む準備ができています',
+    bandStart:          (b) => `${b} の開始`,
+    nextLevel:          '次のレベル →',
+    topicBreakdown:     'トピック別分析',
+    topicsCovered:      (hit, total) => `${hit}/${total} トピックをカバー`,
+    notReached:         'この診断では到達しませんでした',
+    topicStatus:        { strong: '得意', developing: '発展中', weak: '弱点', untested: '未テスト' },
+    skillBreakdown:     'スキル分析',
+    skillStatus:        { mastery: '完全習得', solid: '習得', shaky: '不安定', gap: '未習得' },
+    aevaInsights:       'Aeva のインサイト',
+    generatingInsights: 'インサイトを生成中…',
+    yourProgress:       'あなたの進捗',
+    now:                '← 現在',
+    whatToWorkOn:       '取り組むべき内容',
+    startHere:          'ここから始める',
+    study:              '学習する',
+    recStatus:          {
+      gap:   { icon: '✗', label: '未習得'      },
+      shaky: { icon: '△', label: '不安定'      },
+      next:  { icon: '→', label: '次のステップ' },
+    },
+    resolveReason: (reasonKey, reasonN) => {
+      if (reasonKey === 'unlocksN') return `${reasonN}つのトピックを解放`
+      if (reasonKey === 'unlocks2') return '2つのトピックを解放'
+      if (reasonKey === 'unlocks1') return '別のトピックの前提条件'
+      if (reasonKey === 'weakestArea') return '最も弱いトピック分野'
+      if (reasonKey === 'gapFound') return '診断で特定されたギャップ'
+      if (reasonKey === 'consolidate') return '定着が必要'
+      return '次のステップ'
+    },
+    diagnosticComplete: '診断完了',
+    backToChat:         'チャットに戻る',
+    statsQ:             (n) => `${n} 問`,
+    statsMins:          (n) => `${n} 分`,
+    statsSkills:        (n) => `${n} スキルを評価`,
+    confidence:         (n) => `信頼度 ${n}%`,
+    calibrateAnother:   '別の科目を診断する',
+    reRun:              '診断を再実行する',
+  },
+}
+const getT = (lang) => RESULT_TEXT[lang] || RESULT_TEXT.en
+
 // ── Sub-band indicator ────────────────────────────────────────────────────────
-function SubBandIndicator({ band, bandAvg, bandColor, isLight }) {
+function SubBandIndicator({ band, bandAvg, bandColor, isLight, lang = 'en' }) {
   if (bandAvg == null) return null
+  const t = getT(lang)
   const lower = BAND_LOWER[band] ?? -6.5
   const pos = Math.max(0, Math.min(1, bandAvg - lower))
   const pct = Math.round(pos * 100)
-  const subLabel = pos < 0.35 ? 'Developing' : pos < 0.70 ? 'Solid' : 'Strong'
-  const subDesc  = pos < 0.35
-    ? 'You\'re building this level'
-    : pos < 0.70
-    ? 'You\'re comfortably here'
-    : 'Ready to move up'
+  const subLabel = t.subLabel(pos)
+  const subDesc  = t.subDesc(pos)
   const trackBg = isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.07)'
   const mutedCol = isLight ? 'rgba(0,0,0,0.38)' : 'rgba(255,255,255,0.35)'
 
@@ -99,8 +187,8 @@ function SubBandIndicator({ band, bandAvg, bandColor, isLight }) {
         }} />
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
-        <span style={{ fontSize: 10, color: mutedCol }}>Start of {band}</span>
-        <span style={{ fontSize: 10, color: mutedCol }}>Next level →</span>
+        <span style={{ fontSize: 10, color: mutedCol }}>{t.bandStart(band)}</span>
+        <span style={{ fontSize: 10, color: mutedCol }}>{t.nextLevel}</span>
       </div>
     </div>
   )
@@ -114,7 +202,8 @@ const TOPIC_STATUS = {
   untested:   { icon: '—', color: 'rgba(255,255,255,0.25)', bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.10)', label: 'Not tested' },
 }
 
-function TopicBreakdown({ subject, skillMap, isLight }) {
+function TopicBreakdown({ subject, skillMap, isLight, lang = 'en' }) {
+  const t = getT(lang)
   const clusterMap  = NODE_CLUSTERS[subject]
   const labelMap    = CLUSTER_LABELS[subject]
   if (!clusterMap || !labelMap) return null
@@ -142,10 +231,10 @@ function TopicBreakdown({ subject, skillMap, isLight }) {
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
         <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.10em', color: mutedCol, textTransform: 'uppercase' }}>
-          Topic Breakdown
+          {t.topicBreakdown}
         </div>
         <span style={{ fontSize: 10.5, color: mutedCol }}>
-          {testedCount}/{clusters.length} topics covered
+          {t.topicsCovered(testedCount, clusters.length)}
         </span>
       </div>
 
@@ -174,7 +263,7 @@ function TopicBreakdown({ subject, skillMap, isLight }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: cfg.color }}>{name}</span>
-                  <span style={{ fontSize: 10.5, color: cfg.color, opacity: 0.7 }}>{cfg.label}</span>
+                  <span style={{ fontSize: 10.5, color: cfg.color, opacity: 0.7 }}>{t.topicStatus[status] || cfg.label}</span>
                 </div>
                 {status !== 'untested' && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5 }}>
@@ -192,7 +281,7 @@ function TopicBreakdown({ subject, skillMap, isLight }) {
                 )}
                 {status === 'untested' && (
                   <div style={{ fontSize: 10.5, color: mutedCol, marginTop: 2 }}>
-                    Not reached in this diagnostic
+                    {t.notReached}
                   </div>
                 )}
               </div>
@@ -220,7 +309,8 @@ const STATUS = {
 }
 
 // ── Skill breakdown section ───────────────────────────────────────────────────
-function SkillBreakdown({ skillMap, subjectMap, isLight }) {
+function SkillBreakdown({ skillMap, subjectMap, isLight, lang = 'en' }) {
+  const t = getT(lang)
   const groups = ['mastery', 'solid', 'shaky', 'gap']
     .map(s => ({ status: s, skills: Object.entries(skillMap || {}).filter(([, v]) => v === s) }))
     .filter(g => g.skills.length > 0)
@@ -231,7 +321,7 @@ function SkillBreakdown({ skillMap, subjectMap, isLight }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.10em', color: label, textTransform: 'uppercase' }}>
-        Skill Breakdown
+        {t.skillBreakdown}
       </div>
       {groups.map(({ status, skills }) => {
         const cfg = STATUS[status]
@@ -240,7 +330,7 @@ function SkillBreakdown({ skillMap, subjectMap, isLight }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.dot, flexShrink: 0, boxShadow: `0 0 6px ${cfg.dot}88` }} />
               <span style={{ fontSize: 10.5, fontWeight: 700, color: cfg.dot, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                {cfg.label}
+                {t.skillStatus[status] || cfg.label}
               </span>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -268,7 +358,8 @@ function SkillBreakdown({ skillMap, subjectMap, isLight }) {
 }
 
 // ── AI Insights section ───────────────────────────────────────────────────────
-function InsightsPanel({ insights, isLight }) {
+function InsightsPanel({ insights, isLight, lang = 'en' }) {
+  const t = getT(lang)
   const cardBg  = isLight ? 'rgba(99,102,241,0.06)' : 'rgba(99,102,241,0.10)'
   const border  = isLight ? 'rgba(99,102,241,0.18)' : 'rgba(99,102,241,0.22)'
   const label   = isLight ? 'rgba(0,0,0,0.4)'      : 'rgba(255,255,255,0.35)'
@@ -277,7 +368,7 @@ function InsightsPanel({ insights, isLight }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.10em', color: label, textTransform: 'uppercase' }}>
-        Aeva's Insights
+        {t.aevaInsights}
       </div>
 
       {!insights && (
@@ -287,7 +378,7 @@ function InsightsPanel({ insights, isLight }) {
             transition={{ duration: 1.3, repeat: Infinity }}
             style={{ width: 7, height: 7, borderRadius: '50%', background: '#818CF8', flexShrink: 0 }}
           />
-          <span style={{ fontSize: 12.5, color: label }}>Generating insights…</span>
+          <span style={{ fontSize: 12.5, color: label }}>{t.generatingInsights}</span>
         </div>
       )}
 
@@ -326,8 +417,9 @@ const REC_STATUS = {
   next: { icon: '→', label: 'Next step',   color: '#4ADE80' },
 }
 
-function RecommendationCards({ recommendations, subjectMap, bandColor, isLight, onStartTopic, subject }) {
+function RecommendationCards({ recommendations, subjectMap, bandColor, isLight, onStartTopic, subject, lang = 'en' }) {
   if (!recommendations?.length) return null
+  const t       = getT(lang)
   const cardBg    = isLight ? '#ffffff'               : '#161826'
   const borderCol = isLight ? 'rgba(0,0,0,0.08)'     : 'rgba(255,255,255,0.07)'
   const textCol   = isLight ? '#0f1117'               : 'rgba(255,255,255,0.88)'
@@ -341,12 +433,12 @@ function RecommendationCards({ recommendations, subjectMap, bandColor, isLight, 
       style={{ background: cardBg, borderRadius: 20, border: `1px solid ${borderCol}`, padding: '20px 22px' }}
     >
       <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.10em', color: mutedCol, textTransform: 'uppercase', marginBottom: 14 }}>
-        What To Work On
+        {t.whatToWorkOn}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {recommendations.map((rec, i) => {
           const isPrimary   = i === 0
-          const cfg         = REC_STATUS[rec.status] || { icon: '→', label: 'Topic', color: bandColor }
+          const cfg         = t.recStatus[rec.status] || REC_STATUS[rec.status] || { icon: '→', label: 'Topic', color: bandColor }
           const statusColor = cfg.color
           return (
             <motion.div
@@ -368,7 +460,7 @@ function RecommendationCards({ recommendations, subjectMap, bandColor, isLight, 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   {isPrimary && (
                     <div style={{ fontSize: 9, fontWeight: 800, color: statusColor, letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 4 }}>
-                      Start Here
+                      {t.startHere}
                     </div>
                   )}
                   <div style={{ fontSize: isPrimary ? 14 : 12.5, fontWeight: isPrimary ? 800 : 600, color: textCol, marginBottom: 4, lineHeight: 1.3 }}>
@@ -379,7 +471,7 @@ function RecommendationCards({ recommendations, subjectMap, bandColor, isLight, 
                       {cfg.icon} {cfg.label}
                     </span>
                     <span style={{ fontSize: 9.5, color: mutedCol }}>·</span>
-                    <span style={{ fontSize: 9.5, color: mutedCol }}>{rec.reason}</span>
+                    <span style={{ fontSize: 9.5, color: mutedCol }}>{rec.reasonKey ? t.resolveReason(rec.reasonKey, rec.reasonN) : rec.reason}</span>
                   </div>
                 </div>
                 {isPrimary && (
@@ -392,7 +484,7 @@ function RecommendationCards({ recommendations, subjectMap, bandColor, isLight, 
                       display: 'flex', alignItems: 'center', gap: 5,
                     }}
                   >
-                    Study <ChevronRight size={12} />
+                    {t.study} <ChevronRight size={12} />
                   </button>
                 )}
               </div>
@@ -405,7 +497,8 @@ function RecommendationCards({ recommendations, subjectMap, bandColor, isLight, 
 }
 
 // ── History timeline (Phase 5) ────────────────────────────────────────────────
-function HistoryTimeline({ history, currentBand, isLight }) {
+function HistoryTimeline({ history, currentBand, isLight, lang = 'en' }) {
+  const t = getT(lang)
   if (!history || history.length < 2) return null
 
   // Show last 5 entries (current last = newest)
@@ -421,7 +514,7 @@ function HistoryTimeline({ history, currentBand, isLight }) {
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
         <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.10em', color: label, textTransform: 'uppercase' }}>
-          Your Progress
+          {t.yourProgress}
         </div>
         {improved && (
           <motion.div
@@ -469,7 +562,7 @@ function HistoryTimeline({ history, currentBand, isLight }) {
                 <span style={{ fontSize: isLatest ? 13 : 12, fontWeight: isLatest ? 800 : 500, color: isLatest ? bandColor : label }}>
                   {entry.band}
                 </span>
-                {isLatest && <span style={{ fontSize: 10.5, color: bandColor, opacity: 0.7, fontWeight: 600 }}>← now</span>}
+                {isLatest && <span style={{ fontSize: 10.5, color: bandColor, opacity: 0.7, fontWeight: 600 }}>{t.now}</span>}
                 <span style={{ fontSize: 10.5, color: label, marginLeft: 'auto' }}>{dateStr}</span>
               </div>
             </div>
@@ -496,6 +589,8 @@ export default function CalibrationResult({
   const subjectIcon  = SUBJECT_ICONS[subject]  || '📚'
   const subjectMap   = CALIBRATION_MAP[subject] || {}
 
+  const lang      = result?.language || 'en'
+  const t         = getT(lang)
   const bandColor = BAND_COLORS[result?.band] || '#818CF8'
   const mins      = result?.durationMs ? Math.round(result.durationMs / 60000) : null
   const confidence = result?.confidence ?? null
@@ -536,13 +631,13 @@ export default function CalibrationResult({
           <span style={{ fontSize: 20 }}>{subjectIcon}</span>
           <span style={{ fontSize: 14, fontWeight: 700, color: textCol }}>{subjectLabel}</span>
           <div style={{ width: 1, height: 14, background: borderCol }} />
-          <span style={{ fontSize: 11, color: mutedCol, fontWeight: 600 }}>Diagnostic Complete</span>
+          <span style={{ fontSize: 11, color: mutedCol, fontWeight: 600 }}>{t.diagnosticComplete}</span>
         </div>
         <button
           onClick={onClose}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: mutedCol, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, padding: '6px 10px', borderRadius: 8 }}
         >
-          <X size={13} /> Back to Chat
+          <X size={13} /> {t.backToChat}
         </button>
       </div>
 
@@ -565,7 +660,7 @@ export default function CalibrationResult({
               }}
             >
               <div style={{ fontSize: 11, fontWeight: 700, color: bandColor, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
-                Your Level
+                {t.yourLevel}
               </div>
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
@@ -579,7 +674,7 @@ export default function CalibrationResult({
               {/* Band range (low confidence only) */}
               {result.bandLow && result.bandHigh && (
                 <div style={{ fontSize: 12.5, color: mutedCol, marginBottom: 4, marginTop: 2 }}>
-                  Estimated range: {result.bandLow} – {result.bandHigh}
+                  {t.estimatedRange(result.bandLow, result.bandHigh)}
                 </div>
               )}
 
@@ -588,22 +683,20 @@ export default function CalibrationResult({
                 bandAvg={result.bandAvg}
                 bandColor={bandColor}
                 isLight={isLight}
+                lang={lang}
               />
 
               <div style={{ fontSize: 12.5, color: mutedCol, display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 16, alignItems: 'center' }}>
-                <span>{result.questionsAsked || '?'} questions</span>
-                {mins !== null && <span>{mins} min{mins !== 1 ? 's' : ''}</span>}
-                <span>{Object.keys(result.skillMap || {}).length} skills assessed</span>
-                {/* Confidence pill (Phase A) */}
+                <span>{t.statsQ(result.questionsAsked || '?')}</span>
+                {mins !== null && <span>{t.statsMins(mins)}</span>}
+                <span>{t.statsSkills(Object.keys(result.skillMap || {}).length)}</span>
                 {confidence != null && (
                   <span style={{
                     fontSize: 10, fontWeight: 800, padding: '2px 9px', borderRadius: 99,
-                    background: `${confColor}18`,
-                    color: confColor,
-                    border: `1px solid ${confColor}35`,
-                    letterSpacing: '0.03em',
+                    background: `${confColor}18`, color: confColor,
+                    border: `1px solid ${confColor}35`, letterSpacing: '0.03em',
                   }}>
-                    {confidence}% confidence
+                    {t.confidence(confidence)}
                   </span>
                 )}
               </div>
@@ -617,7 +710,7 @@ export default function CalibrationResult({
                 transition={{ delay: 0.12, duration: 0.26 }}
                 style={{ background: cardBg, border: `1px solid ${borderCol}`, borderRadius: 20, padding: '24px 28px' }}
               >
-                <TopicBreakdown subject={subject} skillMap={result.skillMap} isLight={isLight} />
+                <TopicBreakdown subject={subject} skillMap={result.skillMap} isLight={isLight} lang={lang} />
               </motion.div>
             )}
 
@@ -628,7 +721,7 @@ export default function CalibrationResult({
               transition={{ delay: 0.18, duration: 0.26 }}
               style={{ background: cardBg, border: `1px solid ${borderCol}`, borderRadius: 20, padding: '24px 28px' }}
             >
-              <SkillBreakdown skillMap={result.skillMap} subjectMap={subjectMap} isLight={isLight} />
+              <SkillBreakdown skillMap={result.skillMap} subjectMap={subjectMap} isLight={isLight} lang={lang} />
             </motion.div>
 
             {/* History timeline (Phase 5) */}
@@ -639,7 +732,7 @@ export default function CalibrationResult({
                 transition={{ delay: 0.22, duration: 0.26 }}
                 style={{ background: cardBg, border: `1px solid ${borderCol}`, borderRadius: 20, padding: '24px 28px' }}
               >
-                <HistoryTimeline history={history} currentBand={result.band} isLight={isLight} />
+                <HistoryTimeline history={history} currentBand={result.band} isLight={isLight} lang={lang} />
               </motion.div>
             )}
           </div>
@@ -654,7 +747,7 @@ export default function CalibrationResult({
               transition={{ delay: 0.18, duration: 0.26 }}
               style={{ background: cardBg, border: `1px solid ${borderCol}`, borderRadius: 20, padding: '24px 24px' }}
             >
-              <InsightsPanel insights={insights} isLight={isLight} />
+              <InsightsPanel insights={insights} isLight={isLight} lang={lang} />
             </motion.div>
 
             {/* Recommendation cards (Phase B — replaces single next-topic) */}
@@ -665,6 +758,7 @@ export default function CalibrationResult({
               isLight={isLight}
               onStartTopic={onStartTopic}
               subject={subject}
+              lang={lang}
             />
 
             {/* Secondary actions */}
@@ -682,7 +776,7 @@ export default function CalibrationResult({
                   fontSize: 12.5, fontWeight: 600, color: mutedCol, cursor: 'pointer',
                 }}
               >
-                <Layers size={13} /> Calibrate another subject
+                <Layers size={13} /> {t.calibrateAnother}
               </button>
               <button
                 onClick={() => onRecalibrate?.()}
@@ -692,7 +786,7 @@ export default function CalibrationResult({
                   fontSize: 12.5, fontWeight: 600, color: mutedCol, cursor: 'pointer',
                 }}
               >
-                <RotateCcw size={13} /> Re-run this diagnostic
+                <RotateCcw size={13} /> {t.reRun}
               </button>
             </motion.div>
           </div>
