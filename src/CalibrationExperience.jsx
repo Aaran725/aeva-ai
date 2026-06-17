@@ -864,7 +864,7 @@ export function CalibrationExperience({
         </div>
 
         {/* ── Right: live level arc ─────────────────────────────────────────── */}
-        <LevelArc liveScore={liveScore} nodeCount={nodeCount} isLight={isLight} />
+        <LevelArc liveScore={question?.isFastLane ? null : liveScore} nodeCount={nodeCount} isLight={isLight} />
       </div>
     </motion.div>
   )
