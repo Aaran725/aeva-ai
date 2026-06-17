@@ -5759,7 +5759,6 @@ function ChatView({ onBack }) {
   const generatedQCache         = useRef({})   // C2: { `${nodeId}-${tier}-${lang}` → generated question text }
   const translationCache        = useRef({})   // Phase 2: { `${text}-${lang}` → translated text }
   const currentCalibQRef        = useRef(null) // always holds text of the question currently on screen
-  const pendingCalibLanguageRef = useRef('en') // language chosen in the picker, consumed by the effect
   // ── Dedicated calibration experience state ─────────────────────────────────
   const [currentCalibQuestion, setCurrentCalibQuestion] = useState(null)  // { text, nodeId, tier, qNum, isFastLane }
   const [calibEvaluating, setCalibEvaluating]   = useState(false)         // critic is running
@@ -5971,8 +5970,9 @@ function ChatView({ onBack }) {
   useEffect(() => {
     if (!pendingCalibSubject) return
     useAevaControlStore.getState().clearPendingCalibSubject()
-    const lang = pendingCalibLanguageRef.current || 'en'
-    pendingCalibLanguageRef.current = 'en'  // reset for next use
+    // Read language from the store (set by App's onStartCalib handler) then reset
+    const lang = useAevaControlStore.getState().pendingCalibLanguage || 'en'
+    useAevaControlStore.getState().setPendingCalibLanguage('en')
     startCalibration(pendingCalibSubject, lang)
     setTimeout(() => sendCalibFirstQuestion(pendingCalibSubject), 200)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -11119,7 +11119,7 @@ export default function App() {
                 key="calibration"
                 onBack={() => setView('dashboard')}
                 onStartCalib={(subject, language = 'en') => {
-                  pendingCalibLanguageRef.current = language
+                  useAevaControlStore.getState().setPendingCalibLanguage(language)
                   useAevaControlStore.getState().setPendingCalibSubject(subject)
                   setView('chat')
                 }}
