@@ -555,9 +555,14 @@ After the final step, do NOT add a plain-text summary line ("So the roots are x 
 MARKDOWN: Tables need header + \`| --- |\` row. Blockquotes only for callouts. Bold only for new technical terms.
 
 MATH (maths/science/physics/chemistry/stats — not casual topics):
-- $$...$$ mandatory: equations with =, named formulas, fractions/roots as focus, every step in worked examples. One per line.
-- $...$ only for mid-sentence symbol refs: $x^2$, $\\theta$, $\\pi$. Never a full equation inline.
-- No LaTeX on bare single letters. Fractions always \\frac{}{}. Multiplication always \\times.
+- $$...$$ for: ANY expression with 2+ terms, any equation with =, any factored form, any algebraic expression with operators. Every step in a worked example. Always on its own line — never inline.
+- $...$ ONLY for a SINGLE symbol within prose: $x$, $a$, $n$, $\\theta$. One symbol, no operators, no exponents.
+- No LaTeX on bare single letters in isolation. Fractions always \\frac{}{}. Multiplication always \\times.
+- ✗ WRONG (multi-term expression inline): "To factorize $x^2 - (a-2b)x - 2ab$, we need to..."
+- ✓ RIGHT (display block): "To factorize:\\n$$x^2 - (a-2b)x - 2ab$$\\nwe need to find..."
+- ✗ WRONG (factored form inline): "...simplifies to $(x-a)^2 - b^2$. This is..."
+- ✓ RIGHT (display block): "...simplifies to:\\n$$(x-a)^2 - b^2$$\\nThis is a difference of squares."
+- If in doubt: use $$...$$. There is no such thing as too many display blocks in a maths solution.
 - ✗ "negative b over 2a" → ✓ $$\\frac{-b}{2a}$$
 - ✗ NEVER show two consecutive $$...$$ blocks that are the same equation at different simplification stages. Combine into one step or show ONLY the final simplified form. Example: don't show $$\\frac{-3 \\pm \\sqrt{9+80}}{4}$$ then immediately $$\\frac{-3 \\pm \\sqrt{89}}{4}$$ — just show the final one.
 - ✗ NEVER append prose after the closing $$ on the same line: $$\\text{Mode} = 4$$ (since 4 appears twice) — this breaks the renderer. Put the prose on the next line instead.
@@ -4136,9 +4141,19 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false, isDri
     }
 
     // Auto-promote complex inline $math$ to display block
-    // Catches cases like "The quadratic formula is: $x = \frac{-b \pm \sqrt{b^2-4ac}}{2a}$"
-    // where the model wrote inline $...$ but the content deserves the highlighted box treatment
-    const complexInlineMatch = trimmed.match(/^(.*?)\$([^$\n]+(?:\\frac|\\sqrt|\\pm|\\int|\\sum|\\prod|\\lim)[^$\n]*)\$(.*)$/)
+    // Catches cases where the model wrote inline $...$ but the content deserves a display block.
+    // Check 1: LaTeX commands that always imply display (fractions, roots, integrals etc.)
+    // Check 2: Algebraic/polynomial expressions — 2+ terms, exponents, factored forms
+    const _cim1 = trimmed.match(/^(.*?)\$([^$\n]+(?:\\frac|\\sqrt|\\pm|\\int|\\sum|\\prod|\\lim)[^$\n]*)\$(.*)$/)
+    const _cim2 = (() => {
+      const m = trimmed.match(/^(.*?)\$([^$\n]{14,})\$(.*)$/)
+      if (!m) return null
+      const math = m[2]
+      // Must be algebraic: has ^ (exponent) OR multi-term (letter/digit + +-  + letter/digit)
+      const isAlgebraic = /\^/.test(math) || /[a-zA-Z0-9]\s*[\+\-]\s*[a-zA-Z]/.test(math)
+      return isAlgebraic ? m : null
+    })()
+    const complexInlineMatch = _cim1 || _cim2
     if (complexInlineMatch) {
       flushList()
       const [, before, mathContent, after] = complexInlineMatch
