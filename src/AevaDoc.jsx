@@ -866,6 +866,58 @@ function DocMarkdown({ text, messageIdx = 0, noExpand = false }) {
       i++; continue
     }
 
+    // Auto-promote inline $math$ to a display block when the model should have used $$...$$
+    // Triggered by: LaTeX commands (frac/sqrt/pm/int etc.) OR algebraic expressions (^, multi-term)
+    const _dim1 = trimmed.match(/^(.*?)\$([^$\n]+(?:\\frac|\\sqrt|\\pm|\\int|\\sum|\\prod|\\lim)[^$\n]*)\$(.*)$/)
+    const _dim2 = (() => {
+      const m = trimmed.match(/^(.*?)\$([^$\n]{14,})\$(.*)$/)
+      if (!m) return null
+      const math = m[2]
+      const isAlgebraic = /\^/.test(math) || /[a-zA-Z0-9]\s*[\+\-]\s*[a-zA-Z]/.test(math)
+      return isAlgebraic ? m : null
+    })()
+    const docInlinePromote = _dim1 || _dim2
+    if (docInlinePromote) {
+      flushList()
+      const [, before, mathContent, after] = docInlinePromote
+      if (before.trim()) {
+        elements.push(
+          <div key={`dip-pre-${i}`} style={{ marginTop: 5, fontSize: 15, color: 'rgba(235,233,255,0.84)', lineHeight: 1.80, letterSpacing: '-0.005em' }}>
+            {parseInline(before.trim())}
+          </div>
+        )
+      }
+      try {
+        const html = katex.renderToString(mathContent.trim(), { throwOnError: false, displayMode: true })
+        const mlen = mathContent.trim().length
+        const pad  = mlen < 20 ? '13px 20px' : mlen < 45 ? '18px 28px' : '22px 32px'
+        const fsz  = mlen < 20 ? 16 : mlen < 45 ? 17 : 18
+        elements.push(
+          <div key={`dip-eq-${i}`} style={{
+            overflowX: 'auto', margin: '10px 0', padding: pad,
+            textAlign: 'center', borderRadius: 14, fontSize: fsz,
+            background: 'rgba(6,8,22,0.88)',
+            border: '1px solid rgba(99,102,241,0.20)',
+            borderLeft: '4px solid #6366F1',
+            boxShadow: '0 2px 16px rgba(0,0,0,0.28)',
+            color: '#E0E7FF',
+          }} dangerouslySetInnerHTML={{ __html: html }} />
+        )
+      } catch {
+        elements.push(
+          <div key={`dip-eq-${i}`} style={{ fontFamily: 'monospace', fontSize: '0.9em', color: 'rgba(235,233,255,0.84)' }}>{mathContent}</div>
+        )
+      }
+      if (after.trim()) {
+        elements.push(
+          <div key={`dip-post-${i}`} style={{ marginTop: 5, fontSize: 15, color: 'rgba(235,233,255,0.84)', lineHeight: 1.80, letterSpacing: '-0.005em' }}>
+            {parseInline(after.trim())}
+          </div>
+        )
+      }
+      i++; continue
+    }
+
     // Default paragraph
     flushList()
     elements.push(<div key={`p-${i}`} style={{ marginTop: 5, fontSize: 15, color: 'rgba(235,233,255,0.84)', lineHeight: 1.80, letterSpacing: '-0.005em' }}>{parseInline(trimmed)}</div>)
