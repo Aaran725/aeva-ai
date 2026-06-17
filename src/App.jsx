@@ -4149,9 +4149,10 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false, isDri
       const m = trimmed.match(/^(.*?)\$([^$\n]{14,})\$(.*)$/)
       if (!m) return null
       const math = m[2]
-      // Must be algebraic: has ^ (exponent) OR multi-term (letter/digit + +-  + letter/digit)
+      // Must be an equation (has =) AND algebraic — avoids over-promoting (x+a)(x+b) style references
+      const hasEq = /=/.test(math)
       const isAlgebraic = /\^/.test(math) || /[a-zA-Z0-9]\s*[\+\-]\s*[a-zA-Z]/.test(math)
-      return isAlgebraic ? m : null
+      return (hasEq && isAlgebraic) ? m : null
     })()
     const complexInlineMatch = _cim1 || _cim2
     if (complexInlineMatch) {

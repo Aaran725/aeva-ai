@@ -308,14 +308,15 @@ function BlockEquation({ latex, html, eqNum }) {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* Equation card */}
+      {/* Equation card — style matches main chat $$...$$ display blocks */}
       <div style={{
         overflowX: 'auto', padding: '22px 32px',
-        textAlign: 'center', borderRadius: 14, fontSize: 18,
-        background: 'rgba(6,8,22,0.88)',
-        border: '1px solid rgba(99,102,241,0.20)',
-        borderLeft: '4px solid #6366F1',
-        boxShadow: hovered ? '0 4px 28px rgba(99,102,241,0.22)' : '0 2px 16px rgba(0,0,0,0.28)',
+        textAlign: 'center', borderRadius: 16, fontSize: 19,
+        background: 'rgba(14,16,48,0.80)',
+        border: '1px solid rgba(99,102,241,0.30)',
+        boxShadow: hovered
+          ? '0 4px 32px rgba(0,0,0,0.50), inset 0 1px 0 rgba(165,170,255,0.10)'
+          : '0 4px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(165,170,255,0.07)',
         color: '#E0E7FF',
         transition: 'box-shadow 0.2s',
         userSelect: 'none',
@@ -868,13 +869,16 @@ function DocMarkdown({ text, messageIdx = 0, noExpand = false }) {
 
     // Auto-promote inline $math$ to a display block when the model should have used $$...$$
     // Triggered by: LaTeX commands (frac/sqrt/pm/int etc.) OR algebraic expressions (^, multi-term)
+    // _dim1: complex LaTeX commands always deserve a display block
     const _dim1 = trimmed.match(/^(.*?)\$([^$\n]+(?:\\frac|\\sqrt|\\pm|\\int|\\sum|\\prod|\\lim)[^$\n]*)\$(.*)$/)
+    // _dim2: algebraic EQUATIONS (must have = to avoid promoting expressions like (x+a)(x+b))
     const _dim2 = (() => {
       const m = trimmed.match(/^(.*?)\$([^$\n]{14,})\$(.*)$/)
       if (!m) return null
       const math = m[2]
+      const hasEq = /=/.test(math)
       const isAlgebraic = /\^/.test(math) || /[a-zA-Z0-9]\s*[\+\-]\s*[a-zA-Z]/.test(math)
-      return isAlgebraic ? m : null
+      return (hasEq && isAlgebraic) ? m : null
     })()
     const docInlinePromote = _dim1 || _dim2
     if (docInlinePromote) {
@@ -890,16 +894,15 @@ function DocMarkdown({ text, messageIdx = 0, noExpand = false }) {
       try {
         const html = katex.renderToString(mathContent.trim(), { throwOnError: false, displayMode: true })
         const mlen = mathContent.trim().length
-        const pad  = mlen < 20 ? '13px 20px' : mlen < 45 ? '18px 28px' : '22px 32px'
-        const fsz  = mlen < 20 ? 16 : mlen < 45 ? 17 : 18
+        const pad  = mlen < 20 ? '14px 24px' : mlen < 45 ? '20px 28px' : '22px 32px'
+        const fsz  = mlen < 20 ? 17 : mlen < 45 ? 18 : 19
         elements.push(
           <div key={`dip-eq-${i}`} style={{
-            overflowX: 'auto', margin: '10px 0', padding: pad,
-            textAlign: 'center', borderRadius: 14, fontSize: fsz,
-            background: 'rgba(6,8,22,0.88)',
-            border: '1px solid rgba(99,102,241,0.20)',
-            borderLeft: '4px solid #6366F1',
-            boxShadow: '0 2px 16px rgba(0,0,0,0.28)',
+            overflowX: 'auto', margin: '12px 0', padding: pad,
+            textAlign: 'center', borderRadius: 16, fontSize: fsz,
+            background: 'rgba(14,16,48,0.80)',
+            border: '1px solid rgba(99,102,241,0.30)',
+            boxShadow: '0 4px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(165,170,255,0.07)',
             color: '#E0E7FF',
           }} dangerouslySetInnerHTML={{ __html: html }} />
         )
@@ -1236,7 +1239,7 @@ Subject: ${subject}${level}${summary}
 
 Rules:
 - Show EVERY intermediate line — nothing skipped
-- Wrap ALL maths in LaTeX: inline $...$ and display $$...$$
+- MATH FORMATTING (critical): use $$...$$ display blocks for EVERY equation and multi-term expression — one per line, never inline. Use $...$ ONLY for single symbols within prose ($x$, $a$, $n$). Never put a full equation inside $...$.
 - Use ### N: Sub-step title for numbered sub-steps
 - Use > **Note:** for important observations
 - Be thorough: a confused student must be able to follow every line
