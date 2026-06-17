@@ -1542,9 +1542,9 @@ const READING = {
     prerequisites: [],
     nextSkills: ['sight-words-fluency', 'basic-sentence-comp'],
     questions: [
-      { q: 'Read these words and write them: "ship", "chin", "thin". What sound do the letters "sh", "ch", and "th" each make?', tier: 1 },
-      { q: 'Sound out this word letter by letter — c-l-o-u-d — and write what it says. Now write a sentence using that word.', tier: 2 },
-      { q: 'These words all have a silent letter. Identify the silent letter in each: "knee", "write", "lamb". What spelling rule can you write about silent letters?', tier: 3 },
+      { q: 'Read this word: "chin". Which letters make the "ch" sound?\n(a) c and h together  (b) just the c  (c) just the h  (d) i and n together', tier: 1 },
+      { q: 'Which word has the SAME vowel sound as "cloud"?\n(a) cold  (b) clown  (c) clue  (d) club', tier: 2 },
+      { q: 'Which TWO words have a SILENT letter?\n(a) knee  (b) ship  (c) write  (d) flat', tier: 3 },
     ],
   },
 
@@ -1554,9 +1554,9 @@ const READING = {
     prerequisites: ['phonics-decoding'],
     nextSkills: ['basic-sentence-comp'],
     questions: [
-      { q: 'Read this sentence and answer: "The big brown dog ran fast down the street." What did the dog do? Where did it go?', tier: 1 },
-      { q: 'Read this passage and tell what happens:\n"Sam woke up early. She ate breakfast quickly. Then she ran to catch the bus before it left."\nPut the events in order.', tier: 2 },
-      { q: 'Read this passage:\n"Every morning, Luis fed his fish before school. One day he forgot. When he came home, the fish swam in circles near the top of the tank."\nWhy do you think the fish swam near the top? Use the passage to explain.', tier: 3 },
+      { q: 'Read this: "The big brown dog ran fast down the street. It stopped at a tree and barked loudly." What did the dog do FIRST?\n(a) barked loudly  (b) stopped at a tree  (c) ran fast down the street  (d) sat down', tier: 1 },
+      { q: 'Read this: "Sam woke up early. She ate breakfast quickly. Then she ran to catch the bus before it left." What did Sam do LAST?\n(a) woke up  (b) ate breakfast  (c) ran to catch the bus  (d) got dressed', tier: 2 },
+      { q: 'Read this: "Every morning, Luis fed his fish before school. One day he forgot. When he came home, the fish swam in circles near the top of the tank." Select TWO statements that are TRUE about this story.\n(a) Luis forgot to feed his fish that morning  (b) Luis fed his fish twice that day  (c) the fish may be hungry  (d) the fish was sleeping', tier: 3 },
     ],
   },
 
@@ -1566,9 +1566,9 @@ const READING = {
     prerequisites: ['sight-words-fluency'],
     nextSkills: ['main-idea-details', 'sequence-retell'],
     questions: [
-      { q: 'Read this sentence: "The sleepy kitten curled up on the warm, soft blanket."\nName TWO things we learn about the kitten or where it is.', tier: 1 },
-      { q: 'Read these two sentences: "Maria wanted a dog for her birthday. Instead, she got a book about dogs."\nHow do you think Maria feels? Use the sentences to explain your answer.', tier: 2 },
-      { q: 'Read this: "The tiny seed pushed through the dark soil. First came a thin green shoot, then two leaves, and finally a bright yellow flower."\nPut the events in order and explain what the passage is describing. What clues helped you?', tier: 3 },
+      { q: 'Read this: "The sleepy kitten curled up on the warm, soft blanket." Which TWO things do we learn from this sentence?\n(a) the kitten is sleepy  (b) the kitten is hungry  (c) the blanket is warm and soft  (d) the kitten is playing', tier: 1 },
+      { q: 'Read this: "Maria wanted a dog for her birthday. Instead, she got a book about dogs." How does Maria most likely feel?\n(a) happy and excited  (b) disappointed but still interested in dogs  (c) angry and confused  (d) grateful and relieved', tier: 2 },
+      { q: 'Read this: "The tiny seed pushed through the dark soil. First came a thin green shoot, then two leaves, and finally a bright yellow flower." Select TWO statements that are TRUE.\n(a) the shoot appeared before the flower  (b) the flower appeared first  (c) the seed grew into a plant  (d) the leaves appeared after the flower', tier: 3 },
     ],
   },
 
@@ -1580,9 +1580,9 @@ const READING = {
     prerequisites: ['basic-sentence-comp'],
     nextSkills: ['sequence-retell', 'context-clues-basic', 'grammar-mechanics'],
     questions: [
-      { q: 'Read this passage:\n"Dolphins are very intelligent animals. They can learn tricks and follow instructions. Dolphins also communicate with each other using clicks and whistles. Scientists believe dolphins even have their own names."\nWhat is the MAIN IDEA of this passage? Give one detail that supports it.', tier: 1 },
-      { q: 'Read this passage:\n"In autumn, many trees lose their leaves. Shorter days mean less sunlight, so the trees cannot make enough food. They drop their leaves to save energy for winter. In spring, when sunlight returns, new leaves grow."\nState the main idea and list TWO supporting details.', tier: 2 },
-      { q: 'Read this passage:\n"Ada Lovelace is often called the world\'s first computer programmer. She worked with mathematician Charles Babbage in the 1800s on his Analytical Engine. Lovelace wrote an algorithm for this machine — making her a pioneer of computing over 100 years before modern computers were invented."\nState the main idea and explain how two supporting details strengthen it.', tier: 3 },
+      { q: 'Read this: "Dolphins are very intelligent animals. They can learn tricks and follow instructions. Dolphins also communicate using clicks and whistles. Scientists believe dolphins even have their own names." What is the MAIN IDEA of this passage?\n(a) Dolphins make good pets  (b) Dolphins are very intelligent animals  (c) Dolphins live in the ocean  (d) Scientists study dolphins', tier: 1 },
+      { q: 'Read this: "In autumn, many trees lose their leaves. Shorter days mean less sunlight, so trees cannot make enough food. They drop their leaves to save energy for winter. In spring, when sunlight returns, new leaves grow." Select TWO details that SUPPORT the main idea.\n(a) trees drop their leaves because they cannot make enough food  (b) trees are colourful in autumn  (c) trees save energy for winter by losing leaves  (d) all plants behave the same way in autumn', tier: 2 },
+      { q: 'Read this: "Ada Lovelace is often called the world\'s first computer programmer. She worked with Charles Babbage in the 1800s on his Analytical Engine. Lovelace wrote an algorithm for this machine — making her a pioneer of computing over 100 years before modern computers." Which TWO details BEST support the claim that Ada Lovelace was a pioneer of computing?\n(a) she wrote an algorithm for the Analytical Engine  (b) she worked alongside Charles Babbage  (c) she did this over 100 years before modern computers existed  (d) Babbage designed the Analytical Engine', tier: 3 },
     ],
   },
 
@@ -1592,9 +1592,9 @@ const READING = {
     prerequisites: ['basic-sentence-comp'],
     nextSkills: ['context-clues-basic', 'narrative-structure'],
     questions: [
-      { q: 'Read this passage:\n"First, Mia mixed flour and butter. Next, she added sugar and eggs. Then she poured the batter into a tin. Finally, she put it in the oven."\nPut these steps in order: add eggs · mix flour and butter · put tin in oven · add sugar. What is Mia making?', tier: 1 },
-      { q: 'Read this story:\n"Olu found a lost puppy in the rain. He dried it off and gave it water. He made posters and put them around the neighbourhood. Two days later, a woman called and said the puppy was hers."\nRetell the story in your own words using: first, then, next, finally.', tier: 2 },
-      { q: 'Read this passage:\n"The caterpillar ate for several weeks, growing fat. Then it formed a hard shell called a chrysalis. Inside, its body completely changed. Two weeks later, a butterfly pushed its way out, dried its wings, and flew away."\nExplain the sequence of events AND explain WHY the chrysalis stage is important.', tier: 3 },
+      { q: 'Read this: "First, Mia mixed flour and butter. Next, she added sugar and eggs. Then she poured the batter into a tin. Finally, she put it in the oven." What did Mia do SECOND?\n(a) mixed flour and butter  (b) added sugar and eggs  (c) poured the batter into a tin  (d) put the tin in the oven', tier: 1 },
+      { q: 'Read this: "Olu found a lost puppy in the rain. He dried it off and gave it water. He made posters and put them around the neighbourhood. Two days later, a woman called and said the puppy was hers." Which sentence BEST retells this story?\n(a) Olu kept a puppy he found and never found its owner  (b) Olu found a puppy, cared for it, and helped return it to its owner  (c) A woman lost her dog and put up posters around the neighbourhood  (d) Olu found a puppy and immediately called its owner', tier: 2 },
+      { q: 'Read this: "The caterpillar ate for several weeks, growing fat. Then it formed a hard shell called a chrysalis. Inside, its body completely changed. Two weeks later, a butterfly pushed its way out, dried its wings, and flew away." Select TWO statements that are TRUE about the chrysalis stage.\n(a) it is where the caterpillar\'s body transforms into a butterfly  (b) it is a stage the caterpillar skips if it grows quickly  (c) without the chrysalis, there would be no butterfly  (d) the chrysalis is just a resting place and nothing changes inside it', tier: 3 },
     ],
   },
 
@@ -1604,9 +1604,9 @@ const READING = {
     prerequisites: ['main-idea-details'],
     nextSkills: ['vocabulary-in-context', 'grammar-mechanics'],
     questions: [
-      { q: 'Read this sentence: "The enormous elephant was so large it knocked down a small tree just by walking past."\nWhat does "enormous" mean? Use the sentence to explain your answer.', tier: 1 },
-      { q: 'Read this: "Zara was famished after the long hike. She hadn\'t eaten since breakfast, and her stomach growled loudly as she smelled the soup."\nWhat does "famished" mean? What clues in the passage helped you work it out?', tier: 2 },
-      { q: 'Read this: "The explorer navigated through the dense, impenetrable jungle — the trees grew so close together that sunlight barely reached the ground."\nWhat does "impenetrable" mean? Explain TWO context clues that helped you, and explain what effect this description creates on the reader.', tier: 3 },
+      { q: 'Read this: "The enormous elephant was so large it knocked down a small tree just by walking past." What does "enormous" most likely mean?\n(a) very fast  (b) very large  (c) very loud  (d) very heavy', tier: 1 },
+      { q: 'Read this: "Zara was famished after the long hike. She hadn\'t eaten since breakfast, and her stomach growled loudly as she smelled the soup." Select TWO clues that help you understand what "famished" means.\n(a) she hadn\'t eaten since breakfast  (b) she went on a long hike  (c) her stomach growled  (d) she smelled the soup', tier: 2 },
+      { q: 'Read this: "The explorer navigated through the dense, impenetrable jungle — the trees grew so close together that sunlight barely reached the ground." Select TWO context clues that BEST help you understand what "impenetrable" means.\n(a) the trees grew so close together that sunlight barely reached the ground  (b) the explorer was navigating through the jungle  (c) the word "dense" appears just before it  (d) the jungle is described as somewhere an explorer visits', tier: 3 },
     ],
   },
 
@@ -1616,9 +1616,9 @@ const READING = {
     prerequisites: ['basic-sentence-comp'],
     nextSkills: ['vocabulary-in-context', 'text-structure'],
     questions: [
-      { q: 'Read this sentence: "Running quickly, the girl caught the bus just in time."\nIdentify: (a) the verb, (b) what "Running quickly" tells us about the girl.', tier: 1 },
-      { q: 'Take these two sentences: "The dog barked. The mailman arrived."\nCombine them into one sentence using a connective (because / when / as / although). Write TWO different versions and explain how the meaning changes.', tier: 2 },
-      { q: 'Read this: "Despite the rain, the match continued. The players, soaked through but determined, pressed on."\nExplain how the commas in the second sentence change how we read it. What would be lost if you removed the phrase between the commas?', tier: 3 },
+      { q: 'Read this: "Running quickly, the girl caught the bus just in time." What does the phrase "Running quickly" tell us about the girl?\n(a) what she is wearing  (b) how she was moving  (c) where she was going  (d) who she is', tier: 1 },
+      { q: 'Read these two sentences: "The dog barked. The mailman arrived." If you want to show that the dog barked BECAUSE the mailman arrived, which combined sentence is BEST?\n(a) The dog barked and the mailman arrived  (b) The dog barked because the mailman arrived  (c) The dog barked although the mailman arrived  (d) The dog barked but the mailman arrived', tier: 2 },
+      { q: 'Read this: "The players, soaked through but determined, pressed on." Select TWO things that would be LOST if you removed the phrase "soaked through but determined".\n(a) we would not know how the players felt  (b) we would not know the players pressed on  (c) we would lose information about the players\' physical condition  (d) the sentence would have no subject', tier: 3 },
     ],
   },
 
@@ -1630,9 +1630,9 @@ const READING = {
     prerequisites: ['context-clues-basic'],
     nextSkills: ['authors-purpose', 'inference-basic', 'nonfiction-features'],
     questions: [
-      { q: 'Read this sentence: "The hiker was exhausted after the long trek up the steep mountain path."\nWhat does "exhausted" most likely mean? (a) very tired  (b) very hungry  (c) very lost  (d) very cold', tier: 1 },
-      { q: 'Read this: "The politician\'s speech was eloquent — every word carefully chosen, the rhythm flowing, the argument building steadily to a powerful conclusion."\nWhat does "eloquent" mean? Give TWO clues from the sentence that helped you.', tier: 2 },
-      { q: 'Read this: "After years of obscurity, the painter\'s work finally gained recognition — her canvases began appearing in galleries, critics wrote glowing reviews, and collectors competed to own her pieces."\nExplain what "obscurity" means and identify TWO context clues. Then explain how the contrast between the two halves of the sentence creates meaning.', tier: 3 },
+      { q: 'Read this: "The hiker was exhausted after the long trek up the steep mountain path." What does "exhausted" most likely mean?\n(a) very tired  (b) very hungry  (c) very lost  (d) very cold', tier: 1 },
+      { q: 'Read this: "The politician\'s speech was eloquent — every word carefully chosen, the rhythm flowing, the argument building steadily to a powerful conclusion." What does "eloquent" most likely mean?\n(a) very short and direct  (b) well-spoken and skilfully expressed  (c) loud and forceful  (d) confusing and hard to follow', tier: 2 },
+      { q: 'Read this: "After years of obscurity, the painter\'s work finally gained recognition — her canvases began appearing in galleries, critics wrote glowing reviews, and collectors competed to own her pieces." Select TWO clues that help you understand what "obscurity" means.\n(a) her work "finally gained recognition" — implying she didn\'t have it before  (b) critics wrote glowing reviews of her work  (c) the contrast between "years of obscurity" and the recognition that followed  (d) collectors competed to own her pieces', tier: 3 },
     ],
   },
 
@@ -1642,9 +1642,9 @@ const READING = {
     prerequisites: ['main-idea-details'],
     nextSkills: ['inference-basic', 'text-structure', 'argument-structure'],
     questions: [
-      { q: 'Read this: "Littering is destroying our parks. Every year, tonnes of rubbish are left behind. We all have a responsibility to keep public spaces clean."\nWhat is the author\'s main purpose? (a) to inform  (b) to persuade  (c) to entertain. Give one phrase from the text that shows this.', tier: 1 },
-      { q: 'Read this: "The deep ocean is the least explored place on Earth. More than 80% has never been mapped. Strange creatures live in total darkness miles below the surface — some produce their own light, others have jaws that can swallow prey larger than themselves."\nWhat is the author\'s purpose? How does the language support this purpose?', tier: 2 },
-      { q: 'Read this: "Fresh air is free. Gym memberships are not. Every morning, thousands of people drive to a building to walk on a machine — inside — while the sun shines and the park sits empty outside."\nIdentify the author\'s purpose. Explain TWO specific techniques used to achieve it (contrast, irony, repetition, etc.). What effect do they create on the reader?', tier: 3 },
+      { q: 'Read this: "Littering is destroying our parks. Every year, tonnes of rubbish are left behind. We all have a responsibility to keep public spaces clean." What is the author\'s MAIN purpose?\n(a) to entertain readers with a funny story  (b) to inform readers about different types of litter  (c) to persuade readers to change their behaviour  (d) to describe what parks look like', tier: 1 },
+      { q: 'Read this: "The deep ocean is the least explored place on Earth. More than 80% has never been mapped. Strange creatures live in total darkness miles below the surface — some produce their own light, others have jaws that can swallow prey larger than themselves." Select TWO techniques the author uses to achieve their purpose.\n(a) surprising statistics such as "more than 80% has never been mapped"  (b) a personal anecdote about visiting the ocean  (c) vivid descriptions of strange deep-sea creatures  (d) an argument against ocean exploration', tier: 2 },
+      { q: 'Read this: "Fresh air is free. Gym memberships are not. Every morning, thousands of people drive to a building to walk on a machine — inside — while the sun shines and the park sits empty outside." Select TWO techniques used in this passage.\n(a) contrast between free outdoor exercise and expensive indoor exercise  (b) statistics about gym membership costs  (c) irony — describing the absurdity of driving to a gym when parks exist outside  (d) a personal story about someone who chose the gym over the park', tier: 3 },
     ],
   },
 
@@ -1654,9 +1654,9 @@ const READING = {
     prerequisites: ['main-idea-details'],
     nextSkills: ['text-structure', 'compare-contrast-texts'],
     questions: [
-      { q: 'A nonfiction book contains: a table of contents, chapter headings, a glossary, and an index. What is the PURPOSE of each feature?', tier: 1 },
-      { q: 'A science article includes a bar chart showing annual rainfall in five cities. The caption reads: "London receives less rain than Seattle, despite its reputation."\nWhat does the chart add that the written text cannot? Why might the author include this?', tier: 2 },
-      { q: 'Explain how a journalist would use headings, pull-quotes, and infographics DIFFERENTLY from an academic textbook on the same topic. What does each format assume about its reader?', tier: 3 },
+      { q: 'A nonfiction book has a table of contents and a glossary. What is the PURPOSE of a glossary?\n(a) to list the chapters in order  (b) to explain difficult or technical words used in the book  (c) to list topics alphabetically for quick reference  (d) to summarise each chapter', tier: 1 },
+      { q: 'A science article includes a bar chart showing annual rainfall in five cities, with the caption: "London receives less rain than Seattle, despite its reputation." Select TWO reasons why the author might include this chart.\n(a) to give visual evidence that supports the written claim  (b) to replace the need for any written text  (c) to show data that is easier to compare visually than in words  (d) to make the article look more professional', tier: 2 },
+      { q: 'A journalist and an academic textbook cover the same topic. Select TWO ways their use of text features would DIFFER.\n(a) the journalist uses pull-quotes and headings to grab attention; the textbook uses them to organise dense content  (b) both use identical formatting since the information is the same  (c) the journalist assumes a general reader; the textbook assumes a specialist audience  (d) textbooks never use headings; only journalists use them', tier: 3 },
     ],
   },
 
@@ -1666,9 +1666,9 @@ const READING = {
     prerequisites: ['vocabulary-in-context', 'authors-purpose'],
     nextSkills: ['character-analysis', 'theme-identification', 'inference-advanced'],
     questions: [
-      { q: 'Read this: "Jake walked into the exam hall, sat down, and immediately turned the paper over. He stared at the first question, put his pen down, and rubbed his eyes."\nHow is Jake feeling? He doesn\'t say it directly — use TWO details from the text to support your inference.', tier: 1 },
-      { q: 'Read this: "Nadia put on her coat and called out \'Goodbye!\' No one answered. She stood in the hallway for a moment, then quietly closed the door behind her."\nWhat can you infer about Nadia\'s situation? What two details support your inference?', tier: 2 },
-      { q: 'Read this: "The old man set two cups on the table every morning. He filled one with tea and left the other empty. He never moved the empty cup."\nWhat can you infer from this passage? Explain your inference fully, and discuss what the author has deliberately NOT said — and why that technique is effective.', tier: 3 },
+      { q: 'Read this: "Jake walked into the exam hall, sat down, and immediately turned the paper over. He stared at the first question, put his pen down, and rubbed his eyes." How is Jake most likely feeling?\n(a) excited and confident  (b) nervous or anxious  (c) bored and uninterested  (d) happy and relaxed', tier: 1 },
+      { q: 'Read this: "Nadia put on her coat and called out \'Goodbye!\' No one answered. She stood in the hallway for a moment, then quietly closed the door behind her." Select TWO inferences that are supported by this passage.\n(a) Nadia lives alone or no one was home  (b) Nadia is leaving in a hurry  (c) there is no one to say goodbye to  (d) Nadia is going somewhere she is excited about', tier: 2 },
+      { q: 'Read this: "The old man set two cups on the table every morning. He filled one with tea and left the other empty. He never moved the empty cup." Select TWO inferences that BEST explain this behaviour.\n(a) the old man is forgetful and keeps setting an extra cup by mistake  (b) the empty cup represents someone who used to sit with him  (c) this habit suggests loneliness or grief for someone no longer there  (d) the old man simply prefers two cups on the table', tier: 3 },
     ],
   },
 
@@ -1678,9 +1678,9 @@ const READING = {
     prerequisites: ['authors-purpose', 'sequence-retell'],
     nextSkills: ['character-analysis', 'inference-advanced', 'text-structure-analysis'],
     questions: [
-      { q: 'Read this: "Dogs and cats make popular pets. Dogs need daily walks and enjoy company, while cats are more independent. Both animals, however, need food, water, and regular vet visits."\nWhat text structure is this? (a) cause and effect  (b) compare and contrast  (c) problem and solution  (d) chronological', tier: 1 },
-      { q: 'Read this: "Rising sea levels threaten coastal cities. As ice caps melt due to warming temperatures, water levels rise and storm surges reach further inland. Engineers are designing higher sea walls and flood barriers to protect low-lying areas."\nIdentify the text structure and explain how the structure helps the author communicate the topic.', tier: 2 },
-      { q: 'Read this: "Before the internet, people wrote letters. Writing a letter forced careful thought — you couldn\'t unsend it. Today, a message takes seconds. Yet studies show handwritten letters are remembered more fondly by recipients."\nIdentify the text structure and explain how it shapes the reader\'s understanding. What would be lost if the same information were organised differently?', tier: 3 },
+      { q: 'Read this: "Dogs and cats make popular pets. Dogs need daily walks and enjoy company, while cats are more independent. Both animals, however, need food, water, and regular vet visits." What text structure is this?\n(a) cause and effect  (b) compare and contrast  (c) problem and solution  (d) chronological', tier: 1 },
+      { q: 'Read this: "Rising sea levels threaten coastal cities. As ice caps melt due to warming temperatures, water levels rise and storm surges reach further inland. Engineers are designing higher sea walls and flood barriers to protect low-lying areas." What is the text structure of this passage?\n(a) compare and contrast  (b) chronological order  (c) problem and solution  (d) descriptive', tier: 2 },
+      { q: 'Read this: "Before the internet, people wrote letters. Writing a letter forced careful thought — you couldn\'t unsend it. Today, a message takes seconds. Yet studies show handwritten letters are remembered more fondly by recipients." Select TWO reasons why the author chose to structure this passage as a contrast between past and present.\n(a) to highlight how the speed of communication has changed  (b) to prove that letters are always superior to messages  (c) to suggest that slower, more deliberate communication has lasting value  (d) to provide a timeline of how postal services developed', tier: 3 },
     ],
   },
 
@@ -1692,9 +1692,9 @@ const READING = {
     prerequisites: ['inference-basic'],
     nextSkills: ['theme-identification', 'narrative-structure', 'point-of-view'],
     questions: [
-      { q: 'Read this: "Mr. Greer never smiled. He marked every assignment with red pen and handed it back without a word. Yet on the last day of school, he left a folded note on each student\'s desk."\nDescribe Mr. Greer\'s character. What does his action at the end suggest about him?', tier: 1 },
-      { q: 'Read this: "Elena had always been the best in class — the first to raise her hand, the last to leave the library. But when she saw the exam paper, she went pale. She had studied the wrong chapters."\nHow does Elena\'s character change in this moment? What does this reveal about her? Use specific evidence.', tier: 2 },
-      { q: 'Read this: "Thomas spoke loudly in meetings and took credit for the team\'s ideas. But when the project failed, he was the first to volunteer for the next one — working quietly, arriving early, leaving late."\nAnalyse Thomas\'s character. Identify the contradiction in his behaviour and explain what the author wants us to understand about him.', tier: 3 },
+      { q: 'Read this: "Mr. Greer never smiled. He marked every assignment with red pen and handed it back without a word. Yet on the last day of school, he left a folded note on each student\'s desk." Which description BEST fits Mr. Greer?\n(a) cruel and uncaring  (b) strict on the outside but quietly caring  (c) lazy and disorganised  (d) friendly and warm throughout', tier: 1 },
+      { q: 'Read this: "Elena had always been the best in class — the first to raise her hand, the last to leave the library. But when she saw the exam paper, she went pale. She had studied the wrong chapters." Select TWO things this passage reveals about Elena.\n(a) she is usually hardworking and high-achieving  (b) she is careless about her studies  (c) she experiences vulnerability despite her usual confidence  (d) she gives up easily when things go wrong', tier: 2 },
+      { q: 'Read this: "Thomas spoke loudly in meetings and took credit for the team\'s ideas. But when the project failed, he was the first to volunteer for the next one — working quietly, arriving early, leaving late." Select TWO inferences about Thomas that this passage BEST supports.\n(a) Thomas shows a contradiction — self-promotion in success but quiet effort in adversity  (b) Thomas is consistently arrogant and self-serving throughout  (c) Thomas may be more capable and determined than his initial behaviour suggests  (d) Thomas only volunteers so he can take credit again', tier: 3 },
     ],
   },
 
@@ -1704,9 +1704,9 @@ const READING = {
     prerequisites: ['character-analysis', 'inference-basic'],
     nextSkills: ['figurative-language', 'literary-devices-advanced', 'tone-mood'],
     questions: [
-      { q: 'Read this: "Rosa worked all summer to buy a bicycle. The day she brought it home, her younger brother cried because he wanted one too. Rosa looked at her bike, then at her brother, and sighed."\nWhat is the THEME? (a) jealousy  (b) sacrifice  (c) hard work  (d) fairness. Explain with evidence.', tier: 1 },
-      { q: 'Read this: "The old fisherman had won every competition for twenty years. This year, a teenager beat him by two seconds. The old man shook the teenager\'s hand and said, \'Come back next year. I\'ll be ready.\'\"\nWhat is the theme? How does the dialogue specifically develop it?', tier: 2 },
-      { q: 'Read this: "Every morning the girl watched the astronaut from her window. He jogged past at 6am, in all weather. When she asked him why he ran so early, he said, \'Because the work is done before breakfast, or it isn\'t done at all.\'\"\nIdentify the theme and explain how the author develops it through BOTH character action and dialogue. Why is the astronaut\'s job significant to the theme?', tier: 3 },
+      { q: 'Read this: "Rosa worked all summer to buy a bicycle. The day she brought it home, her younger brother cried because he wanted one too. Rosa looked at her bike, then at her brother, and sighed." What is the THEME of this passage?\n(a) jealousy  (b) sacrifice  (c) hard work  (d) fairness', tier: 1 },
+      { q: 'Read this: "The old fisherman had won every competition for twenty years. This year, a teenager beat him by two seconds. The old man shook the teenager\'s hand and said, \'Come back next year. I\'ll be ready.\'" What is the THEME of this passage?\n(a) jealousy between generations  (b) the importance of winning at all costs  (c) dignity and resilience in the face of defeat  (d) retirement and knowing when to stop', tier: 2 },
+      { q: 'Read this: "Every morning the girl watched the astronaut from her window. He jogged past at 6am, in all weather. When she asked him why he ran so early, he said, \'Because the work is done before breakfast, or it isn\'t done at all.\'" Select TWO ways the author develops the theme of discipline.\n(a) the astronaut\'s daily routine demonstrates discipline through consistent action  (b) the girl\'s admiration shows she has adopted the same habits  (c) the astronaut\'s words state the theme directly through dialogue  (d) the weather is used to show the astronaut is reckless', tier: 3 },
     ],
   },
 
@@ -1716,10 +1716,9 @@ const READING = {
     prerequisites: ['theme-identification'],
     nextSkills: ['literary-devices-advanced', 'authors-craft'],
     questions: [
-      { q: 'Read this: "The classroom was a zoo before the teacher arrived — students were swinging from their chairs, howling with laughter, and stampeding between the desks."\nIdentify the type of figurative language and explain what it means.', tier: 1 },
-      { q: 'Read this: "The city never sleeps — its streets pulse like a heartbeat, its towers reaching for something just beyond their grasp."\nWhich TWO figurative devices are used in this passage? (a) personification  (b) simile  (c) alliteration  (d) onomatopoeia', tier: 2 },
-      { q: 'Read this: "Hope is a thing with feathers / That perches in the soul / And sings the tune without the words / And never stops at all."\nIdentify the figurative language. What qualities of hope does the poet suggest through this comparison? Be specific.', tier: 2 },
-      { q: 'Read this: "The sun was a furnace. The road shimmered and buckled in the heat. Even the shadows felt hot."\nIdentify every figurative device used and explain the precise effect of each. Then explain how the three sentences work together to build a single impression.', tier: 3 },
+      { q: 'Read this: "The classroom was a zoo before the teacher arrived — students were swinging from their chairs, howling with laughter, and stampeding between the desks." What type of figurative language is used?\n(a) simile  (b) personification  (c) metaphor  (d) alliteration', tier: 1 },
+      { q: 'Read this: "The city never sleeps — its streets pulse like a heartbeat, its towers reaching for something just beyond their grasp." Which TWO figurative devices are used in this passage?\n(a) personification  (b) simile  (c) alliteration  (d) onomatopoeia', tier: 2 },
+      { q: 'Read this: "The sun was a furnace. The road shimmered and buckled in the heat. Even the shadows felt hot." Select TWO effects created by the figurative language in this passage.\n(a) it makes the heat feel extreme and oppressive  (b) it suggests the weather will soon improve  (c) it creates a physical, sensory impression of intense heat  (d) it shows the narrator is enjoying the sunshine', tier: 3 },
     ],
   },
 
@@ -1729,9 +1728,9 @@ const READING = {
     prerequisites: ['character-analysis'],
     nextSkills: ['inference-advanced', 'tone-mood'],
     questions: [
-      { q: 'Read this: "I walked into the room first. No one noticed me — they were all looking at Daniel, as usual."\nWhat point of view is this? What does the narrator seem to feel about Daniel? Give evidence.', tier: 1 },
-      { q: 'Read this: "She watched her sister win the trophy and clapped loudly with the rest. Later, alone, she sat on the stairs in the dark."\nThis is third person. What do we NOT know that we would know in first person? Why might the author choose this distance?', tier: 2 },
-      { q: 'Read this: "The hero arrived. From the villagers\' windows they watched him ride in — tall, gleaming, confident. From the hill at the edge of town, the old woman watched too. She had seen heroes before."\nExplain how point of view shifts in this passage. What does the old woman\'s perspective add that the villagers\' view cannot? What is the author implying?', tier: 3 },
+      { q: 'Read this: "I walked into the room first. No one noticed me — they were all looking at Daniel, as usual." What can you infer about the narrator\'s feelings toward Daniel?\n(a) the narrator greatly admires Daniel  (b) the narrator feels overlooked or resentful  (c) the narrator and Daniel are close friends  (d) the narrator does not know who Daniel is', tier: 1 },
+      { q: 'Read this: "She watched her sister win the trophy and clapped loudly with the rest. Later, alone, she sat on the stairs in the dark." Select TWO things a first-person narrator would reveal that this third-person narration CANNOT.\n(a) the character\'s exact inner thoughts and feelings  (b) what the trophy looked like  (c) whether her public reaction matched her private feelings  (d) that she sat on the stairs in the dark', tier: 2 },
+      { q: 'Read this: "The hero arrived. From the villagers\' windows they watched him ride in — tall, gleaming, confident. From the hill at the edge of town, the old woman watched too. She had seen heroes before." Select TWO effects created by including the old woman\'s perspective.\n(a) it introduces doubt or irony about the hero\'s reception  (b) it confirms that the hero is genuinely heroic  (c) it suggests that experience leads to scepticism about heroism  (d) it shows the old woman is jealous of the hero', tier: 3 },
     ],
   },
 
@@ -1741,10 +1740,9 @@ const READING = {
     prerequisites: ['inference-basic', 'text-structure'],
     nextSkills: ['tone-mood', 'argument-structure', 'close-reading'],
     questions: [
-      { q: 'Read this: "The factory had been closed for ten years. In the town, the bakery shut, then the pub, then the school. The bus stopped coming."\nWhat can you infer happened to this town? Name TWO details that support your inference.', tier: 1 },
-      { q: 'Read this: "Every morning for thirty years, the lighthouse keeper climbed the steps and lit the lamp. He noted the weather, the ships, the tides. He never missed a day. When the coastguard arrived one Tuesday, the lamp was unlit and the keeper\'s coat was still on the hook."\nSelect TWO inferences that are supported by this passage? (a) The keeper disappeared suddenly and unexpectedly  (b) The keeper retired and left voluntarily  (c) Something interrupted the keeper\'s normal routine  (d) The lighthouse had been abandoned for years', tier: 2 },
-      { q: 'Read this: "The letter had sat unopened on the mantelpiece for six months. Each morning, Margaret dusted around it carefully. Each evening, she turned off the light without looking at it."\nWhat can you infer about Margaret\'s feelings? Why does she dust around the letter rather than moving it? What does the author imply about avoidance?', tier: 2 },
-      { q: 'Read this: "The politician spoke warmly of \'getting back to basics\' and \'the values that made us great.\' She did not specify which basics, or which values, or when greatness was. The crowd applauded."\nWhat is the author inferring about the politician\'s language? What is implied about the crowd? Name the technique being used and explain its effect.', tier: 3 },
+      { q: 'Read this: "The factory had been closed for ten years. In the town, the bakery shut, then the pub, then the school. The bus stopped coming." What can you MOST REASONABLY infer happened to this town?\n(a) the town grew rapidly after the factory closed  (b) the town declined economically after the factory closed  (c) the residents successfully moved the factory elsewhere  (d) the town\'s businesses closed due to poor management unrelated to the factory', tier: 1 },
+      { q: 'Read this: "Every morning for thirty years, the lighthouse keeper climbed the steps and lit the lamp. He noted the weather, the ships, the tides. He never missed a day. When the coastguard arrived one Tuesday, the lamp was unlit and the keeper\'s coat was still on the hook." Select TWO inferences that are SUPPORTED by this passage.\n(a) the keeper disappeared suddenly and unexpectedly  (b) the keeper retired and left voluntarily  (c) something interrupted the keeper\'s normal routine  (d) the lighthouse had been abandoned for years', tier: 2 },
+      { q: 'Read this: "The politician spoke warmly of \'getting back to basics\' and \'the values that made us great.\' She did not specify which basics, or which values, or when greatness was. The crowd applauded." Select TWO things the author is implying in this passage.\n(a) the politician\'s language is deliberately vague to appeal to everyone  (b) the politician has a specific and detailed policy agenda  (c) the crowd\'s applause shows the vague language was effective  (d) the author admires the politician\'s skill as a communicator', tier: 3 },
     ],
   },
 
@@ -1754,9 +1752,9 @@ const READING = {
     prerequisites: ['sequence-retell', 'character-analysis'],
     nextSkills: ['literary-devices-advanced', 'text-structure-analysis'],
     questions: [
-      { q: 'Explain these plot terms with a brief example for each: exposition, rising action, climax, falling action, resolution.', tier: 1 },
-      { q: 'Read this: "Tom had dreamed of winning the race for years. He trained every morning, even in snow. On race day, he tripped at the starting line. He got up, finished last — and signed up for the next month\'s race."\nIdentify the climax and resolution. How does the resolution affect the overall meaning?', tier: 2 },
-      { q: 'Some stories begin at the ending and work backwards (in medias res). Explain why an author might choose this structure instead of chronological order. What is gained and what is lost? Use a specific story or film as an example.', tier: 3 },
+      { q: 'Read this: "Tom had dreamed of winning the race for years. He trained every morning, even in snow. On race day, he tripped at the starting line. He got up, finished last — and signed up for the next month\'s race." Which part of the story is the CLIMAX?\n(a) Tom dreamed of winning for years  (b) he trained every morning, even in snow  (c) he tripped at the starting line on race day  (d) he signed up for the next race', tier: 1 },
+      { q: 'Read this: "Tom had dreamed of winning the race for years. He trained every morning, even in snow. On race day, he tripped at the starting line. He got up, finished last — and signed up for the next month\'s race." Select TWO ways the resolution affects the MEANING of the story.\n(a) it shows that Tom\'s true goal is persistence, not winning  (b) it suggests Tom is foolish to keep trying after failing  (c) it reframes failure as a beginning rather than an ending  (d) it proves Tom will definitely win the next race', tier: 2 },
+      { q: 'Some stories begin at the ending and then work backwards. Select TWO reasons an author might choose this structure OVER telling events in chronological order.\n(a) to create immediate tension by showing the outcome and making the reader ask "how did we get here?"  (b) because chronological order is too difficult to write well  (c) to shift the reader\'s focus from what happens to why and how it happened  (d) to avoid having to write a satisfying conclusion', tier: 3 },
     ],
   },
 
@@ -1768,10 +1766,9 @@ const READING = {
     prerequisites: ['inference-advanced', 'point-of-view'],
     nextSkills: ['argument-structure', 'rhetoric-introduction', 'literary-devices-advanced'],
     questions: [
-      { q: 'Read this: "The abandoned playground sat rusting under the grey sky. A single swing creaked in the wind. No children came here anymore."\nWhat is the MOOD of this passage? Give TWO words that create it. What is the TONE — is the narrator sad, angry, or neutral?', tier: 1 },
-      { q: 'Read this: "The last train had gone. The platform was empty except for a torn ticket and a forgotten umbrella. Rain began to fall, softly at first, then with a kind of determination."\nSelect TWO words that best describe the mood of this passage? (a) melancholy  (b) tense and urgent  (c) lonely  (d) joyful and optimistic', tier: 2 },
-      { q: 'Read this: "The new CEO walked the factory floor smiling, shaking hands, asking workers their names. He remembered each one. The workers smiled back — though a few exchanged glances."\nIdentify the tone and mood. What is the gap between what the CEO SHOWS and what the passage IMPLIES? How does the author create this gap?', tier: 2 },
-      { q: 'Read this: "She described the hospital waiting room in precise, clinical terms: the linoleum floor, the number of chairs, the make of the vending machine. She did not describe her mother in the next room."\nAnalyse how deliberate avoidance of emotion creates tone and mood. What effect does clinical detail produce here? What is left unsaid, and why is that more powerful?', tier: 3 },
+      { q: 'Read this: "The abandoned playground sat rusting under the grey sky. A single swing creaked in the wind. No children came here anymore." What is the MOOD of this passage?\n(a) joyful and nostalgic  (b) melancholy and desolate  (c) tense and frightening  (d) peaceful and calm', tier: 1 },
+      { q: 'Read this: "The last train had gone. The platform was empty except for a torn ticket and a forgotten umbrella. Rain began to fall, softly at first, then with a kind of determination." Select TWO words that BEST describe the mood of this passage.\n(a) melancholy  (b) tense and urgent  (c) lonely  (d) joyful and optimistic', tier: 2 },
+      { q: 'Read this: "The new CEO walked the factory floor smiling, shaking hands, asking workers their names. He remembered each one. The workers smiled back — though a few exchanged glances." Select TWO techniques the author uses to create a gap between what is shown and what is implied.\n(a) the CEO\'s performed friendliness is contrasted with the workers\' private reaction  (b) the CEO is described positively throughout with no ambiguity  (c) the detail "a few exchanged glances" suggests the workers are not fully convinced  (d) the tone and mood are identical — there is no gap between them', tier: 3 },
     ],
   },
 
@@ -1781,9 +1778,9 @@ const READING = {
     prerequisites: ['inference-advanced', 'authors-purpose'],
     nextSkills: ['rhetoric-introduction', 'counterargument', 'complex-argumentation'],
     questions: [
-      { q: 'Read this: "Schools should start later. Research shows teenagers\' brains are biologically set to sleep later. Early starts reduce academic performance and mental wellbeing."\nIdentify: (a) the CLAIM  (b) one piece of EVIDENCE  (c) the REASONING that connects them.', tier: 1 },
-      { q: 'Read this: "Social media causes anxiety in teenagers. A 2022 study found students who used social media more than 3 hours daily were 40% more likely to report anxiety. When students took a two-week break, anxiety scores dropped significantly."\nEvaluate the argument. Is the evidence sufficient? What question would you ask to test the reasoning?', tier: 2 },
-      { q: 'Read this: "We should ban cars from city centres. Cities with car-free zones — Oslo, Amsterdam — have seen falls in pollution, rises in retail footfall, and improvements in resident wellbeing. Critics say it hurts business; the data says otherwise."\nMap the full argument: claim, evidence, reasoning, counterargument, and rebuttal. What evidence is still missing to make this argument fully convincing?', tier: 3 },
+      { q: 'Read this: "Schools should start later. Research shows teenagers\' brains are biologically set to sleep later. Early starts reduce academic performance and mental wellbeing." Which sentence states the MAIN CLAIM of this passage?\n(a) "Research shows teenagers\' brains are biologically set to sleep later" — a research finding  (b) "Schools should start later" — the main argument being made  (c) "Early starts reduce academic performance" — a consequence  (d) all three sentences together form the claim', tier: 1 },
+      { q: 'Read this: "Social media causes anxiety in teenagers. A 2022 study found students who used social media more than 3 hours daily were 40% more likely to report anxiety. When students took a two-week break, anxiety scores dropped significantly." Select TWO questions that would BEST test the strength of this argument.\n(a) did the students change anything else in their routine during the break?  (b) what was the weather like during the study period?  (c) does a correlation between social media use and anxiety prove that social media CAUSES it?  (d) how many students enjoyed using social media before the study?', tier: 2 },
+      { q: 'Read this: "We should ban cars from city centres. Cities with car-free zones — Oslo, Amsterdam — have seen falls in pollution, rises in retail footfall, and improvements in wellbeing. Critics say it hurts business; the data says otherwise." Select TWO structural features of this argument.\n(a) it includes a counterargument and immediately rebuts it  (b) it uses specific city examples as evidence for the claim  (c) it relies entirely on emotional language with no factual evidence  (d) it presents only one side with no acknowledgement of opposition', tier: 3 },
     ],
   },
 
