@@ -95,14 +95,17 @@ Formatting — use these exact patterns (they render as rich visual cards):
 - > **Note:** text → purple note card
 - > **Warning:** text → red warning card
 - $$LaTeX$$ → large centred formula block (dark background)
-- $LaTeX$ → inline rendered math
+- $LaTeX$ → inline rendered math (single symbols or very short terms only)
 - 1. 2. 3. numbered list → coloured circle numbers
 - - bullet list → coloured diamond bullets
 - *question for student* → amber question card
 - **Bold term** on its own line → section divider
 
 Rules:
-- Wrap ALL maths in LaTeX: inline with $...$ and display with $$...$$
+- CRITICAL math formatting:
+  - Use $$...$$ display blocks for ANY full equation, multi-term expression, or standalone formula (e.g. $$m \\times n = a \\times c$$, $$x = \\frac{-b}{2a}$$)
+  - Use $...$ inline ONLY for single symbols or very short terms within a prose sentence (e.g. "where $x$ is the unknown" or "the value of $n$")
+  - NEVER wrap a full equation in inline $...$ — it creates visual clutter
 - Use > **Label:** callout cards for key concepts, examples, tips
 - Use 1. 2. 3. for steps (renders as beautiful coloured circles)
 - Never write bare equations as plain text
@@ -208,13 +211,10 @@ function parseInline(text) {
           const html = katex.renderToString(mc, { throwOnError: false, displayMode: false })
           parts.push(<span key={key++} dangerouslySetInnerHTML={{ __html: html }} style={{
             verticalAlign: 'middle', display: 'inline-block',
-            padding: '1px 6px', fontSize: '1.05em', lineHeight: 1.3,
-            color: '#A5B4FC',
-            background: 'rgba(99,102,241,0.13)',
-            borderRadius: 5,
-            border: '1px solid rgba(99,102,241,0.20)',
+            padding: '0 3px', fontSize: '1.1em', lineHeight: 1,
+            color: '#C4B5FD',
           }} />)
-        } catch { parts.push(<span key={key++} style={{ fontFamily: 'monospace', fontSize: '0.9em', color: '#A5B4FC' }}>{mc}</span>) }
+        } catch { parts.push(<span key={key++} style={{ fontFamily: 'monospace', fontSize: '0.9em', color: '#C4B5FD' }}>{mc}</span>) }
         remaining = remaining.slice(mathMatch[0].length); continue
       } else {
         if (mathMatch[1]) parts.push(<span key={key++}>{mathMatch[1]}</span>)
@@ -310,12 +310,12 @@ function BlockEquation({ latex, html, eqNum }) {
     >
       {/* Equation card */}
       <div style={{
-        overflowX: 'auto', padding: '18px 24px',
-        textAlign: 'center', borderRadius: 12, fontSize: 18,
-        background: 'rgba(99,102,241,0.07)',
-        border: '1px solid rgba(99,102,241,0.22)',
-        borderLeft: '3px solid #6366F1',
-        boxShadow: hovered ? '0 2px 22px rgba(99,102,241,0.20)' : '0 2px 16px rgba(99,102,241,0.10)',
+        overflowX: 'auto', padding: '22px 32px',
+        textAlign: 'center', borderRadius: 14, fontSize: 18,
+        background: 'rgba(6,8,22,0.88)',
+        border: '1px solid rgba(99,102,241,0.20)',
+        borderLeft: '4px solid #6366F1',
+        boxShadow: hovered ? '0 4px 28px rgba(99,102,241,0.22)' : '0 2px 16px rgba(0,0,0,0.28)',
         color: '#E0E7FF',
         transition: 'box-shadow 0.2s',
         userSelect: 'none',
@@ -459,19 +459,20 @@ function getStepColor(text) {
   return '#818CF8' // default indigo
 }
 
-// ─── Step expander (U3) — expandable full working per H2 step ────────────────
+// ─── H2WithExpander (U3) — heading row with inline ⊕ toggle ─────────────────
 
-function StepExpander({ stepTitle, color }) {
+function H2WithExpander({ stepTitle, color, stepId, noExpand }) {
   const ctx = useContext(DocCtx)
-  const [expanded, setExpanded]   = useState(false)
-  const [content, setContent]     = useState(null)  // null = not yet fetched
-  const [loading, setLoading]     = useState(false)
+  const [expanded, setExpanded] = useState(false)
+  const [content, setContent]   = useState(null)
+  const [loading, setLoading]   = useState(false)
+
+  const showBtn = !noExpand && !!ctx?.getExpansionStream
 
   const handleToggle = async () => {
     if (!expanded) {
       setExpanded(true)
       if (content === null) {
-        // Return cached content instantly if available
         const cached = ctx?.expansionCache?.current?.[stepTitle]
         if (cached) {
           setContent(cached)
@@ -496,32 +497,53 @@ function StepExpander({ stepTitle, color }) {
     }
   }
 
-  if (!ctx?.getExpansionStream) return null
-
   return (
-    <div style={{ marginTop: -4, marginBottom: 8 }}>
-      <motion.button
-        onClick={handleToggle}
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.96 }}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '5px 13px', borderRadius: 99,
-          background: expanded ? `${color}18` : 'rgba(255,255,255,0.04)',
-          border: `1px solid ${expanded ? color + '45' : 'rgba(255,255,255,0.10)'}`,
-          color: expanded ? color : 'rgba(255,255,255,0.32)',
-          fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
-          fontFamily: 'inherit', transition: 'all 0.18s',
-        }}
-      >
-        <span style={{ fontSize: 8, opacity: 0.75 }}>{expanded ? '▲' : '▶'}</span>
-        {expanded ? 'Hide working' : 'Show full working'}
-      </motion.button>
+    <div id={stepId} style={{ marginTop: 34, marginBottom: 6 }}>
+      {/* Heading row — title + inline toggle icon */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        paddingBottom: 10,
+        borderBottom: `2px solid ${color}28`,
+      }}>
+        <div style={{
+          width: 5, height: 24, borderRadius: 3,
+          background: color, flexShrink: 0,
+          boxShadow: `0 0 14px ${color}70`,
+        }} />
+        <span style={{
+          flex: 1,
+          fontWeight: 900, fontSize: 17.5,
+          color: 'rgba(255,255,255,0.98)',
+          letterSpacing: '-0.03em', lineHeight: 1.3,
+        }}>{parseInline(stepTitle)}</span>
 
+        {showBtn && (
+          <motion.button
+            onClick={handleToggle}
+            whileHover={{ scale: 1.12 }}
+            whileTap={{ scale: 0.86 }}
+            title={expanded ? 'Hide full working' : 'Show full working'}
+            style={{
+              flexShrink: 0,
+              width: 24, height: 24, borderRadius: 7,
+              background: expanded ? `${color}22` : 'rgba(255,255,255,0.05)',
+              border: `1px solid ${expanded ? color + '55' : 'rgba(255,255,255,0.10)'}`,
+              color: expanded ? color : 'rgba(255,255,255,0.30)',
+              cursor: 'pointer', fontSize: 14, fontWeight: 700, lineHeight: 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: 'inherit', transition: 'all 0.18s',
+            }}
+          >
+            {loading ? '…' : expanded ? '−' : '+'}
+          </motion.button>
+        )}
+      </div>
+
+      {/* Expandable full working panel */}
       <AnimatePresence initial={false}>
         {expanded && (
           <motion.div
-            key="expander-body"
+            key="exp-body"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
@@ -529,15 +551,12 @@ function StepExpander({ stepTitle, color }) {
             style={{ overflow: 'hidden' }}
           >
             <div style={{
-              margin: '10px 0 4px',
-              padding: '16px 20px',
-              borderRadius: 12,
+              margin: '10px 0 4px', padding: '16px 20px', borderRadius: 12,
               background: `${color}08`,
               border: `1px solid ${color}20`,
               borderLeft: `3px solid ${color}55`,
             }}>
               {loading && !content ? (
-                /* Skeleton shimmer while streaming first tokens */
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
                   {[88, 72, 80, 55, 78].map((w, ii) => (
                     <motion.div key={ii}
@@ -711,37 +730,15 @@ function DocMarkdown({ text, messageIdx = 0, noExpand = false }) {
       i++; continue
     }
 
-    // H2 ## — outer step / section (F4 + U1)
+    // H2 ## — outer step / section (F4 + U1) — uses H2WithExpander for inline toggle
     if (/^##\s/.test(trimmed)) {
       flushList()
       const h2Text  = trimmed.replace(/^##\s/, '')
       const h2Color = getStepColor(h2Text)
       const stepId  = `doc-step-${messageIdx}-${h2Counter++}`
       elements.push(
-        <div id={stepId} key={`h2-${i}`} style={{ marginTop: 34, marginBottom: 6 }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            paddingBottom: 10,
-            borderBottom: `2px solid ${h2Color}28`,
-          }}>
-            <div style={{
-              width: 5, height: 24, borderRadius: 3,
-              background: h2Color, flexShrink: 0,
-              boxShadow: `0 0 14px ${h2Color}70`,
-            }} />
-            <span style={{
-              fontWeight: 900, fontSize: 17.5,
-              color: 'rgba(255,255,255,0.98)',
-              letterSpacing: '-0.03em', lineHeight: 1.3,
-            }}>{parseInline(h2Text)}</span>
-          </div>
-        </div>
+        <H2WithExpander key={`h2-${i}`} stepTitle={h2Text} color={h2Color} stepId={stepId} noExpand={noExpand} />
       )
-      if (!noExpand) {
-        elements.push(
-          <StepExpander key={`expander-${i}`} stepTitle={h2Text} color={h2Color} />
-        )
-      }
       i++; continue
     }
 
@@ -810,20 +807,20 @@ function DocMarkdown({ text, messageIdx = 0, noExpand = false }) {
       flushList()
       const stepColor = getStepColor(stepMatch[2])
       elements.push(
-        <div key={`step-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 13, marginTop: 26, marginBottom: 10 }}>
+        <div key={`step-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 11, marginTop: 22, marginBottom: 9 }}>
           <div style={{
-            flexShrink: 0, width: 32, height: 32, borderRadius: 10,
-            background: `${stepColor}22`,
-            border: `1.5px solid ${stepColor}55`,
-            boxShadow: `0 2px 10px ${stepColor}35`,
+            flexShrink: 0, width: 26, height: 26, borderRadius: 8,
+            background: `${stepColor}18`,
+            border: `1px solid ${stepColor}40`,
+            boxShadow: `0 1px 8px ${stepColor}25`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 13, fontWeight: 900, color: stepColor, letterSpacing: '-0.02em',
+            fontSize: 12, fontWeight: 900, color: stepColor, letterSpacing: '-0.02em',
           }}>
             {stepMatch[1]}
           </div>
           <span style={{
-            fontWeight: 700, fontSize: 15,
-            color: 'rgba(255,255,255,0.97)',
+            fontWeight: 700, fontSize: 14.5,
+            color: 'rgba(255,255,255,0.95)',
             lineHeight: 1.3, letterSpacing: '-0.015em',
           }}>
             {parseInline(stepMatch[2])}
