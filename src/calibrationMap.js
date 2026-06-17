@@ -2414,13 +2414,16 @@ export const FAST_LANE = {
     },
   ],
 
-  // ── READING — two-bracket ladder ──────────────────────────────────────────
-  // Bracket 1 (Grade 8–9): inference + rhetorical device recognition
+  // ── READING — three-bracket ladder ───────────────────────────────────────
+  // Bracket 1 (Grade 8–9): inference + figurative language
   //   ✅ Pass → enter at literary-devices-advanced (Grade 10)
   //   ❌ Fail → Bracket 2
-  // Bracket 2 (Grade 5): main idea + context clues
+  // Bracket 2 (Grade 4–5): main idea + context clues (accessible vocabulary)
   //   ✅ Pass → enter at character-analysis (Grade 7)
-  //   ❌ Fail → enter at main-idea-details (Grade 3)
+  //   ❌ Fail → Bracket 3
+  // Bracket 3 (Grade 1–2): basic sentence recall + simple sequencing
+  //   ✅ Pass → enter at main-idea-details (Grade 3)
+  //   ❌ Fail → enter at basic-sentence-comp (Grade 2)
   reading: [
     {
       label: 'Quick Check 1',
@@ -2431,10 +2434,17 @@ export const FAST_LANE = {
     },
     {
       label: 'Quick Check 2',
-      q: 'Two quick checks — answer both:\n(a) Read this passage: "Dolphins are intelligent animals. They can learn tricks, communicate with clicks and whistles, and scientists believe they even have their own names." What is the MAIN IDEA?\n(b) Read this: "Zara was famished after the long hike — she hadn\'t eaten since breakfast." What does "famished" mean? What clue in the sentence helped you?',
+      q: 'Two quick checks — answer both:\n(a) Read this passage: "Dolphins are intelligent animals. They can learn tricks, communicate with clicks and whistles, and scientists believe they even have their own names." What is the MAIN IDEA?\n(b) Read this: "The enormous elephant was so large it knocked down a small tree just by walking past." What does "enormous" mean? What clue in the sentence helped you?',
       nodeId: 'main-idea-details',
       onPass: 'character-analysis',  // solid → Grade 7 entry
-      onFail: 'main-idea-details',   // not solid → Grade 3 start
+      onFail: null,                  // not solid → try bracket 3
+    },
+    {
+      label: 'Quick Check 3',
+      q: 'Two quick checks — answer both:\n(a) Read this: "The big brown dog ran fast down the street. It stopped at a tree and barked loudly." What did the dog do? Name TWO things.\n(b) Read this: "First Tom put on his shoes. Then he grabbed his bag. Finally he ran to the bus stop." What did Tom do LAST?',
+      nodeId: 'sight-words-fluency',
+      onPass: 'main-idea-details',    // solid → Grade 3 entry
+      onFail: 'basic-sentence-comp',  // not solid → Grade 2 start
     },
   ],
 }
