@@ -251,6 +251,34 @@ function getUIText(language, subject) {
   return { ...base, ...readingOverrides }
 }
 
+// ── MC option parser ─────────────────────────────────────────────────────────
+// Detects "(a) ... (b) ... (c) ..." patterns in reading questions.
+// Returns { stem, options: [{ key, label }] } or null if no options found.
+function parseMCOptions(questionText) {
+  const text = questionText || ''
+  const aIdx = text.search(/\(a\)/i)
+  if (aIdx === -1) return null
+
+  const stem    = text.slice(0, aIdx).trim()
+  const optPart = text.slice(aIdx)
+
+  // Extract each (x) … up to the next (x) or end of string
+  const regex = /\(([a-d])\)\s*([^(]*?)(?=\s*\([a-d]\)|$)/gi
+  const matches = [...optPart.matchAll(regex)]
+  if (matches.length < 2) return null
+
+  const options = matches.map(m => ({
+    key:   m[1].toLowerCase(),
+    // Strip trailing instructional phrases that aren't part of the option label
+    label: m[2].trim()
+      .replace(/[.·]\s*(Explain|Give one|Use the|Why|Note:|How|What).*/i, '')
+      .replace(/\.$/, '')
+      .trim(),
+  })).filter(o => o.label.length > 0)
+
+  return options.length >= 2 ? { stem, options } : null
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 export function CalibrationExperience({
   question,           // { text, nodeId, tier, qNum, isFastLane }
@@ -271,7 +299,12 @@ export function CalibrationExperience({
   const [input, setInput]               = useState('')
   const [showFeedback, setShowFeedback] = useState(false)
   const [activeFeedback, setActiveFeedback] = useState(null)
+  const [selectedMC, setSelectedMC]     = useState(null)  // key of tapped MC option
+  const mcSubmitRef                     = useRef(null)     // pending MC auto-submit timer
   const inputRef = useRef(null)
+
+  // Parse MC options if subject is reading and question contains (a)/(b)/...
+  const mcData = subject === 'reading' ? parseMCOptions(question?.text) : null
 
   const subjectLabel = SUBJECT_LABELS[subject] || subject
   const subjectIcon  = SUBJECT_ICONS[subject]  || '📚'
@@ -285,12 +318,38 @@ export function CalibrationExperience({
     return () => clearTimeout(t)
   }, [lastFeedback?.ts])
 
-  // Clear input and re-focus when question changes
+  // Clear input / MC selection and re-focus when question changes
   useEffect(() => {
     setInput('')
-    const t = setTimeout(() => inputRef.current?.focus(), 180)
-    return () => clearTimeout(t)
-  }, [question?.text])
+    setSelectedMC(null)
+    if (mcSubmitRef.current) { clearTimeout(mcSubmitRef.current); mcSubmitRef.current = null }
+    if (!mcData) {
+      const t = setTimeout(() => inputRef.current?.focus(), 180)
+      return () => clearTimeout(t)
+    }
+  }, [question?.text]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keyboard: A/B/C/D selects MC option; ⌘Enter submits textarea
+  useEffect(() => {
+    const handler = (e) => {
+      if (isEvaluating || selectedMC) return
+      if (mcData && ['a','b','c','d'].includes(e.key.toLowerCase())) {
+        const opt = mcData.options.find(o => o.key === e.key.toLowerCase())
+        if (opt) handleMCSelect(opt)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [isEvaluating, selectedMC, mcData]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleMCSelect = (opt) => {
+    if (selectedMC || isEvaluating) return
+    setSelectedMC(opt.key)
+    // Brief delay so the selection highlights before the screen transitions
+    mcSubmitRef.current = setTimeout(() => {
+      onAnswer(`(${opt.key}) ${opt.label}`)
+    }, 380)
+  }
 
   const handleSubmit = () => {
     const text = input.trim()
@@ -405,7 +464,11 @@ export function CalibrationExperience({
                 fontSize: 16.5, lineHeight: 1.78, color: textCol, fontWeight: 440,
               }}
             >
-              <QuestionText text={question.text} noMath={subject === 'reading'} />
+              {/* For MC questions show only the stem; options rendered below */}
+              <QuestionText
+                text={mcData ? mcData.stem : question.text}
+                noMath={subject === 'reading'}
+              />
             </motion.div>
           </AnimatePresence>
 
@@ -429,78 +492,192 @@ export function CalibrationExperience({
             )}
           </AnimatePresence>
 
-          {/* Answer textarea */}
-          <div style={{ position: 'relative' }}>
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={isEvaluating ? t.placeholderEval : t.placeholder}
-              disabled={isEvaluating}
-              rows={4}
-              style={{
-                width: '100%', boxSizing: 'border-box',
-                background: cardBg, border: `1.5px solid ${inputBorder}`,
-                borderRadius: 14, padding: '16px 20px',
-                fontSize: 15, lineHeight: 1.65, color: textCol,
-                resize: 'vertical', outline: 'none', minHeight: 110,
-                fontFamily: "'Inter', system-ui, sans-serif",
-                opacity: isEvaluating ? 0.5 : 1,
-                transition: 'border-color 0.15s, opacity 0.2s',
-              }}
-              onFocus={e => { e.target.style.borderColor = '#818CF8' }}
-              onBlur={e  => { e.target.style.borderColor = inputBorder }}
-            />
-            {isEvaluating && (
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 14 }}>
-                <motion.span
-                  animate={{ opacity: [0.5, 1, 0.5] }}
-                  transition={{ duration: 1.1, repeat: Infinity }}
-                  style={{ fontSize: 12, fontWeight: 700, color: '#818CF8' }}
+          {mcData ? (
+            /* ── MC option buttons ─────────────────────────────────────────── */
+            <>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={question.text + '-opts'}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1,  y: 0  }}
+                  exit={  { opacity: 0         }}
+                  transition={{ duration: 0.18, delay: 0.06 }}
+                  style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
                 >
-                  {t.checking}
-                </motion.span>
+                  {mcData.options.map((opt, idx) => {
+                    const isSelected = selectedMC === opt.key
+                    const isDimmed   = selectedMC && !isSelected
+                    const selColor   = '#818CF8'
+                    return (
+                      <motion.button
+                        key={opt.key}
+                        initial={{ opacity: 0, x: 12 }}
+                        animate={{ opacity: 1,  x: 0  }}
+                        transition={{ delay: idx * 0.04, duration: 0.18 }}
+                        onClick={() => handleMCSelect(opt)}
+                        disabled={isEvaluating || !!selectedMC}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 14,
+                          padding: '14px 18px', borderRadius: 14, width: '100%',
+                          background: isSelected
+                            ? `rgba(129,140,248,0.14)`
+                            : cardBg,
+                          border: `1.5px solid ${
+                            isSelected ? `${selColor}80`
+                            : isDimmed  ? `${borderCol}`
+                            : borderCol
+                          }`,
+                          cursor: selectedMC || isEvaluating ? 'default' : 'pointer',
+                          textAlign: 'left', fontFamily: 'inherit',
+                          opacity: isDimmed ? 0.38 : 1,
+                          transition: 'all 0.15s',
+                          boxShadow: isSelected ? `0 0 0 1px ${selColor}40` : 'none',
+                        }}
+                        onMouseEnter={e => {
+                          if (!selectedMC && !isEvaluating) {
+                            e.currentTarget.style.borderColor = `${selColor}60`
+                            e.currentTarget.style.background  = `rgba(129,140,248,0.07)`
+                          }
+                        }}
+                        onMouseLeave={e => {
+                          if (!isSelected) {
+                            e.currentTarget.style.borderColor = borderCol
+                            e.currentTarget.style.background  = cardBg
+                          }
+                        }}
+                      >
+                        {/* Key badge */}
+                        <div style={{
+                          width: 26, height: 26, borderRadius: 8, flexShrink: 0,
+                          background: isSelected ? selColor : 'rgba(129,140,248,0.12)',
+                          border: `1px solid ${isSelected ? selColor : 'rgba(129,140,248,0.25)'}`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 11, fontWeight: 800,
+                          color: isSelected ? '#fff' : 'rgba(129,140,248,0.8)',
+                          transition: 'all 0.15s',
+                        }}>
+                          {opt.key.toUpperCase()}
+                        </div>
+                        {/* Label */}
+                        <span style={{
+                          fontSize: 14, lineHeight: 1.5,
+                          color: isSelected ? textCol : isDimmed ? mutedCol : textCol,
+                          fontWeight: isSelected ? 600 : 440,
+                          transition: 'color 0.15s',
+                        }}>
+                          {opt.label}
+                        </span>
+                        {/* Checking spinner on selected */}
+                        {isSelected && isEvaluating && (
+                          <motion.span
+                            animate={{ opacity: [0.5, 1, 0.5] }}
+                            transition={{ duration: 1.1, repeat: Infinity }}
+                            style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: selColor, flexShrink: 0 }}
+                          >
+                            {t.checking}
+                          </motion.span>
+                        )}
+                      </motion.button>
+                    )
+                  })}
+                </motion.div>
+              </AnimatePresence>
+
+              {/* MC skip + keyboard hint */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <button
+                  onClick={onSkip}
+                  disabled={isEvaluating || !!selectedMC}
+                  style={{
+                    background: 'none', border: 'none', padding: 0,
+                    cursor: isEvaluating || selectedMC ? 'default' : 'pointer',
+                    fontSize: 12, color: mutedCol, fontWeight: 600,
+                    opacity: isEvaluating || selectedMC ? 0.3 : 1,
+                  }}
+                >
+                  {t.skip}
+                </button>
+                <span style={{ fontSize: 10, color: mutedCol, opacity: 0.7 }}>
+                  Press A / B / C / D to select
+                </span>
               </div>
-            )}
-          </div>
+            </>
+          ) : (
+            /* ── Open-ended textarea ───────────────────────────────────────── */
+            <>
+              <div style={{ position: 'relative' }}>
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={isEvaluating ? t.placeholderEval : t.placeholder}
+                  disabled={isEvaluating}
+                  rows={4}
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    background: cardBg, border: `1.5px solid ${inputBorder}`,
+                    borderRadius: 14, padding: '16px 20px',
+                    fontSize: 15, lineHeight: 1.65, color: textCol,
+                    resize: 'vertical', outline: 'none', minHeight: 110,
+                    fontFamily: "'Inter', system-ui, sans-serif",
+                    opacity: isEvaluating ? 0.5 : 1,
+                    transition: 'border-color 0.15s, opacity 0.2s',
+                  }}
+                  onFocus={e => { e.target.style.borderColor = '#818CF8' }}
+                  onBlur={e  => { e.target.style.borderColor = inputBorder }}
+                />
+                {isEvaluating && (
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 14 }}>
+                    <motion.span
+                      animate={{ opacity: [0.5, 1, 0.5] }}
+                      transition={{ duration: 1.1, repeat: Infinity }}
+                      style={{ fontSize: 12, fontWeight: 700, color: '#818CF8' }}
+                    >
+                      {t.checking}
+                    </motion.span>
+                  </div>
+                )}
+              </div>
 
-          {/* Action row */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <button
-              onClick={onSkip}
-              disabled={isEvaluating}
-              style={{
-                background: 'none', border: 'none', padding: 0,
-                cursor: isEvaluating ? 'default' : 'pointer',
-                fontSize: 12, color: mutedCol, fontWeight: 600,
-                opacity: isEvaluating ? 0.35 : 1,
-              }}
-            >
-              {t.skip}
-            </button>
+              {/* Action row */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <button
+                  onClick={onSkip}
+                  disabled={isEvaluating}
+                  style={{
+                    background: 'none', border: 'none', padding: 0,
+                    cursor: isEvaluating ? 'default' : 'pointer',
+                    fontSize: 12, color: mutedCol, fontWeight: 600,
+                    opacity: isEvaluating ? 0.35 : 1,
+                  }}
+                >
+                  {t.skip}
+                </button>
 
-            <button
-              onClick={handleSubmit}
-              disabled={!input.trim() || isEvaluating}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                background: input.trim() && !isEvaluating ? '#818CF8' : isLight ? 'rgba(129,140,248,0.14)' : 'rgba(129,140,248,0.16)',
-                border: 'none', borderRadius: 12, padding: '12px 24px',
-                fontSize: 13.5, fontWeight: 700, letterSpacing: '0.01em',
-                color: input.trim() && !isEvaluating ? '#fff' : 'rgba(129,140,248,0.4)',
-                cursor: input.trim() && !isEvaluating ? 'pointer' : 'default',
-                transition: 'all 0.15s',
-              }}
-            >
-              {t.submit} <ChevronRight size={14} />
-            </button>
-          </div>
+                <button
+                  onClick={handleSubmit}
+                  disabled={!input.trim() || isEvaluating}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    background: input.trim() && !isEvaluating ? '#818CF8' : isLight ? 'rgba(129,140,248,0.14)' : 'rgba(129,140,248,0.16)',
+                    border: 'none', borderRadius: 12, padding: '12px 24px',
+                    fontSize: 13.5, fontWeight: 700, letterSpacing: '0.01em',
+                    color: input.trim() && !isEvaluating ? '#fff' : 'rgba(129,140,248,0.4)',
+                    cursor: input.trim() && !isEvaluating ? 'pointer' : 'default',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {t.submit} <ChevronRight size={14} />
+                </button>
+              </div>
 
-          {/* Hint */}
-          <div style={{ textAlign: 'center', fontSize: 10.5, color: mutedCol, marginTop: -4 }}>
-            {t.hint}
-          </div>
+              {/* Hint */}
+              <div style={{ textAlign: 'center', fontSize: 10.5, color: mutedCol, marginTop: -4 }}>
+                {t.hint}
+              </div>
+            </>
+          )}
         </div>
 
         {/* ── Right: live level arc ─────────────────────────────────────────── */}

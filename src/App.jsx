@@ -6815,8 +6815,10 @@ ${needsPassage ? `作成手順:
 
 ルール:
 - 問題文のみを返してください。ラベル・前置き・解説は不要です。
+- 難易度1（文字通りの内容）の場合: 必ず選択肢を日本語で付けてください: (a) … (b) … (c) … (d) …
+- 難易度2〜5: 記述式のみ（選択肢なし）。
 - 難易度 ${tier}/5 に正確に合わせてください。
-- 字数制限: 300字以内。`
+- 字数制限: 350字以内。`
 
     } else if (isReading) {
       // ── English reading ───────────────────────────────────────────────────
@@ -6837,10 +6839,13 @@ The question must require the student to engage with YOUR passage — not genera
 
 Rules:
 - Return ONLY the question text. No label, preamble, or explanation.
-- No multiple-choice unless the tier is 1 (literal). Tiers 2+ should be open-ended.
+- Tier 1 (literal): ALWAYS end with multiple-choice options in this exact format:
+  (a) option one  (b) option two  (c) option three  (d) option four
+  Use 4 options. One must be clearly correct; the others must be plausible distractors.
+- Tiers 2–5: open-ended only — NO multiple choice.
 - The passage and question must both be appropriate for ${node.band} reading level.
 - Match difficulty exactly: tier ${tier}/5 — ${readingTierDesc}.
-- Keep total length under 200 words.`
+- Keep total length under 220 words.`
 
     } else if (language === 'ja') {
       // ── Japanese STEM ─────────────────────────────────────────────────────
