@@ -291,6 +291,31 @@ function parseMCOptions(questionText) {
   return options.length >= 3 ? { stem, options } : null
 }
 
+// ── Multi-select option parser ───────────────────────────────────────────────
+// Triggered only when question text contains explicit "select TWO" / "which TWO" phrasing.
+// Returns { stem, options: [{ key, label }], selectCount } or null.
+function parseMSOptions(questionText) {
+  const text = questionText || ''
+  if (!/\b(select\s+two|which\s+two|select\s+2|choose\s+two)\b/i.test(text)) return null
+
+  const aIdx = text.search(/\(a\)/i)
+  if (aIdx === -1) return null
+
+  const stem    = text.slice(0, aIdx).trim()
+  const optPart = text.slice(aIdx)
+
+  const regex   = /\(([a-d])\)\s*([^(]*?)(?=\s*\([a-d]\)|$)/gi
+  const matches = [...optPart.matchAll(regex)]
+  if (matches.length < 2) return null
+
+  const options = matches.map(m => ({
+    key:   m[1].toLowerCase(),
+    label: m[2].trim().replace(/\.$/, '').trim(),
+  })).filter(o => o.label.length > 0 && o.label.length <= 150)
+
+  return options.length >= 2 ? { stem, options, selectCount: 2 } : null
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 export function CalibrationExperience({
   question,           // { text, nodeId, tier, qNum, isFastLane }
@@ -312,11 +337,13 @@ export function CalibrationExperience({
   const [showFeedback, setShowFeedback] = useState(false)
   const [activeFeedback, setActiveFeedback] = useState(null)
   const [selectedMC, setSelectedMC]     = useState(null)  // key of tapped MC option
+  const [selectedMS, setSelectedMS]     = useState([])    // keys of toggled multi-select options
   const mcSubmitRef                     = useRef(null)     // pending MC auto-submit timer
   const inputRef = useRef(null)
 
-  // Parse MC options if subject is reading and question contains (a)/(b)/...
-  const mcData = subject === 'reading' ? parseMCOptions(question?.text) : null
+  // Parse question type: multi-select takes priority over single-choice MC
+  const msData = subject === 'reading' ? parseMSOptions(question?.text) : null
+  const mcData = !msData && subject === 'reading' ? parseMCOptions(question?.text) : null
 
   const subjectLabel = SUBJECT_LABELS[subject] || subject
   const subjectIcon  = SUBJECT_ICONS[subject]  || '📚'
@@ -330,29 +357,36 @@ export function CalibrationExperience({
     return () => clearTimeout(t)
   }, [lastFeedback?.ts])
 
-  // Clear input / MC selection and re-focus when question changes
+  // Clear input / MC / MS selection and re-focus when question changes
   useEffect(() => {
     setInput('')
     setSelectedMC(null)
+    setSelectedMS([])
     if (mcSubmitRef.current) { clearTimeout(mcSubmitRef.current); mcSubmitRef.current = null }
-    if (!mcData) {
+    if (!mcData && !msData) {
       const t = setTimeout(() => inputRef.current?.focus(), 180)
       return () => clearTimeout(t)
     }
   }, [question?.text]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Keyboard: A/B/C/D selects MC option; ⌘Enter submits textarea
+  // Keyboard: A/B/C/D toggles MS options or selects MC option; ⌘Enter submits textarea/MS
   useEffect(() => {
     const handler = (e) => {
-      if (isEvaluating || selectedMC) return
-      if (mcData && ['a','b','c','d'].includes(e.key.toLowerCase())) {
-        const opt = mcData.options.find(o => o.key === e.key.toLowerCase())
+      if (isEvaluating) return
+      const key = e.key.toLowerCase()
+      if (msData && ['a','b','c','d'].includes(key)) {
+        const opt = msData.options.find(o => o.key === key)
+        if (opt) handleMSToggle(opt)
+        return
+      }
+      if (mcData && !selectedMC && ['a','b','c','d'].includes(key)) {
+        const opt = mcData.options.find(o => o.key === key)
         if (opt) handleMCSelect(opt)
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [isEvaluating, selectedMC, mcData]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isEvaluating, selectedMC, selectedMS, mcData, msData]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleMCSelect = (opt) => {
     if (selectedMC || isEvaluating) return
@@ -361,6 +395,26 @@ export function CalibrationExperience({
     mcSubmitRef.current = setTimeout(() => {
       onAnswer(`(${opt.key}) ${opt.label}`)
     }, 380)
+  }
+
+  const handleMSToggle = (opt) => {
+    if (isEvaluating) return
+    setSelectedMS(prev =>
+      prev.includes(opt.key) ? prev.filter(k => k !== opt.key) : [...prev, opt.key]
+    )
+  }
+
+  const handleMSSubmit = () => {
+    if (isEvaluating || selectedMS.length < 2) return
+    const answer = selectedMS
+      .sort()
+      .map(k => {
+        const opt = msData.options.find(o => o.key === k)
+        return `(${k}) ${opt?.label || k}`
+      })
+      .join(', ')
+    onAnswer(answer)
+    setSelectedMS([])
   }
 
   const handleSubmit = () => {
@@ -476,9 +530,9 @@ export function CalibrationExperience({
                 fontSize: 16.5, lineHeight: 1.78, color: textCol, fontWeight: 440,
               }}
             >
-              {/* For MC questions show only the stem; options rendered below */}
+              {/* For MC/MS questions show only the stem; options rendered below */}
               <QuestionText
-                text={mcData ? mcData.stem : question.text}
+                text={msData ? msData.stem : mcData ? mcData.stem : question.text}
                 noMath={subject === 'reading'}
               />
             </motion.div>
@@ -504,7 +558,124 @@ export function CalibrationExperience({
             )}
           </AnimatePresence>
 
-          {mcData ? (
+          {msData ? (
+            /* ── Multi-select option buttons ───────────────────────────────── */
+            <>
+              <div style={{ fontSize: 11, color: 'rgba(129,140,248,0.8)', fontWeight: 600, marginTop: -4 }}>
+                Select {msData.selectCount} answers
+              </div>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={question.text + '-ms'}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1,  y: 0  }}
+                  exit={  { opacity: 0         }}
+                  transition={{ duration: 0.18, delay: 0.06 }}
+                  style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+                >
+                  {msData.options.map((opt, idx) => {
+                    const isSelected = selectedMS.includes(opt.key)
+                    const selColor   = '#818CF8'
+                    return (
+                      <motion.button
+                        key={opt.key}
+                        initial={{ opacity: 0, x: 12 }}
+                        animate={{ opacity: 1,  x: 0  }}
+                        transition={{ delay: idx * 0.04, duration: 0.18 }}
+                        onClick={() => handleMSToggle(opt)}
+                        disabled={isEvaluating}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 14,
+                          padding: '14px 18px', borderRadius: 14, width: '100%',
+                          background: isSelected ? `rgba(129,140,248,0.14)` : cardBg,
+                          border: `1.5px solid ${isSelected ? `${selColor}80` : borderCol}`,
+                          cursor: isEvaluating ? 'default' : 'pointer',
+                          textAlign: 'left', fontFamily: 'inherit',
+                          transition: 'all 0.15s',
+                          boxShadow: isSelected ? `0 0 0 1px ${selColor}40` : 'none',
+                        }}
+                        onMouseEnter={e => {
+                          if (!isEvaluating) {
+                            e.currentTarget.style.borderColor = `${selColor}60`
+                            e.currentTarget.style.background  = `rgba(129,140,248,0.07)`
+                          }
+                        }}
+                        onMouseLeave={e => {
+                          if (!isSelected) {
+                            e.currentTarget.style.borderColor = borderCol
+                            e.currentTarget.style.background  = cardBg
+                          }
+                        }}
+                      >
+                        {/* Checkbox badge */}
+                        <div style={{
+                          width: 26, height: 26, borderRadius: 8, flexShrink: 0,
+                          background: isSelected ? selColor : 'rgba(129,140,248,0.12)',
+                          border: `1px solid ${isSelected ? selColor : 'rgba(129,140,248,0.25)'}`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 13, fontWeight: 800,
+                          color: isSelected ? '#fff' : 'rgba(129,140,248,0.6)',
+                          transition: 'all 0.15s',
+                        }}>
+                          {isSelected ? '✓' : opt.key.toUpperCase()}
+                        </div>
+                        {/* Label */}
+                        <span style={{
+                          fontSize: 14, lineHeight: 1.5,
+                          color: textCol,
+                          fontWeight: isSelected ? 600 : 440,
+                          transition: 'color 0.15s',
+                        }}>
+                          {opt.label}
+                        </span>
+                      </motion.button>
+                    )
+                  })}
+                </motion.div>
+              </AnimatePresence>
+
+              {/* Submit row */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <button
+                  onClick={onSkip}
+                  disabled={isEvaluating}
+                  style={{
+                    background: 'none', border: 'none', padding: 0,
+                    cursor: isEvaluating ? 'default' : 'pointer',
+                    fontSize: 12, color: mutedCol, fontWeight: 600,
+                    opacity: isEvaluating ? 0.3 : 1,
+                  }}
+                >
+                  {t.skip}
+                </button>
+                <button
+                  onClick={handleMSSubmit}
+                  disabled={selectedMS.length < msData.selectCount || isEvaluating}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    background: selectedMS.length >= msData.selectCount && !isEvaluating
+                      ? '#818CF8'
+                      : isLight ? 'rgba(129,140,248,0.14)' : 'rgba(129,140,248,0.16)',
+                    border: 'none', borderRadius: 12, padding: '12px 24px',
+                    fontSize: 13.5, fontWeight: 700, letterSpacing: '0.01em',
+                    color: selectedMS.length >= msData.selectCount && !isEvaluating
+                      ? '#fff' : 'rgba(129,140,248,0.4)',
+                    cursor: selectedMS.length >= msData.selectCount && !isEvaluating
+                      ? 'pointer' : 'default',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {isEvaluating
+                    ? <motion.span animate={{ opacity: [0.5,1,0.5] }} transition={{ duration: 1.1, repeat: Infinity }}>{t.checking}</motion.span>
+                    : <>{t.submit} <ChevronRight size={14} /></>
+                  }
+                </button>
+              </div>
+              <div style={{ textAlign: 'center', fontSize: 10.5, color: mutedCol, marginTop: -4 }}>
+                Press A / B / C / D to toggle — select {msData.selectCount} then submit
+              </div>
+            </>
+          ) : mcData ? (
             /* ── MC option buttons ─────────────────────────────────────────── */
             <>
               <AnimatePresence mode="wait">

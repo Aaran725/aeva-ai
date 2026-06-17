@@ -1717,6 +1717,7 @@ const READING = {
     nextSkills: ['literary-devices-advanced', 'authors-craft'],
     questions: [
       { q: 'Read this: "The classroom was a zoo before the teacher arrived — students were swinging from their chairs, howling with laughter, and stampeding between the desks."\nIdentify the type of figurative language and explain what it means.', tier: 1 },
+      { q: 'Read this: "The city never sleeps — its streets pulse like a heartbeat, its towers reaching for something just beyond their grasp."\nWhich TWO figurative devices are used in this passage? (a) personification  (b) simile  (c) alliteration  (d) onomatopoeia', tier: 2 },
       { q: 'Read this: "Hope is a thing with feathers / That perches in the soul / And sings the tune without the words / And never stops at all."\nIdentify the figurative language. What qualities of hope does the poet suggest through this comparison? Be specific.', tier: 2 },
       { q: 'Read this: "The sun was a furnace. The road shimmered and buckled in the heat. Even the shadows felt hot."\nIdentify every figurative device used and explain the precise effect of each. Then explain how the three sentences work together to build a single impression.', tier: 3 },
     ],
@@ -1741,6 +1742,7 @@ const READING = {
     nextSkills: ['tone-mood', 'argument-structure', 'close-reading'],
     questions: [
       { q: 'Read this: "The factory had been closed for ten years. In the town, the bakery shut, then the pub, then the school. The bus stopped coming."\nWhat can you infer happened to this town? Name TWO details that support your inference.', tier: 1 },
+      { q: 'Read this: "Every morning for thirty years, the lighthouse keeper climbed the steps and lit the lamp. He noted the weather, the ships, the tides. He never missed a day. When the coastguard arrived one Tuesday, the lamp was unlit and the keeper\'s coat was still on the hook."\nSelect TWO inferences that are supported by this passage? (a) The keeper disappeared suddenly and unexpectedly  (b) The keeper retired and left voluntarily  (c) Something interrupted the keeper\'s normal routine  (d) The lighthouse had been abandoned for years', tier: 2 },
       { q: 'Read this: "The letter had sat unopened on the mantelpiece for six months. Each morning, Margaret dusted around it carefully. Each evening, she turned off the light without looking at it."\nWhat can you infer about Margaret\'s feelings? Why does she dust around the letter rather than moving it? What does the author imply about avoidance?', tier: 2 },
       { q: 'Read this: "The politician spoke warmly of \'getting back to basics\' and \'the values that made us great.\' She did not specify which basics, or which values, or when greatness was. The crowd applauded."\nWhat is the author inferring about the politician\'s language? What is implied about the crowd? Name the technique being used and explain its effect.', tier: 3 },
     ],
@@ -1767,6 +1769,7 @@ const READING = {
     nextSkills: ['argument-structure', 'rhetoric-introduction', 'literary-devices-advanced'],
     questions: [
       { q: 'Read this: "The abandoned playground sat rusting under the grey sky. A single swing creaked in the wind. No children came here anymore."\nWhat is the MOOD of this passage? Give TWO words that create it. What is the TONE — is the narrator sad, angry, or neutral?', tier: 1 },
+      { q: 'Read this: "The last train had gone. The platform was empty except for a torn ticket and a forgotten umbrella. Rain began to fall, softly at first, then with a kind of determination."\nSelect TWO words that best describe the mood of this passage? (a) melancholy  (b) tense and urgent  (c) lonely  (d) joyful and optimistic', tier: 2 },
       { q: 'Read this: "The new CEO walked the factory floor smiling, shaking hands, asking workers their names. He remembered each one. The workers smiled back — though a few exchanged glances."\nIdentify the tone and mood. What is the gap between what the CEO SHOWS and what the passage IMPLIES? How does the author create this gap?', tier: 2 },
       { q: 'Read this: "She described the hospital waiting room in precise, clinical terms: the linoleum floor, the number of chairs, the make of the vending machine. She did not describe her mother in the next room."\nAnalyse how deliberate avoidance of emotion creates tone and mood. What effect does clinical detail produce here? What is left unsaid, and why is that more powerful?', tier: 3 },
     ],
@@ -1790,7 +1793,8 @@ const READING = {
     prerequisites: ['figurative-language', 'theme-identification', 'tone-mood'],
     nextSkills: ['authors-craft', 'close-reading', 'rhetorical-analysis'],
     questions: [
-      { q: 'Read this: "The torch of liberty must never be extinguished — even if we have to fight to keep it burning."\nIdentify: (a) the literary device  (b) what "torch of liberty" represents  (c) the effect this creates.', tier: 1 },
+      { q: 'Read this: "The torch of liberty must never be extinguished — even if we have to fight to keep it burning."\nIdentify the literary device, explain what "torch of liberty" represents, and describe the effect this creates.', tier: 1 },
+      { q: 'Read this: "The torch of liberty burns in every heart. Its flame is passed from one generation to the next — we are its keepers now, and to let it die is to betray all who came before."\nSelect TWO literary devices used in this passage? (a) extended metaphor  (b) direct address  (c) onomatopoeia  (d) flashback', tier: 2 },
       { q: 'Read this: "It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of foolishness."\nIdentify the device. Explain how repetition of structure creates meaning. Why might an author begin a novel this way?', tier: 2 },
       { q: 'Read this: "The captain steered his ship of state through treacherous waters. Below deck, the passengers argued about the colour of the curtains."\nIdentify ALL literary devices and explain how each contributes to the overall meaning. What is the author implying about politics or leadership?', tier: 3 },
     ],
@@ -1803,6 +1807,7 @@ const READING = {
     nextSkills: ['rhetorical-analysis', 'counterargument'],
     questions: [
       { q: 'Read this: "As a doctor who has treated thousands of patients, I know that smoking causes irreversible lung damage. Every cigarette is a step toward a shorter life."\nIdentify whether this uses ethos, pathos, or logos — and explain why.', tier: 1 },
+      { q: 'Read this: "As a surgeon who has performed thousands of operations, I can tell you: every minute without proper funding costs lives. Children are dying while politicians debate. We need action now."\nWhich TWO rhetorical appeals does this passage use? (a) ethos  (b) pathos  (c) logos  (d) kairos', tier: 2 },
       { q: 'Read this: "For just £1 a day — less than a cup of coffee — you can provide clean water for a family of four. Millions of children walk miles every morning so their family can survive. You can help."\nIdentify ALL THREE rhetorical appeals (ethos, pathos, logos) with evidence for each.', tier: 2 },
       { q: 'Read this: "Experts agree that exercise extends lifespan. Studies across 50 countries confirm it. And yet we sit. We scroll. We tell ourselves we\'ll start on Monday."\nAnalyse the rhetoric. Identify each appeal. Then explain how the final three short sentences function differently from the rest of the passage — and what effect this creates.', tier: 3 },
     ],
