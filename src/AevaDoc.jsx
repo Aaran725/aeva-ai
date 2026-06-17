@@ -897,7 +897,10 @@ function DocMarkdown({ text, messageIdx = 0, noExpand = false }) {
     const docInlinePromote = _dim1 || _dim2
     if (docInlinePromote) {
       flushList()
-      const [, before, mathContent, after] = docInlinePromote
+      // Strip stray $ artifacts that appear when model uses $$...$$ inline (regex consumes one $ into before/after)
+      const [, _before, mathContent, _after] = docInlinePromote
+      const before = _before.replace(/\$+\s*$/, '')
+      const after  = _after.replace(/^\s*\$+/, '')
       if (before.trim()) {
         elements.push(
           <div key={`dip-pre-${i}`} style={{ marginTop: 5, fontSize: 15, color: 'rgba(235,233,255,0.84)', lineHeight: 1.80, letterSpacing: '-0.005em' }}>

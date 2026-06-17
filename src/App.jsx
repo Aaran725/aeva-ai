@@ -4157,7 +4157,10 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false, isDri
     const complexInlineMatch = _cim1 || _cim2
     if (complexInlineMatch) {
       flushList()
-      const [, before, mathContent, after] = complexInlineMatch
+      // Strip stray $ artifacts when model uses $$...$$ inline (regex consumes one $ into before/after)
+      const [, _cBefore, mathContent, _cAfter] = complexInlineMatch
+      const before = _cBefore.replace(/\$+\s*$/, '')
+      const after  = _cAfter.replace(/^\s*\$+/, '')
       if (before.trim()) {
         elements.push(
           <p key={`cilabel-${i}`} style={{ margin: '6px 0 4px', fontSize: 14.5, color: isLight ? 'rgba(0,0,0,0.84)' : 'rgba(255,255,255,0.88)', lineHeight: 1.75 }}>
