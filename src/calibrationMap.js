@@ -1630,7 +1630,7 @@ const READING = {
     prerequisites: ['context-clues-basic'],
     nextSkills: ['authors-purpose', 'inference-basic', 'nonfiction-features'],
     questions: [
-      { q: 'Read this sentence: "The scientist\'s hypothesis was proven wrong by the experiment."\nWhat does "hypothesis" most likely mean? (a) a guess or prediction  (b) a result  (c) a method  (d) a conclusion. Explain your choice.', tier: 1 },
+      { q: 'Read this sentence: "The hiker was exhausted after the long trek up the steep mountain path."\nWhat does "exhausted" most likely mean? (a) very tired  (b) very hungry  (c) very lost  (d) very cold', tier: 1 },
       { q: 'Read this: "The politician\'s speech was eloquent — every word carefully chosen, the rhythm flowing, the argument building steadily to a powerful conclusion."\nWhat does "eloquent" mean? Give TWO clues from the sentence that helped you.', tier: 2 },
       { q: 'Read this: "After years of obscurity, the painter\'s work finally gained recognition — her canvases began appearing in galleries, critics wrote glowing reviews, and collectors competed to own her pieces."\nExplain what "obscurity" means and identify TWO context clues. Then explain how the contrast between the two halves of the sentence creates meaning.', tier: 3 },
     ],
@@ -1798,7 +1798,7 @@ const READING = {
 
   'rhetoric-introduction': {
     label: 'Rhetoric: Ethos, Pathos, Logos',
-    subject: 'reading', band: 'Grade 10', bandOrder: 3,
+    subject: 'reading', band: 'Grade 10', bandOrder: 4,
     prerequisites: ['argument-structure', 'tone-mood'],
     nextSkills: ['rhetorical-analysis', 'counterargument'],
     questions: [
@@ -1836,7 +1836,7 @@ const READING = {
 
   'close-reading': {
     label: 'Close Reading',
-    subject: 'reading', band: 'Grade 11', bandOrder: 5,
+    subject: 'reading', band: 'Grade 11', bandOrder: 6,
     prerequisites: ['literary-devices-advanced', 'inference-advanced', 'text-structure-analysis'],
     nextSkills: ['rhetorical-analysis', 'authors-craft', 'complex-inference'],
     questions: [
@@ -1848,7 +1848,7 @@ const READING = {
 
   'rhetorical-analysis': {
     label: 'Rhetorical Analysis',
-    subject: 'reading', band: 'Grade 11', bandOrder: 5,
+    subject: 'reading', band: 'Grade 11', bandOrder: 6,
     prerequisites: ['rhetoric-introduction', 'tone-mood', 'argument-structure'],
     nextSkills: ['close-reading', 'complex-argumentation', 'authors-craft'],
     questions: [
@@ -1896,7 +1896,7 @@ const READING = {
 
   'synthesising-sources': {
     label: 'Synthesising Multiple Sources',
-    subject: 'reading', band: 'Grade 12', bandOrder: 7,
+    subject: 'reading', band: 'Grade 11+', bandOrder: 7,
     prerequisites: ['compare-contrast-texts', 'counterargument'],
     nextSkills: ['ap-language-analysis', 'research-synthesis'],
     questions: [
