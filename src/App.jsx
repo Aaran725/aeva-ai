@@ -8114,7 +8114,11 @@ If no clear changes: {"changes":[]}`
     if (!calibMode) return null
     const cs = calibStateRef.current
     const subjectMap = CALIBRATION_MAP[cs.subject] || {}
-    const entries = Object.entries(cs.skillMap || {})
+    // Exclude fast lane bracket nodes — they are routing data, not calibration data.
+    // Including them skews the average (e.g. two "shaky" results on Grade 8 + Grade 4
+    // nodes average to ~Grade 6 even before any real calibration question is asked).
+    const fastLaneNodeIds = new Set((FAST_LANE[cs.subject] || []).map(b => b.nodeId))
+    const entries = Object.entries(cs.skillMap || {}).filter(([id]) => !fastLaneNodeIds.has(id))
     if (!entries.length) return null
     let wSum = 0, wTotal = 0
     for (const [id, status] of entries) {
