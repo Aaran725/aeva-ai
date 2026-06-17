@@ -262,6 +262,9 @@ function parseMCOptions(questionText) {
   const stem    = text.slice(0, aIdx).trim()
   const optPart = text.slice(aIdx)
 
+  // Real MC stems always end with '?' — sub-task instructions end with ':' and must not trigger MC
+  if (!/\?\s*$/.test(stem)) return null
+
   // Extract each (x) … up to the next (x) or end of string
   const regex = /\(([a-d])\)\s*([^(]*?)(?=\s*\([a-d]\)|$)/gi
   const matches = [...optPart.matchAll(regex)]
