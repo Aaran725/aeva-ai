@@ -274,9 +274,18 @@ function parseMCOptions(questionText) {
       .replace(/[.·]\s*(Explain|Give one|Use the|Why|Note:|How|What).*/i, '')
       .replace(/\.$/, '')
       .trim(),
-  })).filter(o => o.label.length > 0)
+  })).filter(o => {
+    if (!o.label) return false
+    // Reject labels that are themselves questions or essay prompts
+    if (o.label.endsWith('?')) return false
+    // Reject labels that are too long to be answer choices (> 150 chars = paragraph, not a choice)
+    if (o.label.length > 150) return false
+    return true
+  })
 
-  return options.length >= 2 ? { stem, options } : null
+  // Require at least 3 valid options — real MC is A/B/C/D (4), never just 2
+  // This prevents false detection on open-ended questions with incidental (a)/(b) markers
+  return options.length >= 3 ? { stem, options } : null
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
