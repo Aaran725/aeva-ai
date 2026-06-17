@@ -8126,7 +8126,15 @@ If no clear changes: {"changes":[]}`
       const w  = status === 'mastery' ? 3 : status === 'solid' ? 2 : status === 'shaky' ? 1 : 0
       wSum += bo * w; wTotal += w
     }
-    return wTotal === 0 ? null : wSum / wTotal
+    if (wTotal === 0) return null
+    // Bayesian shrinkage — same formula as finishCalibration.
+    // Pulls the live estimate toward the entry-point prior when fewer than 6 nodes
+    // have been assessed, preventing wild swings from 1–2 early answers.
+    const rawAvg       = wSum / wTotal
+    const n            = entries.length
+    const priorBandOrd = CALIBRATION_MAP[cs.subject]?.[ENTRY_NODES[cs.subject]]?.bandOrder ?? 0
+    const priorWeight  = Math.max(0, 6 - n)
+    return (rawAvg * n + priorBandOrd * priorWeight) / (n + priorWeight)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calibTick, calibMode])
 
