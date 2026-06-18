@@ -26,12 +26,10 @@ const MATHS = {
     prerequisites: [],
     nextSkills: ['addition-subtraction'],
     questions: [
-      { q: 'What number comes after 19? And what number comes before 30?', tier: 1 },
+      { q: 'What number comes after 19?', tier: 1 },
       { q: 'Count back from 50 in 5s. Write the first 6 numbers.', tier: 2 },
       { q: 'I have 3 bags. Each bag has 4 apples. How many apples altogether? Explain how you know.', tier: 3 },
-
-      { q: 'Explain two different strategies to add 9 + 7 without counting one by one. Which is fastest and why?', tier: 4 },
-      { q: 'Find all the ways to make 20 using exactly two different whole numbers. Is there a pattern in your pairs?', tier: 5 },    ],
+    ],
   },
 
   'addition-subtraction': {
@@ -40,12 +38,10 @@ const MATHS = {
     prerequisites: ['counting-number'],
     nextSkills: ['place-value', 'times-tables'],
     questions: [
-      { q: 'What is 7 + 8? What is 15 − 6?', tier: 1 },
+      { q: 'What is 7 + 8?', tier: 1 },
       { q: 'A box has 24 crayons. 9 get lost. How many are left? Show your working.', tier: 2 },
       { q: 'True or false: 38 + 47 = 85. If false, what is the correct answer? Show how you worked it out.', tier: 3 },
-
-      { q: 'Explain why 53 − 28 = 25 using two different methods (e.g. column and number line). Which do you prefer and why?', tier: 4 },
-      { q: 'The answer is 100. Write as many addition sums as you can using exactly two 2-digit numbers. What patterns do you notice in the pairs?', tier: 5 },    ],
+    ],
   },
 
   'place-value': {
@@ -57,9 +53,7 @@ const MATHS = {
       { q: 'What is the value of the digit 4 in the number 3,482?', tier: 1 },
       { q: 'Write these numbers in order from smallest to largest: 1,024 · 1,240 · 1,042 · 1,204', tier: 2 },
       { q: 'A number has 5 thousands, 3 hundreds, 0 tens and 7 ones. Write it down and round it to the nearest hundred.', tier: 3 },
-
-      { q: 'Explain why the digit 5 means different things in 5,000 and 500. Use the words ones, tens, hundreds, thousands.', tier: 4 },
-      { q: 'Using the digits 3, 7, 1, 9 exactly once each, how many different 4-digit numbers can you make? What is the largest? Smallest? Find their sum.', tier: 5 },    ],
+    ],
   },
 
   'times-tables': {
@@ -68,12 +62,10 @@ const MATHS = {
     prerequisites: ['place-value'],
     nextSkills: ['multiplication-division', 'basic-fractions'],
     questions: [
-      { q: 'What is 7 × 8? What is 9 × 6?', tier: 1 },
+      { q: 'What is 7 × 8?', tier: 1 },
       { q: 'I think of a number, multiply by 7 and get 63. What was my number?', tier: 2 },
       { q: 'List all the factors of 36. Which are also multiples of 4?', tier: 3 },
-
-      { q: 'Explain why 6 × 7 = 7 × 6 without just saying both equal 42. Use an array of rows and columns to justify it.', tier: 4 },
-      { q: 'Which numbers up to 50 are multiples of BOTH 4 and 6? List them. Is there a pattern? Can you write a rule for finding common multiples?', tier: 5 },    ],
+    ],
   },
 
   'multiplication-division': {
@@ -85,9 +77,7 @@ const MATHS = {
       { q: 'Work out 156 ÷ 12. Show your method.', tier: 1 },
       { q: 'A school orders 24 boxes of pencils. Each box has 36 pencils. How many pencils in total?', tier: 2 },
       { q: '576 students are split equally into groups of 8. Each group then splits into pairs. How many pairs are there in total?', tier: 3 },
-
-      { q: 'Explain the connection between multiplication and division using 7 × 8 = 56. Write two division facts that follow from it and explain why.', tier: 4 },
-      { q: 'Find every number less than 100 that divides exactly by 3, 4, and 5. Explain how you know you have found them all.', tier: 5 },    ],
+    ],
   },
 
   'basic-fractions': {
@@ -99,9 +89,7 @@ const MATHS = {
       { q: 'What is ½ of 24? What is ¼ of 36?', tier: 1 },
       { q: 'Which is larger: 3/5 or 5/8? Show how you decided.', tier: 2 },
       { q: 'A pizza is cut into 8 slices. Tom eats 3/8, Sara eats 1/4. What fraction is left? Write it in its simplest form.', tier: 3 },
-
-      { q: 'Explain why 1/3 is larger than 1/4, even though 4 > 3. Draw a diagram to support your explanation.', tier: 4 },
-      { q: 'Between 0 and 1, list every fraction with a single-digit denominator. Order them. Which pair is closest together?', tier: 5 },    ],
+    ],
   },
 
   'fractions-equivalent': {
@@ -113,9 +101,7 @@ const MATHS = {
       { q: 'Are 3/4 and 9/12 equivalent? Explain why.', tier: 1 },
       { q: 'Convert 2 3/4 to an improper fraction. Then convert 17/5 to a mixed number.', tier: 2 },
       { q: 'Add: 1 2/3 + 2 3/4. Give your answer as a mixed number in its simplest form.', tier: 3 },
-
-      { q: 'Explain why 6/8 = 3/4. What operation do you apply to numerator and denominator, and why does it not change the value?', tier: 4 },
-      { q: 'Between 1/2 and 3/4, how many fractions with single-digit denominators exist? List them all and explain your method.', tier: 5 },    ],
+    ],
   },
 
   'decimals-intro': {
@@ -127,9 +113,7 @@ const MATHS = {
       { q: 'Put these in order from smallest to largest: 0.5 · 0.15 · 0.505 · 0.051', tier: 1 },
       { q: 'Work out: 3.6 × 0.4. Show your working.', tier: 2 },
       { q: 'A ribbon is 4.2 m long. I cut off three pieces each 0.85 m long. How much ribbon is left?', tier: 3 },
-
-      { q: 'Explain why 0.1 + 0.2 does not equal exactly 0.3 on most calculators. What does this reveal about decimals and computing?', tier: 4 },
-      { q: 'Using the digits 1, 2, 3, 4 and a decimal point exactly once each, make as many decimal numbers between 1 and 4 as possible. Order them.', tier: 5 },    ],
+    ],
   },
 
   'negative-numbers': {
@@ -138,12 +122,10 @@ const MATHS = {
     prerequisites: ['decimals-intro'],
     nextSkills: ['number-basics', 'basic-algebra'],
     questions: [
-      { q: 'What is −3 + 7? What is 4 − 9?', tier: 1 },
+      { q: 'What is −3 + 7?', tier: 1 },
       { q: 'The temperature is −6°C at midnight and rises 11°C by noon. What is the temperature at noon?', tier: 2 },
       { q: 'Put these in order: −4, 2, −7, 0, −1, 5. Then find the sum of all six numbers.', tier: 3 },
-
-      { q: 'Explain why subtracting a negative is the same as adding a positive. Use a number line and a real-life context (e.g. temperature) to justify it.', tier: 4 },
-      { q: 'Find all pairs of integers (including negatives) that multiply to give 12. Organise your findings. What patterns do you notice?', tier: 5 },    ],
+    ],
   },
 
   'basic-area-perimeter': {
@@ -155,9 +137,7 @@ const MATHS = {
       { q: 'Find the area and perimeter of a rectangle 6 cm wide and 9 cm tall.', tier: 1 },
       { q: 'A square has a perimeter of 36 cm. What is its area?', tier: 2 },
       { q: 'An L-shaped room is made from two rectangles: one is 5 m × 3 m and the other is 2 m × 4 m. Find the total area and perimeter.', tier: 3 },
-
-      { q: 'Two rectangles have the same perimeter of 20 cm but different areas. Give two examples. What dimensions give the maximum area?', tier: 4 },
-      { q: 'For rectangles with perimeter 24 cm, make a table of whole-number dimensions and their areas. Which has the maximum area and why?', tier: 5 },    ],
+    ],
   },
 
   'angles-shapes': {
@@ -169,9 +149,7 @@ const MATHS = {
       { q: 'A triangle has angles of 90° and 35°. What is the third angle?', tier: 1 },
       { q: 'The angles of a quadrilateral are 110°, 85°, 70°, and x°. Find x.', tier: 2 },
       { q: 'Explain why the exterior angles of any polygon always sum to 360°. Use a regular hexagon as your example.', tier: 3 },
-
-      { q: 'Explain why angles in a triangle always sum to 180°. Describe a paper-folding demonstration that shows this without any calculation.', tier: 4 },
-      { q: 'How many diagonals does a polygon with n sides have? Make a table for n = 3 to 8, find the formula, and prove why it works.', tier: 5 },    ],
+    ],
   },
 
   'statistics-basics': {
@@ -183,9 +161,7 @@ const MATHS = {
       { q: 'Find the mean, median, mode and range of: 3, 7, 8, 2, 10, 7, 4', tier: 1 },
       { q: 'A class of 20 students scored a mean of 14 on a test. A new student joins and scores 18. What is the new class mean?', tier: 2 },
       { q: 'Two data sets both have a mean of 50. Set A has a range of 4, Set B has a range of 40. What does this tell you about the two sets?', tier: 3 },
-
-      { q: 'A class mean is 15. One student scored 30. Explain what happens to the mean, median and range. Which average is most affected and why?', tier: 4 },
-      { q: 'Create a set of exactly 10 whole numbers where the mean is 10 but the median is 7. How many different solutions can you find?', tier: 5 },    ],
+    ],
   },
 
   'coordinates-intro': {
@@ -197,9 +173,7 @@ const MATHS = {
       { q: 'Plot the point (3, −2). Which quadrant does it lie in?', tier: 1 },
       { q: 'A square has three corners at (1,1), (4,1) and (4,4). What are the coordinates of the fourth corner?', tier: 2 },
       { q: 'Points A(0,0), B(4,0), C(4,3) form a triangle. Find its area and the length of side AC.', tier: 3 },
-
-      { q: 'Explain how the signs of a coordinate pair tell you which quadrant the point is in. Give one example for each of the four quadrants.', tier: 4 },
-      { q: 'How many squares can you draw with all four corners on integer coordinates between −3 and 3? Describe your method for finding them all.', tier: 5 },    ],
+    ],
   },
 
   'algebra-intro': {
@@ -211,9 +185,7 @@ const MATHS = {
       { q: 'If n = 5, find the value of 3n − 2.', tier: 1 },
       { q: 'Simplify: 4a + 3b − a + 5b', tier: 2 },
       { q: 'Write an expression for the perimeter of a rectangle where the length is (2x + 1) and the width is (x − 3). Expand and simplify.', tier: 3 },
-
-      { q: 'Explain the difference between an expression and an equation using examples. Why can you solve an equation but not simplify it to a single value?', tier: 4 },
-      { q: 'Find all integer values of n such that 2n + 5 is between 10 and 25 inclusive. Show your working systematically.', tier: 5 },    ],
+    ],
   },
 
   // ── EXISTING GCSE / A-Level nodes ──────────────────────────────────────────
@@ -227,9 +199,7 @@ const MATHS = {
       { q: 'What is 347 × 8?', tier: 1 },
       { q: 'Write 0.045 as a fraction in its simplest form.', tier: 2 },
       { q: 'A number rounded to 2 significant figures is 4200. What is the smallest it could be?', tier: 3 },
-
-      { q: 'Explain why we use significant figures rather than decimal places for very large or very small numbers. Give one example of each.', tier: 4 },
-      { q: 'Which 3-digit numbers read the same forwards and backwards? How many are there? Is there a formula?', tier: 5 },    ],
+    ],
   },
 
   'fractions': {
@@ -241,9 +211,7 @@ const MATHS = {
       { q: 'Calculate: 2/3 + 3/4', tier: 1 },
       { q: 'Calculate: 1 3/5 × 2 1/2', tier: 2 },
       { q: 'Divide 2/3 ÷ 4/9 and give your answer as a mixed number.', tier: 3 },
-
-      { q: 'Explain why dividing by a fraction is the same as multiplying by its reciprocal. Use 3 ÷ 1/2 as a worked example.', tier: 4 },
-      { q: 'Find three different fractions a/b, c/d, e/f in lowest terms where a/b + c/d + e/f = 1 and all denominators are different single digits.', tier: 5 },    ],
+    ],
   },
 
   'percentages': {
@@ -255,9 +223,7 @@ const MATHS = {
       { q: 'Find 35% of 240.', tier: 1 },
       { q: 'A jacket costs £80 after a 20% discount. What was the original price?', tier: 2 },
       { q: 'A population grows from 12000 to 13560 in a year. What is the percentage increase?', tier: 3 },
-
-      { q: 'Explain the difference between a percentage change and a percentage point change. Give a real-world example where confusing them is misleading.', tier: 4 },
-      { q: 'A price rises by x% then falls by x%. Show algebraically that it is never back to the original (unless x = 0). Find the net percentage change.', tier: 5 },    ],
+    ],
   },
 
   'ratio': {
@@ -269,9 +235,7 @@ const MATHS = {
       { q: 'Share £120 in the ratio 3:5.', tier: 1 },
       { q: 'If 4 workers take 6 days to finish a job, how long would 3 workers take?', tier: 2 },
       { q: 'Two quantities are in the ratio 2:3. If the larger is increased by 10 and the ratio becomes 1:2, find the original smaller quantity.', tier: 3 },
-
-      { q: 'Explain why 4:6 is equivalent to 2:3. What operation are you performing and why does it preserve the relationship?', tier: 4 },
-      { q: 'Three siblings share pocket money in the ratio of their ages: 6, 9 and 15. Total is £60. How does each share change each year? When do the shares become equal?', tier: 5 },    ],
+    ],
   },
 
   'basic-algebra': {
@@ -283,9 +247,7 @@ const MATHS = {
       { q: 'Simplify: 3x + 2y − x + 4y', tier: 1 },
       { q: 'If p = 3 and q = −2, find the value of 2p² − 3q.', tier: 2 },
       { q: 'Factorise fully: 12x²y − 8xy²', tier: 3 },
-
-      { q: 'Explain why 3(x + 2) and 3x + 6 are equivalent. Name the algebraic law you are applying and explain why it works.', tier: 4 },
-      { q: 'Find all integer pairs (x, y) where 2x + 3y = 24 and both x and y are positive. How many solutions exist?', tier: 5 },    ],
+    ],
   },
 
   'linear-equations': {
@@ -297,9 +259,7 @@ const MATHS = {
       { q: 'Solve: 3x + 7 = 22', tier: 1 },
       { q: 'Solve: 2(x + 3) = 5x − 9', tier: 2 },
       { q: 'Solve: x/3 + 2 = x/4 + 5', tier: 3 },
-
-      { q: 'Explain each step when solving 2(x + 3) = 5x − 9. For each operation, state the rule that makes it valid.', tier: 4 },
-      { q: 'Two numbers have a sum of 40 and a difference of 8. Set up and solve equations. Now investigate: for which positive differences does a whole-number solution exist?', tier: 5 },    ],
+    ],
   },
 
   'expanding-brackets': {
@@ -311,9 +271,7 @@ const MATHS = {
       { q: 'Expand and simplify: (x + 3)(x − 5)', tier: 1 },
       { q: 'Expand and simplify: (2x − 1)(3x + 4)', tier: 2 },
       { q: 'Expand and simplify: (x + 2)³', tier: 3 },
-
-      { q: 'Explain why (x + 3)(x − 3) = x² − 9 and why the middle term disappears. What is this pattern called and when does it apply?', tier: 4 },
-      { q: 'Without a calculator, find 99² using (100 − 1)². Generalise: derive a quick method for squaring any number near a round number.', tier: 5 },    ],
+    ],
   },
 
   'inequalities': {
@@ -324,10 +282,8 @@ const MATHS = {
     questions: [
       { q: 'Solve: 3x − 4 < 11 and show the solution on a number line.', tier: 1 },
       { q: 'Solve: 2x + 1 ≤ 3x − 5 and find the smallest integer that satisfies it.', tier: 2 },
-      { q: 'Find all integers n such that −3 < 2n − 1 ≤ 7.', tier: 3 },
-
-      { q: 'Explain why the inequality sign reverses when multiplying or dividing by a negative. Give a numerical example to prove it is necessary.', tier: 4 },
-      { q: 'Make up a compound inequality that has exactly 5 integer solutions. Show your working and explain how you constructed it.', tier: 5 },    ],
+      { q: 'Solve: |2x − 3| < 7. Give your answer as a compound inequality and show it on a number line.', tier: 3 },
+    ],
   },
 
   'simultaneous-equations': {
@@ -339,9 +295,7 @@ const MATHS = {
       { q: 'Solve simultaneously: 2x + y = 7 and x − y = 2', tier: 1 },
       { q: 'Solve simultaneously: 3x + 2y = 12 and 5x − y = 7', tier: 2 },
       { q: 'Solve simultaneously: x/2 + y/3 = 4 and 2x − y = 6', tier: 3 },
-
-      { q: 'Solve 2x + y = 7, x − y = 2 using BOTH elimination AND substitution. When is each method preferable? Explain.', tier: 4 },
-      { q: 'Create three different pairs of simultaneous equations that all have solution x = 3, y = −1. Describe the pattern in your equations.', tier: 5 },    ],
+    ],
   },
 
   'quadratic-factorising': {
@@ -353,9 +307,7 @@ const MATHS = {
       { q: 'Factorise: x² + 5x + 6', tier: 1 },
       { q: 'Factorise: 2x² + 7x + 3', tier: 2 },
       { q: 'Factorise: 6x² − x − 12', tier: 3 },
-
-      { q: 'Explain the connection between the factors of x² − 5x + 6 and the roots of x² − 5x + 6 = 0. Why do the roots have opposite signs to the bracket numbers?', tier: 4 },
-      { q: 'Find all quadratics x² + bx + c that factorise over the integers where b and c are both positive single-digit integers. How many are there?', tier: 5 },    ],
+    ],
   },
 
   'completing-the-square': {
@@ -367,9 +319,7 @@ const MATHS = {
       { q: 'Complete the square: x² + 6x + 5', tier: 1 },
       { q: 'Complete the square: x² − 5x + 3', tier: 2 },
       { q: 'Complete the square: 2x² + 8x − 3', tier: 3 },
-
-      { q: 'Explain why completing the square on x² + 6x + 5 gives (x + 3)² − 4. Where does the −4 come from and what does it represent?', tier: 4 },
-      { q: 'Use completing the square to prove that x² + bx + c ≥ 0 for all x only when b² ≤ 4c. Verify with two examples of your choice.', tier: 5 },    ],
+    ],
   },
 
   'quadratic-formula': {
@@ -381,9 +331,7 @@ const MATHS = {
       { q: 'Solve using the quadratic formula: x² − 5x + 6 = 0', tier: 1 },
       { q: 'Solve using the quadratic formula: 2x² + 3x − 2 = 0', tier: 2 },
       { q: 'Solve 3x² − 7x + 1 = 0, giving your answer to 3 significant figures.', tier: 3 },
-
-      { q: 'Explain what each part of x = (−b ± √(b²−4ac)) / 2a means. Why are there two solutions, and what does ± represent?', tier: 4 },
-      { q: 'Find a quadratic with roots 1 + √2 and 1 − √2. Show your method, then generalise: if roots are p ± √q, what is the general equation?', tier: 5 },    ],
+    ],
   },
 
   'discriminant': {
@@ -395,9 +343,7 @@ const MATHS = {
       { q: 'How many solutions does x² + 4x + 4 = 0 have? Show using the discriminant.', tier: 1 },
       { q: 'Find the values of k for which x² + kx + 9 = 0 has equal roots.', tier: 2 },
       { q: 'Show that 2x² − 3x + 4 = 0 has no real solutions and explain geometrically why.', tier: 3 },
-
-      { q: 'Explain geometrically what b² − 4ac tells us about where the parabola y = ax² + bx + c sits relative to the x-axis.', tier: 4 },
-      { q: 'Find all values of k for which kx² + 4x + k = 0 has real roots. Include k < 0 in your investigation. What happens at the boundary?', tier: 5 },    ],
+    ],
   },
 
   'quadratic-graphs': {
@@ -409,9 +355,7 @@ const MATHS = {
       { q: 'State the coordinates of the turning point of y = (x − 2)² + 3.', tier: 1 },
       { q: 'Sketch y = x² − 4x + 3, labelling roots and turning point.', tier: 2 },
       { q: 'Find the equation of the line of symmetry of y = 2x² − 8x + 5.', tier: 3 },
-
-      { q: 'Explain how to read the roots, vertex and y-intercept directly from y = (x − 2)² − 9 without expanding it. What advantage does vertex form give?', tier: 4 },
-      { q: 'Parabolas y = x² and y = −x² + 4 intersect at two points. Find them, then calculate the area enclosed between the two curves.', tier: 5 },    ],
+    ],
   },
 
   'straight-line-graphs': {
@@ -423,9 +367,7 @@ const MATHS = {
       { q: 'Find the gradient and y-intercept of 3x + 2y = 12.', tier: 1 },
       { q: 'Find the equation of the line through (2, 5) and (4, 11).', tier: 2 },
       { q: 'A line is perpendicular to y = 3x − 2 and passes through (6, 1). Find its equation.', tier: 3 },
-
-      { q: 'Explain why parallel lines have equal gradients and why perpendicular lines have gradients that multiply to −1. Use diagrams if it helps.', tier: 4 },
-      { q: 'Triangle with vertices A(0,0), B(4,0), C(1,3). Find equations of all three altitudes and show they meet at one point (the orthocentre).', tier: 5 },    ],
+    ],
   },
 
   'trigonometry': {
@@ -437,9 +379,7 @@ const MATHS = {
       { q: 'In a right triangle, the opposite side is 5 and hypotenuse is 13. Find the angle.', tier: 1 },
       { q: 'A ladder 8m long leans against a wall at 65°. How high up the wall does it reach?', tier: 2 },
       { q: 'Find all angles between 0° and 360° for which sin(x) = −0.5.', tier: 3 },
-
-      { q: 'Explain why sin(30°) = cos(60°). What does this reveal about the relationship between sine and cosine in general?', tier: 4 },
-      { q: 'Without a calculator, find exact values for sin and cos of 0°, 30°, 45°, 60°, 90°. Show your working using right triangles. Why are these exact?', tier: 5 },    ],
+    ],
   },
 
   'sine-cosine-rule': {
@@ -451,9 +391,7 @@ const MATHS = {
       { q: 'In triangle ABC, a = 7, b = 5, C = 40°. Find side c.', tier: 1 },
       { q: 'In triangle PQR, p = 9, q = 12, r = 15. Find angle P.', tier: 2 },
       { q: 'Find the area of a triangle with sides 8, 11 and included angle 62°.', tier: 3 },
-
-      { q: 'Explain when to use the sine rule vs the cosine rule. Create a decision flowchart for choosing between them given different information.', tier: 4 },
-      { q: 'A triangle has sides 5, 12, 13. Use the cosine rule to find all three angles, then confirm which angle is 90° and verify using Pythagoras.', tier: 5 },    ],
+    ],
   },
 
   'surds': {
@@ -465,9 +403,7 @@ const MATHS = {
       { q: 'Simplify: √72', tier: 1 },
       { q: 'Rationalise the denominator: 5 / (2 + √3)', tier: 2 },
       { q: 'Show that (√5 + √2)² = 7 + 2√10', tier: 3 },
-
-      { q: 'Explain why √2 is irrational. What does irrational mean, and why can we not write √2 as a fraction p/q?', tier: 4 },
-      { q: 'Simplify (√3 + 1)/(√3 − 1) by rationalising. Then find the numerical value of (√3 + 1)⁴ without a calculator. Show your method.', tier: 5 },    ],
+    ],
   },
 
   'trig-identities': {
@@ -479,9 +415,7 @@ const MATHS = {
       { q: 'State the identity: sin²θ + cos²θ = ?', tier: 1 },
       { q: 'Prove that (sinθ + cosθ)² = 1 + 2sinθcosθ.', tier: 2 },
       { q: 'Solve sinθ/cosθ = 2sinθ for 0° ≤ θ ≤ 360°.', tier: 3 },
-
-      { q: 'Derive tan²θ + 1 = sec²θ from sin²θ + cos²θ = 1. Explain each algebraic step and why it is valid.', tier: 4 },
-      { q: 'Using the compound angle formulae for sin(A+B) and cos(A+B), derive a formula for tan(A+B). Verify it for A = B = 45°.', tier: 5 },    ],
+    ],
   },
 
   'further-algebra': {
@@ -493,9 +427,7 @@ const MATHS = {
       { q: 'Simplify: (x² − 9) / (x² + x − 6)', tier: 1 },
       { q: 'Express (3x + 1) / ((x+1)(x−2)) in partial fractions.', tier: 2 },
       { q: 'Prove that n² + n is always even for any integer n.', tier: 3 },
-
-      { q: 'Explain what partial fractions are and why they are useful in integration. Demonstrate by decomposing (2x + 3)/((x+1)(x+2)).', tier: 4 },
-      { q: 'Prove that the product of any three consecutive integers is divisible by 6. Then investigate: is the product of four consecutive integers always divisible by 24?', tier: 5 },    ],
+    ],
   },
 
   'calculus-intro': {
@@ -507,9 +439,7 @@ const MATHS = {
       { q: 'Differentiate: y = 3x⁴ − 5x² + 2x − 7', tier: 1 },
       { q: 'Find the gradient of y = x³ − 4x + 1 at x = 2.', tier: 2 },
       { q: 'Find the coordinates of the stationary points of y = x³ − 6x² + 9x + 1 and determine their nature.', tier: 3 },
-
-      { q: 'Explain what the derivative represents geometrically (as a gradient) and physically (as a rate of change). Give a real-world example of each.', tier: 4 },
-      { q: 'Find all x where f(x) = x³ − 6x² + 9x + 1 is increasing. Sketch a rough graph. What is the connection between f(x) being increasing and the sign of f′(x)?', tier: 5 },    ],
+    ],
   },
 
   'integration': {
@@ -521,9 +451,7 @@ const MATHS = {
       { q: 'Find: ∫(4x³ − 2x + 5) dx', tier: 1 },
       { q: 'Evaluate: ∫₁³ (x² + 2x) dx', tier: 2 },
       { q: 'Find the area enclosed between y = x² and y = x + 2.', tier: 3 },
-
-      { q: 'Explain the difference between a definite and an indefinite integral. Why does one give a number and the other a function?', tier: 4 },
-      { q: 'Find the value of a such that ∫₀ᵃ x² dx = ∫ₐ² x² dx. What does this value represent geometrically?', tier: 5 },    ],
+    ],
   },
 
   'vectors': {
@@ -535,9 +463,7 @@ const MATHS = {
       { q: 'Find the magnitude of vector (3, −4, 0).', tier: 1 },
       { q: 'If a = 2i + j − 3k and b = i − 2j + k, find a · b.', tier: 2 },
       { q: 'Show that vectors (1, 2, 3) and (2, 1, −4/3) are perpendicular.', tier: 3 },
-
-      { q: 'Explain what a · b = 0 means geometrically. How do you use the dot product to test if two vectors are perpendicular?', tier: 4 },
-      { q: 'Position vectors of A, B, C are a, b, c where a + b + c = 0. Prove the triangle ABC has a specific centroid and find the area in terms of |a × b|.', tier: 5 },    ],
+    ],
   },
 
   // ── A-LEVEL GAPS (previously missing) ─────────────────────────────────────
@@ -551,9 +477,7 @@ const MATHS = {
       { q: 'Evaluate: log₂(32)', tier: 1 },
       { q: 'Solve: 3^(x+1) = 27^(x−1)', tier: 2 },
       { q: 'Solve: log₃(x + 4) + log₃(x − 2) = 3. State any restrictions on x.', tier: 3 },
-
-      { q: 'Explain why log(ab) = log a + log b using the laws of indices. Start from aᵐ × aⁿ = aᵐ⁺ⁿ.', tier: 4 },
-      { q: 'Solve simultaneously: log₂(x) + log₂(y) = 5 and log₂(x) − log₂(y) = 1. How many solutions exist? What changes if the right-hand sides differ?', tier: 5 },    ],
+    ],
   },
 
   'binomial-expansion': {
@@ -565,9 +489,7 @@ const MATHS = {
       { q: 'Expand (1 + x)⁴ using the binomial theorem.', tier: 1 },
       { q: 'Find the coefficient of x³ in the expansion of (2 + x)⁵.', tier: 2 },
       { q: 'Find the first three terms of (1 − 2x)^(−½) in ascending powers of x. State the range of validity.', tier: 3 },
-
-      { q: 'Explain where Pascal\'s triangle comes from and how it connects to the binomial coefficients ⁿCr. Why does each row start and end with 1?', tier: 4 },
-      { q: 'Find the coefficient of x³ in (1 + x + x²)⁵. You cannot simply expand — explain your method clearly.', tier: 5 },    ],
+    ],
   },
 
   'sequences-series': {
@@ -579,9 +501,7 @@ const MATHS = {
       { q: 'The 3rd term of an arithmetic sequence is 11 and the 7th term is 27. Find the first term and common difference.', tier: 1 },
       { q: 'A geometric series has first term 6 and common ratio 1/3. Find the sum to infinity.', tier: 2 },
       { q: 'Prove that the sum of the first n terms of an arithmetic series is n/2 × (2a + (n−1)d). Then find the least n for which the sum exceeds 1000, given a = 5, d = 3.', tier: 3 },
-
-      { q: 'Explain why the sum to infinity of a geometric series only exists when |r| < 1. What happens to the partial sums when r = 1 or r = −1?', tier: 4 },
-      { q: 'The sequence aₙ₊₁ = aₙ² − aₙ with a₁ = 2. Find the first 5 terms. Does it converge? Investigate for a₁ = 0, 1, 2, 3.', tier: 5 },    ],
+    ],
   },
 
   'mathematical-proof': {
@@ -593,9 +513,7 @@ const MATHS = {
       { q: 'Prove that the sum of any two odd numbers is even.', tier: 1 },
       { q: 'Disprove by counter-example: "n² + n + 41 is prime for all positive integers n."', tier: 2 },
       { q: 'Prove by contradiction that √2 is irrational.', tier: 3 },
-
-      { q: 'Explain the difference between proof by contradiction and disproof by counter-example. Why can one counter-example disprove a universal claim?', tier: 4 },
-      { q: 'Prove there are infinitely many primes. Then use the structure of this proof to explain what makes a proof by contradiction valid in general.', tier: 5 },    ],
+    ],
   },
 
   'further-trig': {
@@ -607,9 +525,7 @@ const MATHS = {
       { q: 'Write sin(A + B) and cos(A + B) in expanded form.', tier: 1 },
       { q: 'Solve: 2sin²x − sinx − 1 = 0 for 0° ≤ x ≤ 360°.', tier: 2 },
       { q: 'Express 3sinx + 4cosx in the form Rsin(x + α), finding R and α. Hence find the maximum value and the x at which it occurs.', tier: 3 },
-
-      { q: 'Explain geometrically using the unit circle why sin(π − x) = sin(x) and cos(π − x) = −cos(x).', tier: 4 },
-      { q: 'Solve 4sin²x − 4sinx + 1 = 0 for 0 ≤ x ≤ 2π. Show all steps. How many solutions are there and why does the repeated root affect the count?', tier: 5 },    ],
+    ],
   },
 
   'quadratic-simultaneous': {
@@ -621,8 +537,6 @@ const MATHS = {
       { q: 'Solve simultaneously: y = x + 1 and y = x²− 1', tier: 1 },
       { q: 'Solve simultaneously: x² + y² = 25 and y = 2x', tier: 2 },
       { q: 'Find the x-coordinates where y = x² − 3x and y = x + 5 intersect. Give exact answers.', tier: 3 },
-      { q: 'Explain why solving y = x + k and y = x² simultaneously gives a quadratic in x. What does the discriminant of that quadratic tell you about the number of intersections?', tier: 4 },
-      { q: 'Show that the line y = mx + c intersects y = x² at two points when m² + 4c > 0. Find the coordinates of both points in terms of m and c.', tier: 5 },
     ],
   },
 
@@ -635,8 +549,6 @@ const MATHS = {
       { q: 'Solve: x² − 5x + 6 > 0', tier: 1 },
       { q: 'Solve: 2x² + x − 3 ≤ 0', tier: 2 },
       { q: 'Find the range of values of x for which x² < 3x + 10. Give your answer using inequality notation.', tier: 3 },
-      { q: 'Explain why the solution to x² − 4 > 0 is two separate regions (x < −2 or x > 2) rather than one continuous range. Use a sketch to justify.', tier: 4 },
-      { q: 'Solve x² + bx + c < 0 in terms of b and c, assuming two real roots α and β where α < β. State clearly when this is possible and when no solution exists.', tier: 5 },
     ],
   },
 
@@ -649,8 +561,6 @@ const MATHS = {
       { q: 'The graph of y = f(x) is translated 3 units right. Write the new equation.', tier: 1 },
       { q: 'Describe the transformation that maps y = x² to y = −(x + 2)²', tier: 2 },
       { q: 'The graph of y = sin(x) is stretched vertically by factor 3 and translated π/2 left. Write the equation of the new graph.', tier: 3 },
-      { q: 'Explain why y = f(x + a) shifts the graph LEFT when a > 0, even though adding a feels like it should go right. Use a numerical example to prove it.', tier: 4 },
-      { q: 'Starting from y = x², apply these transformations in order: reflect in x-axis, stretch horizontally by factor 2, translate (1, −3). Write the equation after each step and justify the order matters.', tier: 5 },
     ],
   },
 
@@ -663,8 +573,6 @@ const MATHS = {
       { q: 'A particle moves with displacement s = t³ − 6t² + 9t. Find its velocity at t = 2.', tier: 1 },
       { q: 'Find the minimum value of f(x) = x³ − 3x² + 4 and verify it is a minimum.', tier: 2 },
       { q: 'A rectangle has perimeter 20 cm. Use calculus to find the dimensions that maximise the area.', tier: 3 },
-      { q: 'A particle has velocity v = 3t² − 12t + 9. Find when it is stationary, and determine whether these are maximum or minimum velocity points.', tier: 4 },
-      { q: 'An open-top box is made from a 12 cm × 12 cm square card by cutting equal squares of side x from each corner. Find x that maximises volume. Show it is a maximum.', tier: 5 },
     ],
   },
 
@@ -677,9 +585,7 @@ const MATHS = {
       { q: 'A curve is defined by x = t + 1, y = t² − 3. Find y when t = 2.', tier: 1 },
       { q: 'Convert x = 2cosθ, y = 3sinθ to a Cartesian equation.', tier: 2 },
       { q: 'A curve has parametric equations x = t², y = t³ − 3t. Find dy/dx in terms of t, and find the coordinates of the stationary points.', tier: 3 },
-
-      { q: 'Explain why eliminating t converts parametric equations to a Cartesian equation of the same curve. What does t represent physically?', tier: 4 },
-      { q: 'For x = t² + 1, y = t³ − t, find all points where the tangent is horizontal or vertical. Use these to sketch the shape of the curve.', tier: 5 },    ],
+    ],
   },
 }
 
