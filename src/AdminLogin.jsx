@@ -2,8 +2,6 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Shield, Eye, EyeOff, ArrowRight } from 'lucide-react'
 
-const _a = atob('YWRtaW5AYWV2YS5kZXY=')       // admin@aeva.dev
-const _b = atob('QWV2YUFkbWluMjAyNiE=')       // AevaAdmin2026!
 
 export default function AdminLogin({ onSuccess, onCancel }) {
   const [email, setEmail]       = useState('')
@@ -12,18 +10,27 @@ export default function AdminLogin({ onSuccess, onCancel }) {
   const [error, setError]       = useState('')
   const [loading, setLoading]   = useState(false)
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError('')
     setLoading(true)
-    setTimeout(() => {
-      if (email.trim() === _a && password === _b) {
+    try {
+      const res = await fetch('/api/admin-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password }),
+      })
+      const data = await res.json()
+      if (data.ok) {
         sessionStorage.setItem('aeva_admin_session', '1')
         onSuccess()
       } else {
-        setError('Invalid credentials.')
+        setError(data.error ?? 'Invalid credentials.')
       }
+    } catch {
+      setError('Network error. Please try again.')
+    } finally {
       setLoading(false)
-    }, 600)
+    }
   }
 
   const inputStyle = {

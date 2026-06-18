@@ -8,7 +8,7 @@ export const GROQ_KEYS = [
   import.meta.env.VITE_GROQ_API_KEY_3,
 ].filter(Boolean)
 
-export const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
+export const GROQ_URL = '/api/groq'
 
 let _idx = 0
 export function nextGroqKey() {
