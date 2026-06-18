@@ -1790,10 +1790,10 @@ const READING = {
     prerequisites: ['figurative-language', 'theme-identification', 'tone-mood'],
     nextSkills: ['authors-craft', 'close-reading', 'rhetorical-analysis'],
     questions: [
-      { q: 'Read this: "The torch of liberty must never be extinguished — even if we have to fight to keep it burning."\nIdentify the literary device, explain what "torch of liberty" represents, and describe the effect this creates.', tier: 1 },
-      { q: 'Read this: "The torch of liberty burns in every heart. Its flame is passed from one generation to the next — we are its keepers now, and to let it die is to betray all who came before."\nSelect TWO literary devices used in this passage? (a) extended metaphor  (b) direct address  (c) onomatopoeia  (d) flashback', tier: 2 },
-      { q: 'Read this: "It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of foolishness."\nIdentify the device. Explain how repetition of structure creates meaning. Why might an author begin a novel this way?', tier: 2 },
-      { q: 'Read this: "The captain steered his ship of state through treacherous waters. Below deck, the passengers argued about the colour of the curtains."\nIdentify ALL literary devices and explain how each contributes to the overall meaning. What is the author implying about politics or leadership?', tier: 3 },
+      { q: 'Read this: "The torch of liberty must never be extinguished — even if we have to fight to keep it burning." What literary device is PRIMARILY used?\n(a) simile  (b) extended metaphor  (c) alliteration  (d) personification', tier: 1 },
+      { q: 'Read this: "The torch of liberty burns in every heart. Its flame is passed from one generation to the next — we are its keepers now, and to let it die is to betray all who came before." Select TWO literary devices used in this passage.\n(a) extended metaphor  (b) direct address  (c) onomatopoeia  (d) flashback', tier: 2 },
+      { q: 'Read this: "It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of foolishness." Select TWO effects created by the repeated parallel structure.\n(a) it creates a sense of paradox — suggesting two contradictory things were simultaneously true  (b) it shows the narrator is confused about history  (c) the parallel structure gives each contradiction equal weight and authority  (d) it implies the narrator prefers one era over the other', tier: 2 },
+      { q: 'Read this: "The captain steered his ship of state through treacherous waters. Below deck, the passengers argued about the colour of the curtains." Select TWO things the author is implying about politics or leadership.\n(a) leaders must navigate serious dangers while those they lead focus on trivial concerns  (b) the passage suggests the captain is incompetent  (c) the contrast between "treacherous waters" and "colour of the curtains" highlights political dysfunction  (d) the passengers are right to focus on the curtains because it is their home', tier: 3 },
     ],
   },
 
@@ -1803,10 +1803,10 @@ const READING = {
     prerequisites: ['argument-structure', 'tone-mood'],
     nextSkills: ['rhetorical-analysis', 'counterargument'],
     questions: [
-      { q: 'Read this: "As a doctor who has treated thousands of patients, I know that smoking causes irreversible lung damage. Every cigarette is a step toward a shorter life."\nIdentify whether this uses ethos, pathos, or logos — and explain why.', tier: 1 },
-      { q: 'Read this: "As a surgeon who has performed thousands of operations, I can tell you: every minute without proper funding costs lives. Children are dying while politicians debate. We need action now."\nWhich TWO rhetorical appeals does this passage use? (a) ethos  (b) pathos  (c) logos  (d) kairos', tier: 2 },
-      { q: 'Read this: "For just £1 a day — less than a cup of coffee — you can provide clean water for a family of four. Millions of children walk miles every morning so their family can survive. You can help."\nIdentify ALL THREE rhetorical appeals (ethos, pathos, logos) with evidence for each.', tier: 2 },
-      { q: 'Read this: "Experts agree that exercise extends lifespan. Studies across 50 countries confirm it. And yet we sit. We scroll. We tell ourselves we\'ll start on Monday."\nAnalyse the rhetoric. Identify each appeal. Then explain how the final three short sentences function differently from the rest of the passage — and what effect this creates.', tier: 3 },
+      { q: 'Read this: "As a doctor who has treated thousands of patients, I know that smoking causes irreversible lung damage. Every cigarette is a step toward a shorter life." Which rhetorical appeal is PRIMARILY used?\n(a) pathos — appealing to the audience\'s emotions  (b) logos — using statistics and data  (c) ethos — establishing credibility through expertise  (d) kairos — appealing to the urgency of timing', tier: 1 },
+      { q: 'Read this: "As a surgeon who has performed thousands of operations, I can tell you: every minute without proper funding costs lives. Children are dying while politicians debate. We need action now." Select TWO rhetorical appeals used in this passage.\n(a) ethos  (b) pathos  (c) logos  (d) kairos', tier: 2 },
+      { q: 'Read this: "For just £1 a day — less than a cup of coffee — you can provide clean water for a family of four. Millions of children walk miles every morning so their family can survive. You can help." Select TWO rhetorical appeals used in this passage.\n(a) logos — the cost comparison provides a relatable statistic  (b) ethos — the author establishes their personal credibility  (c) pathos — "children walk miles every morning" creates an emotional response  (d) kairos — it references a current news event to create urgency', tier: 2 },
+      { q: 'Read this: "Experts agree that exercise extends lifespan. Studies across 50 countries confirm it. And yet we sit. We scroll. We tell ourselves we\'ll start on Monday." Select TWO things the final three short sentences ("And yet we sit. We scroll. We tell ourselves we\'ll start on Monday.") achieve that the rest of the passage does not.\n(a) they shift from facts about others to implicating the reader directly  (b) they introduce a new piece of statistical evidence  (c) the short, fragmented structure mimics the distracted behaviour being described  (d) they use ethos by referencing the author\'s own expertise', tier: 3 },
     ],
   },
 
@@ -1816,9 +1816,9 @@ const READING = {
     prerequisites: ['text-structure', 'narrative-structure', 'literary-devices-advanced'],
     nextSkills: ['close-reading', 'compare-contrast-texts'],
     questions: [
-      { q: 'A poem has four four-line stanzas and then a final single line standing alone.\nWhy might a poet isolate the last line? What effect does this structural choice create?', tier: 1 },
-      { q: 'A speech moves in this order: statistics → personal story → call to action.\nWhy is this order more persuasive than the reverse? What psychological principle does this sequence use?', tier: 2 },
-      { q: 'A novel alternates between two timelines — 1944 and 2005 — with chapters switching between them.\nExplain TWO reasons an author might choose this structure. How does it create suspense? What risks does it carry? Give an example from a novel or film that uses this technique.', tier: 3 },
+      { q: 'A poem has four four-line stanzas, then a final line that stands alone. What is the MOST LIKELY reason the poet isolated the final line?\n(a) the poet ran out of ideas for a fourth stanza  (b) to create dramatic emphasis and make the final thought stand apart  (c) because isolated lines are always more poetic  (d) to show that the final idea is less important than the rest', tier: 1 },
+      { q: 'A speech moves in this order: statistics → personal story → call to action. Select TWO reasons why this order is more persuasive than the reverse.\n(a) statistics establish the problem logically before the emotion of the personal story  (b) opening with statistics is always the most powerful choice in any speech  (c) the personal story makes the audience care before they are asked to act  (d) a call to action is always ineffective unless placed last', tier: 2 },
+      { q: 'A novel alternates between chapters set in 1944 and chapters set in 2005. Select TWO reasons an author might choose this structure over a straightforward chronological story.\n(a) to create suspense by withholding information from one timeline that only the other reveals  (b) because readers prefer not to read events in chronological order  (c) to allow the reader to discover connections between past and present gradually  (d) alternating timelines always make a novel more commercially successful', tier: 3 },
     ],
   },
 
@@ -1828,9 +1828,9 @@ const READING = {
     prerequisites: ['text-structure-analysis', 'argument-structure'],
     nextSkills: ['synthesising-sources', 'close-reading'],
     questions: [
-      { q: 'Text A: "Technology is making us smarter — access to information has never been easier."\nText B: "Technology is making us lazier — we no longer need to remember anything."\nWhat is the KEY DIFFERENCE in their arguments? What do both texts agree on?', tier: 1 },
-      { q: 'Text A (1960): "Space exploration is the greatest achievement of human civilisation."\nText B (2020): "Space exploration diverts billions from poverty, climate, and healthcare."\nCompare the texts on: (a) their claim  (b) their likely audience  (c) the historical context that shapes each view.', tier: 2 },
-      { q: 'Text A: rising property prices benefit homeowners and boost the local economy (cities are becoming more equal).\nText B: rising property prices displace low-income residents who built the community (cities are becoming less equal).\nBoth texts use economic data. How can the same type of evidence support opposite conclusions? What does this tell us about how to evaluate sources?', tier: 3 },
+      { q: 'Text A: "Technology is making us smarter — access to information has never been easier." Text B: "Technology is making us lazier — we no longer need to remember anything." What is the KEY DIFFERENCE between these two arguments?\n(a) they discuss different types of technology  (b) Text A focuses on what technology provides; Text B focuses on what technology removes  (c) Text A is scientific while Text B is personal opinion  (d) they have completely opposite intended audiences', tier: 1 },
+      { q: 'Text A (1960): "Space exploration is the greatest achievement of human civilisation." Text B (2020): "Space exploration diverts billions from poverty, climate, and healthcare." Select TWO factors that BEST explain why the texts reach opposite conclusions.\n(a) the historical context differs — 1960 was the space race, when exploration felt urgent and exciting  (b) Text A has a better argument because it is older  (c) Text B is shaped by modern awareness of global crises that did not dominate 1960s priorities  (d) the texts were written in different countries, which explains the disagreement', tier: 2 },
+      { q: 'Text A argues rising property prices benefit homeowners and boost local economies. Text B argues they displace low-income residents who built the community. Both use economic data. Select TWO statements that BEST explain how the same data can support opposite conclusions.\n(a) each text measures "benefit" differently — one tracks homeowner wealth, the other tracks community wellbeing  (b) one text must be wrong because data cannot support two different conclusions  (c) the texts focus on different groups — one on owners, the other on renters and workers  (d) the economic data must have been collected at different times, making comparisons invalid', tier: 3 },
     ],
   },
 
@@ -2424,21 +2424,21 @@ export const FAST_LANE = {
   reading: [
     {
       label: 'Quick Check 1',
-      q: 'Two quick checks — answer both:\n(a) Read this: "The letter had sat unopened on the desk for weeks. Each morning she dusted around it." What can you INFER about the person\'s feelings toward the letter? Explain your reasoning.\n(b) Read this: "The sun was a furnace." What type of figurative language is this, and what does it suggest about the heat?',
+      q: 'Read this: "The old woman arrived early every Sunday and sat in the same pew. She never spoke to anyone. But when the church announced it would close, she was the first to sign the petition." Select TWO inferences BEST supported by this passage.\n(a) the church holds deep personal significance for her  (b) she attends only out of habit with no real attachment  (c) her silence suggests private devotion rather than indifference  (d) she signed the petition because she enjoys protesting',
       nodeId: 'inference-advanced',
       onPass: 'literary-devices-advanced',  // solid → skip to Grade 10 entry
       onFail: null,                          // not solid → try bracket 2
     },
     {
       label: 'Quick Check 2',
-      q: 'Two quick checks — answer both:\n(a) Read this passage: "Dolphins are intelligent animals. They can learn tricks, communicate with clicks and whistles, and scientists believe they even have their own names." What is the MAIN IDEA?\n(b) Read this: "The enormous elephant was so large it knocked down a small tree just by walking past." What does "enormous" mean? What clue in the sentence helped you?',
+      q: 'Read this: "Dolphins are intelligent animals. They can learn tricks, communicate using clicks and whistles, and scientists believe they even have their own names." What is the MAIN IDEA of this passage?\n(a) dolphins are dangerous to humans  (b) dolphins are very intelligent animals  (c) scientists study dolphins in the ocean  (d) dolphins make good pets',
       nodeId: 'main-idea-details',
       onPass: 'character-analysis',  // solid → Grade 7 entry
       onFail: null,                  // not solid → try bracket 3
     },
     {
       label: 'Quick Check 3',
-      q: 'Two quick checks — answer both:\n(a) Read this: "The big brown dog ran fast down the street. It stopped at a tree and barked loudly." What did the dog do? Name TWO things.\n(b) Read this: "First Tom put on his shoes. Then he grabbed his bag. Finally he ran to the bus stop." What did Tom do LAST?',
+      q: 'Read this: "First Tom put on his shoes. Then he grabbed his bag. Finally he ran to the bus stop." What did Tom do LAST?\n(a) put on his shoes  (b) grabbed his bag  (c) ran to the bus stop  (d) had breakfast',
       nodeId: 'sight-words-fluency',
       onPass: 'main-idea-details',    // solid → Grade 3 entry
       onFail: 'basic-sentence-comp',  // not solid → Grade 2 start
