@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNeuralStore } from './neuralStore'
 import { useXPStore, ORBS, levelFromXP } from './xpStore'
 import { useBrainStore } from './brainStore'
 import { useLibraryStore } from './libraryStore'
-import { Shield, LogOut, BarChart2, Database, Map, Wrench, Trash2, Download, Upload, RefreshCw, ChevronRight, Check, AlertTriangle } from 'lucide-react'
+import { Shield, LogOut, BarChart2, Database, Map, Wrench, Trash2, Download, Upload, RefreshCw, ChevronRight, Check, AlertTriangle, Activity, Users, Zap, Wifi, WifiOff, Clock } from 'lucide-react'
 
 /* ── helpers ── */
 function fmt(n) { return typeof n === 'number' ? n.toLocaleString() : String(n ?? '—') }
@@ -15,6 +15,14 @@ function ago(ts) {
   if (s < 3600) return `${Math.floor(s / 60)}m ago`
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`
   return `${Math.floor(s / 86400)}d ago`
+}
+
+/* ── global spin keyframe ── */
+if (typeof document !== 'undefined' && !document.getElementById('aeva-spin-style')) {
+  const s = document.createElement('style')
+  s.id = 'aeva-spin-style'
+  s.textContent = '@keyframes spin { to { transform: rotate(360deg); } }'
+  document.head.appendChild(s)
 }
 
 /* ── design tokens ── */
@@ -120,6 +128,246 @@ function BtnAdmin({ onClick, children, danger, disabled }) {
     >
       {children}
     </motion.button>
+  )
+}
+
+/* ── Monitor tab ── */
+function TabMonitor() {
+  const token = sessionStorage.getItem('aeva_admin_token') || ''
+  const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+
+  const [groq, setGroq]       = useState(null)
+  const [stats, setStats]     = useState(null)
+  const [health, setHealth]   = useState({})
+  const [loading, setLoading] = useState(false)
+  const [lastFetch, setLastFetch] = useState(null)
+  const [userFilter, setUserFilter] = useState('')
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [groqRes, statsRes] = await Promise.all([
+        fetch('/api/admin/groq-status', { headers }),
+        fetch('/api/admin/app-stats', { headers }),
+      ])
+      if (groqRes.ok)  setGroq(await groqRes.json())
+      if (statsRes.ok) setStats(await statsRes.json())
+
+      // Health pings
+      const endpoints = ['/api/ping', '/api/groq', '/api/admin-auth']
+      const checks = await Promise.all(endpoints.map(async ep => {
+        const t0 = Date.now()
+        try {
+          const r = await fetch(ep, { method: ep === '/api/ping' ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' }, body: ep !== '/api/ping' ? '{}' : undefined })
+          return { ep, ok: r.status !== 500, ms: Date.now() - t0 }
+        } catch { return { ep, ok: false, ms: Date.now() - t0 } }
+      }))
+      setHealth(Object.fromEntries(checks.map(c => [c.ep, c])))
+      setLastFetch(Date.now())
+    } finally {
+      setLoading(false)
+    }
+  }, [token])
+
+  useEffect(() => { fetchAll() }, [fetchAll])
+
+  // auto-refresh every 60s
+  useEffect(() => {
+    const t = setInterval(fetchAll, 60_000)
+    return () => clearInterval(t)
+  }, [fetchAll])
+
+  const statusColor = s => s === 'ok' ? A.green : s === 'limited' ? A.yellow : A.red
+  const statusLabel = s => s === 'ok' ? 'Healthy' : s === 'limited' ? 'Rate limited' : s === 'invalid' ? 'Invalid key' : 'Error'
+
+  function BarPct({ value, total, color }) {
+    const pct = total > 0 ? Math.round((value / total) * 100) : 0
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: A.muted }}>
+          <span style={{ color }}>{value?.toLocaleString() ?? '?'} / {total?.toLocaleString() ?? '?'}</span>
+          <span style={{ color: A.text, fontWeight: 700 }}>{pct}%</span>
+        </div>
+        <div style={{ height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${pct}%`, borderRadius: 99, background: color, transition: 'width 0.6s ease' }} />
+        </div>
+      </div>
+    )
+  }
+
+  const filteredUsers = (stats?.users || []).filter(u =>
+    !userFilter || u.email?.toLowerCase().includes(userFilter.toLowerCase())
+  )
+
+  function relTime(ts) {
+    if (!ts) return '—'
+    const s = Math.floor((Date.now() - new Date(ts).getTime()) / 1000)
+    if (s < 60) return `${s}s ago`
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`
+    return `${Math.floor(s / 86400)}d ago`
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <SectionHeader>Live Monitor</SectionHeader>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {lastFetch && <span style={{ fontSize: 11, color: A.muted }}>updated {relTime(lastFetch)}</span>}
+          <BtnAdmin onClick={fetchAll} disabled={loading}>
+            <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+            {loading ? 'Refreshing…' : 'Refresh'}
+          </BtnAdmin>
+        </div>
+      </div>
+
+      {/* ── App Stats ── */}
+      <div>
+        <SectionHeader>App Stats</SectionHeader>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
+          <StatBox label="Total Users" value={stats?.totalUsers ?? '—'} color="#A78BFA" />
+          <StatBox label="New This Week" value={stats?.newThisWeek ?? '—'} color={A.green} />
+          <StatBox label="Total Messages" value={stats?.totalMessages ?? '—'} sub="across all users" color="#60A5FA" />
+          {stats?.missingKey && (
+            <div style={{ gridColumn: '1 / -1', fontSize: 12, color: A.yellow, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: 12, padding: '10px 14px' }}>
+              Add <code style={{ fontFamily: 'monospace', color: A.yellow }}>SUPABASE_SERVICE_KEY</code> to Vercel env vars to enable user data.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Groq Key Health ── */}
+      <div>
+        <SectionHeader>Groq API Keys</SectionHeader>
+        {!groq ? (
+          <div style={{ fontSize: 13, color: A.muted, padding: '16px 0' }}>Loading…</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {groq.keys.map(k => (
+              <div key={k.label} style={{
+                background: A.surface, border: `1px solid ${A.border}`,
+                borderRadius: 16, padding: '16px 20px',
+                display: 'flex', flexDirection: 'column', gap: 12,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: statusColor(k.status), boxShadow: `0 0 6px ${statusColor(k.status)}` }} />
+                    <span style={{ fontSize: 14, fontWeight: 700, color: A.text }}>{k.label}</span>
+                  </div>
+                  <Tag color={statusColor(k.status)}>{statusLabel(k.status)}</Tag>
+                </div>
+
+                {k.status === 'ok' || k.status === 'limited' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: A.muted, marginBottom: 4, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Requests remaining</div>
+                      <BarPct value={k.reqRemaining} total={k.reqLimit} color="#60A5FA" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: A.muted, marginBottom: 4, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Tokens remaining</div>
+                      <BarPct value={k.tokRemaining} total={k.tokLimit} color="#A78BFA" />
+                    </div>
+                    {k.resetReq && (
+                      <div style={{ fontSize: 11, color: A.muted, display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <Clock size={11} /> Resets in {k.resetReq}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: A.red }}>{k.error}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── System Health ── */}
+      <div>
+        <SectionHeader>System Health</SectionHeader>
+        <div style={{ background: A.surface, border: `1px solid ${A.border}`, borderRadius: 16, padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {Object.entries(health).map(([ep, info]) => (
+            <div key={ep} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {info.ok
+                  ? <Wifi size={14} color={A.green} />
+                  : <WifiOff size={14} color={A.red} />}
+                <span style={{ fontSize: 13, fontFamily: 'monospace', color: A.text }}>{ep}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 12, color: A.muted }}>{info.ms}ms</span>
+                <Tag color={info.ok ? A.green : A.red}>{info.ok ? 'Up' : 'Down'}</Tag>
+              </div>
+            </div>
+          ))}
+          {Object.keys(health).length === 0 && (
+            <div style={{ fontSize: 13, color: A.muted }}>Running health checks…</div>
+          )}
+        </div>
+      </div>
+
+      {/* ── User Accounts ── */}
+      <div>
+        <SectionHeader>User Accounts — {stats?.totalUsers ?? 0} total</SectionHeader>
+        {stats?.missingKey ? (
+          <div style={{ fontSize: 13, color: A.muted, padding: '12px 0' }}>
+            Add <code style={{ fontFamily: 'monospace' }}>SUPABASE_SERVICE_KEY</code> to Vercel to view user accounts.
+          </div>
+        ) : (
+          <>
+            <input
+              placeholder="Filter by email…"
+              value={userFilter}
+              onChange={e => setUserFilter(e.target.value)}
+              style={{
+                padding: '10px 14px', borderRadius: 11, marginBottom: 12,
+                background: 'rgba(255,255,255,0.05)', border: `1px solid ${A.border}`,
+                color: A.text, fontSize: 14, fontFamily: 'inherit', outline: 'none',
+                width: '100%', boxSizing: 'border-box',
+              }}
+              onFocus={e => e.target.style.borderColor = A.accent}
+              onBlur={e => e.target.style.borderColor = A.border}
+            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {filteredUsers.length === 0 && (
+                <div style={{ fontSize: 13, color: A.muted, textAlign: 'center', padding: '24px 0' }}>
+                  {stats?.users?.length === 0 ? 'No users yet.' : 'No match.'}
+                </div>
+              )}
+              {filteredUsers.map(u => (
+                <div key={u.id} style={{
+                  background: A.surface, border: `1px solid ${A.border}`,
+                  borderRadius: 14, padding: '13px 16px',
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto',
+                  gap: '8px 16px',
+                  alignItems: 'start',
+                }}>
+                  <div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: A.text }}>{u.email}</div>
+                    <div style={{ fontSize: 11, color: A.muted, marginTop: 2, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      <span>Joined {relTime(u.createdAt)}</span>
+                      <span>·</span>
+                      <span>Active {relTime(u.lastActive)}</span>
+                      <span>·</span>
+                      <span style={{ textTransform: 'capitalize' }}>{u.provider}</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
+                    <Tag color="#FBBF24">Lv {u.level} · {u.xp.toLocaleString()} XP</Tag>
+                    <Tag color="#60A5FA">{u.chatSessions} sessions</Tag>
+                    <Tag color="#A78BFA">{u.totalMessages} msgs</Tag>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+    </div>
   )
 }
 
@@ -556,6 +804,7 @@ function TabDevTools({ neural, xp }) {
 ══════════════════════════════════════════════ */
 const TABS = [
   { id: 'overview',  label: 'Overview',    icon: BarChart2 },
+  { id: 'monitor',   label: 'Monitor',     icon: Activity  },
   { id: 'data',      label: 'Data Editor', icon: Database  },
   { id: 'concepts',  label: 'Concepts',    icon: Map       },
   { id: 'devtools',  label: 'Dev Tools',   icon: Wrench    },
@@ -640,6 +889,7 @@ export default function AdminPanel({ onLogout }) {
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.2 }}>
             {tab === 'overview' && <TabOverview neural={neural} xp={xp} />}
+            {tab === 'monitor'  && <TabMonitor />}
             {tab === 'data'     && <TabDataEditor neural={neural} xp={xp} />}
             {tab === 'concepts' && <TabConceptMap neural={neural} />}
             {tab === 'devtools' && <TabDevTools neural={neural} xp={xp} />}

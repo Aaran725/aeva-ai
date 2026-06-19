@@ -22,6 +22,7 @@ export default function AdminLogin({ onSuccess, onCancel }) {
       const data = await res.json()
       if (data.ok) {
         sessionStorage.setItem('aeva_admin_session', '1')
+        sessionStorage.setItem('aeva_admin_token', password)
         onSuccess()
       } else {
         setError(data.error ?? 'Invalid credentials.')
