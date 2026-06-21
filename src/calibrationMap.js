@@ -74,7 +74,7 @@ const MATHS = {
     prerequisites: ['times-tables'],
     nextSkills: ['basic-fractions', 'decimals-intro', 'basic-area-perimeter'],
     questions: [
-      { q: 'Work out 156 ÷ 12. Show your method.', tier: 1 },
+      { q: 'A school buys 7 boxes of markers. Each box holds 12 markers. How many markers altogether?', tier: 1 },
       { q: 'A school orders 24 boxes of pencils. Each box has 36 pencils. How many pencils in total?', tier: 2 },
       { q: '576 students are split equally into groups of 8. Each group then splits into pairs. How many pairs are there in total?', tier: 3 },
     ],
@@ -86,7 +86,7 @@ const MATHS = {
     prerequisites: ['times-tables'],
     nextSkills: ['fractions-equivalent', 'decimals-intro'],
     questions: [
-      { q: 'What is ½ of 24? What is ¼ of 36?', tier: 1 },
+      { q: 'What is ½ of 24?', tier: 1 },
       { q: 'Which is larger: 3/5 or 5/8? Show how you decided.', tier: 2 },
       { q: 'A pizza is cut into 8 slices. Tom eats 3/8, Sara eats 1/4. What fraction is left? Write it in its simplest form.', tier: 3 },
     ],
@@ -210,7 +210,7 @@ const MATHS = {
     questions: [
       { q: 'Calculate: 2/3 + 3/4', tier: 1 },
       { q: 'Calculate: 1 3/5 × 2 1/2', tier: 2 },
-      { q: 'Divide 2/3 ÷ 4/9 and give your answer as a mixed number.', tier: 3 },
+      { q: 'A tank is 3/4 full. After using 1/3 of the water in it, 30 litres remain. What is the full capacity of the tank?', tier: 3 },
     ],
   },
 
@@ -328,7 +328,7 @@ const MATHS = {
     prerequisites: ['completing-the-square'],
     nextSkills: ['discriminant', 'quadratic-simultaneous'],
     questions: [
-      { q: 'Solve using the quadratic formula: x² − 5x + 6 = 0', tier: 1 },
+      { q: 'Solve using the quadratic formula: x² + 4x − 1 = 0. Give your answers to 2 decimal places.', tier: 1 },
       { q: 'Solve using the quadratic formula: 2x² + 3x − 2 = 0', tier: 2 },
       { q: 'Solve 3x² − 7x + 1 = 0, giving your answer to 3 significant figures.', tier: 3 },
     ],
@@ -376,7 +376,7 @@ const MATHS = {
     prerequisites: ['straight-line-graphs'],
     nextSkills: ['sine-cosine-rule', 'trig-identities'],
     questions: [
-      { q: 'In a right triangle, the opposite side is 5 and hypotenuse is 13. Find the angle.', tier: 1 },
+      { q: 'In a right-angled triangle, the hypotenuse is 10 cm and one angle is 30°. Find the length of the side opposite the 30° angle.', tier: 1 },
       { q: 'A ladder 8m long leans against a wall at 65°. How high up the wall does it reach?', tier: 2 },
       { q: 'Find all angles between 0° and 360° for which sin(x) = −0.5.', tier: 3 },
     ],
@@ -462,7 +462,7 @@ const MATHS = {
     questions: [
       { q: 'Find the magnitude of vector (3, −4, 0).', tier: 1 },
       { q: 'If a = 2i + j − 3k and b = i − 2j + k, find a · b.', tier: 2 },
-      { q: 'Show that vectors (1, 2, 3) and (2, 1, −4/3) are perpendicular.', tier: 3 },
+      { q: 'Vectors a = 3i − j + 2k and b = i + 2j − k. Find a unit vector in the direction of a + b, and find the angle between a and b to the nearest degree.', tier: 3 },
     ],
   },
 
@@ -500,7 +500,7 @@ const MATHS = {
     questions: [
       { q: 'The 3rd term of an arithmetic sequence is 11 and the 7th term is 27. Find the first term and common difference.', tier: 1 },
       { q: 'A geometric series has first term 6 and common ratio 1/3. Find the sum to infinity.', tier: 2 },
-      { q: 'Prove that the sum of the first n terms of an arithmetic series is n/2 × (2a + (n−1)d). Then find the least n for which the sum exceeds 1000, given a = 5, d = 3.', tier: 3 },
+      { q: 'A geometric sequence has first term a and common ratio r. The sum of the first 4 terms is 30 and the sum of the first 8 terms is 510. Find a and r.', tier: 3 },
     ],
   },
 
