@@ -291,6 +291,23 @@ function parseMCOptions(questionText) {
   return options.length >= 3 ? { stem, options } : null
 }
 
+// ── Sub-question parser ──────────────────────────────────────────────────────
+// Detects "(a) ... (b) ..." patterns that are open-ended sub-tasks (not MC options).
+// MC stems end with '?'; sub-question stems end with ':' or contain "answer both".
+function parseSubQuestions(questionText) {
+  const text = questionText || ''
+  const aIdx = text.search(/\(a\)/i)
+  if (aIdx === -1) return null
+  const stem = text.slice(0, aIdx).trim()
+  // Must be a sub-task stem (ends with ':' or contains directive phrasing), not an MC stem
+  if (!/[:\-]$/.test(stem) && !/answer both|quick check/i.test(stem)) return null
+  const regex = /\(([a-d])\)\s*([^(]+?)(?=\s*\([a-d]\)|$)/gi
+  const matches = [...text.matchAll(regex)]
+  if (matches.length < 2) return null
+  const parts = matches.map(m => ({ key: m[1].toLowerCase(), label: m[2].trim() })).filter(p => p.label.length > 0)
+  return parts.length >= 2 ? { stem, parts } : null
+}
+
 // ── Multi-select option parser ───────────────────────────────────────────────
 // Triggered only when question text contains explicit "select TWO" / "which TWO" phrasing.
 // Returns { stem, options: [{ key, label }], selectCount } or null.
@@ -334,6 +351,7 @@ export function CalibrationExperience({
 }) {
   const t = getUIText(language, subject)
   const [input, setInput]               = useState('')
+  const [subInputs, setSubInputs]       = useState({})    // per-part answers for sub-questions
   const [showFeedback, setShowFeedback] = useState(false)
   const [activeFeedback, setActiveFeedback] = useState(null)
   const [selectedMC, setSelectedMC]     = useState(null)  // key of tapped MC option
@@ -344,6 +362,7 @@ export function CalibrationExperience({
   // Parse question type: multi-select takes priority over single-choice MC
   const msData = subject === 'reading' ? parseMSOptions(question?.text) : null
   const mcData = !msData && subject === 'reading' ? parseMCOptions(question?.text) : null
+  const sqData = !msData && !mcData ? parseSubQuestions(question?.text) : null
 
   const subjectLabel = SUBJECT_LABELS[subject] || subject
   const subjectIcon  = SUBJECT_ICONS[subject]  || '📚'
@@ -357,13 +376,14 @@ export function CalibrationExperience({
     return () => clearTimeout(t)
   }, [lastFeedback?.ts])
 
-  // Clear input / MC / MS selection and re-focus when question changes
+  // Clear input / MC / MS / sub-question state and re-focus when question changes
   useEffect(() => {
     setInput('')
+    setSubInputs({})
     setSelectedMC(null)
     setSelectedMS([])
     if (mcSubmitRef.current) { clearTimeout(mcSubmitRef.current); mcSubmitRef.current = null }
-    if (!mcData && !msData) {
+    if (!mcData && !msData && !sqData) {
       const t = setTimeout(() => inputRef.current?.focus(), 180)
       return () => clearTimeout(t)
     }
@@ -422,6 +442,17 @@ export function CalibrationExperience({
     if (!text || isEvaluating) return
     onAnswer(text)
     setInput('')
+  }
+
+  const handleSQSubmit = () => {
+    if (isEvaluating || !sqData) return
+    const allFilled = sqData.parts.every(p => (subInputs[p.key] || '').trim())
+    if (!allFilled) return
+    const combined = sqData.parts
+      .map(p => `(${p.key}) ${subInputs[p.key].trim()}`)
+      .join('\n')
+    onAnswer(combined)
+    setSubInputs({})
   }
 
   const handleKeyDown = e => {
@@ -783,6 +814,82 @@ export function CalibrationExperience({
                 <span style={{ fontSize: 10, color: mutedCol, opacity: 0.7 }}>
                   Press A / B / C / D to select
                 </span>
+              </div>
+            </>
+          ) : sqData ? (
+            /* ── Sub-question boxes (one per part) ─────────────────────────── */
+            <>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {sqData.parts.map((part, idx) => (
+                  <div key={part.key}>
+                    <div style={{
+                      fontSize: 12, fontWeight: 700, color: 'rgba(129,140,248,0.8)',
+                      marginBottom: 6, letterSpacing: '0.03em',
+                    }}>
+                      ({part.key.toUpperCase()}) {part.label}
+                    </div>
+                    <textarea
+                      autoFocus={idx === 0}
+                      value={subInputs[part.key] || ''}
+                      onChange={e => setSubInputs(prev => ({ ...prev, [part.key]: e.target.value }))}
+                      onKeyDown={e => {
+                        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleSQSubmit()
+                      }}
+                      placeholder={isEvaluating ? t.placeholderEval : 'Your answer…'}
+                      disabled={isEvaluating}
+                      rows={2}
+                      style={{
+                        width: '100%', boxSizing: 'border-box',
+                        background: cardBg, border: `1.5px solid ${inputBorder}`,
+                        borderRadius: 12, padding: '12px 16px',
+                        fontSize: 14, lineHeight: 1.6, color: textCol,
+                        resize: 'vertical', outline: 'none', minHeight: 72,
+                        fontFamily: "'Inter', system-ui, sans-serif",
+                        opacity: isEvaluating ? 0.5 : 1,
+                        transition: 'border-color 0.15s, opacity 0.2s',
+                      }}
+                      onFocus={e => { e.target.style.borderColor = '#818CF8' }}
+                      onBlur={e  => { e.target.style.borderColor = inputBorder }}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <button
+                  onClick={onSkip}
+                  disabled={isEvaluating}
+                  style={{
+                    background: 'none', border: 'none', padding: 0,
+                    cursor: isEvaluating ? 'default' : 'pointer',
+                    fontSize: 12, color: mutedCol, fontWeight: 600,
+                    opacity: isEvaluating ? 0.35 : 1,
+                  }}
+                >
+                  {t.skip}
+                </button>
+                <button
+                  onClick={handleSQSubmit}
+                  disabled={isEvaluating || !sqData.parts.every(p => (subInputs[p.key] || '').trim())}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    background: sqData.parts.every(p => (subInputs[p.key] || '').trim()) && !isEvaluating
+                      ? '#818CF8' : 'rgba(129,140,248,0.16)',
+                    border: 'none', borderRadius: 12, padding: '12px 24px',
+                    fontSize: 13.5, fontWeight: 700,
+                    color: sqData.parts.every(p => (subInputs[p.key] || '').trim()) && !isEvaluating
+                      ? '#fff' : 'rgba(129,140,248,0.4)',
+                    cursor: sqData.parts.every(p => (subInputs[p.key] || '').trim()) && !isEvaluating
+                      ? 'pointer' : 'default',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {t.submit} <ChevronRight size={14} />
+                </button>
+              </div>
+
+              <div style={{ textAlign: 'center', fontSize: 10.5, color: mutedCol, marginTop: -4 }}>
+                {t.hint}
               </div>
             </>
           ) : (
