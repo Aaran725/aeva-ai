@@ -5825,6 +5825,13 @@ function ChatView({ onBack }) {
   const hasInput = input.trim().length > 0
   const isActive = isThinking || hasInput
 
+  // Reset textarea height when input is cleared after send
+  useEffect(() => {
+    if (!input && inputRef.current) {
+      inputRef.current.style.height = 'auto'
+    }
+  }, [input])
+
   // Keep masteryMapRef in sync for session-end save
   useEffect(() => { masteryMapRef.current = masteryMap }, [masteryMap])
 
@@ -9796,7 +9803,44 @@ If no clear changes: {"changes":[]}`
                 )}
               </AnimatePresence>
 
-              <div className="chat-input-bar" style={{ width: '100%', maxWidth: isMission ? 720 : 640, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 10px 10px 16px', backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)', borderRadius: 999, transition: 'border 0.3s, box-shadow 0.3s', ...inputBarStyle }}>
+              {/* Math symbol toolbar — appears when input contains maths chars */}
+              <AnimatePresence>
+                {/[x+\-*/=^0-9√π×÷≤≥½]/.test(input) && input.trim().length > 0 && (
+                  <motion.div
+                    key="math-toolbar"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 6 }}
+                    transition={{ duration: 0.15 }}
+                    style={{ width: '100%', maxWidth: isMission ? 720 : 640, margin: '0 auto 6px', display: 'flex', gap: 4, flexWrap: 'wrap' }}
+                  >
+                    {['×', '÷', '²', '³', '√', '≤', '≥', '≠', 'π', '½', '¼', '→', '∞', 'θ', 'Δ'].map(sym => (
+                      <motion.button
+                        key={sym}
+                        whileTap={{ scale: 0.85 }}
+                        onMouseDown={e => {
+                          e.preventDefault()
+                          const el = inputRef.current
+                          if (!el) { setInput(p => p + sym); return }
+                          const start = el.selectionStart ?? input.length
+                          const end   = el.selectionEnd   ?? input.length
+                          const next  = input.slice(0, start) + sym + input.slice(end)
+                          setInput(next)
+                          requestAnimationFrame(() => {
+                            el.focus()
+                            el.setSelectionRange(start + sym.length, start + sym.length)
+                          })
+                        }}
+                        style={{ padding: '4px 9px', borderRadius: 8, background: 'rgba(139,143,255,0.12)', border: '1px solid rgba(139,143,255,0.28)', color: 'rgba(165,180,252,0.90)', fontSize: 14, fontWeight: 600, cursor: 'pointer', lineHeight: 1 }}
+                      >
+                        {sym}
+                      </motion.button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="chat-input-bar" style={{ width: '100%', maxWidth: isMission ? 720 : 640, margin: '0 auto', display: 'flex', alignItems: 'flex-end', gap: 10, padding: '10px 10px 10px 16px', backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)', borderRadius: input.includes('\n') || input.length > 60 ? 24 : 999, transition: 'border 0.3s, box-shadow 0.3s, border-radius 0.2s', ...inputBarStyle }}>
                 {/* All chat tools collapsed into one dropdown */}
                 {!isMission && (
                   <ChatToolsMenu
@@ -9809,15 +9853,22 @@ If no clear changes: {"changes":[]}`
                     workingAttachment={workingAttachment}
                   />
                 )}
-                <input
+                <textarea
                   ref={inputRef}
-                  type="text"
+                  rows={1}
                   value={input}
-                  onChange={e => setInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
+                  onChange={e => {
+                    setInput(e.target.value)
+                    const el = e.target
+                    el.style.height = 'auto'
+                    el.style.height = Math.min(el.scrollHeight, 130) + 'px'
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
+                  }}
                   placeholder={placeholderNote}
                   disabled={isThinking}
-                  style={{ flex: 1, background: 'transparent', outline: 'none', border: 'none', color: inputTextColor, fontFamily: isMission && activeMission?.id === 'startup' ? '"JetBrains Mono", monospace' : "'Inter', system-ui, sans-serif", fontSize: 15, fontWeight: 400, caretColor: activeMission?.color || '#6b5fe8', opacity: isThinking ? 0.5 : 1 }}
+                  style={{ flex: 1, background: 'transparent', outline: 'none', border: 'none', color: inputTextColor, fontFamily: isMission && activeMission?.id === 'startup' ? '"JetBrains Mono", monospace' : "'Inter', system-ui, sans-serif", fontSize: 15, fontWeight: 400, caretColor: activeMission?.color || '#6b5fe8', opacity: isThinking ? 0.5 : 1, resize: 'none', overflow: 'hidden', lineHeight: '1.5', padding: '2px 0', maxHeight: 130, display: 'block' }}
                 />
                 {isThinking ? (
                   <motion.button onClick={stop} whileTap={{ scale: 0.84 }}
