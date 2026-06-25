@@ -732,6 +732,10 @@ At most ONE ⚡CMD per response. Executes silently — student never sees the ta
 ⚡CMD:{"type":"set_timer","seconds":120,"label":"Challenge label e.g. Solve the circuit"}
 ⚡CMD:{"type":"lock_topic","topic":"EXACT TOPIC","reason":"short reason e.g. you keep skipping the hard step","exchanges":5}
 ⚡CMD:{"type":"echo","topic":"EXACT TOPIC e.g. chain rule","moment":"one specific sentence — what ${userName} just demonstrated, in your voice, e.g. 'Finally derived it from scratch after three failed attempts'"}
+⚡CMD:{"type":"dim_world","duration":45}
+⚡CMD:{"type":"spotlight","target":"pinned-note|challenge-timer|chat-input|chat-history","duration":5}
+⚡CMD:{"type":"rewind","message_index":N,"reason":"short phrase — what broke here e.g. sign error on discriminant"}
+⚡CMD:{"type":"theme_shift","preset":"war_room|focus|victory|calm","reason":"short reason"}
 
 TRIGGER CONDITIONS — only fire when one of these is true:
 - Student types "open lab" or "go to lab" → open_lab
@@ -744,6 +748,10 @@ TRIGGER CONDITIONS — only fire when one of these is true:
 - You are explicitly setting a TIMED challenge (you told the student how long they have). Not for regular practice problems → set_timer (30-300 seconds)
 - Student keeps avoiding or skipping a concept they're struggling with → lock_topic (3-8 exchanges)
 - Student gets something right after getting it wrong earlier in this session (even once wrong is enough) → echo. Student makes an unprompted connection between two concepts → echo. Maximum 2 per session. The "moment" description MUST be specific: "Finally got the discriminant sign right after two wrong attempts" not "understood quadratics better". Generic echo descriptions are prohibited. Fire this more readily — a small win named precisely is more powerful than a grand win named vaguely.
+- Student is getting distracted or you need their absolute attention for a critical concept → dim_world (30-90s). The entire UI fades — reserve this for genuinely critical moments.
+- You reference a specific on-screen element by name (e.g. "look at that pinned formula") → spotlight that element. target must be one of: "pinned-note", "challenge-timer", "chat-input", "chat-history"
+- You detect a cascade of errors in this session that all stem from ONE earlier exchange → rewind. message_index is the 0-based index of that message in the conversation. reason is one short phrase naming the exact misunderstanding.
+- Student has an exam in ≤7 days → theme_shift "war_room". Student just achieved a major breakthrough after struggling → theme_shift "victory". Extended deep focus session (10+ exchanges, no distractions) → theme_shift "focus". Student asks to restore normal → theme_shift "calm".
 DO NOT fire CMDs routinely. pin_note and set_timer in particular should be RARE — most sessions have zero of them.
 Only use LaTeX math ($...$, \[...\]) for actual mathematical or scientific expressions. Never use math delimiters for non-math content.
 Never announce commands. Describe in past tense: "I've pinned that formula", "Timer's running", "I've awarded you 60 XP for that."
@@ -5686,6 +5694,108 @@ function ChatToolsMenu({ onLens, onPhoto, onDoc, onDrill, onWorking, photoAttach
   )
 }
 
+// ── SpotlightOverlay ──────────────────────────────────────────────────────────
+// Finds a DOM element by data-spotlight-id, gets its bounding rect, and renders
+// a pulsing ring at those exact coords. Lifts automatically after duration.
+function SpotlightOverlay({ target }) {
+  const [rect, setRect] = React.useState(null)
+
+  React.useEffect(() => {
+    if (!target?.id) { setRect(null); return }
+    const el = document.querySelector(`[data-spotlight-id="${target.id}"]`)
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    setRect({ top: r.top, left: r.left, width: r.width, height: r.height })
+    // Recompute on scroll/resize for the duration
+    const update = () => {
+      const r2 = el.getBoundingClientRect()
+      setRect({ top: r2.top, left: r2.left, width: r2.width, height: r2.height })
+    }
+    window.addEventListener('scroll', update, true)
+    window.addEventListener('resize', update)
+    return () => { window.removeEventListener('scroll', update, true); window.removeEventListener('resize', update) }
+  }, [target?.id, target?.duration])
+
+  if (!target || !rect) return null
+  const pad = 8
+  return (
+    <motion.div
+      key={target.id + target.duration}
+      initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+      transition={{ duration: 0.25 }}
+      aria-hidden
+      style={{
+        position: 'fixed', zIndex: 1300, pointerEvents: 'none',
+        top: rect.top - pad, left: rect.left - pad,
+        width: rect.width + pad * 2, height: rect.height + pad * 2,
+        borderRadius: 16,
+        boxShadow: '0 0 0 3px rgba(139,143,255,0.90), 0 0 28px 8px rgba(139,143,255,0.45)',
+      }}>
+      <motion.div
+        animate={{ boxShadow: ['0 0 0 3px rgba(139,143,255,0.9)', '0 0 0 7px rgba(139,143,255,0.3)', '0 0 0 3px rgba(139,143,255,0.9)'] }}
+        transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+        style={{ width: '100%', height: '100%', borderRadius: 16 }}
+      />
+    </motion.div>
+  )
+}
+
+// ── AevaThemeOverride ─────────────────────────────────────────────────────────
+// Injects CSS variable overrides on :root to shift the app's visual theme.
+// A small badge lets the student restore their own theme.
+const AEVA_THEME_PRESETS = {
+  war_room: {
+    '--ui-bg': '#0d0505', '--ui-surface': '#1a0808', '--ui-border': 'rgba(239,68,68,0.25)',
+    '--ui-accent': '#EF4444', '--ui-accent-muted': 'rgba(239,68,68,0.15)',
+    label: '⚔️ War Room', desc: 'Exam mode activated',
+  },
+  focus: {
+    '--ui-bg': '#06080f', '--ui-surface': '#0c1122', '--ui-border': 'rgba(99,102,241,0.20)',
+    '--ui-accent': '#6366F1', '--ui-accent-muted': 'rgba(99,102,241,0.12)',
+    label: '🔵 Focus', desc: 'Deep work mode',
+  },
+  victory: {
+    '--ui-bg': '#0a0900', '--ui-surface': '#141100', '--ui-border': 'rgba(234,179,8,0.25)',
+    '--ui-accent': '#EAB308', '--ui-accent-muted': 'rgba(234,179,8,0.14)',
+    label: '🏆 Victory', desc: 'Breakthrough unlocked',
+  },
+}
+
+function AevaThemeOverride({ preset, onRestore }) {
+  const theme = AEVA_THEME_PRESETS[preset]
+
+  React.useEffect(() => {
+    if (!theme) return
+    const root = document.documentElement
+    const prev = {}
+    Object.entries(theme).forEach(([k, v]) => {
+      if (k.startsWith('--')) { prev[k] = root.style.getPropertyValue(k); root.style.setProperty(k, v) }
+    })
+    return () => { Object.entries(prev).forEach(([k, v]) => root.style.setProperty(k, v)) }
+  }, [preset])
+
+  if (!theme) return null
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+      style={{
+        position: 'fixed', top: 12, left: '50%', transform: 'translateX(-50%)',
+        zIndex: 1400, display: 'flex', alignItems: 'center', gap: 10,
+        padding: '7px 14px', borderRadius: 99,
+        background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255,255,255,0.10)',
+        fontFamily: "'Inter', system-ui, sans-serif",
+      }}>
+      <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.80)', fontWeight: 500 }}>{theme.label} · {theme.desc}</span>
+      <button onClick={onRestore} style={{
+        padding: '3px 10px', borderRadius: 99, background: 'rgba(255,255,255,0.08)',
+        border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.55)',
+        fontSize: 11, cursor: 'pointer', fontFamily: 'inherit',
+      }}>restore</button>
+    </motion.div>
+  )
+}
+
 function ChatView({ onBack }) {
   const T = useT()
   const { name } = useUser()
@@ -5820,6 +5930,10 @@ function ChatView({ onBack }) {
   const [pinnedNote, setPinnedNote] = useState(null)   // { title, content } | null
   const [challengeTimer, setChallengeTimer] = useState(null)  // { label, total, remaining } | null
   const [topicLock, setTopicLock] = useState(null)    // { topic, reason, until } | null — until = exchange count
+  const [dimWorld, setDimWorld] = useState(null)       // null | { duration, until } — Aeva dims everything but chat
+  const [spotlightTarget, setSpotlightTarget] = useState(null) // null | { id, duration, until }
+  const [rewindTarget, setRewindTarget] = useState(null)       // null | { index, reason }
+  const [aevaTheme, setAevaTheme] = useState(null)    // null | 'war_room' | 'focus' | 'victory' | 'calm'
   const challengeTimerRef = useRef(null)
 
   const hasInput = input.trim().length > 0
@@ -7763,6 +7877,40 @@ Rules:
                 id: `breakthrough_${Date.now()}`,
               }])
               label = `Breakthrough · ${topic}`
+
+            } else if (action.type === 'dim_world') {
+              const secs = Math.min(120, Math.max(10, Math.round(action.duration || 45)))
+              setDimWorld({ duration: secs, until: Date.now() + secs * 1000 })
+              setTimeout(() => setDimWorld(null), secs * 1000)
+              label = `Focus mode · ${secs}s`
+
+            } else if (action.type === 'dim_world_lift') {
+              setDimWorld(null)
+              label = 'Focus lifted'
+
+            } else if (action.type === 'spotlight') {
+              const targetId = (action.target || '').trim()
+              const secs = Math.min(15, Math.max(2, Math.round(action.duration || 5)))
+              if (targetId) {
+                setSpotlightTarget({ id: targetId, duration: secs })
+                setTimeout(() => setSpotlightTarget(null), secs * 1000)
+                label = `Spotlight · ${targetId}`
+              }
+
+            } else if (action.type === 'rewind') {
+              const idx = Math.max(0, Math.round(action.message_index ?? action.index ?? 0))
+              const reason = (action.reason || 'Understanding broke here').slice(0, 140)
+              setRewindTarget({ index: idx, reason, ts: Date.now() })
+              setTimeout(() => {
+                const el = document.getElementById(`msg-${idx}`)
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+              }, 100)
+              label = `Rewind · ${reason.slice(0, 40)}`
+
+            } else if (action.type === 'theme_shift') {
+              const preset = ['war_room', 'focus', 'victory', 'calm'].includes(action.preset) ? action.preset : 'focus'
+              setAevaTheme(preset === 'calm' ? null : preset)
+              label = `Theme · ${preset}`
             }
 
             if (label) {
@@ -8189,10 +8337,39 @@ If no clear changes: {"changes":[]}`
           ? activeTheme.bg
           : isMission ? missionBg : 'var(--ui-bg)',
         fontFamily: "'Inter', system-ui, sans-serif",
+        zIndex: dimWorld ? 1300 : undefined,
       }}
     >
       {/* Mission glow overlay */}
       {missionGlow && <div aria-hidden style={missionGlow} />}
+
+      {/* ── Aeva Visual CMDs ────────────────────────────────────────── */}
+
+      {/* dim_world — fades everything behind chat to force focus */}
+      <AnimatePresence>
+        {dimWorld && (
+          <motion.div
+            key="dim-world"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.6 }}
+            aria-hidden
+            onClick={() => setDimWorld(null)}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 1200,
+              background: 'rgba(0,0,0,0.82)',
+              backdropFilter: 'blur(6px)',
+              WebkitBackdropFilter: 'blur(6px)',
+              pointerEvents: 'all',
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* spotlight — glowing ring pulses around a named element */}
+      <SpotlightOverlay target={spotlightTarget} />
+
+      {/* theme_shift — CSS variable overrides on :root */}
+      {aevaTheme && <AevaThemeOverride preset={aevaTheme} onRestore={() => setAevaTheme(null)} />}
 
       {/* Roadmap session pill — floats bottom-right while working on a node */}
       <AnimatePresence>
@@ -8553,6 +8730,7 @@ If no clear changes: {"changes":[]}`
             {/* History button */}
             {!isMission && (
               <motion.button
+                data-spotlight-id="chat-history"
                 whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }}
                 onClick={() => setHistoryOpen(true)}
                 title="Chat history"
@@ -9151,6 +9329,7 @@ If no clear changes: {"changes":[]}`
                 {/* ── Pinned Note Card ──────────────────────────────────── */}
                 {pinnedNote && (
                   <motion.div
+                    data-spotlight-id="pinned-note"
                     initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
                     style={{
                       marginBottom: 14, borderRadius: 14,
@@ -9175,6 +9354,7 @@ If no clear changes: {"changes":[]}`
                 {/* ── Challenge Timer ───────────────────────────────────── */}
                 {challengeTimer && (
                   <motion.div
+                    data-spotlight-id="challenge-timer"
                     initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }}
                     style={{
                       marginBottom: 14, borderRadius: 14,
@@ -9238,8 +9418,9 @@ If no clear changes: {"changes":[]}`
                   calibMode={calibMode}
                 />
 
-                {messages.map((msg, i) =>
-                  isMission
+                {messages.map((msg, i) => {
+                  const isRewindTarget = rewindTarget && rewindTarget.index === i
+                  const bubble = isMission
                     ? <ThemedChatBubble key={i} msg={msg} mission={activeMission} />
                     : msg.isPhaseTransition
                       ? <PhaseTransitionCard key={msg.id || i} from={msg.from} to={msg.to} />
@@ -9255,7 +9436,22 @@ If no clear changes: {"changes":[]}`
                             isLight={isLight}
                           />
                         : <ChatBubble key={i} msg={msg} deepDiveCards={deepDiveMap[i] || []} onDismissCard={(cardId) => setDeepDiveMap(prev => ({ ...prev, [i]: (prev[i] || []).filter(c => c.id !== cardId) }))} isLight={isLight} isWidget={isWidget} widgetTheme={isWidget ? activeTheme : null}  />
-                )}
+                  return (
+                    <div key={i} id={`msg-${i}`} style={{ position: 'relative' }}>
+                      {isRewindTarget && (
+                        <motion.div
+                          initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+                          style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '5px 12px', marginBottom: 4,
+                            borderLeft: '3px solid #F87171', borderRadius: '0 8px 8px 0',
+                            background: 'rgba(239,68,68,0.08)', fontSize: 12, color: '#FCA5A5', fontWeight: 500 }}>
+                          <span>↩</span>
+                          <span>{rewindTarget.reason}</span>
+                        </motion.div>
+                      )}
+                      {bubble}
+                    </div>
+                  )
+                })}
 
                 {/* Live skill reveal — grows during calibration as skills are assessed */}
                 {calibMode && calibSubject && (
@@ -9840,7 +10036,7 @@ If no clear changes: {"changes":[]}`
                 )}
               </AnimatePresence>
 
-              <div className="chat-input-bar" style={{ width: '100%', maxWidth: isMission ? 720 : 640, margin: '0 auto', display: 'flex', alignItems: 'flex-end', gap: 10, padding: '10px 10px 10px 16px', backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)', borderRadius: input.includes('\n') || input.length > 60 ? 24 : 999, transition: 'border 0.3s, box-shadow 0.3s, border-radius 0.2s', ...inputBarStyle }}>
+              <div data-spotlight-id="chat-input" className="chat-input-bar" style={{ width: '100%', maxWidth: isMission ? 720 : 640, margin: '0 auto', display: 'flex', alignItems: 'flex-end', gap: 10, padding: '10px 10px 10px 16px', backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)', borderRadius: input.includes('\n') || input.length > 60 ? 24 : 999, transition: 'border 0.3s, box-shadow 0.3s, border-radius 0.2s', ...inputBarStyle }}>
                 {/* All chat tools collapsed into one dropdown */}
                 {!isMission && (
                   <ChatToolsMenu
