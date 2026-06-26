@@ -2735,7 +2735,7 @@ function MobileBottomBar({ onChat, onLab, onArcade, onCalibrate, onDrillCount, a
 
 /* ═══ LEFT SIDEBAR ════════════════════════════════ */
 
-function SidebarNavItem({ Icon, label, tooltip, action, badge, accent, collapsed }) {
+function SidebarNavItem({ Icon, icon, label, tooltip, action, badge, accent, collapsed }) {
   const [hovered, setHovered] = useState(false)
   return (
     <motion.button
@@ -2765,7 +2765,10 @@ function SidebarNavItem({ Icon, label, tooltip, action, badge, accent, collapsed
       {!accent && hovered && !collapsed && (
         <div style={{ position: 'absolute', left: 0, top: '20%', height: '60%', width: 2, borderRadius: 99, background: 'rgba(165,180,252,0.6)' }} />
       )}
-      <Icon size={15} style={{ flexShrink: 0, opacity: accent ? 1 : hovered ? 1 : 0.85 }} />
+      {icon
+        ? <span style={{ fontSize: 15, lineHeight: 1, flexShrink: 0, opacity: hovered ? 1 : 0.85 }}>{icon}</span>
+        : <Icon size={15} style={{ flexShrink: 0, opacity: accent ? 1 : hovered ? 1 : 0.85 }} />
+      }
       {!collapsed && (
         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>{label}</span>
       )}
@@ -2781,7 +2784,7 @@ function SidebarNavItem({ Icon, label, tooltip, action, badge, accent, collapsed
   )
 }
 
-function LeftSidebar({ collapsed, onToggle, onChatOpen, onLibrary, onBrain, onMirror, onLab, onRoadmap, onSchedule, onArcade, onCalibrate, onDocs, onParents, onProfile, onYourUI, onSettings, onSignOut, labBadge, brainTotal, sessionCount }) {
+function LeftSidebar({ collapsed, onToggle, onChatOpen, onLibrary, onBrain, onMirror, onLab, onRoadmap, onSchedule, onArcade, onCalibrate, onDocs, onParents, onTextbook, onProfile, onYourUI, onSettings, onSignOut, labBadge, brainTotal, sessionCount }) {
   const { name } = useUser()
   const W = collapsed ? 62 : 224
 
@@ -2799,6 +2802,7 @@ function LeftSidebar({ collapsed, onToggle, onChatOpen, onLibrary, onBrain, onMi
     { label: 'PLAY', items: [
       { Icon: Gamepad2,    label: 'Arcade',   tooltip: 'Drill challenges & timed practice arena', action: onArcade },
       { Icon: FlaskConical,label: 'Lab',      tooltip: 'Focus modes & specialised study tools',  action: onLab,      badge: labBadge > 0 ? labBadge : null },
+      { icon: '📖',        label: 'Textbook', tooltip: 'AI-generated adaptive stories',           action: onTextbook, isEmoji: true },
     ]},
     { label: 'TOOLS', items: [
       { Icon: FileText,    label: 'Docs',     tooltip: 'Upload worksheets & documents to study',  action: onDocs },
@@ -3030,6 +3034,7 @@ function DashboardView({ onChatOpen, onSignOut, onCalibrate, onTextbook }) {
           onCalibrate={onCalibrate}
           onDocs={() => setDocOpen(true)}
           onParents={() => setShowEmOpen(true)}
+          onTextbook={onTextbook}
           onProfile={() => setProfileOpen(true)}
           onYourUI={() => setYourUIOpen(true)}
           onSettings={() => setAppSettingsOpen(true)}
@@ -3162,22 +3167,30 @@ function DashboardView({ onChatOpen, onSignOut, onCalibrate, onTextbook }) {
               <PersonalProgressCard />
               {/* Textbook entry card */}
               {onTextbook && (
-                <motion.div
-                  whileHover={{ scale: 1.02, boxShadow: '0 8px 32px rgba(99,102,241,0.22)' }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={onTextbook}
-                  style={{
-                    gridColumn: 'span 1', borderRadius: 20, padding: '22px',
-                    background: 'linear-gradient(135deg, rgba(99,102,241,0.14), rgba(139,92,246,0.08))',
-                    border: '1px solid rgba(99,102,241,0.25)', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: 16,
-                  }}>
-                  <div style={{ fontSize: 36 }}>📖</div>
-                  <div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', fontFamily: "'Inter', system-ui" }}>The Textbook</div>
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 2, fontFamily: "'Inter', system-ui" }}>AI-generated stories · adapts to you</div>
+                <GlassCard onClick={onTextbook} style={{ padding: '20px', minHeight: 140 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase' }}>
+                      Textbook
+                    </span>
+                    <span style={{ fontSize: 14 }}>📖</span>
                   </div>
-                </motion.div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1, marginBottom: 8 }}>
+                    The Textbook
+                  </div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)', lineHeight: 1.5, marginBottom: 14 }}>
+                    AI stories that adapt to your level
+                  </div>
+                  <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                    onClick={e => { e.stopPropagation(); onTextbook() }}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 5,
+                      padding: '5px 11px', borderRadius: 99,
+                      background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
+                      color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                    }}>
+                    Open →
+                  </motion.button>
+                </GlassCard>
               )}
             </motion.div>
           )}
