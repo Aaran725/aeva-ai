@@ -34,6 +34,7 @@ import { CalibrationExperience, CalibResumeOffer } from './CalibrationExperience
 // ── Lazy-loaded chunks (split by route / feature) ─────────────────────────────
 const ArcadeHub          = lazy(() => import('./ArcadeHub'))
 const LabHub             = lazy(() => import('./LabHub'))
+const TextbookHub        = lazy(() => import('./TextbookHub'))
 const RoadmapHub         = lazy(() => import('./RoadmapHub'))
 const LearningFingerprint = lazy(() => import('./LearningFingerprint'))
 const MemoryPalace       = lazy(() => import('./MemoryPalace'))
@@ -2938,7 +2939,7 @@ function LeftSidebar({ collapsed, onToggle, onChatOpen, onLibrary, onBrain, onMi
 }
 
 /* ═══ DASHBOARD VIEW ══════════════════════════════ */
-function DashboardView({ onChatOpen, onSignOut, onCalibrate }) {
+function DashboardView({ onChatOpen, onSignOut, onCalibrate, onTextbook }) {
   const { openArcade } = useArcadeStore()
   const { openLab, orders: labOrders } = useLabStore()
   const { openRoadmapHub } = useRoadmapStore()
@@ -3158,6 +3159,25 @@ function DashboardView({ onChatOpen, onSignOut, onCalibrate }) {
               <FingerprintCard onOpen={() => setFingerprintOpen(true)} />
               <MemoryPalaceCard onOpen={() => setPalaceOpen(true)} />
               <PersonalProgressCard />
+              {/* Textbook entry card */}
+              {onTextbook && (
+                <motion.div
+                  whileHover={{ scale: 1.02, boxShadow: '0 8px 32px rgba(99,102,241,0.22)' }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={onTextbook}
+                  style={{
+                    gridColumn: 'span 1', borderRadius: 20, padding: '22px',
+                    background: 'linear-gradient(135deg, rgba(99,102,241,0.14), rgba(139,92,246,0.08))',
+                    border: '1px solid rgba(99,102,241,0.25)', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 16,
+                  }}>
+                  <div style={{ fontSize: 36 }}>📖</div>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', fontFamily: "'Inter', system-ui" }}>The Textbook</div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 2, fontFamily: "'Inter', system-ui" }}>AI-generated stories · adapts to you</div>
+                  </div>
+                </motion.div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -11405,6 +11425,7 @@ export default function App() {
               onChatOpen={() => setView('chat')}
               onSignOut={() => supabase.auth.signOut()}
               onCalibrate={() => setView('calibration')}
+              onTextbook={() => setView('textbook')}
             />
           : view === 'calibration'
             ? <CalibrationHub
@@ -11416,6 +11437,8 @@ export default function App() {
                   setView('chat')
                 }}
               />
+          : view === 'textbook'
+            ? <TextbookHub key="textbook" onBack={() => setView('dashboard')} />
           : activeMode === 'arena'
             ? <DebateArena key="arena" onBack={handleBack} />
             : <ChatView key="chat" onBack={handleBack} />
