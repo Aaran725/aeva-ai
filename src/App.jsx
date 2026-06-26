@@ -3136,6 +3136,7 @@ function DashboardView({ onChatOpen, onSignOut, onCalibrate, onTextbook }) {
               onPalace={() => setPalaceOpen(true)}
               onOrbClick={() => setOrbSelectorOpen(true)}
               onOpenCalendar={() => setMapsOpen(true)}
+              onTextbook={onTextbook}
               userName={name}
               isMobile={isMobile}
             />

@@ -466,16 +466,16 @@ function DueWidget({ count, onLab }) {
 }
 
 /* ── QUICK LAUNCH  (dark pill card like "Today's Metrix") ── */
-function QuickLaunchWidget({ onChat, onLab, onArcade, onRoadmaps, onDocs, onBrain, onParents, labBadge }) {
+function QuickLaunchWidget({ onChat, onLab, onArcade, onRoadmaps, onDocs, onBrain, onParents, onTextbook, labBadge }) {
   const actions = [
-    { icon: <MessageCircle size={17} />, label: 'Chat',    color: '#818CF8', bg: 'rgba(99,102,241,0.18)', border: 'rgba(99,102,241,0.30)', action: onChat },
-    { icon: <FlaskConical  size={17} />, label: 'Lab',     color: '#60A5FA', bg: 'rgba(59,130,246,0.18)', border: 'rgba(59,130,246,0.30)', action: onLab, badge: labBadge },
-    { icon: <Gamepad2      size={17} />, label: 'Arcade',  color: '#A78BFA', bg: 'rgba(139,92,246,0.18)', border: 'rgba(139,92,246,0.30)', action: onArcade },
+    { icon: <MessageCircle size={17} />, label: 'Chat',     color: '#818CF8', bg: 'rgba(99,102,241,0.18)', border: 'rgba(99,102,241,0.30)', action: onChat },
+    { icon: <FlaskConical  size={17} />, label: 'Lab',      color: '#60A5FA', bg: 'rgba(59,130,246,0.18)', border: 'rgba(59,130,246,0.30)', action: onLab, badge: labBadge },
+    { icon: <Gamepad2      size={17} />, label: 'Arcade',   color: '#A78BFA', bg: 'rgba(139,92,246,0.18)', border: 'rgba(139,92,246,0.30)', action: onArcade },
     { icon: <span style={{ fontSize:17, lineHeight:1 }}>🗺️</span>, label: 'Maps', color: '#C4B5FD', bg: 'rgba(167,139,250,0.18)', border: 'rgba(167,139,250,0.30)', action: onRoadmaps },
-    { icon: <Brain         size={17} />, label: 'Brain',   color: '#34D399', bg: 'rgba(52,211,153,0.18)', border: 'rgba(52,211,153,0.30)', action: onBrain },
-    { icon: <FileText      size={17} />, label: 'Docs',    color: '#FCD34D', bg: 'rgba(245,158,11,0.18)', border: 'rgba(245,158,11,0.30)', action: onDocs },
-    { icon: <Users         size={17} />, label: 'Parents', color: '#FB7185', bg: 'rgba(251,113,133,0.18)', border: 'rgba(251,113,133,0.30)', action: onParents },
-    { icon: <BookOpen      size={17} />, label: 'Library', color: '#93C5FD', bg: 'rgba(96,165,250,0.18)', border: 'rgba(96,165,250,0.30)', action: onDocs },
+    { icon: <Brain         size={17} />, label: 'Brain',    color: '#34D399', bg: 'rgba(52,211,153,0.18)', border: 'rgba(52,211,153,0.30)', action: onBrain },
+    { icon: <FileText      size={17} />, label: 'Docs',     color: '#FCD34D', bg: 'rgba(245,158,11,0.18)', border: 'rgba(245,158,11,0.30)', action: onDocs },
+    { icon: <Users         size={17} />, label: 'Parents',  color: '#FB7185', bg: 'rgba(251,113,133,0.18)', border: 'rgba(251,113,133,0.30)', action: onParents },
+    { icon: <span style={{ fontSize:17, lineHeight:1 }}>📖</span>, label: 'Textbook', color: '#6EE7B7', bg: 'rgba(52,211,153,0.14)', border: 'rgba(52,211,153,0.28)', action: onTextbook },
   ]
   return (
     <Widget idx={6} style={{
@@ -717,6 +717,7 @@ export default function WidgetDashboard({
   onPalace,
   onOrbClick,
   onOpenCalendar,
+  onTextbook,
   userName,
   isMobile,
 }) {
@@ -797,6 +798,7 @@ export default function WidgetDashboard({
         onDocs={onDocs}
         onBrain={onBrain}
         onParents={onShowEm}
+        onTextbook={onTextbook}
         labBadge={labBadge}
       />
       <KnowledgeWidget concepts={[...conceptMap]} onPalace={onPalace} />
