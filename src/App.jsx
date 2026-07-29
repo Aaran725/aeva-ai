@@ -2812,10 +2812,11 @@ function LeftSidebar({ collapsed, onToggle, onChatOpen, onLibrary, onBrain, onMi
 
   return (
     <motion.div
+      initial={{ width: W, minWidth: W }}
       animate={{ width: W, minWidth: W }}
-      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       style={{
-        width: W, minWidth: W, height: '100vh',
+        height: '100vh',
         position: 'sticky', top: 0,
         display: 'flex', flexDirection: 'column',
         background: 'linear-gradient(180deg, rgba(8,6,30,0.96) 0%, rgba(6,5,22,0.98) 100%)',
