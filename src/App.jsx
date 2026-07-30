@@ -2786,7 +2786,7 @@ function SidebarNavItem({ Icon, icon, label, tooltip, action, badge, accent, col
 
 function LeftSidebar({ collapsed, onToggle, onChatOpen, onLibrary, onBrain, onMirror, onLab, onRoadmap, onSchedule, onArcade, onCalibrate, onDocs, onParents, onTextbook, onProfile, onYourUI, onSettings, onSignOut, labBadge, brainTotal, sessionCount }) {
   const { name } = useUser()
-  const W = collapsed ? 62 : 224
+  const W = collapsed ? 0 : 224
 
   const GROUPS = [
     { label: 'LEARN', items: [
@@ -2855,19 +2855,12 @@ function LeftSidebar({ collapsed, onToggle, onChatOpen, onLibrary, onBrain, onMi
             )}
           </AnimatePresence>
         </div>
-        {/* collapse toggle */}
-        {!collapsed && (
-          <motion.button whileHover={{ scale: 1.1, background: 'rgba(255,255,255,0.1)' }} whileTap={{ scale: 0.9 }} onClick={onToggle}
-            style={{ position: 'absolute', top: 14, right: 12, width: 24, height: 24, borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}>
-            <ChevronLeft size={13} />
-          </motion.button>
-        )}
-        {collapsed && (
-          <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={onToggle} title="Expand sidebar"
-            style={{ marginTop: 10, width: 28, height: 28, borderRadius: 9, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ChevronRight size={13} />
-          </motion.button>
-        )}
+        {/* collapse toggle — only needed when sidebar is open */}
+        <motion.button whileHover={{ scale: 1.1, background: 'rgba(255,255,255,0.1)' }} whileTap={{ scale: 0.9 }} onClick={onToggle}
+          title="Collapse sidebar"
+          style={{ position: 'absolute', top: 14, right: 12, width: 24, height: 24, borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}>
+          <ChevronLeft size={13} />
+        </motion.button>
       </div>
 
       {/* ── Chat CTA ── */}
@@ -3024,6 +3017,7 @@ function DashboardView({ onChatOpen, onSignOut, onCalibrate, onTextbook }) {
         <LeftSidebar
           collapsed={sidebarCollapsed}
           onToggle={toggleSidebar}
+          key="sidebar"
           onChatOpen={onChatOpen}
           onLibrary={() => setLibraryOpen(true)}
           onBrain={() => setBrainOpen(true)}
@@ -3044,6 +3038,30 @@ function DashboardView({ onChatOpen, onSignOut, onCalibrate, onTextbook }) {
           brainTotal={brainStats.total}
           sessionCount={sessions.length}
         />
+      )}
+
+      {/* ── Sidebar re-open tab (shown when sidebar is fully collapsed) ── */}
+      {!isMobile && sidebarCollapsed && (
+        <motion.button
+          initial={{ opacity: 0, x: -8 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -8 }}
+          transition={{ duration: 0.2 }}
+          onClick={toggleSidebar}
+          title="Open sidebar"
+          style={{
+            position: 'fixed', left: 0, top: '50%', transform: 'translateY(-50%)',
+            zIndex: 50, width: 18, height: 56, borderRadius: '0 8px 8px 0',
+            background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
+            borderLeft: 'none', color: 'rgba(255,255,255,0.45)',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'background 0.15s, color 0.15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.13)'; e.currentTarget.style.color = '#fff' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = 'rgba(255,255,255,0.45)' }}
+        >
+          <ChevronRight size={11} />
+        </motion.button>
       )}
 
       {/* ── Main content ── */}
