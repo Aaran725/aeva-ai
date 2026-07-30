@@ -175,6 +175,10 @@ export const useArenaStore = create((set, get) => ({
   preTopicAccuracy: {},    // 6.6: baseUserId → accuracy at session start (for improvement delta)
   challengeMode:    false, // 6.5: this player wants questions targeting their weak spots
 
+  // ── Bug fixes / Rejoin
+  currentQTime:        Q_TIME, // actual timer start for current question, synced to all clients
+  disconnectedPlayers: {},      // 7.1: baseUserId → { score, streak, coins, cards } for rejoin
+
   // ── Channel / timers
   _channel:     null,
   _timerRef:    null,
@@ -205,6 +209,7 @@ export const useArenaStore = create((set, get) => ({
       isPaused: false, kickedUserIds: [], hostPreviewQ: null,
       shopCards: [], shopNextQIdx: null, savageLog: [], myLastReceivedCard: null,
       playerProfiles: {}, playerTiers: {}, preTopicAccuracy: {}, challengeMode: false,
+      currentQTime: Q_TIME, disconnectedPlayers: {},
       _channel: null, _timerRef: null, _cdRef: null, _shopTimeout: null,
     })
   },
@@ -244,10 +249,9 @@ export const useArenaStore = create((set, get) => ({
   },
 
   submitAnswer: (choiceIdx) => {
-    const { _channel, myUserId, currentQIdx, timerSeconds, isSpectator, playerTiers, settings } = get()
+    const { _channel, myUserId, currentQIdx, timerSeconds, isSpectator, playerTiers, currentQTime } = get()
     if (isSpectator) return
-    const qTime  = DIFF_TIMERS[settings?.difficulty] || Q_TIME
-    const timeMs = (qTime - timerSeconds) * 1000
+    const timeMs = (currentQTime - timerSeconds) * 1000
     const tier   = playerTiers[myUserId] || 'standard'
     const payload = { userId: myUserId, choiceIdx, timeMs, qIdx: currentQIdx, tier }
     set(s => ({ answers: { ...s.answers, [myUserId]: payload } }))
@@ -438,6 +442,7 @@ export const useArenaStore = create((set, get) => ({
       questionCacheIds: [], questionVotes: {}, myQuestionVotes: {},
       savageLog: [], shopCards: [], shopNextQIdx: null, myLastReceivedCard: null,
       playerProfiles: {}, playerTiers: {}, preTopicAccuracy: {},
+      currentQTime: Q_TIME, disconnectedPlayers: {},
     }
     set(s => ({ ...resetState, players: s.players.map(p => ({ ...p, score: 0, streak: 0, cards: [], coins: 100 })) }))
     _channel?.send({ type: 'broadcast', event: 'rematch', payload: { settings } })
@@ -474,12 +479,63 @@ export const useArenaStore = create((set, get) => ({
       }
     })
 
-    // 3.6: host re-broadcasts current game state whenever a new player joins mid-game
-    ch.on('presence', { event: 'join' }, () => {
-      const { isHost, phase, stubs, currentQIdx } = get()
+    // 3.6: host re-broadcasts game state on join; also syncs settings in lobby (guest bug fix)
+    ch.on('presence', { event: 'join' }, ({ newPresences }) => {
+      const { isHost, phase, stubs, currentQIdx, disconnectedPlayers, settings } = get()
       if (!isHost) return
+      if (phase === 'lobby') {
+        ch.send({ type: 'broadcast', event: 'lobby_sync', payload: { settings } })
+        return
+      }
       if (!['question', 'reveal', 'sabotage'].includes(phase)) return
       ch.send({ type: 'broadcast', event: 'game_in_progress', payload: { stubs, currentQIdx, canJoinLate: currentQIdx < 2 } })
+      // 7.1: Rejoin — if reconnecting player has saved state, restore it
+      ;(newPresences || []).forEach(p => {
+        const baseId = p.baseUserId || p.userId?.split('-')[0]
+        const saved  = baseId && disconnectedPlayers[baseId]
+        if (!saved) return
+        ch.send({ type: 'broadcast', event: 'player_resume', payload: { targetUserId: p.userId, ...saved, currentQIdx } })
+        set(s => ({
+          disconnectedPlayers: Object.fromEntries(Object.entries(s.disconnectedPlayers).filter(([k]) => k !== baseId)),
+          players: s.players.map(ep => ep.userId === p.userId ? { ...ep, ...saved } : ep),
+        }))
+      })
+    })
+
+    // 7.1: Save disconnecting players' state during active game
+    ch.on('presence', { event: 'leave' }, ({ leftPresences }) => {
+      const { isHost, phase } = get()
+      if (!isHost) return
+      if (!['question', 'reveal', 'sabotage', 'shop'].includes(phase)) return
+      ;(leftPresences || []).forEach(p => {
+        const baseId      = p.baseUserId || p.userId?.split('-')[0]
+        if (!baseId) return
+        const playerState = get().players.find(ep => (ep.baseUserId || ep.userId.split('-')[0]) === baseId)
+        if (!playerState) return
+        set(s => ({
+          disconnectedPlayers: {
+            ...s.disconnectedPlayers,
+            [baseId]: { score: playerState.score, streak: playerState.streak, coins: playerState.coins, cards: playerState.cards, displayName: playerState.displayName },
+          },
+        }))
+      })
+    })
+
+    // Settings sync — guests receive host's settings on lobby join
+    ch.on('broadcast', { event: 'lobby_sync' }, ({ payload }) => {
+      if (get().isHost) return
+      set({ settings: payload.settings })
+    })
+
+    // 7.1: Rejoin — restore score/coins/cards for a reconnecting player
+    ch.on('broadcast', { event: 'player_resume' }, ({ payload }) => {
+      const { myUserId } = get()
+      if (payload.targetUserId !== myUserId) return
+      const { score, streak, coins, cards, currentQIdx } = payload
+      set(s => ({
+        players: s.players.map(p => p.userId === myUserId ? { ...p, score, streak, coins, cards } : p),
+        currentQIdx: currentQIdx ?? s.currentQIdx,
+      }))
     })
 
     ch.on('broadcast', { event: 'countdown_start' }, () => {
@@ -498,7 +554,7 @@ export const useArenaStore = create((set, get) => ({
       const { qIdx, qTime } = payload
       get()._clearTimer()
       const timer = qTime || DIFF_TIMERS[get().settings?.difficulty] || Q_TIME
-      set({ currentQIdx: qIdx, timerSeconds: timer, answers: {}, correctIdx: null, sabotagePlayed: [], aevaLine: '', phase: 'question' })
+      set({ currentQIdx: qIdx, timerSeconds: timer, currentQTime: timer, answers: {}, correctIdx: null, sabotagePlayed: [], aevaLine: '', phase: 'question' })
       get()._startTimer()
     })
 
@@ -921,7 +977,7 @@ Return ONLY a JSON array (same length as input):
     if (!stub) { get()._endGame(); return }
     get()._clearTimer()
     const qTime = DIFF_TIMERS[settings?.difficulty] || Q_TIME
-    set({ currentQIdx: qIdx, timerSeconds: qTime, answers: {}, correctIdx: null, sabotagePlayed: [], aevaLine: '', scoreDeltas: {}, phase: 'question', hostPreviewQ: null, isPaused: false })
+    set({ currentQIdx: qIdx, timerSeconds: qTime, currentQTime: qTime, answers: {}, correctIdx: null, sabotagePlayed: [], aevaLine: '', scoreDeltas: {}, phase: 'question', hostPreviewQ: null, isPaused: false })
     if (isHost) {
       _channel?.send({ type: 'broadcast', event: 'question_start', payload: { qIdx, qTime } })
     }
@@ -1151,6 +1207,55 @@ Return ONLY a JSON array (same length as input):
         }
       })
 
+      // 7.10: Anti-cheat — flag players with suspiciously fast consistent answers
+      const antiCheatFlags = {}
+      playerResults.forEach(pr => {
+        const fastAnswers = Object.values(allAnswers)
+          .map(qMap => qMap[pr.userId])
+          .filter(ans => ans && ans.timeMs < 500)
+        antiCheatFlags[pr.userId] = fastAnswers.length >= 3
+      })
+
+      // 7.7: Achievement badges
+      const achievementMap = {} // baseUserId → string[]
+      const addAch = (baseId, badge) => { achievementMap[baseId] = [...(achievementMap[baseId] || []), badge] }
+
+      // First Blood — first offensive sabotage of the game
+      const firstOffensive = get().savageLog.find(e => e.target !== e.by)
+      if (firstOffensive) {
+        const pr = playerResults.find(p => p.userId === firstOffensive.by)
+        if (pr) addAch(pr.baseUserId, 'first_blood')
+      }
+      // Untouchable — nobody played a card against them
+      playerResults.forEach(pr => {
+        if (!get().savageLog.some(e => e.target === pr.userId && e.by !== pr.userId)) addAch(pr.baseUserId, 'untouchable')
+      })
+      // Perfect — all questions correct
+      playerResults.forEach(pr => {
+        if (pr.correctCount === pr.totalQuestions && pr.totalQuestions > 0) addAch(pr.baseUserId, 'perfect')
+      })
+      // Ruthless — most offensive cards played (min 2)
+      const offCounts = {}
+      get().savageLog.forEach(e => { if (e.target !== e.by) offCounts[e.by] = (offCounts[e.by] || 0) + 1 })
+      const maxOff = Math.max(0, ...Object.values(offCounts))
+      if (maxOff >= 2) {
+        Object.entries(offCounts).forEach(([uid, n]) => {
+          if (n === maxOff) { const pr = playerResults.find(p => p.userId === uid); if (pr) addAch(pr.baseUserId, 'ruthless') }
+        })
+      }
+      // Speed Demon — fastest avg correct-answer time (min 3 correct to qualify)
+      const speedScores = {}
+      playerResults.forEach(pr => {
+        const times = []
+        Object.entries(allAnswers).forEach(([qiStr, qMap]) => {
+          const ans = qMap[pr.userId]
+          if (ans && ans.choiceIdx === questions[parseInt(qiStr)]?.correct) times.push(ans.timeMs || 0)
+        })
+        if (times.length >= 3) speedScores[pr.baseUserId] = times.reduce((s, t) => s + t, 0) / times.length
+      })
+      const [fastestBase, fastestAvg] = Object.entries(speedScores).sort(([, a], [, b]) => a - b)[0] || []
+      if (fastestBase && fastestAvg < 8000) addAch(fastestBase, 'speed_demon')
+
       const eloDeltas = calcEloDeltas(playerResults)
 
       const sessionPayload = {
@@ -1239,6 +1344,8 @@ Return ONLY a JSON array (same length as input):
           totalQuestions: pr.totalQuestions,
           topic:          settings.topic,
           topicImprovement,
+          achievements:    achievementMap[pr.baseUserId] || [],
+          suspiciousSpeed: antiCheatFlags[pr.userId] || false,
         }
       }
 

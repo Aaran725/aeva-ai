@@ -432,7 +432,7 @@ function IncomingCardToast() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -24, scale: 0.92 }}
           transition={{ type: 'spring', stiffness: 380, damping: 26 }}
-          style={{ position: 'fixed', top: 72, left: '50%', transform: 'translateX(-50%)', zIndex: 900, display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', borderRadius: 14, background: 'rgba(244,63,94,0.22)', border: '1.5px solid rgba(244,63,94,0.55)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 8px 32px rgba(244,63,94,0.30)', whiteSpace: 'nowrap' }}
+          style={{ position: 'fixed', top: 72, left: '50%', transform: 'translateX(-50%)', zIndex: 900, display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', borderRadius: 14, background: 'rgba(244,63,94,0.22)', border: '1.5px solid rgba(244,63,94,0.55)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 8px 32px rgba(244,63,94,0.30)', maxWidth: 'calc(100vw - 32px)', overflow: 'hidden' }}
         >
           <span style={{ fontSize: 24 }}>{def.emoji}</span>
           <div>
@@ -637,12 +637,12 @@ function QuestionScreen() {
                 onClick={!answered && !frozen && !isSpectator && !isPaused ? () => submitAnswer(origIdx) : undefined}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '12px 14px', borderRadius: 12,
+                  padding: '13px 14px', borderRadius: 12, minHeight: 46,
                   background: selected ? choiceBgs[displayIdx] : (answered || isSpectator) ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.05)',
                   border: `1.5px solid ${selected ? choiceBorders[displayIdx] : 'rgba(255,255,255,0.09)'}`,
                   color: selected ? '#fff' : (answered || isSpectator) ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.80)',
                   cursor: answered || frozen || isSpectator || isPaused ? 'default' : 'pointer',
-                  fontFamily: 'inherit', fontSize: 13, fontWeight: 500,
+                  fontFamily: 'inherit', fontSize: 14, fontWeight: 500,
                   textAlign: 'left', width: '100%', transition: 'all 0.15s',
                 }}
               >
@@ -1180,6 +1180,38 @@ function DoneScreen() {
         )
       })()}
 
+      {/* 7.7: Achievement badges */}
+      {lastSessionStats?.achievements?.length > 0 && (() => {
+        const BADGE_DEFS = {
+          first_blood:  { emoji: '🩸', label: 'First Blood',   desc: 'First to throw a sabotage card'     },
+          untouchable:  { emoji: '🛡️', label: 'Untouchable',  desc: 'Nobody touched you all game'        },
+          perfect:      { emoji: '⭐', label: 'Perfect',       desc: 'Every question correct'             },
+          ruthless:     { emoji: '⚔️', label: 'Ruthless',     desc: 'Most offensive cards played'        },
+          speed_demon:  { emoji: '⚡', label: 'Speed Demon',   desc: 'Fastest average answer time'        },
+        }
+        return (
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
+            style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(245,158,11,0.06)', border: '1.5px solid rgba(245,158,11,0.20)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontSize: 9, color: 'rgba(253,211,77,0.65)', fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase' }}>Achievements Unlocked</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {lastSessionStats.achievements.map(key => {
+                const def = BADGE_DEFS[key]
+                if (!def) return null
+                return (
+                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 18, flexShrink: 0 }}>{def.emoji}</span>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: '#FCD34D' }}>{def.label}</div>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.38)', marginTop: 1 }}>{def.desc}</div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </motion.div>
+        )
+      })()}
+
       {/* 3.4: Final leaderboard — top 10 + my position if outside */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {sorted.slice(0, 10).map((p, i) => (
@@ -1247,6 +1279,18 @@ function DoneScreen() {
           </motion.div>
         )
       })()}
+
+      {/* 7.10: Anti-cheat notice (host only) — shown when suspicious activity detected */}
+      {isHost && lastSessionStats?.suspiciousSpeed && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(244,63,94,0.07)', border: '1px solid rgba(244,63,94,0.22)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 18 }}>⚠️</span>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#FDA4AF' }}>Speed anomaly detected</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>One or more players answered 3+ questions in under 500ms</div>
+          </div>
+        </motion.div>
+      )}
 
       {/* 4.7 + 4.8: Host-only accuracy breakdown table + CSV export */}
       {isHost && questions.length > 0 && (
