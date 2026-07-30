@@ -166,13 +166,14 @@ function JoinScreen({ prefillCode }) {
   const [code, setCode] = useState(prefillCode || '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [spectator, setSpectator] = useState(false)
   const name = (() => { try { return localStorage.getItem('aeva_display_name') || 'Player' } catch { return 'Player' } })()
   const userId = (() => { try { return localStorage.getItem('aeva_anon_id') || `anon-${Math.random().toString(36).slice(2,8)}` } catch { return `anon-${Math.random().toString(36).slice(2,8)}` } })()
 
   const handle = async () => {
     if (!code.trim()) return
     setLoading(true); setError('')
-    try { await joinRoom(code, { userId, displayName: name }) }
+    try { await joinRoom(code, { userId, displayName: name, spectator }) }
     catch (e) { setError('Room not found. Check the code and try again.') }
     setLoading(false)
   }
@@ -194,16 +195,31 @@ function JoinScreen({ prefillCode }) {
           style={{ width: '100%', boxSizing: 'border-box', padding: '13px 14px', borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: `1px solid ${error ? 'rgba(248,113,113,0.55)' : 'rgba(255,255,255,0.12)'}`, color: '#fff', fontSize: 20, fontWeight: 800, fontFamily: "'Inter', monospace", letterSpacing: '0.12em', textAlign: 'center', outline: 'none' }} />
         {error && <div style={{ fontSize: 11, color: '#F87171', marginTop: 5 }}>{error}</div>}
       </div>
+      {/* 3.7: spectator toggle */}
+      <motion.button whileTap={{ scale: 0.96 }} onClick={() => setSpectator(s => !s)}
+        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', borderRadius: 12, background: spectator ? 'rgba(14,165,233,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${spectator ? 'rgba(14,165,233,0.35)' : 'rgba(255,255,255,0.09)'}`, cursor: 'pointer', fontFamily: 'inherit', width: '100%', transition: 'all 0.15s' }}>
+        <span style={{ fontSize: 16 }}>👁</span>
+        <div style={{ flex: 1, textAlign: 'left' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: spectator ? '#7DD3FC' : 'rgba(255,255,255,0.55)' }}>Watch Only (Spectate)</div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', marginTop: 1 }}>See the game live — no scoring, no sabotage</div>
+        </div>
+        <div style={{ width: 18, height: 18, borderRadius: 4, background: spectator ? '#0EA5E9' : 'rgba(255,255,255,0.10)', border: `1.5px solid ${spectator ? '#0EA5E9' : 'rgba(255,255,255,0.20)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          {spectator && <div style={{ width: 8, height: 8, borderRadius: 2, background: '#fff' }} />}
+        </div>
+      </motion.button>
+
       <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} onClick={handle} disabled={!code.trim() || loading}
         style={{ padding: '13px', borderRadius: 14, background: code.trim() && !loading ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : 'rgba(255,255,255,0.07)', border: 'none', color: code.trim() && !loading ? '#fff' : 'rgba(255,255,255,0.30)', fontSize: 14, fontWeight: 800, cursor: code.trim() && !loading ? 'pointer' : 'default', fontFamily: 'inherit', transition: 'all 0.2s' }}>
-        {loading ? 'Joining…' : 'Join →'}
+        {loading ? 'Joining…' : spectator ? '👁 Watch →' : 'Join →'}
       </motion.button>
     </motion.div>
   )
 }
 
 function LobbyScreen() {
-  const { code, players, myUserId, isHost, startGame, settings } = useArenaStore()
+  const { code, players, myUserId, isHost, startGame, settings, coHostId, spectators } = useArenaStore()
+  const assignCoHost = useArenaStore(s => s.assignCoHost)
+  const kickPlayer   = useArenaStore(s => s.kickPlayer)
   const [copied, setCopied] = useState(false)
   const [qrUrl, setQrUrl] = useState('')
   const canStart = isHost && players.length >= 1
@@ -246,23 +262,51 @@ function LobbyScreen() {
         )}
       </div>
 
-      {/* Players */}
-      <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.30)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{players.length} player{players.length !== 1 ? 's' : ''}</div>
-        {players.map(p => (
-          <div key={p.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <PlayerChip player={p} myUserId={myUserId} showScore={false} size={34} />
-            {p.userId === myUserId && isHost && <span style={{ fontSize: 9, fontWeight: 700, color: '#F59E0B', background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.30)', borderRadius: 99, padding: '2px 7px', letterSpacing: '0.06em' }}>HOST</span>}
-          </div>
-        ))}
-        {players.length < 2 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', fontStyle: 'italic' }}>Waiting for more players…</div>}
+      {/* Players — 3.3: scrollable for 30+ */}
+      <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '12px', display: 'flex', flexDirection: 'column', gap: 0 }}>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.30)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
+          {players.length} player{players.length !== 1 ? 's' : ''}
+          {spectators.length > 0 && <span style={{ marginLeft: 8, color: 'rgba(14,165,233,0.55)' }}>· {spectators.length} watching</span>}
+        </div>
+        <div style={{ maxHeight: 224, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {players.map(p => {
+            const isMe      = p.userId === myUserId
+            const isCoHost  = p.userId === coHostId
+            return (
+              <div key={p.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                <PlayerChip player={p} myUserId={myUserId} showScore={false} size={30} />
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
+                  {isMe && isHost && <span style={{ fontSize: 9, fontWeight: 700, color: '#F59E0B', background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.30)', borderRadius: 99, padding: '2px 7px' }}>HOST</span>}
+                  {isCoHost && !isMe && <span style={{ fontSize: 9, fontWeight: 700, color: '#A5B4FC', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.30)', borderRadius: 99, padding: '2px 7px' }}>CO-HOST</span>}
+                  {isHost && !isMe && (
+                    <motion.button whileTap={{ scale: 0.90 }} onClick={() => assignCoHost(p.userId)}
+                      style={{ fontSize: 9, fontWeight: 600, color: isCoHost ? 'rgba(244,63,94,0.70)' : 'rgba(255,255,255,0.28)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 6, padding: '2px 6px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      {isCoHost ? '− co-host' : '+ co-host'}
+                    </motion.button>
+                  )}
+                  {isHost && !isMe && (
+                    <motion.button whileTap={{ scale: 0.90 }} onClick={() => kickPlayer(p.userId)}
+                      style={{ fontSize: 9, fontWeight: 600, color: 'rgba(244,63,94,0.60)', background: 'rgba(244,63,94,0.06)', border: '1px solid rgba(244,63,94,0.16)', borderRadius: 6, padding: '2px 6px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      🚫
+                    </motion.button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        {players.length < 2 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', fontStyle: 'italic', marginTop: 8 }}>Waiting for more players…</div>}
       </div>
 
-      {/* Cards preview */}
-      <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.18)', borderRadius: 12, padding: '10px 12px' }}>
-        <div style={{ fontSize: 10, color: 'rgba(165,180,252,0.70)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 7 }}>Your Starting Cards</div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {['freeze', 'steal', 'double_down', 'bomb'].map(c => <CardPill key={c} card={c} disabled />)}
+      {/* 5.1: Chaos Coins — earned during play, spent in the shop */}
+      <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.18)', borderRadius: 12, padding: '12px 14px' }}>
+        <div style={{ fontSize: 10, color: 'rgba(165,180,252,0.70)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Chaos Economy</div>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div style={{ fontSize: 24, flexShrink: 0 }}>🪙</div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#A5B4FC' }}>Start with 100 Chaos Coins</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 3 }}>Earn more from correct answers · Shop opens every 3 questions</div>
+          </div>
         </div>
       </div>
 
@@ -342,8 +386,43 @@ function IncomingCardToast() {
   )
 }
 
+// 2.1 — Per-question thumbs up/down, shown during reveal
+function VoteRow({ qIdx }) {
+  const voteQuestion    = useArenaStore(s => s.voteQuestion)
+  const myVote          = useArenaStore(s => s.myQuestionVotes[qIdx])
+  const votes           = useArenaStore(s => s.questionVotes[qIdx])
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', paddingTop: 4 }}>
+      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.22)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+        Accurate?
+      </div>
+      {[['up', '👍'], ['down', '👎']].map(([v, emoji]) => {
+        const isChosen = myVote === v
+        const count    = v === 'up' ? (votes?.up || 0) : (votes?.down || 0)
+        return (
+          <motion.button key={v}
+            whileTap={!myVote ? { scale: 0.85 } : {}}
+            onClick={() => !myVote && voteQuestion(qIdx, v)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              padding: '4px 11px', borderRadius: 99, fontSize: 12, fontWeight: 700,
+              cursor: myVote ? 'default' : 'pointer', fontFamily: 'inherit',
+              background:   isChosen ? (v === 'up' ? 'rgba(16,185,129,0.22)' : 'rgba(244,63,94,0.18)') : 'rgba(255,255,255,0.05)',
+              border: `1px solid ${isChosen ? (v === 'up' ? 'rgba(16,185,129,0.50)' : 'rgba(244,63,94,0.42)') : 'rgba(255,255,255,0.10)'}`,
+              color:  isChosen ? (v === 'up' ? '#6EE7B7' : '#FDA4AF') : 'rgba(255,255,255,0.45)',
+              transition: 'all 0.15s',
+            }}>
+            {emoji} {count > 0 && <span style={{ fontSize: 10, opacity: 0.8 }}>{count}</span>}
+          </motion.button>
+        )
+      })}
+    </div>
+  )
+}
+
 function QuestionScreen() {
-  const { stubs, questions, currentQIdx, timerSeconds, answers, myUserId, submitAnswer, isHost, effects } = useArenaStore()
+  const { stubs, questions, currentQIdx, timerSeconds, answers, myUserId, submitAnswer, isHost, effects, hostSkipQuestion, isSpectator, coHostId, isPaused } = useArenaStore()
   const stub  = stubs[currentQIdx]
   const myAns = answers[myUserId]
   const myEff = effects[myUserId] || {}
@@ -390,10 +469,43 @@ function QuestionScreen() {
         )}
       </AnimatePresence>
 
+      {/* 4.2: Pause overlay */}
+      <AnimatePresence>
+        {isPaused && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'absolute', inset: 0, zIndex: 25, background: 'rgba(4,4,20,0.82)', borderRadius: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, pointerEvents: 'none', backdropFilter: 'blur(4px)' }}>
+            <div style={{ fontSize: 38 }}>⏸</div>
+            <div style={{ fontSize: 17, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Game Paused</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)', fontStyle: 'italic' }}>Waiting for host to resume…</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Timer bar + counter */}
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Q{currentQIdx + 1}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Q{currentQIdx + 1}</div>
+            {/* 2.7 + category: category badge */}
+            {stub.category && (
+              <span style={{ fontSize: 9, color: 'rgba(165,180,252,0.70)', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.20)', borderRadius: 99, padding: '1px 7px', fontWeight: 600 }}>
+                {stub.category}
+              </span>
+            )}
+            {/* 3.7: spectator badge */}
+            {isSpectator && (
+              <span style={{ fontSize: 9, fontWeight: 600, color: 'rgba(14,165,233,0.65)', background: 'rgba(14,165,233,0.08)', border: '1px solid rgba(14,165,233,0.22)', borderRadius: 99, padding: '1px 7px' }}>
+                👁 Spectating
+              </span>
+            )}
+            {/* 2.6 / 3.5: host or co-host skip */}
+            {(isHost || coHostId === myUserId) && !isSpectator && (
+              <motion.button whileTap={{ scale: 0.90 }} onClick={hostSkipQuestion}
+                style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.28)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 6, padding: '2px 7px', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.03em' }}>
+                Skip Q →
+              </motion.button>
+            )}
+          </div>
           <div style={{ fontSize: 20, fontWeight: 900, color: urgentColor, fontVariantNumeric: 'tabular-nums', transition: 'color 0.3s' }}>{timerSeconds}</div>
         </div>
         <div style={{ height: 5, borderRadius: 99, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
@@ -417,51 +529,82 @@ function QuestionScreen() {
         )}
       </AnimatePresence>
 
-      {/* Choices */}
+      {/* 5.6: Wager indicator */}
+      <AnimatePresence>
+        {myEff.wagered && !myAns && (
+          <motion.div initial={{ opacity: 0, scale: 0.88 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+            style={{ textAlign: 'center', padding: '8px 12px', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.40)', borderRadius: 10, fontSize: 12, color: '#FCD34D', fontWeight: 700 }}>
+            🎰 {myEff.wagered}× Wager active — {myEff.wagered === 2 ? 'double or nothing' : 'triple or bust'}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 5.4: Scramble notice */}
+      <AnimatePresence>
+        {myEff.scrambled && !myAns && (
+          <motion.div initial={{ opacity: 0, scale: 0.88 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+            style={{ textAlign: 'center', padding: '8px 12px', background: 'rgba(244,63,94,0.12)', border: '1px solid rgba(244,63,94,0.35)', borderRadius: 10, fontSize: 12, color: '#FDA4AF', fontWeight: 700 }}>
+            🔀 Scrambled — answers shuffled!
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Choices — 5.4: scramble reverses display order */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
-        {stub.choices.map((choice, i) => {
-          const selected = myAns?.choiceIdx === i
-          const answered = !!myAns
-          return (
-            <motion.button key={i}
-              whileHover={!answered && !frozen ? { scale: 1.02 } : {}}
-              whileTap={!answered && !frozen ? { scale: 0.97 } : {}}
-              onClick={!answered && !frozen ? () => submitAnswer(i) : undefined}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '12px 14px', borderRadius: 12,
-                background: selected ? choiceBgs[i] : answered ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.05)',
-                border: `1.5px solid ${selected ? choiceBorders[i] : 'rgba(255,255,255,0.09)'}`,
-                color: selected ? '#fff' : answered ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.80)',
-                cursor: answered || frozen ? 'default' : 'pointer',
-                fontFamily: 'inherit', fontSize: 13, fontWeight: 500,
-                textAlign: 'left', width: '100%', transition: 'all 0.15s',
-              }}
-            >
-              <span style={{ width: 24, height: 24, borderRadius: 7, background: selected ? choiceBorders[i] : 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: selected ? '#fff' : 'rgba(255,255,255,0.40)', flexShrink: 0 }}>
-                {frozen && myEff.frozen ? '?' : choiceLetters[i]}
-              </span>
-              {frozen && myEff.frozen ? <span style={{ color: 'rgba(255,255,255,0.20)' }}>···</span> : choice}
-            </motion.button>
-          )
-        })}
+        {(() => {
+          const isScrambled = !!myEff.scrambled
+          const displayOrder = isScrambled ? [3, 2, 1, 0] : [0, 1, 2, 3]
+          return displayOrder.map((origIdx, displayIdx) => {
+            const choice   = stub.choices[origIdx]
+            const selected = myAns?.choiceIdx === origIdx
+            const answered = !!myAns
+            return (
+              <motion.button key={origIdx}
+                whileHover={!answered && !frozen && !isSpectator && !isPaused ? { scale: 1.02 } : {}}
+                whileTap={!answered && !frozen && !isSpectator && !isPaused ? { scale: 0.97 } : {}}
+                onClick={!answered && !frozen && !isSpectator && !isPaused ? () => submitAnswer(origIdx) : undefined}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '12px 14px', borderRadius: 12,
+                  background: selected ? choiceBgs[displayIdx] : (answered || isSpectator) ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.05)',
+                  border: `1.5px solid ${selected ? choiceBorders[displayIdx] : 'rgba(255,255,255,0.09)'}`,
+                  color: selected ? '#fff' : (answered || isSpectator) ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.80)',
+                  cursor: answered || frozen || isSpectator || isPaused ? 'default' : 'pointer',
+                  fontFamily: 'inherit', fontSize: 13, fontWeight: 500,
+                  textAlign: 'left', width: '100%', transition: 'all 0.15s',
+                }}
+              >
+                <span style={{ width: 24, height: 24, borderRadius: 7, background: selected ? choiceBorders[displayIdx] : 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: selected ? '#fff' : 'rgba(255,255,255,0.40)', flexShrink: 0 }}>
+                  {frozen && myEff.frozen ? '?' : choiceLetters[displayIdx]}
+                </span>
+                {frozen && myEff.frozen ? <span style={{ color: 'rgba(255,255,255,0.20)' }}>···</span> : choice}
+              </motion.button>
+            )
+          })
+        })()}
       </div>
 
-      {myAns && (
+      {myAns && !isSpectator && (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
           style={{ textAlign: 'center', fontSize: 12, color: 'rgba(255,255,255,0.40)', fontStyle: 'italic', paddingBottom: 4 }}>
           Locked in — waiting for others…
         </motion.div>
       )}
+
+      {/* 2.7: AI disclaimer */}
+      <div style={{ textAlign: 'center', fontSize: 9, color: 'rgba(255,255,255,0.14)', letterSpacing: '0.03em', paddingBottom: 2 }}>
+        AI generated · verify important facts
+      </div>
     </motion.div>
   )
 }
 
 function RevealScreen() {
-  const { stubs, currentQIdx, correctIdx, explanation, aevaLine, answers, players, myUserId, scoreDeltas } = useArenaStore()
+  const { stubs, currentQIdx, correctIdx, explanation, aevaLine, answers, players, myUserId, scoreDeltas, effects } = useArenaStore()
   const stub = stubs[currentQIdx]
   const myAns = answers[myUserId]
   const isCorrect = myAns?.choiceIdx === correctIdx
+  const isBlinded = !!(effects[myUserId] || {}).blinded
   const myDelta = scoreDeltas?.[myUserId] || 0
   const choiceBg  = ['rgba(99,102,241,0.14)', 'rgba(244,63,94,0.14)', 'rgba(16,185,129,0.14)', 'rgba(245,158,11,0.14)']
   const choiceLtr = ['A', 'B', 'C', 'D']
@@ -515,31 +658,63 @@ function RevealScreen() {
         </motion.div>
       )}
 
-      {/* Quick leaderboard */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {/* 5.4: Blind — hide standings for this reveal */}
+      {isBlinded ? (
+        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+          style={{ textAlign: 'center', padding: '16px', background: 'rgba(244,63,94,0.10)', border: '1px solid rgba(244,63,94,0.30)', borderRadius: 12 }}>
+          <div style={{ fontSize: 22, marginBottom: 4 }}>😵</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#FDA4AF' }}>Blinded — standings hidden</div>
+        </motion.div>
+      ) : null}
+
+      {/* 3.4: Compact standings — top 5 + my position if outside */}
+      {!isBlinded && <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Standings</div>
-        {[...players].sort((a, b) => (b.score || 0) - (a.score || 0)).map((p, rank) => (
-          <div key={p.userId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 10, background: p.userId === myUserId ? 'rgba(99,102,241,0.10)' : 'rgba(255,255,255,0.03)', border: `1px solid ${p.userId === myUserId ? 'rgba(99,102,241,0.25)' : 'rgba(255,255,255,0.06)'}` }}>
-            <span style={{ fontSize: 12, fontWeight: 800, color: rank === 0 ? '#F59E0B' : 'rgba(255,255,255,0.30)', width: 16 }}>{rank + 1}</span>
-            <PlayerChip player={p} myUserId={myUserId} showScore={false} size={24} />
-            <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.70)', fontVariantNumeric: 'tabular-nums' }}>{fmtScore(p.score || 0)}</span>
-            {scoreDeltas?.[p.userId] > 0 && (
-              <motion.span initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} style={{ fontSize: 10, color: '#6EE7B7', fontWeight: 700 }}>
-                +{fmtScore(scoreDeltas[p.userId])}
-              </motion.span>
-            )}
-          </div>
-        ))}
-      </div>
+        {(() => {
+          const sorted = [...players].sort((a, b) => (b.score || 0) - (a.score || 0))
+          const myPos  = sorted.findIndex(p => p.userId === myUserId)
+          const top    = sorted.slice(0, 5)
+          const showMe = myPos >= 5 ? sorted[myPos] : null
+          const renderRow = (p, rank) => (
+            <div key={p.userId} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 9, background: p.userId === myUserId ? 'rgba(99,102,241,0.10)' : 'rgba(255,255,255,0.03)', border: `1px solid ${p.userId === myUserId ? 'rgba(99,102,241,0.25)' : 'rgba(255,255,255,0.05)'}` }}>
+              <span style={{ fontSize: 11, fontWeight: 800, color: rank === 0 ? '#F59E0B' : 'rgba(255,255,255,0.28)', width: 14, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{rank + 1}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: p.userId === myUserId ? '#A5B4FC' : 'rgba(255,255,255,0.75)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {p.displayName}{p.userId === myUserId && <span style={{ fontSize: 9, opacity: 0.55, marginLeft: 4 }}>YOU</span>}
+              </span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.65)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{fmtScore(p.score || 0)}</span>
+              {scoreDeltas?.[p.userId] > 0 && (
+                <motion.span initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }} style={{ fontSize: 10, color: '#6EE7B7', fontWeight: 700, flexShrink: 0 }}>
+                  +{fmtScore(scoreDeltas[p.userId])}
+                </motion.span>
+              )}
+            </div>
+          )
+          return (
+            <>
+              {top.map((p, i) => renderRow(p, i))}
+              {showMe && <>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.15)', textAlign: 'center', padding: '1px 0' }}>···</div>
+                {renderRow(showMe, myPos)}
+              </>}
+              {players.length > 5 && !showMe && (
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.18)', textAlign: 'center', paddingTop: 2 }}>+{players.length - 5} more</div>
+              )}
+            </>
+          )
+        })()}
+      </div>}
+
+      {/* 2.1: thumbs vote on question accuracy */}
+      <VoteRow qIdx={currentQIdx} />
     </motion.div>
   )
 }
 
 function SabotageScreen() {
-  const { players, myUserId, sabotagePlayed } = useArenaStore()
+  const { players, myUserId, sabotagePlayed, isSpectator, myLastReceivedCard } = useArenaStore()
   const playCard = useArenaStore(s => s.playCard)
   const me = players.find(p => p.userId === myUserId)
-  const myCards = [...new Set(me?.cards || [])]
+  const myCards = me?.cards || []
   const [selectedCard, setSelectedCard] = useState(null)
   const [timer, setTimer] = useState(6)
   const [used, setUsed] = useState(false)
@@ -553,11 +728,26 @@ function SabotageScreen() {
   const def = selectedCard ? CARD_DEFS[selectedCard] : null
   const progress = timer / 6
 
-  const handlePlay = (card, targetId) => {
-    playCard(card, targetId)
+  // 5.7: rank map for target display
+  const sortedByScore = [...players].sort((a, b) => (b.score || 0) - (a.score || 0))
+  const rankMap = {}
+  sortedByScore.forEach((p, i) => { rankMap[p.userId] = i + 1 })
+
+  const handlePlay = (card, targetId, extra = {}) => {
+    playCard(card, targetId, extra)
     setSelectedCard(null)
     setUsed(true)
   }
+
+  // 3.7: spectator view — no cards, just countdown
+  if (isSpectator) return (
+    <motion.div key="sabotage-spectator" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 12 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Next question in</div>
+      <div style={{ fontSize: 60, fontWeight: 900, color: timer <= 2 ? '#F43F5E' : '#F59E0B', fontVariantNumeric: 'tabular-nums', transition: 'color 0.3s' }}>{timer}</div>
+      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.28)', fontStyle: 'italic' }}>👁 Spectating — no sabotage</div>
+    </motion.div>
+  )
 
   return (
     <motion.div key="sabotage" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
@@ -635,13 +825,40 @@ function SabotageScreen() {
               {def.self ? (
                 <>
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
-                    Step 2 — Use on yourself
+                    Step 2 — {selectedCard === 'wager' ? 'Choose your multiplier' : 'Use on yourself'}
                   </div>
-                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                    onClick={() => handlePlay(selectedCard, myUserId)}
-                    style={{ width: '100%', padding: '14px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(99,102,241,0.28), rgba(139,92,246,0.22))', border: '1.5px solid rgba(99,102,241,0.55)', color: '#A5B4FC', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
-                    {def.emoji} Activate {def.label} → 2× next answer
-                  </motion.button>
+                  {/* 5.6: Wager — pick 2× or 3× */}
+                  {selectedCard === 'wager' ? (
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      {[2, 3].map(mult => (
+                        <motion.button key={mult} whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.95 }}
+                          onClick={() => handlePlay('wager', myUserId, { multiplier: mult })}
+                          style={{ flex: 1, padding: '16px 0', borderRadius: 14, background: mult === 2 ? 'rgba(245,158,11,0.18)' : 'rgba(244,63,94,0.18)', border: `1.5px solid ${mult === 2 ? 'rgba(245,158,11,0.55)' : 'rgba(244,63,94,0.55)'}`, color: '#fff', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center' }}>
+                          <div style={{ fontSize: 22, fontWeight: 900 }}>{mult}×</div>
+                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginTop: 3 }}>{mult === 2 ? 'Double or nothing' : 'Triple or bust'}</div>
+                        </motion.button>
+                      ))}
+                    </div>
+                  ) : selectedCard === 'echo' ? (
+                    /* 5.4: Echo — show what card will be copied */
+                    myLastReceivedCard && CARD_DEFS[myLastReceivedCard] ? (
+                      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                        onClick={() => handlePlay('echo', myUserId)}
+                        style={{ width: '100%', padding: '14px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(99,102,241,0.28), rgba(139,92,246,0.22))', border: '1.5px solid rgba(99,102,241,0.55)', color: '#A5B4FC', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        {CARD_DEFS[myLastReceivedCard].emoji} Echo → copy {CARD_DEFS[myLastReceivedCard].label}
+                      </motion.button>
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: '14px', background: 'rgba(255,255,255,0.04)', borderRadius: 12, fontSize: 12, color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>
+                        No card received yet — get hit first!
+                      </div>
+                    )
+                  ) : (
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                      onClick={() => handlePlay(selectedCard, myUserId)}
+                      style={{ width: '100%', padding: '14px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(99,102,241,0.28), rgba(139,92,246,0.22))', border: '1.5px solid rgba(99,102,241,0.55)', color: '#A5B4FC', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      {def.emoji} Activate {def.label}
+                    </motion.button>
+                  )}
                 </>
               ) : (
                 <>
@@ -653,9 +870,11 @@ function SabotageScreen() {
                       <motion.button key={p.userId} whileHover={{ scale: 1.02, background: 'rgba(244,63,94,0.22)' }} whileTap={{ scale: 0.96 }}
                         onClick={() => handlePlay(selectedCard, p.userId)}
                         style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, background: 'rgba(244,63,94,0.12)', border: '1.5px solid rgba(244,63,94,0.38)', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s' }}>
-                        <PlayerChip player={p} myUserId={myUserId} showScore size={36} />
-                        <div style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: '#FDA4AF' }}>
-                          {def.emoji} Hit →
+                        {/* 5.7: rank badge */}
+                        <span style={{ fontSize: 11, fontWeight: 900, color: rankMap[p.userId] === 1 ? '#F59E0B' : 'rgba(255,255,255,0.30)', width: 18, textAlign: 'center', flexShrink: 0 }}>#{rankMap[p.userId]}</span>
+                        <PlayerChip player={p} myUserId={myUserId} showScore size={34} />
+                        <div style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: '#FDA4AF', flexShrink: 0 }}>
+                          {def.emoji} →
                         </div>
                       </motion.button>
                     ))}
@@ -666,8 +885,11 @@ function SabotageScreen() {
           )}
         </>
       ) : (
-        <div style={{ textAlign: 'center', padding: '20px', background: 'rgba(255,255,255,0.03)', borderRadius: 12, fontSize: 13, color: 'rgba(255,255,255,0.28)', fontStyle: 'italic' }}>
-          No cards — earn one by getting 3 in a row ⚡
+        <div style={{ textAlign: 'center', padding: '20px', background: 'rgba(255,255,255,0.03)', borderRadius: 12 }}>
+          <div style={{ fontSize: 24, marginBottom: 6 }}>🪙</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.50)', fontWeight: 600 }}>No cards in hand</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', marginTop: 4 }}>Spend Chaos Coins in the shop — opens every 3 questions</div>
+          <div style={{ fontSize: 12, color: '#A5B4FC', fontWeight: 700, marginTop: 8 }}>🪙 {me?.coins || 0} coins ready</div>
         </div>
       )}
 
@@ -694,8 +916,14 @@ function SabotageScreen() {
 }
 
 function DoneScreen() {
-  const { players, myUserId, settings, close, lastSessionStats } = useArenaStore()
+  const { players, myUserId, settings, close, lastSessionStats, isHost } = useArenaStore()
+  const allAnswers  = useArenaStore(s => s.allAnswers)
+  const questions   = useArenaStore(s => s.questions)
+  const code        = useArenaStore(s => s.code)
+  const savageLog   = useArenaStore(s => s.savageLog)
+  const rematch     = useArenaStore(s => s.rematch)
   const addDirectXP = useXPStore(s => s.addDirectXP)
+  const [showAnalytics, setShowAnalytics] = useState(false)
   const sorted  = [...players].sort((a, b) => (b.score || 0) - (a.score || 0))
   const myRank  = sorted.findIndex(p => p.userId === myUserId) + 1
   const isWinner = myRank === 1
@@ -709,6 +937,32 @@ function DoneScreen() {
     const label = myRank === 1 ? 'Arena Victory!' : myRank <= 3 ? 'Arena Podium' : 'Arena Match'
     addDirectXP(xp, label)
   }, [])
+
+  // 4.8: CSV export — per-player, per-question result
+  const handleExportCSV = useCallback(() => {
+    const sortedPlayers = [...players].sort((a, b) => (b.score || 0) - (a.score || 0))
+    const headers = ['Rank', 'Player', ...questions.map((_, i) => `Q${i + 1}`), 'Score']
+    const rows = sortedPlayers.map((p, rank) => [
+      rank + 1,
+      p.displayName,
+      ...questions.map((q, qi) => {
+        const ans = allAnswers[qi]?.[p.userId]
+        if (!ans) return '-'
+        return ans.choiceIdx === q.correct
+          ? `correct (${(ans.timeMs / 1000).toFixed(1)}s)`
+          : 'wrong'
+      }),
+      p.score || 0,
+    ])
+    const csv = [headers, ...rows]
+      .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href = url; a.download = `arena-${code || 'results'}.csv`; a.click()
+    URL.revokeObjectURL(url)
+  }, [players, questions, allAnswers, code])
 
   const handleShare = useCallback(async () => {
     const me = sorted.find(p => p.userId === myUserId)
@@ -830,28 +1084,146 @@ function DoneScreen() {
         </div>
       )}
 
-      {/* Final leaderboard */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-        {sorted.map((p, i) => (
+      {/* 3.4: Final leaderboard — top 10 + my position if outside */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {sorted.slice(0, 10).map((p, i) => (
           <motion.div key={p.userId}
-            initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.07 }}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 13, background: p.userId === myUserId ? 'rgba(99,102,241,0.14)' : i === 0 ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.04)', border: `1.5px solid ${p.userId === myUserId ? 'rgba(99,102,241,0.35)' : i === 0 ? 'rgba(245,158,11,0.25)' : 'rgba(255,255,255,0.07)'}` }}>
-            <span style={{ fontSize: 18, width: 24, textAlign: 'center' }}>{medals[i] || `${i + 1}`}</span>
-            <PlayerChip player={p} myUserId={myUserId} showScore={false} size={32} />
-            <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-              <div style={{ fontSize: 15, fontWeight: 900, color: i === 0 ? '#FCD34D' : 'rgba(255,255,255,0.80)', fontVariantNumeric: 'tabular-nums' }}>{fmtScore(p.score || 0)}</div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.06em' }}>pts</div>
+            initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 12, background: p.userId === myUserId ? 'rgba(99,102,241,0.14)' : i === 0 ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.04)', border: `1.5px solid ${p.userId === myUserId ? 'rgba(99,102,241,0.35)' : i === 0 ? 'rgba(245,158,11,0.25)' : 'rgba(255,255,255,0.07)'}` }}>
+            <span style={{ fontSize: 16, width: 22, textAlign: 'center', flexShrink: 0 }}>{medals[i] || `${i + 1}`}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: p.userId === myUserId ? '#A5B4FC' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {p.displayName}{p.userId === myUserId && <span style={{ fontSize: 9, color: '#A5B4FC', marginLeft: 5 }}>YOU</span>}
+              </div>
             </div>
+            <div style={{ fontSize: 14, fontWeight: 900, color: i === 0 ? '#FCD34D' : 'rgba(255,255,255,0.75)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{fmtScore(p.score || 0)}</div>
           </motion.div>
         ))}
+        {myRank > 10 && (
+          <>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.15)', textAlign: 'center', padding: '1px 0' }}>···</div>
+            <motion.div initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 12, background: 'rgba(99,102,241,0.14)', border: '1.5px solid rgba(99,102,241,0.35)' }}>
+              <span style={{ fontSize: 16, width: 22, textAlign: 'center', flexShrink: 0 }}>{myRank}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#A5B4FC', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {sorted[myRank - 1]?.displayName} <span style={{ fontSize: 9, opacity: 0.6 }}>YOU</span>
+                </div>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 900, color: 'rgba(255,255,255,0.75)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{fmtScore(sorted[myRank - 1]?.score || 0)}</div>
+            </motion.div>
+          </>
+        )}
       </div>
 
+      {/* 5.8: Most Savage award */}
+      {(() => {
+        const offensive = savageLog.filter(e => e.target !== e.by)
+        if (!offensive.length) return null
+        const counts = {}
+        const names  = {}
+        const cards  = {}
+        offensive.forEach(e => {
+          counts[e.by] = (counts[e.by] || 0) + 1
+          names[e.by]  = e.byName
+          if (!cards[e.by]) cards[e.by] = {}
+          cards[e.by][e.card] = (cards[e.by][e.card] || 0) + 1
+        })
+        const topId   = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0]
+        const topName = names[topId]
+        const topCard = Object.keys(cards[topId]).sort((a, b) => cards[topId][b] - cards[topId][a])[0]
+        const topCount = counts[topId]
+        const cardDef  = CARD_DEFS[topCard] || {}
+        const isMe     = topId === myUserId
+        return (
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.4 }}
+            style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(239,68,68,0.08)', border: '1.5px solid rgba(239,68,68,0.22)', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 22 }}>🗡️</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 9, color: 'rgba(239,68,68,0.65)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>Most Savage</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: isMe ? '#FCA5A5' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {topName}{isMe && <span style={{ fontSize: 9, color: '#FCA5A5', marginLeft: 5 }}>YOU</span>}
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.40)', marginTop: 1 }}>
+                {topCount} attack{topCount > 1 ? 's' : ''} · {cardDef.emoji} {cardDef.label || topCard} was their weapon
+              </div>
+            </div>
+          </motion.div>
+        )
+      })()}
+
+      {/* 4.7 + 4.8: Host-only accuracy breakdown table + CSV export */}
+      {isHost && questions.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowAnalytics(s => !s)}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.40)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+              <span>{showAnalytics ? '▲' : '▼'}</span>
+              <span>Host Analytics · {players.length} player{players.length !== 1 ? 's' : ''}</span>
+            </motion.button>
+            <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.95 }} onClick={handleExportCSV}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.55)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+              📥 Export CSV
+            </motion.button>
+          </div>
+
+          {showAnalytics && (
+            <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 220, borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ minWidth: Math.max(280, (questions.length + 2) * 50), fontSize: 11 }}>
+                {/* Header */}
+                <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.08)', position: 'sticky', top: 0 }}>
+                  <div style={{ width: 90, padding: '6px 8px', fontWeight: 700, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>Player</div>
+                  {questions.map((_, i) => (
+                    <div key={i} style={{ width: 42, padding: '6px 2px', fontWeight: 700, color: 'rgba(255,255,255,0.35)', textAlign: 'center', flexShrink: 0 }}>Q{i + 1}</div>
+                  ))}
+                  <div style={{ width: 54, padding: '6px 8px', fontWeight: 700, color: 'rgba(255,255,255,0.35)', textAlign: 'right', flexShrink: 0 }}>Score</div>
+                </div>
+                {/* Rows */}
+                {[...players].sort((a, b) => (b.score || 0) - (a.score || 0)).map((p, ri) => (
+                  <div key={p.userId} style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.05)', background: p.userId === myUserId ? 'rgba(99,102,241,0.08)' : ri % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
+                    <div style={{ width: 90, padding: '5px 8px', color: p.userId === myUserId ? '#A5B4FC' : 'rgba(255,255,255,0.65)', fontWeight: 600, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.displayName}</div>
+                    {questions.map((q, qi) => {
+                      const ans     = allAnswers[qi]?.[p.userId]
+                      const correct = ans && ans.choiceIdx === q.correct
+                      const secs    = ans ? (ans.timeMs / 1000).toFixed(1) : null
+                      return (
+                        <div key={qi} style={{ width: 42, padding: '4px 2px', textAlign: 'center', flexShrink: 0 }}>
+                          {!ans ? (
+                            <span style={{ color: 'rgba(255,255,255,0.16)' }}>—</span>
+                          ) : correct ? (
+                            <div>
+                              <div style={{ color: '#6EE7B7', fontWeight: 800 }}>✓</div>
+                              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)' }}>{secs}s</div>
+                            </div>
+                          ) : (
+                            <span style={{ color: '#FDA4AF', fontWeight: 800 }}>✗</span>
+                          )}
+                        </div>
+                      )
+                    })}
+                    <div style={{ width: 54, padding: '5px 8px', color: 'rgba(255,255,255,0.55)', fontWeight: 700, textAlign: 'right', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{fmtScore(p.score || 0)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 8 }}>
-        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-          onClick={() => useArenaStore.setState({ phase: 'entry' })}
-          style={{ flex: 1, padding: '12px', borderRadius: 13, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-          Play Again
-        </motion.button>
+        {isHost ? (
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+            onClick={rematch}
+            style={{ flex: 1, padding: '12px', borderRadius: 13, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.30)', color: '#A5B4FC', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            🔁 Rematch
+          </motion.button>
+        ) : (
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+            onClick={() => useArenaStore.setState({ phase: 'entry' })}
+            style={{ flex: 1, padding: '12px', borderRadius: 13, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            New Game
+          </motion.button>
+        )}
         <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
           onClick={close}
           style={{ flex: 1, padding: '12px', borderRadius: 13, background: 'linear-gradient(135deg, #4F46E5, #7C3AED)', border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -865,6 +1237,228 @@ function DoneScreen() {
         📸 Share Result Card
       </motion.button>
     </motion.div>
+  )
+}
+
+// ── HostBar — 4.1: Host-only control panel rendered below screen content ───────
+
+// ── ShopScreen ────────────────────────────────────────────────────────────────
+
+function ShopScreen() {
+  const { shopCards, myUserId, players, isHost, closeShop, buyCard } = useArenaStore()
+  const SHOP_DURATION = 25
+  const [secsLeft, setSecsLeft] = useState(SHOP_DURATION)
+  const me = players.find(p => p.userId === myUserId) || {}
+  const myCoins = me.coins ?? 100
+  const myCards = me.cards || []
+
+  useEffect(() => {
+    const t = setInterval(() => setSecsLeft(s => Math.max(0, s - 1)), 1000)
+    return () => clearInterval(t)
+  }, [])
+
+  const tierColor = { common: '#9CA3AF', rare: '#818CF8', legendary: '#F59E0B' }
+  const tierLabel = { common: 'Common', rare: 'Rare', legendary: 'Legendary' }
+
+  return (
+    <motion.div key="shop"
+      initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+      style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 8px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>Card Shop</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 1 }}>Closes in {secsLeft}s · {shopCards.length} cards available</div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+          <span style={{ fontSize: 22, fontWeight: 900, color: '#FCD34D', fontVariantNumeric: 'tabular-nums' }}>🪙 {myCoins}</span>
+          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Chaos Coins</span>
+        </div>
+      </div>
+
+      {/* Countdown bar */}
+      <div style={{ height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+        <motion.div animate={{ width: `${(secsLeft / SHOP_DURATION) * 100}%` }} transition={{ duration: 1, ease: 'linear' }}
+          style={{ height: '100%', background: secsLeft < 8 ? '#EF4444' : '#6366F1', borderRadius: 99 }} />
+      </div>
+
+      {/* Card grid */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {shopCards.map((cardKey, i) => {
+          const def     = CARD_DEFS[cardKey] || {}
+          const canBuy  = myCoins >= def.cost
+          const owned   = myCards.filter(c => c === cardKey).length
+          return (
+            <motion.div key={cardKey + i}
+              initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14,
+                background: 'rgba(255,255,255,0.04)', border: `1.5px solid rgba(255,255,255,0.08)` }}>
+              <span style={{ fontSize: 26, flexShrink: 0 }}>{def.emoji || '❓'}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{def.label || cardKey}</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: tierColor[def.tier] || '#fff', background: `${tierColor[def.tier]}18`, border: `1px solid ${tierColor[def.tier]}40`, borderRadius: 99, padding: '1px 6px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                    {tierLabel[def.tier] || def.tier}
+                  </span>
+                  {owned > 0 && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)' }}>×{owned} owned</span>}
+                </div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.40)', marginTop: 2, lineHeight: 1.3 }}>{def.desc}</div>
+              </div>
+              <motion.button whileTap={{ scale: canBuy ? 0.90 : 1 }} onClick={() => canBuy && buyCard(cardKey)}
+                style={{ padding: '7px 14px', borderRadius: 10, fontSize: 12, fontWeight: 800, cursor: canBuy ? 'pointer' : 'default', fontFamily: 'inherit', flexShrink: 0,
+                  background: canBuy ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.05)',
+                  border: `1.5px solid ${canBuy ? 'rgba(99,102,241,0.50)' : 'rgba(255,255,255,0.09)'}`,
+                  color: canBuy ? '#A5B4FC' : 'rgba(255,255,255,0.20)' }}>
+                🪙 {def.cost}
+              </motion.button>
+            </motion.div>
+          )
+        })}
+      </div>
+
+      {/* Host close-early button */}
+      {isHost && (
+        <motion.button whileTap={{ scale: 0.93 }} onClick={closeShop}
+          style={{ padding: '9px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.28)', color: '#F59E0B', marginTop: 4 }}>
+          Close Shop Early →
+        </motion.button>
+      )}
+    </motion.div>
+  )
+}
+
+function HostBar() {
+  const { isPaused, answers, players, phase, hostPreviewQ, myUserId } = useArenaStore()
+  const pauseGame        = useArenaStore(s => s.pauseGame)
+  const resumeGame       = useArenaStore(s => s.resumeGame)
+  const extendTimer      = useArenaStore(s => s.extendTimer)
+  const kickPlayer       = useArenaStore(s => s.kickPlayer)
+  const hostSkipQuestion = useArenaStore(s => s.hostSkipQuestion)
+  const closeShopAction  = useArenaStore(s => s.closeShop)
+  const [showPlayers, setShowPlayers] = useState(false)
+  const [kickConfirm, setKickConfirm] = useState(null)
+
+  // Auto-clear kick confirmation after 3s
+  useEffect(() => {
+    if (!kickConfirm) return
+    const t = setTimeout(() => setKickConfirm(null), 3000)
+    return () => clearTimeout(t)
+  }, [kickConfirm])
+
+  const answeredCount = players.filter(p => answers[p.userId]).length
+
+  const ctrlBtn = (label, onClick, active = false) => (
+    <motion.button whileTap={{ scale: 0.91 }} onClick={onClick}
+      style={{
+        padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+        cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+        background: active ? 'rgba(99,102,241,0.20)' : 'rgba(255,255,255,0.07)',
+        border: `1px solid ${active ? 'rgba(99,102,241,0.45)' : 'rgba(255,255,255,0.12)'}`,
+        color: active ? '#A5B4FC' : 'rgba(255,255,255,0.60)',
+      }}>
+      {label}
+    </motion.button>
+  )
+
+  return (
+    <div style={{
+      background: 'rgba(5,5,18,0.98)', borderTop: '1px solid rgba(255,255,255,0.10)',
+      padding: '10px 20px 12px', display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0,
+    }}>
+      {/* Controls row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 9, fontWeight: 800, color: '#F59E0B', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.28)', borderRadius: 99, padding: '2px 8px', letterSpacing: '0.08em', flexShrink: 0 }}>HOST</span>
+
+        {/* 4.2: Pause/resume, 4.9: extend, 4.3: skip — only during question */}
+        {phase === 'question' && (
+          <>
+            {ctrlBtn(isPaused ? '▶ Resume' : '⏸ Pause', isPaused ? resumeGame : pauseGame, isPaused)}
+            {ctrlBtn('+5s', extendTimer)}
+            {ctrlBtn('Skip Q →', hostSkipQuestion)}
+          </>
+        )}
+
+        {/* 5.2: Close shop early — only during shop */}
+        {phase === 'shop' && (
+          ctrlBtn('Close Shop →', closeShopAction, false)
+        )}
+
+        {/* 4.6: Answer progress indicator */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          {phase === 'question' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: answeredCount === players.length ? '#10B981' : 'rgba(255,255,255,0.40)', fontVariantNumeric: 'tabular-nums' }}>
+                {answeredCount}/{players.length}
+              </span>
+              {players.length <= 12 && (
+                <div style={{ display: 'flex', gap: 2 }}>
+                  {players.map(p => (
+                    <div key={p.userId} style={{ width: 6, height: 6, borderRadius: '50%', background: answers[p.userId] ? '#10B981' : 'rgba(255,255,255,0.14)', transition: 'background 0.25s' }} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {/* 4.5: Player list toggle for mid-game kick */}
+          <motion.button whileTap={{ scale: 0.92 }} onClick={() => setShowPlayers(s => !s)}
+            style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '4px 8px', borderRadius: 7, background: showPlayers ? 'rgba(99,102,241,0.14)' : 'rgba(255,255,255,0.05)', border: `1px solid ${showPlayers ? 'rgba(99,102,241,0.30)' : 'rgba(255,255,255,0.09)'}`, color: 'rgba(255,255,255,0.40)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>
+            <Users size={11} />
+            {showPlayers ? '▲' : '▼'}
+          </motion.button>
+        </div>
+      </div>
+
+      {/* 4.10: Host preview of next question (shown during sabotage phase) */}
+      {hostPreviewQ?.q && (
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+          style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.24)' }}>
+          <div style={{ fontSize: 9, fontWeight: 800, color: '#F59E0B', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>⚡ Next Question (Host Preview)</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)', lineHeight: 1.4, fontWeight: 500 }}>{hostPreviewQ.q}</div>
+          {hostPreviewQ.category && (
+            <div style={{ fontSize: 9, color: 'rgba(165,180,252,0.55)', marginTop: 4, fontWeight: 600 }}>{hostPreviewQ.category}</div>
+          )}
+        </motion.div>
+      )}
+
+      {/* Player list with kick controls (4.4 lobby / 4.5 mid-game) */}
+      {showPlayers && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 130, overflowY: 'auto' }}>
+          {players.map(p => {
+            const isMe      = p.userId === myUserId
+            const isConfirm = kickConfirm === p.userId
+            return (
+              <div key={p.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+                  {phase === 'question' && (
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: answers[p.userId] ? '#10B981' : 'rgba(255,255,255,0.15)', transition: 'background 0.25s' }} />
+                  )}
+                  <span style={{ fontSize: 11, color: isMe ? '#A5B4FC' : 'rgba(255,255,255,0.60)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {p.displayName}{isMe ? ' (you)' : ''}
+                  </span>
+                </div>
+                {!isMe && (
+                  isConfirm ? (
+                    <motion.button whileTap={{ scale: 0.90 }}
+                      onClick={() => { kickPlayer(p.userId); setKickConfirm(null) }}
+                      style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: 'rgba(244,63,94,0.80)', border: '1px solid rgba(244,63,94,0.90)', borderRadius: 6, padding: '2px 9px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+                      Confirm
+                    </motion.button>
+                  ) : (
+                    <motion.button whileTap={{ scale: 0.90 }}
+                      onClick={() => setKickConfirm(p.userId)}
+                      style={{ fontSize: 10, fontWeight: 600, color: 'rgba(244,63,94,0.60)', background: 'rgba(244,63,94,0.07)', border: '1px solid rgba(244,63,94,0.18)', borderRadius: 6, padding: '2px 9px', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+                      Kick
+                    </motion.button>
+                  )
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -997,7 +1591,7 @@ function LeaderboardScreen() {
 // ── Root component ─────────────────────────────────────────────────────────────
 
 export default function Arena() {
-  const { isOpen, phase, close } = useArenaStore()
+  const { isOpen, phase, close, isHost } = useArenaStore()
 
   // Handle ?arena=CODE URL param (from QR scan)
   useEffect(() => {
@@ -1053,11 +1647,14 @@ export default function Arena() {
               {phase === 'question'    && <QuestionScreen key="question" />}
               {phase === 'reveal'      && <RevealScreen key="reveal" />}
               {phase === 'sabotage'    && <SabotageScreen key="sabotage" />}
+              {phase === 'shop'        && <ShopScreen key="shop" />}
               {phase === 'done'        && <DoneScreen key="done" />}
               {phase === 'leaderboard' && <LeaderboardScreen key="leaderboard" />}
             </AnimatePresence>
           </div>
         </div>
+        {/* 4.1: Host dashboard bar — visible only to host during active game */}
+        {isHost && ['question', 'reveal', 'sabotage', 'shop'].includes(phase) && <HostBar />}
       </motion.div>
     </AnimatePresence>
   )
