@@ -70,9 +70,17 @@ const BASE_PTS     = 1000
 const SPEED_MAX    = 500
 const STREAK_BONUS = 200
 const STEAL_AMT    = 300
-const Q_TIME       = 15
+const Q_TIME       = 15   // fallback default
 const ELO_K        = 32
 const SHOP_DURATION = 25  // seconds
+
+// 6.4: Difficulty modes → question complexity + time limit
+const DIFF_TIMERS = { casual: 20, competitive: 15, brutal: 10 }
+const DIFF_PROMPT = {
+  casual:      'simple and beginner-friendly, straightforward distractors',
+  competitive: 'moderately challenging with plausible wrong answers',
+  brutal:      'expert-level with highly deceptive distractors, nuanced distinctions',
+}
 
 // ── ELO: each player vs every other player, normalised by (N-1) ──────────────
 function calcEloDeltas(playerResults) {
@@ -161,6 +169,12 @@ export const useArenaStore = create((set, get) => ({
   savageLog:          [],   // 5.8: [{ by, byName, target, card }] — accumulated all game
   myLastReceivedCard: null, // for echo: last card played against this player
 
+  // ── Adaptive AI (Pillar 6)
+  playerProfiles:   {},    // 6.1: baseUserId → arena_profiles row (fetched at game start)
+  playerTiers:      {},    // 6.3: tabUserId → 'expert'|'standard'
+  preTopicAccuracy: {},    // 6.6: baseUserId → accuracy at session start (for improvement delta)
+  challengeMode:    false, // 6.5: this player wants questions targeting their weak spots
+
   // ── Channel / timers
   _channel:     null,
   _timerRef:    null,
@@ -190,6 +204,7 @@ export const useArenaStore = create((set, get) => ({
       isSpectator: false, coHostId: null, spectators: [],
       isPaused: false, kickedUserIds: [], hostPreviewQ: null,
       shopCards: [], shopNextQIdx: null, savageLog: [], myLastReceivedCard: null,
+      playerProfiles: {}, playerTiers: {}, preTopicAccuracy: {}, challengeMode: false,
       _channel: null, _timerRef: null, _cdRef: null, _shopTimeout: null,
     })
   },
@@ -201,7 +216,7 @@ export const useArenaStore = create((set, get) => ({
     const color = ARENA_COLORS[0]
     const ch    = get()._buildChannel(code, tabId)
     await ch.subscribe()
-    await ch.track({ userId: tabId, baseUserId: userId, displayName, color, role: 'player', score: 0, streak: 0, cards: [], coins: 100 })
+    await ch.track({ userId: tabId, baseUserId: userId, displayName, color, role: 'player', score: 0, streak: 0, cards: [], coins: 100, challengeMode: false })
     set({
       code, isHost: true, isSpectator: false,
       myUserId: tabId, myBaseUserId: userId, myDisplayName: displayName, myColor: color,
@@ -217,7 +232,7 @@ export const useArenaStore = create((set, get) => ({
     const color   = ARENA_COLORS[slot]
     const ch      = get()._buildChannel(trimmed, tabId)
     await ch.subscribe()
-    await ch.track({ userId: tabId, baseUserId: userId, displayName, color, role: spectator ? 'spectator' : 'player', score: 0, streak: 0, cards: [], coins: spectator ? 0 : 100 })
+    await ch.track({ userId: tabId, baseUserId: userId, displayName, color, role: spectator ? 'spectator' : 'player', score: 0, streak: 0, cards: [], coins: spectator ? 0 : 100, challengeMode: false })
     set({ code: trimmed, isHost: false, isSpectator: spectator, myUserId: tabId, myBaseUserId: userId, myDisplayName: displayName, myColor: color, phase: 'lobby', _channel: ch })
   },
 
@@ -229,10 +244,12 @@ export const useArenaStore = create((set, get) => ({
   },
 
   submitAnswer: (choiceIdx) => {
-    const { _channel, myUserId, currentQIdx, timerSeconds, isSpectator } = get()
+    const { _channel, myUserId, currentQIdx, timerSeconds, isSpectator, playerTiers, settings } = get()
     if (isSpectator) return
-    const timeMs = (Q_TIME - timerSeconds) * 1000
-    const payload = { userId: myUserId, choiceIdx, timeMs, qIdx: currentQIdx }
+    const qTime  = DIFF_TIMERS[settings?.difficulty] || Q_TIME
+    const timeMs = (qTime - timerSeconds) * 1000
+    const tier   = playerTiers[myUserId] || 'standard'
+    const payload = { userId: myUserId, choiceIdx, timeMs, qIdx: currentQIdx, tier }
     set(s => ({ answers: { ...s.answers, [myUserId]: payload } }))
     _channel?.send({ type: 'broadcast', event: 'answer', payload })
   },
@@ -402,6 +419,14 @@ export const useArenaStore = create((set, get) => ({
     }, 3000)
   },
 
+  // 6.5: Toggle challenge mode — re-track presence so host picks it up at game start
+  setChallengeMode: (val) => {
+    const { _channel, myUserId, players } = get()
+    set({ challengeMode: val })
+    const me = players.find(p => p.userId === myUserId)
+    if (_channel && me) _channel.track({ ...me, challengeMode: val })
+  },
+
   // 7.15: Rematch
   rematch: () => {
     const { isHost, _channel, settings } = get()
@@ -412,6 +437,7 @@ export const useArenaStore = create((set, get) => ({
       sabotagePlayed: [], aevaLine: '', scoreDeltas: {}, lastSessionStats: null,
       questionCacheIds: [], questionVotes: {}, myQuestionVotes: {},
       savageLog: [], shopCards: [], shopNextQIdx: null, myLastReceivedCard: null,
+      playerProfiles: {}, playerTiers: {}, preTopicAccuracy: {},
     }
     set(s => ({ ...resetState, players: s.players.map(p => ({ ...p, score: 0, streak: 0, cards: [], coins: 100 })) }))
     _channel?.send({ type: 'broadcast', event: 'rematch', payload: { settings } })
@@ -464,14 +490,15 @@ export const useArenaStore = create((set, get) => ({
 
     ch.on('broadcast', { event: 'stubs_sync' }, ({ payload }) => {
       if (get().isHost) return
-      set({ stubs: payload.stubs })
+      set({ stubs: payload.stubs, playerTiers: payload.playerTiers || {} })
     })
 
     ch.on('broadcast', { event: 'question_start' }, ({ payload }) => {
       if (get().isHost) return
-      const { qIdx } = payload
+      const { qIdx, qTime } = payload
       get()._clearTimer()
-      set({ currentQIdx: qIdx, timerSeconds: Q_TIME, answers: {}, correctIdx: null, sabotagePlayed: [], aevaLine: '', phase: 'question' })
+      const timer = qTime || DIFF_TIMERS[get().settings?.difficulty] || Q_TIME
+      set({ currentQIdx: qIdx, timerSeconds: timer, answers: {}, correctIdx: null, sabotagePlayed: [], aevaLine: '', phase: 'question' })
       get()._startTimer()
     })
 
@@ -699,14 +726,74 @@ export const useArenaStore = create((set, get) => ({
   },
 
   _generateAndStart: async () => {
-    const { settings, _channel } = get()
-    const diffMap  = { easy: 'simple and beginner-friendly', medium: 'moderately challenging', hard: 'challenging and detailed' }
+    const { settings, players, _channel } = get()
     const topicKey = settings.topic.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').slice(0, 80)
+    const diffDesc = DIFF_PROMPT[settings.difficulty] || DIFF_PROMPT.competitive
 
-    const prompt = `Generate ${settings.questionCount} multiple choice quiz questions about "${settings.topic}". Difficulty: ${diffMap[settings.difficulty] || 'medium'}. Rate your confidence that each answer is factually correct (0.0=uncertain, 1.0=certain). Return ONLY a JSON array, no markdown:\n[{"q":"...","choices":["A","B","C","D"],"correct":0,"explain":"one concise sentence","confidence":0.9,"category":"Biology"}]`
+    // ── 6.1 + 6.2: Fetch all player profiles for topic history ──────────────────
+    const baseUserIds = players.map(p => p.baseUserId || p.userId.split('-')[0]).filter(Boolean)
+    let profileMap = {}
+    try {
+      const { data: profiles } = await supabase
+        .from('arena_profiles')
+        .select('user_id, elo, accuracy_pct, topic_accuracy')
+        .in('user_id', baseUserIds)
+      ;(profiles || []).forEach(pr => { profileMap[pr.user_id] = pr })
+    } catch {}
 
-    let questions    = []
-    let rawResponse  = null
+    // ── 6.3: Classify player tiers based on topic accuracy ──────────────────────
+    const playerTiers = {}
+    const preTopicAccuracy = {}
+    players.forEach(p => {
+      const baseId  = p.baseUserId || p.userId.split('-')[0]
+      const profile = profileMap[baseId]
+      const topicAcc = profile?.topic_accuracy?.[settings.topic]
+      const overallAcc = profile?.accuracy_pct || 0
+      preTopicAccuracy[baseId] = topicAcc ?? null
+      // Expert if historically good on this specific topic, or overall expert with no topic history
+      const isExpert = topicAcc != null ? topicAcc >= 0.65 : overallAcc >= 0.70
+      playerTiers[p.userId] = isExpert ? 'expert' : 'standard'
+    })
+    set({ playerProfiles: profileMap, playerTiers, preTopicAccuracy })
+
+    // ── 6.2: Build topic history context for prompt ──────────────────────────────
+    const expertPlayers  = players.filter(p => playerTiers[p.userId] === 'expert')
+    const weakPlayers    = players.filter(p => {
+      const baseId = p.baseUserId || p.userId.split('-')[0]
+      const acc = profileMap[baseId]?.topic_accuracy?.[settings.topic]
+      return acc != null && acc < 0.45
+    })
+    const challengePlayers = players.filter(p => p.challengeMode)
+
+    let contextLines = []
+    if (expertPlayers.length) {
+      contextLines.push(`Expert-level players (high ${settings.topic} accuracy): ${expertPlayers.map(p => p.displayName).join(', ')} — these players need genuinely challenging content.`)
+    }
+    if (weakPlayers.length) {
+      contextLines.push(`Struggling players: ${weakPlayers.map(p => p.displayName).join(', ')} — keep foundational concepts well-represented.`)
+    }
+    if (challengePlayers.length) {
+      const challengeCtx = challengePlayers.map(p => {
+        const baseId = p.baseUserId || p.userId.split('-')[0]
+        const topicAcc = profileMap[baseId]?.topic_accuracy || {}
+        const weakTopics = Object.entries(topicAcc)
+          .filter(([, v]) => v < 0.45)
+          .sort(([, a], [, b]) => a - b)
+          .slice(0, 3)
+          .map(([t]) => t)
+        return weakTopics.length ? `${p.displayName} (weak on: ${weakTopics.join(', ')})` : p.displayName
+      }).join('; ')
+      contextLines.push(`Challenge-mode players who want to face their weaknesses: ${challengeCtx} — include sub-concepts where beginners typically fail.`)
+    }
+    const contextBlock = contextLines.length
+      ? `\nPlayer context:\n${contextLines.join('\n')}\n`
+      : ''
+
+    // ── Main question generation ─────────────────────────────────────────────────
+    const prompt = `Generate ${settings.questionCount} multiple choice quiz questions about "${settings.topic}". Difficulty: ${diffDesc}. Rate your confidence that each answer is factually correct (0.0=uncertain, 1.0=certain).${contextBlock}Return ONLY a JSON array, no markdown:\n[{"q":"...","choices":["A","B","C","D"],"correct":0,"explain":"one concise sentence","confidence":0.9,"category":"Biology"}]`
+
+    let questions   = []
+    let rawResponse = null
 
     try {
       const res = await fetch(GROQ_URL, {
@@ -758,6 +845,38 @@ export const useArenaStore = create((set, get) => ({
 
     questions = questions.slice(0, settings.questionCount)
 
+    // ── 6.3: Generate expert-tier variant choices if any expert players ───────────
+    const hasExperts = Object.values(playerTiers).some(t => t === 'expert')
+    if (hasExperts && questions.length > 0) {
+      try {
+        const expertPrompt = `These are ${questions.length} quiz questions. For each, generate 3 harder wrong answers — more deceptive, factually adjacent, or requiring deeper nuance to rule out than the current distractors. The correct answer must stay identical.
+Questions: ${JSON.stringify(questions.map(q => ({ q: q.q, correct: q.choices[q.correct] })))}
+Return ONLY a JSON array (same length as input):
+[{"correct":"exact correct answer text","wrongChoices":["harder wrong 1","harder wrong 2","harder wrong 3"]}]`
+        const res  = await fetch(GROQ_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
+          body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: expertPrompt }], temperature: 0.7, max_tokens: 3000 }),
+        })
+        const d   = await res.json()
+        const raw = d.choices[0]?.message?.content?.trim() || '[]'
+        const m   = raw.match(/\[[\s\S]*\]/)
+        const variants = JSON.parse(m?.[0] || '[]')
+        variants.forEach((v, i) => {
+          if (!questions[i] || !v?.wrongChoices?.length) return
+          const correct = questions[i].choices[questions[i].correct]
+          const wrongs  = v.wrongChoices.slice(0, 3)
+          // Shuffle correct answer into a random position among the 4 slots
+          const expertChoices = [...wrongs]
+          const insertAt = Math.floor(Math.random() * 4)
+          expertChoices.splice(insertAt, 0, correct)
+          questions[i].expertChoices = expertChoices.slice(0, 4)
+          questions[i].expertCorrect  = insertAt
+        })
+      } catch {}
+    }
+
+    // ── Cache new questions to DB ────────────────────────────────────────────────
     const toCache = questions.filter(q => !q._cacheId)
     let insertedIds = []
     if (toCache.length > 0) {
@@ -785,20 +904,26 @@ export const useArenaStore = create((set, get) => ({
     const questionCacheIds = questions.map(q => q._cacheId || insertedIds[insertedIdx++] || null)
     set({ questionCacheIds })
 
-    const stubs = questions.map(q => ({ q: q.q, choices: q.choices, category: q.category || null }))
+    const stubs = questions.map(q => ({
+      q: q.q,
+      choices: q.choices,
+      category: q.category || null,
+      expertChoices: q.expertChoices || null,
+    }))
     set({ questions, stubs })
-    _channel?.send({ type: 'broadcast', event: 'stubs_sync', payload: { stubs } })
+    _channel?.send({ type: 'broadcast', event: 'stubs_sync', payload: { stubs, playerTiers } })
     setTimeout(() => get()._startQuestion(0), 300)
   },
 
   _startQuestion: (qIdx) => {
-    const { stubs, _channel, isHost } = get()
+    const { stubs, _channel, isHost, settings } = get()
     const stub = stubs[qIdx]
     if (!stub) { get()._endGame(); return }
     get()._clearTimer()
-    set({ currentQIdx: qIdx, timerSeconds: Q_TIME, answers: {}, correctIdx: null, sabotagePlayed: [], aevaLine: '', scoreDeltas: {}, phase: 'question', hostPreviewQ: null, isPaused: false })
+    const qTime = DIFF_TIMERS[settings?.difficulty] || Q_TIME
+    set({ currentQIdx: qIdx, timerSeconds: qTime, answers: {}, correctIdx: null, sabotagePlayed: [], aevaLine: '', scoreDeltas: {}, phase: 'question', hostPreviewQ: null, isPaused: false })
     if (isHost) {
-      _channel?.send({ type: 'broadcast', event: 'question_start', payload: { qIdx } })
+      _channel?.send({ type: 'broadcast', event: 'question_start', payload: { qIdx, qTime } })
     }
     get()._startTimer()
   },
@@ -824,11 +949,12 @@ export const useArenaStore = create((set, get) => ({
   },
 
   _endQuestion: async () => {
-    const { questions, currentQIdx, answers, players, effects, _channel } = get()
+    const { questions, currentQIdx, answers, players, effects, _channel, settings, playerProfiles } = get()
     get()._clearTimer()
     const q = questions[currentQIdx]
     if (!q) return
     const correctIdx = q.correct
+    const qTime = DIFF_TIMERS[settings?.difficulty] || Q_TIME
 
     const scoreDeltas   = {}
     const playerUpdates = {}
@@ -846,8 +972,12 @@ export const useArenaStore = create((set, get) => ({
       // 5.6: wager multiplier (replaces double_down)
       const wagerMult = eff.wagered || 1
 
-      if (ans?.choiceIdx === correctIdx) {
-        const spd  = Math.round(SPEED_MAX * Math.max(0, (Q_TIME * 1000 - ans.timeMs) / (Q_TIME * 1000)))
+      // 6.3: expert-tier players are graded against expertCorrect when available
+      const isExpert   = ans?.tier === 'expert'
+      const correctFor = (isExpert && q.expertCorrect != null) ? q.expertCorrect : correctIdx
+
+      if (ans?.choiceIdx === correctFor) {
+        const spd  = Math.round(SPEED_MAX * Math.max(0, (qTime * 1000 - ans.timeMs) / (qTime * 1000)))
         delta      = (BASE_PTS + spd + (streak >= 2 ? STREAK_BONUS : 0)) * wagerMult
         score     += delta
         streak    += 1
@@ -892,12 +1022,32 @@ export const useArenaStore = create((set, get) => ({
 
     let aevaLine = ''
     try {
-      const correct = players.filter(p => answers[p.userId]?.choiceIdx === correctIdx).length
-      const ctx = correct === players.length ? 'everyone got it right. Be underwhelmed' : correct === 0 ? 'nobody got it right. Be savage' : `only ${correct} of ${players.length} got it right`
+      // Count correct answers, accounting for expert tiers
+      const correctCount = players.filter(p => {
+        const ans = answers[p.userId]
+        const isExpert   = ans?.tier === 'expert'
+        const correctFor = (isExpert && q.expertCorrect != null) ? q.expertCorrect : correctIdx
+        return ans?.choiceIdx === correctFor
+      }).length
+      const ctx = correctCount === players.length ? 'everyone got it right. Be underwhelmed' : correctCount === 0 ? 'nobody got it right. Be savage' : `only ${correctCount} of ${players.length} got it right`
+
+      // 6.7: inject per-player topic history for personalized snark
+      const historySnippets = players
+        .map(p => {
+          const baseId = p.baseUserId || p.userId.split('-')[0]
+          const acc = playerProfiles[baseId]?.topic_accuracy?.[settings.topic]
+          if (acc == null) return null
+          const pct = Math.round(acc * 100)
+          return `${p.displayName} has ${pct}% historical accuracy on ${settings.topic}`
+        })
+        .filter(Boolean)
+        .slice(0, 2) // cap to 2 players to keep prompt short
+      const histCtx = historySnippets.length ? ` Context: ${historySnippets.join('. ')}.` : ''
+
       const r   = await fetch(GROQ_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
-        body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: `You are Aeva, a sharp and slightly ruthless quiz host. ${ctx}. One sentence, max 12 words, no emojis, no quotes.` }], max_tokens: 40, temperature: 1.0 }),
+        body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: `You are Aeva, a sharp and slightly ruthless quiz host. ${ctx}.${histCtx} One sentence, max 12 words, no emojis, no quotes. Reference a player's history if it's ironic or savage.` }], max_tokens: 40, temperature: 1.0 }),
       })
       const d   = await r.json()
       aevaLine  = d.choices[0]?.message?.content?.trim() || ''
@@ -957,7 +1107,7 @@ export const useArenaStore = create((set, get) => ({
 
   // ── Persist results to Supabase, compute ELO, broadcast stats ────────────────
   _persistSessionResults: async () => {
-    const { code, settings, players, allAnswers, questions, myBaseUserId, isHost, _channel } = get()
+    const { code, settings, players, allAnswers, questions, myBaseUserId, isHost, _channel, preTopicAccuracy } = get()
     if (!isHost || players.length === 0) return
 
     try {
@@ -1073,6 +1223,13 @@ export const useArenaStore = create((set, get) => ({
           updated_at:     new Date().toISOString(),
         }, { onConflict: 'user_id' })
 
+        // 6.6: Topic improvement delta (pre-game snapshot vs new accuracy)
+        const prePct = preTopicAccuracy[pr.baseUserId] ?? null
+        const postPct = topicAcc[settings.topic]
+        const topicImprovement = prePct !== null
+          ? { topic: settings.topic, before: Math.round(prePct * 100), after: Math.round(postPct * 100) }
+          : null
+
         playerStats[pr.userId] = {
           eloChange:      delta,
           newElo,
@@ -1081,6 +1238,7 @@ export const useArenaStore = create((set, get) => ({
           correctCount:   pr.correctCount,
           totalQuestions: pr.totalQuestions,
           topic:          settings.topic,
+          topicImprovement,
         }
       }
 

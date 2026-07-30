@@ -98,7 +98,7 @@ function CreateScreen() {
   const { createRoom } = useArenaStore()
   const { name } = (() => { try { return { name: localStorage.getItem('aeva_display_name') || 'Player' } } catch { return { name: 'Player' } } })()
   const [topic, setTopic] = useState('')
-  const [difficulty, setDifficulty] = useState('medium')
+  const [difficulty, setDifficulty] = useState('competitive')
   const [questionCount, setQuestionCount] = useState(10)
   const [loading, setLoading] = useState(false)
 
@@ -130,12 +130,21 @@ function CreateScreen() {
       </div>
 
       <div>
-        <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.40)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 7 }}>Difficulty</label>
+        <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.40)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 7 }}>Mode</label>
         <div style={{ display: 'flex', gap: 8 }}>
-          {['easy', 'medium', 'hard'].map(d => (
-            <motion.button key={d} whileTap={{ scale: 0.95 }} onClick={() => setDifficulty(d)}
-              style={{ flex: 1, padding: '9px 0', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', textTransform: 'capitalize', transition: 'all 0.15s', background: difficulty === d ? (d === 'easy' ? 'rgba(16,185,129,0.22)' : d === 'medium' ? 'rgba(245,158,11,0.22)' : 'rgba(244,63,94,0.22)') : 'rgba(255,255,255,0.05)', border: `1.5px solid ${difficulty === d ? (d === 'easy' ? 'rgba(16,185,129,0.55)' : d === 'medium' ? 'rgba(245,158,11,0.55)' : 'rgba(244,63,94,0.55)') : 'rgba(255,255,255,0.08)'}`, color: difficulty === d ? '#fff' : 'rgba(255,255,255,0.40)' }}>
-              {d}
+          {[
+            { key: 'casual',      label: 'Casual',      sub: '20s',  color: '#10B981' },
+            { key: 'competitive', label: 'Competitive', sub: '15s',  color: '#F59E0B' },
+            { key: 'brutal',      label: 'Brutal',      sub: '10s',  color: '#EF4444' },
+          ].map(({ key, label, sub, color }) => (
+            <motion.button key={key} whileTap={{ scale: 0.95 }} onClick={() => setDifficulty(key)}
+              style={{ flex: 1, padding: '8px 0 7px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+                background: difficulty === key ? `${color}22` : 'rgba(255,255,255,0.05)',
+                border: `1.5px solid ${difficulty === key ? `${color}88` : 'rgba(255,255,255,0.08)'}`,
+                color: difficulty === key ? '#fff' : 'rgba(255,255,255,0.40)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+              <span>{label}</span>
+              <span style={{ fontSize: 9, opacity: 0.6, fontWeight: 600 }}>{sub}</span>
             </motion.button>
           ))}
         </div>
@@ -217,9 +226,10 @@ function JoinScreen({ prefillCode }) {
 }
 
 function LobbyScreen() {
-  const { code, players, myUserId, isHost, startGame, settings, coHostId, spectators } = useArenaStore()
-  const assignCoHost = useArenaStore(s => s.assignCoHost)
-  const kickPlayer   = useArenaStore(s => s.kickPlayer)
+  const { code, players, myUserId, isHost, startGame, settings, coHostId, spectators, challengeMode, playerProfiles } = useArenaStore()
+  const assignCoHost    = useArenaStore(s => s.assignCoHost)
+  const kickPlayer      = useArenaStore(s => s.kickPlayer)
+  const setChallengeMode = useArenaStore(s => s.setChallengeMode)
   const [copied, setCopied] = useState(false)
   const [qrUrl, setQrUrl] = useState('')
   const canStart = isHost && players.length >= 1
@@ -229,6 +239,21 @@ function LobbyScreen() {
     QRCode.toDataURL(url, { width: 160, margin: 1, color: { dark: '#ffffff', light: '#05061a' } })
       .then(setQrUrl).catch(() => {})
   }, [code])
+
+  // 6.1: Fetch profiles so topic accuracy badges are visible in lobby
+  useEffect(() => {
+    if (!players.length) return
+    const ids = players.map(p => p.baseUserId || p.userId.split('-')[0]).filter(Boolean)
+    supabase.from('arena_profiles')
+      .select('user_id, accuracy_pct, topic_accuracy')
+      .in('user_id', ids)
+      .then(({ data }) => {
+        if (!data) return
+        const map = {}
+        data.forEach(r => { map[r.user_id] = r })
+        useArenaStore.setState({ playerProfiles: map })
+      })
+  }, [players.length])
 
   const copyCode = () => {
     navigator.clipboard.writeText(code).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
@@ -240,7 +265,9 @@ function LobbyScreen() {
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>⚔️ Arena · Sabotage</div>
         <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', letterSpacing: '-0.03em' }}>{settings.topic}</div>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 3 }}>{settings.questionCount} questions · {settings.difficulty}</div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 3 }}>
+          {settings.questionCount} questions · {settings.difficulty} · {settings.difficulty === 'casual' ? '20s' : settings.difficulty === 'brutal' ? '10s' : '15s'}/q
+        </div>
       </div>
 
       {/* Code + QR */}
@@ -272,9 +299,22 @@ function LobbyScreen() {
           {players.map(p => {
             const isMe      = p.userId === myUserId
             const isCoHost  = p.userId === coHostId
+            const baseId    = p.baseUserId || p.userId.split('-')[0]
+            const topicAcc  = playerProfiles[baseId]?.topic_accuracy?.[settings.topic]
+            const pctLabel  = topicAcc != null ? `${Math.round(topicAcc * 100)}%` : null
+            const tierColor = topicAcc != null ? (topicAcc >= 0.65 ? '#F59E0B' : topicAcc >= 0.45 ? '#6EE7B7' : '#FDA4AF') : null
             return (
               <div key={p.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                <PlayerChip player={p} myUserId={myUserId} showScore={false} size={30} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                  <PlayerChip player={p} myUserId={myUserId} showScore={false} size={30} />
+                  {/* 6.1: topic accuracy badge */}
+                  {pctLabel && (
+                    <span style={{ fontSize: 9, fontWeight: 700, color: tierColor, background: `${tierColor}18`, border: `1px solid ${tierColor}40`, borderRadius: 99, padding: '1px 6px', flexShrink: 0 }}>
+                      {pctLabel} {settings.topic}
+                    </span>
+                  )}
+                  {p.challengeMode && <span title="Challenge mode" style={{ fontSize: 11 }}>🎯</span>}
+                </div>
                 <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
                   {isMe && isHost && <span style={{ fontSize: 9, fontWeight: 700, color: '#F59E0B', background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.30)', borderRadius: 99, padding: '2px 7px' }}>HOST</span>}
                   {isCoHost && !isMe && <span style={{ fontSize: 9, fontWeight: 700, color: '#A5B4FC', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.30)', borderRadius: 99, padding: '2px 7px' }}>CO-HOST</span>}
@@ -309,6 +349,25 @@ function LobbyScreen() {
           </div>
         </div>
       </div>
+
+      {/* 6.5: Challenge Mode toggle — each player can opt in */}
+      <motion.button whileTap={{ scale: 0.97 }} onClick={() => setChallengeMode(!challengeMode)}
+        style={{ padding: '11px 14px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left',
+          background: challengeMode ? 'rgba(239,68,68,0.10)' : 'rgba(255,255,255,0.04)',
+          border: `1.5px solid ${challengeMode ? 'rgba(239,68,68,0.35)' : 'rgba(255,255,255,0.09)'}` }}>
+        <span style={{ fontSize: 18, flexShrink: 0 }}>🎯</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: challengeMode ? '#FCA5A5' : 'rgba(255,255,255,0.60)' }}>
+            Challenge Mode {challengeMode ? '· ON' : '· OFF'}
+          </div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.30)', marginTop: 1 }}>
+            Aeva targets your weak spots — questions skew toward topics you struggle with
+          </div>
+        </div>
+        <div style={{ width: 28, height: 16, borderRadius: 99, background: challengeMode ? '#EF4444' : 'rgba(255,255,255,0.12)', position: 'relative', flexShrink: 0, transition: 'background 0.2s' }}>
+          <div style={{ position: 'absolute', top: 2, left: challengeMode ? 14 : 2, width: 12, height: 12, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+        </div>
+      </motion.button>
 
       {isHost ? (
         <motion.button whileHover={canStart ? { scale: 1.02 } : {}} whileTap={canStart ? { scale: 0.97 } : {}} onClick={canStart ? startGame : undefined}
@@ -422,7 +481,7 @@ function VoteRow({ qIdx }) {
 }
 
 function QuestionScreen() {
-  const { stubs, questions, currentQIdx, timerSeconds, answers, myUserId, submitAnswer, isHost, effects, hostSkipQuestion, isSpectator, coHostId, isPaused } = useArenaStore()
+  const { stubs, questions, currentQIdx, timerSeconds, answers, myUserId, submitAnswer, isHost, effects, hostSkipQuestion, isSpectator, coHostId, isPaused, playerTiers, settings } = useArenaStore()
   const stub  = stubs[currentQIdx]
   const myAns = answers[myUserId]
   const myEff = effects[myUserId] || {}
@@ -447,7 +506,13 @@ function QuestionScreen() {
 
   if (!stub) return null
 
-  const progress = timerSeconds / 15
+  // 6.3: Use expert choices if this player is expert tier and they exist
+  const myTier          = playerTiers[myUserId] || 'standard'
+  const isExpertPlayer  = myTier === 'expert'
+  const activeChoices   = (isExpertPlayer && stub.expertChoices?.length) ? stub.expertChoices : stub.choices
+
+  const qTime    = settings?.difficulty === 'casual' ? 20 : settings?.difficulty === 'brutal' ? 10 : 15
+  const progress = timerSeconds / qTime
   const urgentColor = timerSeconds <= 5 ? '#F43F5E' : timerSeconds <= 10 ? '#F59E0B' : '#6366F1'
   const choiceLetters = ['A', 'B', 'C', 'D']
   const choiceBgs = ['rgba(99,102,241,0.12)', 'rgba(244,63,94,0.12)', 'rgba(16,185,129,0.12)', 'rgba(245,158,11,0.12)']
@@ -549,13 +614,20 @@ function QuestionScreen() {
         )}
       </AnimatePresence>
 
-      {/* Choices — 5.4: scramble reverses display order */}
+      {/* 6.3: expert tier badge */}
+      {isExpertPlayer && stub.expertChoices?.length && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', alignSelf: 'flex-start' }}>
+          <span style={{ fontSize: 10, fontWeight: 800, color: '#F59E0B', letterSpacing: '0.06em' }}>⭐ EXPERT MODE — harder distractors</span>
+        </div>
+      )}
+
+      {/* Choices — 5.4: scramble reverses display order; 6.3: expert uses activeChoices */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
         {(() => {
           const isScrambled = !!myEff.scrambled
           const displayOrder = isScrambled ? [3, 2, 1, 0] : [0, 1, 2, 3]
           return displayOrder.map((origIdx, displayIdx) => {
-            const choice   = stub.choices[origIdx]
+            const choice   = activeChoices[origIdx]
             const selected = myAns?.choiceIdx === origIdx
             const answered = !!myAns
             return (
@@ -1083,6 +1155,30 @@ function DoneScreen() {
           {[0, 1, 2].map(i => <div key={i} style={{ flex: 1, height: 58, borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }} />)}
         </div>
       )}
+
+      {/* 6.6: Topic improvement report */}
+      {lastSessionStats?.topicImprovement && (() => {
+        const { topic, before, after } = lastSessionStats.topicImprovement
+        const improved = after > before
+        const delta    = after - before
+        return (
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }}
+            style={{ padding: '12px 14px', borderRadius: 14, background: improved ? 'rgba(16,185,129,0.07)' : 'rgba(255,255,255,0.04)', border: `1.5px solid ${improved ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 22 }}>{improved ? '📈' : '📊'}</span>
+            <div>
+              <div style={{ fontSize: 9, color: improved ? 'rgba(110,231,183,0.65)' : 'rgba(255,255,255,0.30)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>
+                {topic} Accuracy
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.40)', fontVariantNumeric: 'tabular-nums' }}>{before}%</span>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.20)' }}>→</span>
+                <span style={{ fontSize: 18, fontWeight: 900, color: improved ? '#6EE7B7' : 'rgba(255,255,255,0.65)', fontVariantNumeric: 'tabular-nums' }}>{after}%</span>
+                {improved && <span style={{ fontSize: 11, fontWeight: 700, color: '#6EE7B7' }}>+{delta}pp this session</span>}
+              </div>
+            </div>
+          </motion.div>
+        )
+      })()}
 
       {/* 3.4: Final leaderboard — top 10 + my position if outside */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
