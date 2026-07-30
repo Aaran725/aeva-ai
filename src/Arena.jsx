@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Copy, Check, Trophy, Zap, Users, ChevronRight, ArrowLeft, Crown } from 'lucide-react'
 import { useArenaStore, ARENA_COLORS, CARD_DEFS } from './arenaStore'
 import { useXPStore } from './xpStore'
+import { supabase } from './supabase'
 import QRCode from 'qrcode'
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -83,6 +84,11 @@ function EntryScreen() {
         onClick={() => useArenaStore.setState({ phase: 'join' })}
         style={{ width: '100%', padding: '14px', borderRadius: 14, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.14)', color: 'rgba(255,255,255,0.88)', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
         Join Room
+      </motion.button>
+      <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+        onClick={() => useArenaStore.setState({ phase: 'leaderboard' })}
+        style={{ width: '100%', padding: '11px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.45)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+        <Trophy size={13} /> Leaderboard
       </motion.button>
     </motion.div>
   )
@@ -688,18 +694,94 @@ function SabotageScreen() {
 }
 
 function DoneScreen() {
-  const { players, myUserId, settings, close } = useArenaStore()
-  const addXP = useXPStore(s => s.addXP)
-  const sorted = [...players].sort((a, b) => (b.score || 0) - (a.score || 0))
-  const myRank = sorted.findIndex(p => p.userId === myUserId) + 1
+  const { players, myUserId, settings, close, lastSessionStats } = useArenaStore()
+  const addDirectXP = useXPStore(s => s.addDirectXP)
+  const sorted  = [...players].sort((a, b) => (b.score || 0) - (a.score || 0))
+  const myRank  = sorted.findIndex(p => p.userId === myUserId) + 1
   const isWinner = myRank === 1
+  const medals  = ['🥇', '🥈', '🥉']
 
+  // Award XP for all players (host XP also awarded here; _persistSessionResults doesn't double-award)
   useEffect(() => {
     const me = players.find(p => p.userId === myUserId)
-    if (me?.score > 0) addXP(Math.min(500, Math.round(me.score / 10)))
+    if (!me) return
+    const xp    = myRank === 1 ? 150 : myRank <= 3 ? 75 : 30
+    const label = myRank === 1 ? 'Arena Victory!' : myRank <= 3 ? 'Arena Podium' : 'Arena Match'
+    addDirectXP(xp, label)
   }, [])
 
-  const medals = ['🥇', '🥈', '🥉']
+  const handleShare = useCallback(async () => {
+    const me = sorted.find(p => p.userId === myUserId)
+    const W = 600, H = 315
+    const canvas = document.createElement('canvas')
+    canvas.width = W; canvas.height = H
+    const ctx = canvas.getContext('2d')
+
+    const bg = ctx.createLinearGradient(0, 0, 0, H)
+    bg.addColorStop(0, '#06061a'); bg.addColorStop(1, '#04040f')
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H)
+
+    const glw = ctx.createRadialGradient(120, 80, 0, 120, 80, 200)
+    glw.addColorStop(0, 'rgba(99,102,241,0.22)'); glw.addColorStop(1, 'transparent')
+    ctx.fillStyle = glw; ctx.fillRect(0, 0, W, H)
+
+    ctx.fillStyle = '#6366F1'; ctx.fillRect(0, 0, W, 4)
+
+    ctx.fillStyle = 'rgba(244,63,94,0.85)'
+    ctx.font = 'bold 11px system-ui, -apple-system, sans-serif'
+    ctx.fillText('ARENA: SABOTAGE', 40, 42)
+
+    ctx.fillStyle = '#ffffff'
+    ctx.font = 'bold 46px system-ui, -apple-system, sans-serif'
+    ctx.fillText(me?.displayName || 'Player', 40, 115)
+
+    const rankStr = myRank === 1 ? '1st Place' : myRank === 2 ? '2nd Place' : myRank === 3 ? '3rd Place' : `${myRank}th Place`
+    ctx.fillStyle = myRank === 1 ? '#FCD34D' : 'rgba(255,255,255,0.65)'
+    ctx.font = 'bold 24px system-ui, -apple-system, sans-serif'
+    ctx.fillText(rankStr, 40, 158)
+
+    ctx.fillStyle = 'rgba(255,255,255,0.5)'
+    ctx.font = '600 17px system-ui, -apple-system, sans-serif'
+    ctx.fillText(`${fmtScore(me?.score || 0)} pts  ·  ${settings.topic}`, 40, 196)
+
+    if (lastSessionStats?.eloChange !== undefined) {
+      const sign = lastSessionStats.eloChange >= 0 ? '+' : ''
+      ctx.fillStyle = lastSessionStats.eloChange >= 0 ? '#6EE7B7' : '#FDA4AF'
+      ctx.font = 'bold 20px system-ui, -apple-system, sans-serif'
+      const eloText = `${sign}${lastSessionStats.eloChange} ELO`
+      ctx.fillText(eloText, 40, 236)
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'
+      ctx.font = '500 15px system-ui, -apple-system, sans-serif'
+      ctx.fillText(`→ ${lastSessionStats.newElo} total`, 40 + ctx.measureText(eloText).width + 12, 236)
+    }
+
+    ctx.fillStyle = 'rgba(255,255,255,0.22)'
+    ctx.font = '500 13px system-ui, -apple-system, sans-serif'
+    ctx.fillText(new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }), 40, 278)
+
+    ctx.textAlign = 'right'
+    ctx.fillStyle = 'rgba(99,102,241,0.65)'
+    ctx.font = 'bold 30px system-ui, -apple-system, sans-serif'
+    ctx.fillText('AEVA', W - 40, 278)
+
+    ctx.strokeStyle = 'rgba(99,102,241,0.25)'
+    ctx.lineWidth = 1
+    ctx.strokeRect(0.5, 0.5, W - 1, H - 1)
+
+    canvas.toBlob(async blob => {
+      if (!blob) return
+      const file = new File([blob], 'arena-result.png', { type: 'image/png' })
+      try {
+        if (navigator.canShare?.({ files: [file] })) {
+          await navigator.share({ files: [file], title: 'Arena: Sabotage', text: `I finished ${rankStr} in ${settings.topic}!` })
+          return
+        }
+      } catch {}
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a'); a.href = url; a.download = 'arena-result.png'; a.click()
+      URL.revokeObjectURL(url)
+    }, 'image/png')
+  }, [sorted, myUserId, myRank, settings, lastSessionStats])
 
   return (
     <motion.div key="done" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -715,6 +797,38 @@ function DoneScreen() {
         </div>
         <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.40)' }}>{settings.topic} · {settings.questionCount} questions</div>
       </div>
+
+      {/* ELO + accuracy stats — loads after _persistSessionResults resolves */}
+      {lastSessionStats ? (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+          style={{ display: 'flex', gap: 8 }}>
+          <div style={{ flex: 1, padding: '10px 12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 12 }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.30)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>ELO</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+              <span style={{ fontSize: 18, fontWeight: 900, color: lastSessionStats.eloChange >= 0 ? '#6EE7B7' : '#FDA4AF', fontVariantNumeric: 'tabular-nums' }}>
+                {lastSessionStats.eloChange >= 0 ? '+' : ''}{lastSessionStats.eloChange}
+              </span>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.30)' }}>→ {lastSessionStats.newElo}</span>
+            </div>
+          </div>
+          <div style={{ flex: 1, padding: '10px 12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 12 }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.30)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>Accuracy</div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: '#A5B4FC', fontVariantNumeric: 'tabular-nums' }}>
+              {lastSessionStats.correctCount}/{lastSessionStats.totalQuestions}
+            </div>
+          </div>
+          <div style={{ flex: 1, padding: '10px 12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 12 }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.30)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>Rank</div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: myRank === 1 ? '#FCD34D' : 'rgba(255,255,255,0.75)', fontVariantNumeric: 'tabular-nums' }}>
+              {myRank}/{lastSessionStats.playerCount}
+            </div>
+          </div>
+        </motion.div>
+      ) : (
+        <div style={{ display: 'flex', gap: 8 }}>
+          {[0, 1, 2].map(i => <div key={i} style={{ flex: 1, height: 58, borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }} />)}
+        </div>
+      )}
 
       {/* Final leaderboard */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
@@ -743,6 +857,138 @@ function DoneScreen() {
           style={{ flex: 1, padding: '12px', borderRadius: 13, background: 'linear-gradient(135deg, #4F46E5, #7C3AED)', border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
           Back to Arcade
         </motion.button>
+      </div>
+
+      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+        onClick={handleShare}
+        style={{ width: '100%', padding: '11px', borderRadius: 12, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.22)', color: '#A5B4FC', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+        📸 Share Result Card
+      </motion.button>
+    </motion.div>
+  )
+}
+
+// ── LeaderboardScreen ──────────────────────────────────────────────────────────
+
+function LeaderboardScreen() {
+  const { myBaseUserId } = useArenaStore()
+  const [tab, setTab]           = useState('global')
+  const [loading, setLoading]   = useState(true)
+  const [globalRows, setGlobal] = useState([])
+  const [friendRows, setFriends] = useState([])
+  const [myProfile, setMyProfile] = useState(null)
+
+  useEffect(() => { loadGlobal() }, [])
+  useEffect(() => { if (tab === 'friends' && friendRows.length === 0) loadFriends() }, [tab])
+
+  const loadGlobal = async () => {
+    setLoading(true)
+    const { data } = await supabase
+      .from('arena_leaderboard')
+      .select('user_id, display_name, elo, wins, losses, total_games, accuracy_pct, title_badge, global_rank')
+      .limit(100)
+    const rows = data || []
+    setGlobal(rows)
+    if (myBaseUserId) setMyProfile(rows.find(r => r.user_id === myBaseUserId) || null)
+    setLoading(false)
+  }
+
+  const loadFriends = async () => {
+    setLoading(true)
+    if (!myBaseUserId) { setLoading(false); return }
+    const { data: mine }  = await supabase.from('arena_results').select('session_id').eq('user_id', myBaseUserId)
+    const sids = [...new Set((mine || []).map(r => r.session_id))]
+    if (!sids.length) { setLoading(false); return }
+    const { data: all } = await supabase.from('arena_results').select('user_id').in('session_id', sids)
+    const fids = [...new Set((all || []).map(r => r.user_id))]
+    if (!fids.length) { setLoading(false); return }
+    const { data: profiles } = await supabase.from('arena_profiles')
+      .select('user_id, display_name, elo, wins, losses, total_games, accuracy_pct, title_badge')
+      .in('user_id', fids).order('elo', { ascending: false }).limit(50)
+    setFriends(profiles || [])
+    setLoading(false)
+  }
+
+  const rows = tab === 'global' ? globalRows : friendRows
+
+  const renderRow = (row, idx) => {
+    const isMe  = row.user_id === myBaseUserId
+    const rank  = tab === 'global' ? (row.global_rank || idx + 1) : idx + 1
+    const rkCol = rank === 1 ? '#FCD34D' : rank === 2 ? '#C0C0C0' : rank === 3 ? '#CD7F32' : 'rgba(255,255,255,0.22)'
+    return (
+      <div key={row.user_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 11, background: isMe ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.03)', border: `1px solid ${isMe ? 'rgba(99,102,241,0.28)' : 'rgba(255,255,255,0.06)'}`, marginBottom: 6 }}>
+        <span style={{ fontSize: 13, fontWeight: 800, color: rkCol, width: 22, textAlign: 'center', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{rank}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: isMe ? '#A5B4FC' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {row.display_name}
+            {isMe && <span style={{ fontSize: 9, color: '#A5B4FC', marginLeft: 5 }}>YOU</span>}
+            {row.title_badge && (
+              <span style={{ fontSize: 9, color: '#FCD34D', background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 99, padding: '1px 5px', marginLeft: 6 }}>
+                {row.title_badge}
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', marginTop: 2 }}>
+            W{row.wins} L{row.losses} · {Math.round((row.accuracy_pct || 0) * 100)}% acc
+          </div>
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 900, color: isMe ? '#A5B4FC' : 'rgba(255,255,255,0.80)', fontVariantNumeric: 'tabular-nums' }}>{row.elo}</div>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.06em' }}>ELO</div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <motion.div key="leaderboard" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 14, height: '100%' }}>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <motion.button whileTap={{ scale: 0.92 }} onClick={() => useArenaStore.setState({ phase: 'entry' })}
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 8, padding: '5px 8px', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+          <ArrowLeft size={14} />
+        </motion.button>
+        <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', letterSpacing: '-0.03em' }}>Leaderboard</div>
+      </div>
+
+      {/* My rank strip (global tab only) */}
+      {myProfile && tab === 'global' && (
+        <div style={{ padding: '10px 14px', background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.24)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: 9, color: 'rgba(165,180,252,0.55)', fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', marginBottom: 3 }}>Your Rank</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>#{myProfile.global_rank} · {myProfile.elo} ELO</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.32)' }}>W{myProfile.wins} L{myProfile.losses}</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.32)' }}>{Math.round((myProfile.accuracy_pct || 0) * 100)}% acc</div>
+          </div>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 6 }}>
+        {[['global', '🌍 Global'], ['friends', '👥 Friends']].map(([t, label]) => (
+          <motion.button key={t} whileTap={{ scale: 0.95 }} onClick={() => setTab(t)}
+            style={{ flex: 1, padding: '8px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s', background: tab === t ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.05)', border: `1.5px solid ${tab === t ? 'rgba(99,102,241,0.55)' : 'rgba(255,255,255,0.08)'}`, color: tab === t ? '#A5B4FC' : 'rgba(255,255,255,0.40)' }}>
+            {label}
+          </motion.button>
+        ))}
+      </div>
+
+      {/* Rows */}
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        {loading ? (
+          Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} style={{ height: 52, borderRadius: 11, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', marginBottom: 6 }} />
+          ))
+        ) : rows.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: 'rgba(255,255,255,0.22)', fontSize: 13 }}>
+            {tab === 'friends' ? 'Play a game with friends to see them here' : 'No players yet — be the first!'}
+          </div>
+        ) : (
+          rows.map((row, idx) => renderRow(row, idx))
+        )}
       </div>
     </motion.div>
   )
@@ -798,16 +1044,17 @@ export default function Arena() {
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', zIndex: 1 }}>
           <div style={{ width: '100%', maxWidth: 480, padding: '20px 20px 32px', flex: 1, display: 'flex', flexDirection: 'column' }}>
             <AnimatePresence mode="wait">
-              {phase === 'entry'      && <EntryScreen key="entry" />}
-              {phase === 'create'     && <CreateScreen key="create" />}
-              {phase === 'join'       && <JoinScreen key="join" prefillCode={prefillCode} />}
-              {phase === 'lobby'      && <LobbyScreen key="lobby" />}
-              {phase === 'countdown'  && <CountdownScreen key="countdown" />}
-              {phase === 'preparing'  && <PreparingScreen key="preparing" />}
-              {phase === 'question'   && <QuestionScreen key="question" />}
-              {phase === 'reveal'     && <RevealScreen key="reveal" />}
-              {phase === 'sabotage'   && <SabotageScreen key="sabotage" />}
-              {phase === 'done'       && <DoneScreen key="done" />}
+              {phase === 'entry'       && <EntryScreen key="entry" />}
+              {phase === 'create'      && <CreateScreen key="create" />}
+              {phase === 'join'        && <JoinScreen key="join" prefillCode={prefillCode} />}
+              {phase === 'lobby'       && <LobbyScreen key="lobby" />}
+              {phase === 'countdown'   && <CountdownScreen key="countdown" />}
+              {phase === 'preparing'   && <PreparingScreen key="preparing" />}
+              {phase === 'question'    && <QuestionScreen key="question" />}
+              {phase === 'reveal'      && <RevealScreen key="reveal" />}
+              {phase === 'sabotage'    && <SabotageScreen key="sabotage" />}
+              {phase === 'done'        && <DoneScreen key="done" />}
+              {phase === 'leaderboard' && <LeaderboardScreen key="leaderboard" />}
             </AnimatePresence>
           </div>
         </div>

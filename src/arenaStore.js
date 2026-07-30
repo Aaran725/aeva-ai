@@ -1,10 +1,12 @@
 /**
  * arenaStore — Arena: Sabotage multiplayer quiz game
- * Supabase Realtime broadcast + presence, Groq question generation
+ * Supabase Realtime broadcast + presence, Groq question generation,
+ * Supabase DB persistence for ELO, stats, leaderboards.
  */
 import { create } from 'zustand'
 import { supabase } from './supabase'
 import { nextGroqKey, GROQ_URL } from './groqClient'
+import { useXPStore } from './xpStore'
 
 const TAB_ID = Math.random().toString(36).slice(2, 7)
 
@@ -32,57 +34,83 @@ export const CARD_DEFS = {
   bomb:        { emoji: '💣', label: 'Bomb',        desc: 'Block their screen for 2s',         self: false },
 }
 
-const BASE_PTS   = 1000
-const SPEED_MAX  = 500
+const BASE_PTS    = 1000
+const SPEED_MAX   = 500
 const STREAK_BONUS = 200
-const STEAL_AMT  = 300
-const Q_TIME     = 15   // seconds per question
+const STEAL_AMT   = 300
+const Q_TIME      = 15
+const ELO_K       = 32
+
+// ── ELO: each player vs every other player, normalised by (N-1) ──────────────
+function calcEloDeltas(playerResults) {
+  const N = playerResults.length
+  if (N < 2) return {}
+  const deltas = {}
+  playerResults.forEach(a => {
+    deltas[a.userId] = 0
+    playerResults.forEach(b => {
+      if (a.userId === b.userId) return
+      const eloA = a.currentElo || 1000
+      const eloB = b.currentElo || 1000
+      const expected = 1 / (1 + Math.pow(10, (eloB - eloA) / 400))
+      const actual   = a.rank < b.rank ? 1 : a.rank > b.rank ? 0 : 0.5
+      deltas[a.userId] += ELO_K * (actual - expected)
+    })
+    deltas[a.userId] = Math.round(deltas[a.userId] / (N - 1))
+  })
+  return deltas
+}
 
 export const useArenaStore = create((set, get) => ({
   // ── UI
   isOpen:  false,
-  phase:   'idle', // idle|entry|create|join|lobby|countdown|question|reveal|sabotage|done
+  phase:   'idle', // idle|entry|create|join|lobby|countdown|question|reveal|sabotage|done|leaderboard
 
   // ── Room
   code:    null,
   isHost:  false,
 
   // ── Identity
-  myUserId:     null,
+  myUserId:     null,   // tabId (userId-XXXXX)
+  myBaseUserId: null,   // raw localStorage aeva_anon_id
   myDisplayName:'',
   myColor:      null,
 
   // ── Players (from presence)
-  players: [], // [{ userId, displayName, color, score, streak, cards }]
+  players: [], // [{ userId, baseUserId, displayName, color, score, streak, cards }]
 
   // ── Settings (host sets)
   settings: { topic: '', difficulty: 'medium', questionCount: 10 },
 
   // ── Questions
-  questions:    [],   // host only — full [{q, choices, correct, explain}]
-  stubs:        [],   // all — [{q, choices}]
+  questions:    [],
+  stubs:        [],
   currentQIdx:  -1,
   timerSeconds: 0,
 
   // ── Round state
-  answers:      {},   // { userId: { choiceIdx, timeMs } }
-  correctIdx:   null,
-  explanation:  '',
-  effects:      {},   // { userId: { frozen, bomb, stolen, doubled } }
-  sabotagePlayed: [], // [{ by, byName, target, card }]
-  aevaLine:     '',
-  scoreDeltas:  {},   // { userId: delta } shown after reveal
+  answers:        {},   // { userId: { choiceIdx, timeMs } } — current question only
+  allAnswers:     {},   // { qIdx: { userId: { choiceIdx, timeMs } } } — full game history
+  correctIdx:     null,
+  explanation:    '',
+  effects:        {},
+  sabotagePlayed: [],
+  aevaLine:       '',
+  scoreDeltas:    {},
 
-  // ── Incoming card notification (shown on target's screen)
-  incomingCard: null, // { byName, card } — cleared after 2.5s
+  // ── Post-game stats (set after _persistSessionResults resolves)
+  lastSessionStats: null, // { eloChange, newElo, rank, playerCount, correctCount, totalQuestions, topic, xpEarned }
+
+  // ── Incoming card notification
+  incomingCard: null,
 
   // ── Countdown
   countdownVal: 3,
 
   // ── Channel
-  _channel: null,
+  _channel:  null,
   _timerRef: null,
-  _cdRef: null,
+  _cdRef:    null,
 
   // ──────────────────────────────────────────────────────────────────
   // Public actions
@@ -98,8 +126,10 @@ export const useArenaStore = create((set, get) => ({
     set({
       isOpen: false, phase: 'idle', code: null, isHost: false,
       players: [], questions: [], stubs: [], currentQIdx: -1,
-      answers: {}, correctIdx: null, effects: {}, sabotagePlayed: [],
-      aevaLine: '', scoreDeltas: {}, incomingCard: null,
+      answers: {}, allAnswers: {}, correctIdx: null, effects: {},
+      sabotagePlayed: [], aevaLine: '', scoreDeltas: {},
+      incomingCard: null, lastSessionStats: null,
+      myBaseUserId: null,
       _channel: null, _timerRef: null, _cdRef: null,
     })
   },
@@ -110,10 +140,10 @@ export const useArenaStore = create((set, get) => ({
     const color = ARENA_COLORS[0]
     const ch    = get()._buildChannel(code, tabId)
     await ch.subscribe()
-    await ch.track({ userId: tabId, displayName, color, score: 0, streak: 0, cards: ['freeze', 'steal', 'double_down', 'bomb'] })
+    await ch.track({ userId: tabId, baseUserId: userId, displayName, color, score: 0, streak: 0, cards: ['freeze', 'steal', 'double_down', 'bomb'] })
     set({
       code, isHost: true,
-      myUserId: tabId, myDisplayName: displayName, myColor: color,
+      myUserId: tabId, myBaseUserId: userId, myDisplayName: displayName, myColor: color,
       settings: { topic, difficulty, questionCount: Number(questionCount) },
       phase: 'lobby', _channel: ch,
     })
@@ -126,13 +156,13 @@ export const useArenaStore = create((set, get) => ({
     const color   = ARENA_COLORS[slot]
     const ch      = get()._buildChannel(trimmed, tabId)
     await ch.subscribe()
-    await ch.track({ userId: tabId, displayName, color, score: 0, streak: 0, cards: ['freeze', 'steal', 'double_down', 'bomb'] })
-    set({ code: trimmed, isHost: false, myUserId: tabId, myDisplayName: displayName, myColor: color, phase: 'lobby', _channel: ch })
+    await ch.track({ userId: tabId, baseUserId: userId, displayName, color, score: 0, streak: 0, cards: ['freeze', 'steal', 'double_down', 'bomb'] })
+    set({ code: trimmed, isHost: false, myUserId: tabId, myBaseUserId: userId, myDisplayName: displayName, myColor: color, phase: 'lobby', _channel: ch })
   },
 
   startGame: async () => {
     const { settings, _channel } = get()
-    set({ phase: 'countdown', countdownVal: 3, aevaLine: '' })
+    set({ phase: 'countdown', countdownVal: 3, aevaLine: '', allAnswers: {} })
     get()._runCountdown(() => get()._generateAndStart())
     _channel?.send({ type: 'broadcast', event: 'countdown_start', payload: {} })
   },
@@ -149,10 +179,9 @@ export const useArenaStore = create((set, get) => ({
     const { _channel, myUserId, myDisplayName, players } = get()
     const me = players.find(p => p.userId === myUserId)
     if (!me?.cards?.includes(card)) return
-    // Remove from hand
     set(s => ({
       players: s.players.map(p =>
-        p.userId === myUserId ? { ...p, cards: p.cards.filter((c, i) => { const idx = p.cards.indexOf(card); return i !== idx || (i === idx && false) }).filter((c,i,a) => { const fi = a.indexOf(card); return i !== fi }) } : p
+        p.userId === myUserId ? { ...p, cards: (() => { const c = [...p.cards]; const i = c.indexOf(card); if (i > -1) c.splice(i, 1); return c })() } : p
       ),
       sabotagePlayed: [...s.sabotagePlayed, { by: myUserId, byName: myDisplayName, target: targetUserId, card }],
     }))
@@ -175,11 +204,9 @@ export const useArenaStore = create((set, get) => ({
     ch.on('broadcast', { event: 'countdown_start' }, () => {
       if (get().isHost) return
       set({ phase: 'countdown', countdownVal: 3 })
-      // After countdown, guests show preparing state until stubs_sync arrives
       get()._runCountdown(() => set({ phase: 'preparing' }))
     })
 
-    // Host sends question stubs (no answers) before first question
     ch.on('broadcast', { event: 'stubs_sync' }, ({ payload }) => {
       if (get().isHost) return
       set({ stubs: payload.stubs })
@@ -189,7 +216,6 @@ export const useArenaStore = create((set, get) => ({
       if (get().isHost) return
       const { qIdx } = payload
       get()._clearTimer()
-      // Do NOT reset effects — they carry over from the sabotage window into this question
       set({ currentQIdx: qIdx, timerSeconds: Q_TIME, answers: {}, correctIdx: null, sabotagePlayed: [], aevaLine: '', phase: 'question' })
       get()._startTimer()
     })
@@ -204,26 +230,24 @@ export const useArenaStore = create((set, get) => ({
 
     ch.on('broadcast', { event: 'card_played' }, ({ payload }) => {
       const { by, byName, target, card } = payload
-      // Consistent effect keys: freeze→frozen, steal→stolen, bomb→bomb, double_down→doubled
       const effectKey = card === 'freeze' ? 'frozen' : card === 'steal' ? 'stolen' : card === 'bomb' ? 'bomb' : card === 'double_down' ? 'doubled' : card
       const { myUserId } = get()
       set(s => ({
         effects: { ...s.effects, [target]: { ...(s.effects[target] || {}), [effectKey]: true } },
         sabotagePlayed: [...s.sabotagePlayed, { by, byName, target, card }],
-        // Remove the card from the sender's hand
         players: s.players.map(p => p.userId === by ? { ...p, cards: (() => { const c = [...p.cards]; const i = c.indexOf(card); if (i > -1) c.splice(i, 1); return c })() } : p),
-        // Show notification if this card was played ON ME
         incomingCard: target === myUserId ? { byName, card } : s.incomingCard,
       }))
-      // Auto-clear the notification after 2.5s
-      if (target === myUserId) {
-        setTimeout(() => set({ incomingCard: null }), 2500)
-      }
+      if (target === myUserId) setTimeout(() => set({ incomingCard: null }), 2500)
     })
 
     ch.on('broadcast', { event: 'question_end' }, ({ payload }) => {
       if (get().isHost) return
-      const { correctIdx, explanation, playerUpdates, aevaLine, scoreDeltas } = payload
+      const { correctIdx, explanation, playerUpdates, aevaLine, scoreDeltas, qIdx, qAnswers } = payload
+      // Guests accumulate answers received from host
+      if (qIdx !== undefined && qAnswers) {
+        set(s => ({ allAnswers: { ...s.allAnswers, [qIdx]: qAnswers } }))
+      }
       set(s => ({
         correctIdx, explanation, aevaLine, phase: 'reveal', scoreDeltas,
         players: s.players.map(p => playerUpdates[p.userId] ? { ...p, ...playerUpdates[p.userId] } : p),
@@ -240,6 +264,14 @@ export const useArenaStore = create((set, get) => ({
     ch.on('broadcast', { event: 'game_end' }, ({ payload }) => {
       if (get().isHost) return
       set({ phase: 'done', players: payload.players })
+    })
+
+    // Receives per-player stats computed by host after game ends
+    ch.on('broadcast', { event: 'session_stats' }, ({ payload }) => {
+      const { playerStats } = payload
+      const { myUserId } = get()
+      const myStats = playerStats[myUserId]
+      if (myStats) set({ lastSessionStats: myStats })
     })
 
     return ch
@@ -284,23 +316,18 @@ export const useArenaStore = create((set, get) => ({
       }))
     }
 
-    // Cap to requested count
     questions = questions.slice(0, settings.questionCount)
     const stubs = questions.map(q => ({ q: q.q, choices: q.choices }))
     set({ questions, stubs })
-    // Send stubs to guests first, then kick off Q1
     _channel?.send({ type: 'broadcast', event: 'stubs_sync', payload: { stubs } })
-    // Small delay so guests store stubs before question_start fires
     setTimeout(() => get()._startQuestion(0), 300)
   },
 
   _startQuestion: (qIdx) => {
-    const { questions, stubs, _channel, isHost } = get()
+    const { stubs, _channel, isHost } = get()
     const stub = stubs[qIdx]
     if (!stub) { get()._endGame(); return }
     get()._clearTimer()
-    // NOTE: do NOT reset effects here — they are set during the sabotage window
-    // and must persist into the next question. Effects are cleared after _endQuestion.
     set({ currentQIdx: qIdx, timerSeconds: Q_TIME, answers: {}, correctIdx: null, sabotagePlayed: [], aevaLine: '', scoreDeltas: {}, phase: 'question' })
     if (isHost) {
       _channel?.send({ type: 'broadcast', event: 'question_start', payload: { qIdx } })
@@ -359,7 +386,9 @@ export const useArenaStore = create((set, get) => ({
       playerUpdates[p.userId] = { score, streak, cards }
     })
 
-    // Aeva commentary (fast, 1-shot)
+    // Accumulate this question's answers into the full-game history
+    set(s => ({ allAnswers: { ...s.allAnswers, [currentQIdx]: { ...answers } } }))
+
     let aevaLine = ''
     try {
       const correct = players.filter(p => answers[p.userId]?.choiceIdx === correctIdx).length
@@ -377,10 +406,9 @@ export const useArenaStore = create((set, get) => ({
       correctIdx, explanation: q.explain, aevaLine, phase: 'reveal', scoreDeltas,
       players: s.players.map(p => playerUpdates[p.userId] ? { ...p, ...playerUpdates[p.userId] } : p),
     }))
-    _channel?.send({ type: 'broadcast', event: 'question_end', payload: { correctIdx, explanation: q.explain, playerUpdates, aevaLine, scoreDeltas } })
+    // Send qAnswers snapshot to guests so they can build allAnswers on their side
+    _channel?.send({ type: 'broadcast', event: 'question_end', payload: { correctIdx, explanation: q.explain, playerUpdates, aevaLine, scoreDeltas, qIdx: currentQIdx, qAnswers: answers } })
 
-    // Open sabotage window after 3.5s — clear previous effects HERE so the
-    // window starts clean and fresh cards can be played for the NEXT question
     setTimeout(() => {
       set({ phase: 'sabotage', sabotagePlayed: [], effects: {} })
       setTimeout(() => {
@@ -401,5 +429,160 @@ export const useArenaStore = create((set, get) => ({
     get()._clearTimer()
     set({ phase: 'done' })
     _channel?.send({ type: 'broadcast', event: 'game_end', payload: { players } })
+    // Fire-and-forget — DoneScreen renders immediately, stats appear when ready
+    get()._persistSessionResults()
+  },
+
+  // ── Persist results to Supabase, compute ELO, broadcast stats to all players ──
+  _persistSessionResults: async () => {
+    const { code, settings, players, allAnswers, questions, myBaseUserId, isHost, _channel } = get()
+    if (!isHost || players.length === 0) return
+
+    try {
+      // Rank players by final score
+      const sorted = [...players].sort((a, b) => (b.score || 0) - (a.score || 0))
+      const rankMap = {}
+      sorted.forEach((p, i) => { rankMap[p.userId] = i + 1 })
+
+      // Fetch current ELOs for all players
+      const baseUserIds = players.map(p => p.baseUserId || p.userId)
+      const { data: profiles } = await supabase
+        .from('arena_profiles')
+        .select('user_id, elo, wins, losses, total_games, total_score, accuracy_pct, topic_accuracy')
+        .in('user_id', baseUserIds)
+      const profileMap = {}
+      ;(profiles || []).forEach(pr => { profileMap[pr.user_id] = pr })
+
+      // Build per-player result objects
+      const playerResults = players.map(p => {
+        const baseId  = p.baseUserId || p.userId
+        const qCount  = questions.length
+        const qHistory = Array.from({ length: qCount }, (_, i) => {
+          const ans = allAnswers[i]?.[p.userId]
+          return {
+            qIdx: i,
+            choiceIdx: ans?.choiceIdx ?? null,
+            timeMs: ans?.timeMs ?? null,
+            correct: ans?.choiceIdx === questions[i]?.correct,
+          }
+        })
+        const correctCount = qHistory.filter(a => a.correct).length
+        return {
+          userId:       p.userId,
+          baseUserId:   baseId,
+          displayName:  p.displayName,
+          score:        p.score || 0,
+          rank:         rankMap[p.userId],
+          currentElo:   profileMap[baseId]?.elo || 1000,
+          correctCount,
+          totalQuestions: qCount,
+          answers:      qHistory,
+          cardsUsed:    [],  // cards played log not currently per-player tracked here
+          existingProfile: profileMap[baseId] || null,
+        }
+      })
+
+      // ELO deltas
+      const eloDeltas = calcEloDeltas(playerResults)
+
+      // Write arena_sessions row
+      const sessionPayload = {
+        room_code:      code,
+        topic:          settings.topic,
+        difficulty:     settings.difficulty,
+        question_count: settings.questionCount,
+        player_count:   players.length,
+        host_user_id:   myBaseUserId,
+        ended_at:       new Date().toISOString(),
+      }
+      const { data: session } = await supabase
+        .from('arena_sessions')
+        .insert(sessionPayload)
+        .select('id')
+        .single()
+      const sessionId = session?.id
+
+      const playerStats = {}
+
+      for (const pr of playerResults) {
+        const delta   = eloDeltas[pr.userId] || 0
+        const newElo  = Math.max(100, pr.currentElo + delta)
+        const isWin   = pr.rank === 1
+        const prev    = pr.existingProfile
+        const accuracy = pr.correctCount / Math.max(1, pr.totalQuestions)
+
+        // arena_results row
+        if (sessionId) {
+          await supabase.from('arena_results').insert({
+            session_id:      sessionId,
+            user_id:         pr.baseUserId,
+            display_name:    pr.displayName,
+            final_score:     pr.score,
+            rank:            pr.rank,
+            correct_count:   pr.correctCount,
+            total_questions: pr.totalQuestions,
+            elo_before:      pr.currentElo,
+            elo_after:       newElo,
+            elo_delta:       delta,
+            cards_played:    pr.cardsUsed,
+            answers:         pr.answers,
+          })
+        }
+
+        // Upsert arena_profiles
+        const prevGames      = prev?.total_games || 0
+        const prevTotalScore = prev?.total_score || 0
+        const newTotalGames  = prevGames + 1
+        const newTotalScore  = prevTotalScore + pr.score
+        const newAvgScore    = Math.round(newTotalScore / newTotalGames)
+
+        // Running accuracy: weighted average (prior 70%, this game 30%)
+        const prevAcc  = prev?.accuracy_pct || 0
+        const newAcc   = prevGames === 0 ? accuracy : prevAcc * 0.7 + accuracy * 0.3
+
+        // Topic accuracy: same weighted merge
+        const topicAcc = { ...(prev?.topic_accuracy || {}) }
+        const prevTopicAcc = topicAcc[settings.topic]
+        topicAcc[settings.topic] = prevTopicAcc !== undefined
+          ? Math.round((prevTopicAcc * 0.7 + accuracy * 0.3) * 1000) / 1000
+          : Math.round(accuracy * 1000) / 1000
+
+        await supabase.from('arena_profiles').upsert({
+          user_id:        pr.baseUserId,
+          display_name:   pr.displayName,
+          elo:            newElo,
+          wins:           (prev?.wins || 0) + (isWin ? 1 : 0),
+          losses:         (prev?.losses || 0) + (isWin ? 0 : 1),
+          total_games:    newTotalGames,
+          total_score:    newTotalScore,
+          avg_score:      newAvgScore,
+          accuracy_pct:   Math.round(newAcc * 1000) / 1000,
+          topic_accuracy: topicAcc,
+          updated_at:     new Date().toISOString(),
+        }, { onConflict: 'user_id' })
+
+        playerStats[pr.userId] = {
+          eloChange:      delta,
+          newElo,
+          rank:           pr.rank,
+          playerCount:    players.length,
+          correctCount:   pr.correctCount,
+          totalQuestions: pr.totalQuestions,
+          topic:          settings.topic,
+        }
+      }
+
+      // Broadcast stats to all players (guests read this in _buildChannel)
+      _channel?.send({ type: 'broadcast', event: 'session_stats', payload: { playerStats } })
+
+      // Also set for host directly
+      const myPlayer = players.find(p => p.baseUserId === myBaseUserId || p.userId.startsWith(myBaseUserId))
+      if (myPlayer && playerStats[myPlayer.userId]) {
+        set({ lastSessionStats: playerStats[myPlayer.userId] })
+      }
+
+    } catch (err) {
+      console.error('[Arena] persist error:', err)
+    }
   },
 }))
