@@ -485,7 +485,7 @@ function QuestionScreen() {
   const stub  = stubs[currentQIdx]
   const myAns = answers[myUserId]
   const myEff = effects[myUserId] || {}
-  const [frozen, setFrozen] = useState(true)
+  const [frozen, setFrozen] = useState(!!myEff.frozen)
 
   // Freeze effect: hide choices for 4s
   useEffect(() => {
@@ -672,10 +672,14 @@ function QuestionScreen() {
 }
 
 function RevealScreen() {
-  const { stubs, currentQIdx, correctIdx, explanation, aevaLine, answers, players, myUserId, scoreDeltas, effects } = useArenaStore()
+  const { stubs, currentQIdx, correctIdx, explanation, aevaLine, answers, players, myUserId, scoreDeltas, effects, playerTiers } = useArenaStore()
   const stub = stubs[currentQIdx]
   const myAns = answers[myUserId]
-  const isCorrect = myAns?.choiceIdx === correctIdx
+  const myTier = playerTiers?.[myUserId] || 'standard'
+  const isExpertPlayer = myTier === 'expert'
+  const correctForMe = (isExpertPlayer && stub?.expertCorrect != null) ? stub.expertCorrect : correctIdx
+  const displayChoices = (isExpertPlayer && stub?.expertChoices?.length) ? stub.expertChoices : stub?.choices
+  const isCorrect = myAns?.choiceIdx === correctForMe
   const isBlinded = !!(effects[myUserId] || {}).blinded
   const myDelta = scoreDeltas?.[myUserId] || 0
   const choiceBg  = ['rgba(99,102,241,0.14)', 'rgba(244,63,94,0.14)', 'rgba(16,185,129,0.14)', 'rgba(245,158,11,0.14)']
@@ -702,8 +706,8 @@ function RevealScreen() {
 
       {/* Correct answer highlight */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {stub.choices.map((choice, i) => {
-          const isRight = i === correctIdx
+        {(displayChoices || stub.choices).map((choice, i) => {
+          const isRight = i === correctForMe
           const myPick  = myAns?.choiceIdx === i
           return (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 11, background: isRight ? 'rgba(16,185,129,0.14)' : myPick && !isRight ? 'rgba(244,63,94,0.10)' : 'rgba(255,255,255,0.03)', border: `1.5px solid ${isRight ? 'rgba(16,185,129,0.45)' : myPick ? 'rgba(244,63,94,0.30)' : 'rgba(255,255,255,0.06)'}` }}>
