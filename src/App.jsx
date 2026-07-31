@@ -10006,38 +10006,33 @@ If no clear changes: {"changes":[]}`
                 )}
               </AnimatePresence>
 
-              {/* Photo preview strip — shown when a photo is attached */}
+              {/* Photo preview chip — compact so it doesn't push input off-screen */}
               <AnimatePresence>
                 {photoAttachment && (
                   <motion.div
-                    initial={{ opacity: 0, y: 8, height: 0 }}
+                    initial={{ opacity: 0, y: 6, height: 0 }}
                     animate={{ opacity: 1, y: 0, height: 'auto' }}
-                    exit={{ opacity: 0, y: 8, height: 0 }}
-                    style={{ width: '100%', maxWidth: isMission ? 720 : 640, margin: '0 auto 10px', overflow: 'hidden' }}
+                    exit={{ opacity: 0, y: 6, height: 0 }}
+                    style={{ width: '100%', maxWidth: isMission ? 720 : 640, margin: '0 auto 8px', overflow: 'hidden' }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, padding: '10px 14px', borderRadius: 20, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 10px 5px 6px', borderRadius: 999, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)' }}>
                       {/* Thumbnail */}
                       <div style={{ position: 'relative', flexShrink: 0 }}>
                         <img
                           src={photoAttachment.dataUrl}
                           alt="Attached"
-                          style={{ width: 72, height: 72, borderRadius: 12, objectFit: 'cover', display: 'block', border: '1px solid rgba(255,255,255,0.15)' }}
+                          style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', display: 'block', border: '1px solid rgba(255,255,255,0.15)' }}
                         />
                         <motion.button
                           whileTap={{ scale: 0.88 }}
                           onClick={() => setPhotoAttachment(null)}
-                          style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: 'rgba(30,30,50,0.95)', border: '1px solid rgba(255,255,255,0.25)', color: 'rgba(255,255,255,0.70)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          style={{ position: 'absolute', top: -5, right: -5, width: 16, height: 16, borderRadius: '50%', background: 'rgba(30,30,50,0.95)', border: '1px solid rgba(255,255,255,0.25)', color: 'rgba(255,255,255,0.70)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         >
-                          <X size={10} strokeWidth={2.5} />
+                          <X size={8} strokeWidth={2.5} />
                         </motion.button>
                       </div>
-                      {/* Label */}
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 12.5, fontWeight: 700, color: 'rgba(255,255,255,0.80)', marginBottom: 3 }}>Photo attached</div>
-                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', lineHeight: 1.5 }}>
-                          Add a message or just press send — Aeva will teach you the concept.
-                        </div>
-                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.75)' }}>Photo attached</span>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>· tap send or add a message</span>
                     </div>
                   </motion.div>
                 )}
