@@ -1265,7 +1265,7 @@ async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _at
 }
 
 /* ── Vision streaming — image + text → llama-4-scout ─────────────────────── */
-const VISION_MODEL = 'meta-llama/llama-4-maverick-17b-128e-instruct'
+const VISION_MODEL = 'qwen/qwen3.6-27b'
 
 async function streamGroqVision(base64, mimeType, userText, systemPrompt, onChunk, signal) {
   const key = nextGroqKey()
