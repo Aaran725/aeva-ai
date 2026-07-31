@@ -185,6 +185,96 @@ function Movers({ changes, onSelect }) {
   )
 }
 
+/* ── Macro regime banner ─────────────────────────────────────────── */
+const REGIME_COLOR = {
+  bull:            { accent: '#4ADE80', bg: 'rgba(74,222,128,0.08)',  border: 'rgba(74,222,128,0.25)'  },
+  bear:            { accent: '#F87171', bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.25)' },
+  rate_hike:       { accent: '#FBBF24', bg: 'rgba(251,191,36,0.08)',  border: 'rgba(251,191,36,0.25)'  },
+  innovation_boom: { accent: '#A78BFA', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.25)' },
+}
+
+function MacroBanner({ announcement, onDismiss }) {
+  if (!announcement) return null
+  const col = REGIME_COLOR[announcement.id] || { accent: '#D4AF37', bg: 'rgba(212,175,55,0.08)', border: 'rgba(212,175,55,0.25)' }
+  return (
+    <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+      style={{ margin: '0 12px 10px', borderRadius: 12, background: col.bg, border: `1px solid ${col.border}`, padding: '11px 14px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <span style={{ fontSize: 22, flexShrink: 0, lineHeight: 1.2 }}>{announcement.emoji}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+            <span style={{ fontSize: 10, fontWeight: 800, color: col.accent, letterSpacing: '.08em', textTransform: 'uppercase' }}>New Season Regime</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{announcement.label}</span>
+          </div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', lineHeight: 1.55 }}>{announcement.aevaNote}</div>
+        </div>
+        <button onClick={onDismiss}
+          style={{ flexShrink: 0, background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)', fontSize: 16, cursor: 'pointer', lineHeight: 1, padding: '0 2px' }}>
+          ×
+        </button>
+      </div>
+    </motion.div>
+  )
+}
+
+/* ── Pre-bell prediction widget ──────────────────────────────────── */
+function PredictionWidget({ companies, prediction, predictionResult, onSetPrediction, onClear, onClearPrediction, bellRinging }) {
+  const [selId, setSelId] = useState(companies[0]?.id || '')
+  const isSet = !!prediction
+  const col = predictionResult ? (predictionResult.correct ? '#4ADE80' : '#F87171') : '#D4AF37'
+
+  if (predictionResult) {
+    return (
+      <motion.div key="result" initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+        style={{ margin: '0 12px 8px', padding: '10px 14px', borderRadius: 11, background: predictionResult.correct ? 'rgba(74,222,128,0.09)' : 'rgba(248,113,113,0.07)', border: `1px solid ${predictionResult.correct ? 'rgba(74,222,128,0.28)' : 'rgba(248,113,113,0.22)'}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ fontSize: 18 }}>{predictionResult.emoji}</span>
+        <div style={{ flex: 1 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: col }}>
+            {predictionResult.correct ? `🎯 Correct! +₳${predictionResult.bonus}` : '❌ Miss'}
+          </span>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginLeft: 6 }}>
+            {predictionResult.ticker} {predictionResult.direction === 'up' ? '↑' : '↓'} called
+          </span>
+        </div>
+        <button onClick={onClear} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)', fontSize: 14, cursor: 'pointer' }}>×</button>
+      </motion.div>
+    )
+  }
+
+  if (isSet && !predictionResult) {
+    const co = companies.find(c => c.id === prediction.companyId)
+    return (
+      <motion.div key="set" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+        style={{ margin: '0 12px 8px', padding: '8px 14px', borderRadius: 11, background: 'rgba(212,175,55,0.07)', border: '1px solid rgba(212,175,55,0.22)', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 14 }}>{co?.emoji}</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: '#D4AF37', flex: 1 }}>
+          {co?.ticker} {prediction.direction === 'up' ? '↑ Up' : '↓ Down'} — ring to reveal
+        </span>
+        <button onClick={onClearPrediction} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)', fontSize: 14, cursor: 'pointer' }}>×</button>
+      </motion.div>
+    )
+  }
+
+  return (
+    <div style={{ margin: '0 12px 8px', display: 'flex', gap: 6, alignItems: 'center' }}>
+      <select value={selId} onChange={e => setSelId(e.target.value)}
+        style={{ flex: 1, padding: '6px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', fontSize: 11, appearance: 'none', minWidth: 0 }}>
+        {companies.filter(c => !c.isStartup).map(c => (
+          <option key={c.id} value={c.id} style={{ background: '#111' }}>{c.emoji} {c.ticker}</option>
+        ))}
+      </select>
+      <button onClick={() => onSetPrediction(selId, 'up')} disabled={bellRinging}
+        style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(74,222,128,0.3)', background: 'rgba(74,222,128,0.08)', color: '#4ADE80', fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+        ↑ Up
+      </button>
+      <button onClick={() => onSetPrediction(selId, 'down')} disabled={bellRinging}
+        style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.08)', color: '#F87171', fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+        ↓ Down
+      </button>
+    </div>
+  )
+}
+
 /* ── Season end overlay ──────────────────────────────────────────── */
 function tradingSignal(co) {
   if (co._debtRatio > 0.45)     return 'a debt warning signal'
@@ -398,7 +488,7 @@ function CompanyDetail({ company, holding, mode, onBack }) {
   const theme = SECTOR_THEME[company.sector] || { accent: '#D4AF37', bg: 'rgba(212,175,55,0.12)', glow: 'rgba(212,175,55,0.3)' }
   const change = pctChange(company.priceHistory)
   const up = change >= 0
-  const overlay = calcModeOverlay(company, mode)
+  const overlay = calcModeOverlay(company, mode, macroRegime)
   const pnl = holding ? (company.price - holding.avgCost) * holding.shares : 0
 
   const maxBuy  = Math.max(1, Math.floor((coins - 100) / company.price))
@@ -720,7 +810,9 @@ export default function CallStreet() {
     companies, portfolio, news, mode, seasonDay, season,
     indexHistory, pendingGrade, ipoActive, lastBellChanges, streak, seasonStartValue,
     watchlist, hotSector, crashEvent, insiderTip,
+    macroRegime, macroAnnouncement, prediction, predictionResult,
     ringTheBell, setMode, clearGrade, toggleWatchlist, clearCrash, buyInsiderTip, freshStart, resetPrices,
+    setPrediction, clearPrediction, clearPredictionResult, clearMacroAnnouncement,
   } = useCallStreetStore()
   const { coins, earnCoins: earn } = useCoinStore()
 
@@ -888,6 +980,11 @@ export default function CallStreet() {
         companies={companies}
       />
 
+      {/* Macro regime banner */}
+      <AnimatePresence>
+        {macroAnnouncement && <MacroBanner announcement={macroAnnouncement} onDismiss={clearMacroAnnouncement} />}
+      </AnimatePresence>
+
       {/* Tab bar */}
       <div style={{ display: 'flex', padding: '8px 16px 0', gap: 4, borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 4 }}>
         {[['market','📈 Market'], ['portfolio','💼 Portfolio']].map(([tab, label]) => (
@@ -970,9 +1067,14 @@ export default function CallStreet() {
                 initial={isNew ? { opacity: 0, x: -14 } : false}
                 animate={{ opacity: 1, x: 0 }}
                 transition={isNew ? { delay: i * 0.1, duration: 0.28 } : {}}
-                style={{ display: 'flex', gap: 9, padding: '7px 0', borderBottom: '0.5px solid rgba(255,255,255,0.05)' }}>
+                style={{ display: 'flex', gap: 9, padding: '7px 0', borderBottom: '0.5px solid rgba(255,255,255,0.05)', background: n.isFundamental ? (n.positive ? 'rgba(74,222,128,0.04)' : 'rgba(248,113,113,0.04)') : 'transparent', borderRadius: n.isFundamental ? 8 : 0, paddingLeft: n.isFundamental ? 8 : 0 }}>
                 <span style={{ fontSize: 15, flexShrink: 0 }}>{n.emoji}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
+                  {n.isFundamental && (
+                    <div style={{ fontSize: 9, fontWeight: 800, color: n.positive ? '#4ADE80' : '#F87171', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 2 }}>
+                      ⚙ Fundamental Change · {n.eventLabel}
+                    </div>
+                  )}
                   <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5 }}>{n.text}</div>
                   {n.aevaNote && (
                     <div style={{ fontSize: 10, color: 'rgba(165,180,252,0.6)', marginTop: 2, lineHeight: 1.5 }}>
@@ -980,9 +1082,11 @@ export default function CallStreet() {
                     </div>
                   )}
                 </div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: n.positive ? '#4ADE80' : '#F87171', flexShrink: 0, alignSelf: 'flex-start', marginTop: 2 }}>
-                  {n.positive ? '+' : ''}{Math.round(n.impact * 100)}%
-                </div>
+                {!n.isFundamental && (
+                  <div style={{ fontSize: 11, fontWeight: 700, color: n.positive ? '#4ADE80' : '#F87171', flexShrink: 0, alignSelf: 'flex-start', marginTop: 2 }}>
+                    {n.positive ? '+' : ''}{Math.round(n.impact * 100)}%
+                  </div>
+                )}
               </motion.div>
             )
           })}
@@ -1050,7 +1154,7 @@ export default function CallStreet() {
           const holding = portfolio.find(p => p.companyId === co.id)
           const change = pctChange(co.priceHistory)
           const up = change >= 0
-          const overlay = calcModeOverlay(co, mode)
+          const overlay = calcModeOverlay(co, mode, macroRegime)
           const isHot = co.sector === hotSector
           const isWatched = (watchlist || []).includes(co.id)
           return (
@@ -1076,6 +1180,11 @@ export default function CallStreet() {
                   <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{co.name}</span>
                   {co.isStartup && <span style={{ fontSize: 9, color: '#fb923c', fontWeight: 700, padding: '1px 5px', background: 'rgba(251,146,60,0.12)', borderRadius: 4 }}>STARTUP</span>}
                   {isHot && <span style={{ fontSize: 9, color: SECTOR_THEME[co.sector]?.accent || '#D4AF37', fontWeight: 700 }}>🔥</span>}
+                  {co._lastFundamentalEvent?.season === season && (
+                    <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: co._lastFundamentalEvent.positive ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)', color: co._lastFundamentalEvent.positive ? '#4ADE80' : '#F87171' }}>
+                      {co._lastFundamentalEvent.positive ? '↑' : '↓'} {co._lastFundamentalEvent.label}
+                    </span>
+                  )}
                 </div>
                 {overlay ? (
                   <div style={{ fontSize: 10, color: overlay.highlight ? '#4ADE80' : 'rgba(255,255,255,0.3)', marginTop: 1 }}>
@@ -1110,6 +1219,29 @@ export default function CallStreet() {
       </div>
 
       </>}
+
+      {/* Active regime badge */}
+      {macroRegime && (
+        <div style={{ padding: '0 12px 6px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: REGIME_COLOR[macroRegime]?.accent || '#D4AF37', background: REGIME_COLOR[macroRegime]?.bg || 'rgba(212,175,55,0.08)', border: `1px solid ${REGIME_COLOR[macroRegime]?.border || 'rgba(212,175,55,0.2)'}`, borderRadius: 6, padding: '2px 8px', letterSpacing: '.06em', textTransform: 'uppercase' }}>
+            {{ bull: '🐂 Bull Market', bear: '🐻 Bear Market', rate_hike: '📈 Rate Hike', innovation_boom: '⚡ Innovation Boom' }[macroRegime]}
+          </div>
+        </div>
+      )}
+
+      {/* Pre-bell prediction */}
+      <AnimatePresence mode="wait">
+        <PredictionWidget
+          key={predictionResult ? 'result' : prediction ? 'set' : 'idle'}
+          companies={companies}
+          prediction={prediction}
+          predictionResult={predictionResult}
+          onSetPrediction={(id, dir) => setPrediction(id, dir)}
+          onClear={clearPredictionResult}
+          onClearPrediction={clearPrediction}
+          bellRinging={bellRinging}
+        />
+      </AnimatePresence>
 
       {/* Bell + streak */}
       <div style={{ padding: '8px 16px', display: 'flex', gap: 10, alignItems: 'stretch' }}>

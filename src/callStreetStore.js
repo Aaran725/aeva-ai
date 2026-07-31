@@ -67,6 +67,46 @@ const AEVA_LESSONS = {
   crash:    { pos: null, neg: "Market crashes can be buying opportunities for quality companies. Fear is often overblown." },
 }
 
+// ── Macro regimes ─────────────────────────────────────────────────
+const MACRO_REGIMES = [
+  { id: 'bull',            label: 'Bull Market',      emoji: '🐂',
+    aevaNote: "In a bull market, optimism lifts all boats. Even average companies outperform — but quality compounds fastest. Focus on strong fundamentals so you ride the wave without overpaying." },
+  { id: 'bear',            label: 'Bear Market',      emoji: '🐻',
+    aevaNote: "Bear markets punish speculation and reward quality. Cash-rich, low-debt companies survive while leveraged ones suffer. Buffett loads up in downturns: 'Be greedy when others are fearful.'" },
+  { id: 'rate_hike',       label: 'Rate Hike Cycle',  emoji: '📈',
+    aevaNote: "Rising rates raise the cost of debt. Highly leveraged companies face squeezed interest coverage while capital-light businesses feel little impact. Rotate toward low-debt, high-margin names." },
+  { id: 'innovation_boom', label: 'Innovation Boom',  emoji: '⚡',
+    aevaNote: "Tech breakthroughs re-rate entire sectors. The market pays a premium for growth — even at the cost of profitability. Biotech, tech, and space attract speculative capital. Soros mode shines here." },
+]
+
+// ── Fundamental event types ────────────────────────────────────────
+const FUNDAMENTAL_EVENTS = [
+  { id: 'margin_compression', label: 'Margin Compression',   positive: false,
+    apply: c => ({ _profitMargin: Math.max(-0.45, c._profitMargin - 0.12) }),
+    text:  n => `${n}: Margin compression — rising input costs squeeze earnings`,
+    aevaNote: "Margin compression creeps in before headlines catch it. When costs rise faster than revenue, profitability erodes. Watch gross margins as an early warning." },
+  { id: 'rev_acceleration',   label: 'Revenue Acceleration', positive: true,
+    apply: c => ({ _revGrowth: Math.min(0.90, c._revGrowth + 0.15) }),
+    text:  n => `${n}: Revenue acceleration — new market expansion breaks out`,
+    aevaNote: "A step-change in revenue growth is one of the most powerful signals. When a company cracks a new market the re-rating can be dramatic. Lynch called these 'fast growers.'" },
+  { id: 'debt_spiral',        label: 'Debt Spiral',          positive: false,
+    apply: c => ({ _debtRatio: Math.min(0.85, c._debtRatio + 0.22) }),
+    text:  n => `${n}: Debt spiral — emergency refinancing sharply raises leverage`,
+    aevaNote: "Debt spirals compound quickly. More debt means more interest, which means less cash for growth, which means more borrowing. Buffett avoids heavily indebted companies for exactly this reason." },
+  { id: 'founder_exit',       label: 'Founder Exit',         positive: false,
+    apply: c => ({ _founderScore: Math.max(0.35, c._founderScore - 0.28) }),
+    text:  n => `${n}: Founder steps down — leadership transition creates uncertainty`,
+    aevaNote: "Founders carry vision that hired managers rarely replicate. Their exit is a yellow flag. Study who replaces them and what changes in strategy before deciding to hold." },
+  { id: 'profit_recovery',    label: 'Path to Profitability',positive: true,
+    apply: c => ({ _profitMargin: Math.min(0.40, c._profitMargin + 0.12) }),
+    text:  n => `${n}: Turns profitable — disciplined cost cuts deliver margin inflection`,
+    aevaNote: "Crossing into profitability is when valuation re-ratings begin. Amazon was loss-making for years before becoming one of the most valuable companies on Earth." },
+  { id: 'rev_slowdown',       label: 'Revenue Slowdown',     positive: false,
+    apply: c => ({ _revGrowth: Math.max(0.02, c._revGrowth - 0.14) }),
+    text:  n => `${n}: Growth decelerates — market saturation limits expansion`,
+    aevaNote: "Deceleration is often more damaging than an absolute miss. Markets price expectations — a company priced for 50% growth delivering 25% gets punished even if the absolute number looks fine." },
+]
+
 function calcFairValue(def) {
   const growthMult  = 1 + Math.max(0, def._revGrowth) * 2.0
   const profitMult  = 1 + def._profitMargin * 2.0
@@ -108,7 +148,7 @@ export function calcPE(company) {
   return Math.round(company.price / (eps * 10))
 }
 
-export function calcModeOverlay(company, mode) {
+export function calcModeOverlay(company, mode, macroRegime) {
   if (mode === 'buffett') {
     const pe = calcPE(company)
     const benchmark = SECTOR_PE[company.sector] || 20
@@ -129,13 +169,23 @@ export function calcModeOverlay(company, mode) {
     }
   }
   if (mode === 'soros') {
-    const sectors = { tech: 72, logistics: 45, energy: 38, biotech: 61, environment: 55, robotics: 48, space: 80, materials: 30 }
-    const momentum = sectors[company.sector] || 50
+    const BASE = { tech: 60, logistics: 44, energy: 38, biotech: 56, environment: 48, robotics: 50, space: 68, materials: 32 }
+    const ADJ  = {
+      bull:            { tech:+10, logistics:+5,  energy:+5,  biotech:+8,  environment:+4, robotics:+8,  space:+10, materials:+5  },
+      bear:            { tech:-15, logistics:-4,  energy:-5,  biotech:-10, environment:-2, robotics:-8,  space:-15, materials:-4  },
+      rate_hike:       { tech:-12, logistics:-5,  energy:+8,  biotech:-8,  environment:+4, robotics:-6,  space:-15, materials:+8  },
+      innovation_boom: { tech:+22, logistics:-5,  energy:-8,  biotech:+20, environment:+3, robotics:+14, space:+22, materials:-5  },
+    }
+    const adj  = macroRegime ? (ADJ[macroRegime]?.[company.sector] || 0) : 0
+    const heat = Math.min(99, Math.max(8, (BASE[company.sector] || 50) + adj))
+    const regLabel = macroRegime
+      ? { bull: 'Bull', bear: 'Bear', rate_hike: 'Rates', innovation_boom: 'Boom' }[macroRegime]
+      : null
     return {
-      label: 'Sector Heat',
-      value: `${momentum}%`,
-      note: momentum > 65 ? '🔥 Hot sector' : momentum > 45 ? 'Warm' : '❄ Cold',
-      highlight: momentum > 65,
+      label: regLabel ? `${regLabel} Heat` : 'Sector Heat',
+      value: `${heat}%`,
+      note: heat > 70 ? '🔥 Hot' : heat > 50 ? 'Warm' : '❄ Cold',
+      highlight: heat > 65,
     }
   }
   return null
@@ -169,6 +219,10 @@ function freshState() {
     hotSectorBellCount: 0,
     insiderTip: null,
     crashEvent: null,
+    macroRegime: null,
+    macroAnnouncement: null,
+    prediction: null,
+    predictionResult: null,
   }
 }
 
@@ -199,7 +253,13 @@ export const useCallStreetStore = create((set, get) => {
 
         if (withNews.has(company.id)) {
           const events = generateEventsForCompany(company)
-          const totalImpact = events.reduce((s, e) => s + e.impact, 0)
+          let totalImpact = events.reduce((s, e) => s + e.impact, 0)
+          // Innovation Boom: amplify positive news for tech/biotech/space
+          if (state.macroRegime === 'innovation_boom' && ['tech','biotech','space'].includes(company.sector) && totalImpact > 0)
+            totalImpact *= 1.5
+          // Rate Hike: dampen positive news for high-debt stocks
+          if (state.macroRegime === 'rate_hike' && company._debtRatio > 0.40 && totalImpact > 0)
+            totalImpact *= 0.4
           const startupNoise = company.isStartup ? (Math.random() - 0.45) * (company._volatility || 0.1) : 0
           const fv = company.fairValue || calcFairValue(company)
           // Dampen news impact when overvalued; amplify when undervalued
@@ -240,12 +300,38 @@ export const useCallStreetStore = create((set, get) => {
       // Market crash — 4% chance, wipes 15–30% off all prices
       const crashPct = Math.random() < 0.04 ? 0.15 + Math.random() * 0.15 : 0
       const crashEvent = crashPct > 0 ? { pct: Math.round(crashPct * 100) } : null
-      const finalCompanies = crashPct > 0
+      let finalCompanies = crashPct > 0
         ? updatedCompanies.map(c => {
             const cp = Math.max(1, Math.round(c.price * (1 - crashPct)))
             return { ...c, price: cp, priceHistory: [...c.priceHistory.slice(-9), cp] }
           })
         : updatedCompanies
+
+      // Macro regime drift (Bull +2%, Bear −2%, Rate Hike penalises high-debt)
+      if (state.macroRegime === 'bull' || state.macroRegime === 'bear' || state.macroRegime === 'rate_hike') {
+        finalCompanies = finalCompanies.map(c => {
+          let adj = 0
+          if (state.macroRegime === 'bull')  adj = +0.02
+          if (state.macroRegime === 'bear')  adj = -0.02
+          if (state.macroRegime === 'rate_hike' && c._debtRatio > 0.40) adj = -0.04
+          if (adj === 0) return c
+          const np = Math.max(1, Math.round(c.price * (1 + adj)))
+          return { ...c, price: np, priceHistory: [...c.priceHistory.slice(-9), np] }
+        })
+      }
+
+      // Prediction result
+      let predictionResult = null
+      if (state.prediction) {
+        const { companyId, direction } = state.prediction
+        const prevP = prevPrices[companyId]
+        const co = finalCompanies.find(c => c.id === companyId)
+        if (prevP && co) {
+          const correct = direction === 'up' ? co.price > prevP : co.price < prevP
+          if (correct) useCoinStore.getState().earnCoins(30, `Prediction correct: ${co.ticker} ${direction}`)
+          predictionResult = { correct, bonus: correct ? 30 : 0, ticker: co.ticker, emoji: co.emoji, direction }
+        }
+      }
 
       // Sector rotation — hot sector changes every 3 bells
       const hotSectorBellCount = ((state.hotSectorBellCount || 0) + 1) % 3
@@ -280,6 +366,8 @@ export const useCallStreetStore = create((set, get) => {
       let season = state.season
       let seasonDay = newDay
       let seasonStartValue = state.seasonStartValue
+      let macroRegime = state.macroRegime
+      let macroAnnouncement = state.macroAnnouncement
 
       if (seasonEnds) {
         pendingGrade = calcGrade(state.portfolio, finalCompanies, state.seasonStartValue, newIndexHistory, (state.streak || 0) + 1)
@@ -289,6 +377,33 @@ export const useCallStreetStore = create((set, get) => {
           const co = finalCompanies.find(c => c.id === h.companyId)
           return s + (co ? co.price * h.shares : 0)
         }, 0)
+
+        // Dynamic fundamentals — 2–3 companies evolve permanently
+        const numShifts = Math.random() < 0.4 ? 3 : 2
+        const toShift = [...finalCompanies].sort(() => Math.random() - 0.5).slice(0, numShifts)
+        toShift.forEach(co => {
+          const evt = FUNDAMENTAL_EVENTS[Math.floor(Math.random() * FUNDAMENTAL_EVENTS.length)]
+          const changes = evt.apply(co)
+          finalCompanies = finalCompanies.map(c => {
+            if (c.id !== co.id) return c
+            const nu = { ...c, ...changes, _lastFundamentalEvent: { label: evt.label, positive: evt.positive, season: state.season + 1 } }
+            return { ...nu, fairValue: calcFairValue(nu) }
+          })
+          allNews.unshift({
+            id: `fund-${co.id}-${Date.now()}-${Math.random()}`,
+            companyId: co.id, ticker: co.ticker, emoji: co.emoji,
+            text: evt.text(co.name),
+            impact: 0, positive: evt.positive, type: 'fundamental',
+            aevaNote: evt.aevaNote,
+            day: newDay, ringId,
+            isFundamental: true, eventLabel: evt.label,
+          })
+        })
+
+        // New macro regime for next season
+        const nextRegimeDef = MACRO_REGIMES[Math.floor(Math.random() * MACRO_REGIMES.length)]
+        macroRegime = nextRegimeDef.id
+        macroAnnouncement = { id: nextRegimeDef.id, label: nextRegimeDef.label, emoji: nextRegimeDef.emoji, aevaNote: nextRegimeDef.aevaNote }
       }
 
       // IPO trigger: 30% chance on day 3 of a new season
@@ -317,6 +432,10 @@ export const useCallStreetStore = create((set, get) => {
         hotSector,
         hotSectorBellCount,
         insiderTip: null,
+        macroRegime,
+        macroAnnouncement,
+        prediction: null,
+        predictionResult,
       }
       persist(updated)
       set(updated)
@@ -446,6 +565,26 @@ export const useCallStreetStore = create((set, get) => {
       const fresh = freshState()
       persist(fresh)
       set(fresh)
+    },
+
+    setPrediction: (companyId, direction) => {
+      const updated = { ...get(), prediction: { companyId, direction } }
+      persist(updated); set(updated)
+    },
+
+    clearPrediction: () => {
+      const updated = { ...get(), prediction: null }
+      persist(updated); set(updated)
+    },
+
+    clearPredictionResult: () => {
+      const updated = { ...get(), predictionResult: null }
+      persist(updated); set(updated)
+    },
+
+    clearMacroAnnouncement: () => {
+      const updated = { ...get(), macroAnnouncement: null }
+      persist(updated); set(updated)
     },
 
     resetPrices: () => {
