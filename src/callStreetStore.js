@@ -107,6 +107,71 @@ const FUNDAMENTAL_EVENTS = [
     aevaNote: "Deceleration is often more damaging than an absolute miss. Markets price expectations — a company priced for 50% growth delivering 25% gets punished even if the absolute number looks fine." },
 ]
 
+// ── Narrative arcs — 3-act company storylines ─────────────────────
+const NARRATIVE_ARCS = {
+  'neuro-link': {
+    name: 'FDA Odyssey',
+    acts: [
+      { text: n => `🧪 ${n}: FDA breakthrough designation granted — Phase 2 trial shows 94% efficacy`,
+        positive: true, apply: c => ({ _founderScore: Math.min(1.0, c._founderScore + 0.06) }),
+        aevaNote: 'FDA breakthrough status fast-tracks the approval timeline. The market loves binary catalyst events like this — all eyes are now on the trial outcome.' },
+      { text: n => `⚠️ ${n}: Trial paused — unexpected adverse events trigger protocol amendment and 18-month delay`,
+        positive: false, apply: c => ({ _founderScore: Math.max(0.3, c._founderScore - 0.20), _debtRatio: Math.min(0.8, c._debtRatio + 0.18) }),
+        aevaNote: 'Clinical setbacks are normal in biotech. The key question: is this a fatal flaw or just a delay? Management credibility during crises determines whether investors stay or flee.' },
+      { random: true, threshold: 0.4,
+        beat: { text: n => `🎉 ${n}: FDA APPROVED — first commercial BCI device cleared for sale`,
+          positive: true, apply: c => ({ _revGrowth: Math.min(0.9, c._revGrowth + 0.40), _profitMargin: Math.min(0.5, c._profitMargin + 0.22) }),
+          aevaNote: 'FDA approval converts years of speculation into real revenue. This binary event is why biotech investors accept massive volatility — the upside can be transformational.' },
+        miss: { text: n => `💔 ${n}: FDA rejection — Complete Response Letter demands 2 more years of safety data`,
+          positive: false, apply: c => ({ _profitMargin: Math.max(-0.8, c._profitMargin - 0.28), _founderScore: Math.max(0.2, c._founderScore - 0.22) }),
+          aevaNote: 'A CRL means years more of burn with no revenue path. This is precisely why position sizing in high-risk biotech is critical — uncapped downside is real.' },
+      },
+    ],
+  },
+  'fusion-grid': {
+    name: 'The Government Gamble',
+    acts: [
+      { text: n => `🏛️ ${n}: Wins ₳8B national grid modernisation contract — decade of predictable revenue secured`,
+        positive: true, apply: c => ({ _revGrowth: Math.min(0.9, c._revGrowth + 0.26) }),
+        aevaNote: 'Government contracts provide stable, long-term revenue. The market pays a premium for cash-flow predictability — but execution risk is always hiding in the fine print.' },
+      { text: n => `📋 ${n}: Cost overruns hit grid project — contractor disputes delay delivery by 18 months`,
+        positive: false, apply: c => ({ _debtRatio: Math.min(0.85, c._debtRatio + 0.22), _profitMargin: Math.max(-0.5, c._profitMargin - 0.15) }),
+        aevaNote: 'Infrastructure projects routinely overrun. Debt funding those overruns compounds the risk — more debt means less cash for growth, which often means even more debt.' },
+      { text: n => `🤝 ${n}: Contract renegotiated — reduced scope but higher margins and penalty-free completion`,
+        positive: true, apply: c => ({ _revGrowth: Math.max(0.02, c._revGrowth - 0.10), _profitMargin: Math.min(0.45, c._profitMargin + 0.20) }),
+        aevaNote: 'Lower revenue but better margins is often a quality upgrade. Buffett prefers companies that earn 20 cents on the dollar over those that earn 2 cents on ten times the volume.' },
+    ],
+  },
+  'nova-ai': {
+    name: 'The AI Gold Rush',
+    acts: [
+      { text: n => `🏛️ ${n}: Exclusive government AI contract — ₳4.2B data licensing deal signed across 12 agencies`,
+        positive: true, apply: c => ({ _revGrowth: Math.min(0.9, c._revGrowth + 0.18), _profitMargin: Math.min(0.5, c._profitMargin + 0.08) }),
+        aevaNote: 'Enterprise AI contracts lock in revenue for years and validate the product. First-mover advantage in government AI is a durable moat — switching costs are enormous.' },
+      { text: n => `📉 ${n}: Open-source rivals undercut pricing — three major enterprise clients churn in one quarter`,
+        positive: false, apply: c => ({ _profitMargin: Math.max(-0.4, c._profitMargin - 0.19) }),
+        aevaNote: 'Commoditisation risk is the existential threat to AI software. When open-source catches up, pricing power evaporates overnight. Moats built on data — not algorithms — are more durable.' },
+      { text: n => `⚡ ${n}: Launches proprietary AI chip division — hardware integration re-rates the entire valuation`,
+        positive: true, apply: c => ({ _revGrowth: Math.min(0.9, c._revGrowth + 0.16), _profitMargin: Math.min(0.5, c._profitMargin + 0.16), _rdSpend: Math.min(1.0, c._rdSpend + 0.08) }),
+        aevaNote: "Vertical integration — owning chip AND software — is Nvidia's playbook. When you own the full stack, margins expand dramatically. This is how software companies become trillion-dollar hardware companies." },
+    ],
+  },
+  'orbital-x': {
+    name: 'Race to Orbit',
+    acts: [
+      { text: n => `🛸 ${n}: 400-satellite constellation fully deployed — global broadband coverage goes live`,
+        positive: true, apply: c => ({ _founderScore: Math.min(1.0, c._founderScore + 0.05), _revGrowth: Math.min(0.9, c._revGrowth + 0.16) }),
+        aevaNote: 'Network effects compound in satellite internet — every new subscriber adds marginal revenue at near-zero marginal cost. Scale is the entire game here.' },
+      { text: n => `⚔️ ${n}: Rival constellation launches at 60% lower price — subscriber growth collapses`,
+        positive: false, apply: c => ({ _profitMargin: Math.max(-0.5, c._profitMargin - 0.18), _revGrowth: Math.max(0.0, c._revGrowth - 0.16) }),
+        aevaNote: 'Pricing wars in low-orbit internet mirror early airlines — margin destruction before consolidation. The survivor wins big; the losers are liquidated. Timing matters enormously.' },
+      { text: n => `🎯 ${n}: Classified military satellite contract awarded — ₳12B over 10 years, immune to commercial competition`,
+        positive: true, apply: c => ({ _revGrowth: Math.min(0.9, c._revGrowth + 0.26), _profitMargin: Math.min(0.5, c._profitMargin + 0.22) }),
+        aevaNote: 'Defence contracts provide non-cyclical, high-margin revenue that commercial rivals cannot touch. A single contract like this can transform a losing business into a profitable one.' },
+    ],
+  },
+}
+
 function calcFairValue(def) {
   const growthMult  = 1 + Math.max(0, def._revGrowth) * 2.0
   const profitMult  = 1 + def._profitMargin * 2.0
@@ -136,7 +201,7 @@ function initCompany(def) {
   const variation = 1 + (Math.random() - 0.5) * 0.08
   const price = Math.round(def.basePrice * variation)
   const fairValue = calcFairValue(def)
-  return { ...def, price, priceHistory: [price], daysHeldByMe: 0, reportUnlocked: false, fairValue }
+  return { ...def, price, priceHistory: [price], daysHeldByMe: 0, reportUnlocked: false, fairValue, _arcAct: 0 }
 }
 
 // ── Sector PE benchmarks (for Buffett mode) ───────────────────────
@@ -228,6 +293,11 @@ function freshState() {
     belowFiveCount: {},
     haltBanner: null,
     lastDelistingSeason: -99,
+    earningsWindow: false,
+    earningsPredictions: {},
+    earningsReveal: null,
+    seasonsPlayed: 0,
+    beatMarketStreak: 0,
   }
 }
 
@@ -377,6 +447,44 @@ export const useCallStreetStore = create((set, get) => {
         }
       }
 
+      // ── Earnings Season (Day 9 bell reveals results; Day 8 bell opens window) ──
+      let earningsReveal = null
+      if ((state.earningsWindow) && newDay === 9) {
+        const heldIds = new Set(state.portfolio.map(h => h.companyId))
+        const earningsResults = []
+        finalCompanies.forEach(co => {
+          if (!heldIds.has(co.id) || co.delisted) return
+          const beatScore = co._revGrowth * 0.40 + co._profitMargin * 0.30 + co._founderScore * 0.30
+          const beatProb = Math.min(0.80, Math.max(0.20, 0.50 + beatScore * 1.5))
+          const beat = Math.random() < beatProb
+          const pct = beat ? 0.14 + Math.random() * 0.13 : -(0.14 + Math.random() * 0.13)
+          const prediction = (state.earningsPredictions || {})[co.id] || null
+          const correct = prediction ? prediction === (beat ? 'beat' : 'miss') : null
+          const bonus = correct === true ? 20 : correct === false ? -10 : 0
+          if (bonus > 0) useCoinStore.getState().earnCoins(bonus, `Earnings correct: ${co.ticker}`)
+          if (bonus < 0) useCoinStore.getState().spendCoins(Math.abs(bonus), `Earnings wrong: ${co.ticker}`)
+          earningsResults.push({ companyId: co.id, ticker: co.ticker, emoji: co.emoji, name: co.name, beat, pct: Math.round(pct * 100), prediction, correct, bonus })
+          allNews.unshift({
+            id: `earnings-${co.id}-${Date.now()}-${Math.random()}`,
+            companyId: co.id, ticker: co.ticker, emoji: co.emoji,
+            text: beat ? `📈 ${co.name} BEATS earnings — revenue and margins exceed expectations` : `📉 ${co.name} MISSES earnings — guidance cut sends shares lower`,
+            impact: pct, positive: beat, type: 'earnings',
+            aevaNote: beat
+              ? "Earnings beats drive short-term price jumps. Ask: is this a one-off or a sign of durable improvement? Consistent beats over multiple quarters are what build lasting wealth."
+              : "Earnings misses hurt — but ask whether the business model is broken or facing temporary headwinds. Great companies miss sometimes; how management responds tells you more than the miss itself.",
+            day: newDay, ringId, isEarnings: true,
+          })
+        })
+        // Apply price impact from earnings
+        finalCompanies = finalCompanies.map(co => {
+          const r = earningsResults.find(r => r.companyId === co.id)
+          if (!r) return co
+          const np = Math.max(1, Math.round(co.price * (1 + r.pct / 100)))
+          return { ...co, price: np, priceHistory: [...co.priceHistory.slice(-9), np] }
+        })
+        earningsReveal = { results: earningsResults, totalBonus: earningsResults.reduce((s, r) => s + (r.bonus || 0), 0) }
+      }
+
       // Sector rotation — hot sector changes every 3 bells
       const hotSectorBellCount = ((state.hotSectorBellCount || 0) + 1) % 3
       const hotSector = hotSectorBellCount === 0
@@ -444,6 +552,35 @@ export const useCallStreetStore = create((set, get) => {
           })
         })
 
+        // Narrative arc advancement — each arc company plays its next act
+        const arcCompanies = [...finalCompanies]
+        Object.entries(NARRATIVE_ARCS).forEach(([coId, arc]) => {
+          const idx = arcCompanies.findIndex(c => c.id === coId)
+          if (idx === -1) return
+          const co = arcCompanies[idx]
+          const actIdx = co._arcAct || 0
+          if (actIdx >= arc.acts.length) return
+          const act = arc.acts[actIdx]
+          let changes, text, positive, aevaNote
+          if (act.random) {
+            const win = Math.random() > act.threshold
+            const v = win ? act.beat : act.miss
+            changes = v.apply(co); text = v.text(co.name); positive = v.positive; aevaNote = v.aevaNote
+          } else {
+            changes = act.apply(co); text = act.text(co.name); positive = act.positive; aevaNote = act.aevaNote
+          }
+          const nu = { ...co, ...changes, _arcAct: actIdx + 1 }
+          arcCompanies[idx] = { ...nu, fairValue: calcFairValue(nu) }
+          allNews.unshift({
+            id: `arc-${coId}-s${state.season}-${Date.now()}-${Math.random()}`,
+            companyId: coId, ticker: co.ticker, emoji: co.emoji,
+            text, impact: 0, positive, type: 'arc',
+            aevaNote, day: newDay, ringId,
+            isNarrative: true, arcName: arc.name,
+          })
+        })
+        finalCompanies = arcCompanies
+
         // New macro regime for next season
         const nextRegimeDef = MACRO_REGIMES[Math.floor(Math.random() * MACRO_REGIMES.length)]
         macroRegime = nextRegimeDef.id
@@ -499,6 +636,13 @@ export const useCallStreetStore = create((set, get) => {
         portfolio: bankruptId
           ? state.portfolio.filter(p => p.companyId !== bankruptId)
           : state.portfolio,
+        earningsWindow: seasonEnds ? false : (newDay === 8 ? true : newDay === 9 ? false : (state.earningsWindow || false)),
+        earningsPredictions: (newDay === 8 || seasonEnds) ? {} : (state.earningsPredictions || {}),
+        earningsReveal,
+        seasonsPlayed: seasonEnds ? (state.seasonsPlayed || 0) + 1 : (state.seasonsPlayed || 0),
+        beatMarketStreak: seasonEnds
+          ? (pendingGrade?.beatMarket ? (state.beatMarketStreak || 0) + 1 : 0)
+          : (state.beatMarketStreak || 0),
       }
       persist(updated)
       set(updated)
@@ -693,6 +837,17 @@ export const useCallStreetStore = create((set, get) => {
       const updated = { ...state, shorts }
       persist(updated); set(updated)
       return { ok: true, closeCost }
+    },
+
+    makeEarningsPrediction: (companyId, call) => {
+      const state = get()
+      const updated = { ...state, earningsPredictions: { ...(state.earningsPredictions || {}), [companyId]: call } }
+      persist(updated); set(updated)
+    },
+
+    clearEarningsReveal: () => {
+      const updated = { ...get(), earningsReveal: null }
+      persist(updated); set(updated)
     },
 
     resetPrices: () => {

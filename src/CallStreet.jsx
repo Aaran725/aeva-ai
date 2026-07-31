@@ -11,11 +11,26 @@ function pctChange(history) {
 }
 
 const MODES = [
-  { id: 'buffett', label: '🏛️ Buffett' },
-  { id: 'lynch',   label: '🔍 Lynch' },
-  { id: 'soros',   label: '🌎 Soros' },
-  { id: 'venture', label: '🚀 Venture' },
+  { id: 'buffett', label: '🏛️ Buffett', unlockAt: null,   unlockDesc: null },
+  { id: 'lynch',   label: '🔍 Lynch',   unlockAt: 'beat1', unlockDesc: 'Beat the market once' },
+  { id: 'soros',   label: '🌎 Soros',   unlockAt: 'beat2', unlockDesc: 'Beat the market twice' },
+  { id: 'venture', label: '🚀 Venture', unlockAt: 's5',    unlockDesc: '5 seasons played' },
 ]
+
+function getUnlockedModes(marketBeats, seasonsPlayed) {
+  const unlocked = new Set(['buffett'])
+  if (marketBeats >= 1) unlocked.add('lynch')
+  if (marketBeats >= 2) unlocked.add('soros')
+  if (seasonsPlayed >= 5) unlocked.add('venture')
+  return unlocked
+}
+
+function getNextUnlock(marketBeats, seasonsPlayed) {
+  if (marketBeats < 1) return { label: '🔍 Lynch Mode', hint: 'Beat the market this season' }
+  if (marketBeats < 2) return { label: '🌎 Soros Mode + Short Selling', hint: 'Beat the market one more time' }
+  if (seasonsPlayed < 5) return { label: '🚀 Venture (Startups)', hint: `${5 - seasonsPlayed} more season${5 - seasonsPlayed !== 1 ? 's' : ''} to unlock` }
+  return null
+}
 
 /* ── Sparkline ───────────────────────────────────────────────────── */
 function Spark({ history, w = 60, h = 24 }) {
@@ -477,6 +492,119 @@ function DetailChart({ history }) {
   )
 }
 
+/* ── Earnings widget ─────────────────────────────────────────────── */
+function EarningsWidget({ earningsWindow, seasonDay, portfolio, companies, earningsPredictions, makeEarningsPrediction }) {
+  if (!earningsWindow || seasonDay !== 8) return null
+  const held = portfolio.map(h => companies.find(c => c.id === h.companyId)).filter(Boolean)
+  const predCount = Object.keys(earningsPredictions || {}).length
+  return (
+    <motion.div key="earnings-widget" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+      style={{ margin: '8px 16px', background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.3)', borderRadius: 16, overflow: 'hidden' }}>
+      <div style={{ background: 'rgba(212,175,55,0.1)', padding: '10px 14px', borderBottom: '0.5px solid rgba(212,175,55,0.2)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#D4AF37', letterSpacing: '.06em', textTransform: 'uppercase' }}>⚡ Earnings Season</div>
+          <div style={{ fontSize: 10, color: 'rgba(212,175,55,0.7)', fontWeight: 600 }}>{predCount}/{held.length} predicted</div>
+        </div>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>
+          Call Beat or Miss before the Day 9 bell · +₳20 correct · −₳10 wrong
+        </div>
+      </div>
+      <div style={{ padding: '0 14px 6px' }}>
+        {held.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '14px 0', fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>
+            Buy stocks to participate in earnings calls
+          </div>
+        )}
+        {held.map(co => {
+          const pred = (earningsPredictions || {})[co.id]
+          const beatScore = co._revGrowth * 0.40 + co._profitMargin * 0.30 + co._founderScore * 0.30
+          const beatPct = Math.round(Math.min(80, Math.max(20, 50 + beatScore * 150)))
+          return (
+            <div key={co.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '0.5px solid rgba(255,255,255,0.05)' }}>
+              <span style={{ fontSize: 18, flexShrink: 0 }}>{co.emoji}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{co.name}</div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>
+                  Rev {Math.round(co._revGrowth * 100)}% · Margin {Math.round(co._profitMargin * 100)}% · Beat prob ~{beatPct}%
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                <motion.button whileTap={{ scale: 0.92 }} onClick={() => makeEarningsPrediction(co.id, 'beat')}
+                  style={{ padding: '5px 12px', borderRadius: 8, border: `1px solid ${pred === 'beat' ? 'rgba(74,222,128,0.7)' : 'rgba(74,222,128,0.2)'}`, background: pred === 'beat' ? 'rgba(74,222,128,0.22)' : 'rgba(74,222,128,0.04)', color: '#4ADE80', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                  Beat
+                </motion.button>
+                <motion.button whileTap={{ scale: 0.92 }} onClick={() => makeEarningsPrediction(co.id, 'miss')}
+                  style={{ padding: '5px 12px', borderRadius: 8, border: `1px solid ${pred === 'miss' ? 'rgba(248,113,113,0.7)' : 'rgba(248,113,113,0.2)'}`, background: pred === 'miss' ? 'rgba(248,113,113,0.22)' : 'rgba(248,113,113,0.04)', color: '#F87171', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                  Miss
+                </motion.button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <div style={{ padding: '6px 14px 10px', fontSize: 10, color: 'rgba(165,180,252,0.55)', display: 'flex', gap: 5 }}>
+        <span style={{ flexShrink: 0 }}>🎓</span>
+        <span>Aeva: Earnings seasons are when fundamentals meet expectations. Companies with high revenue growth and strong founders beat more often — but surprises happen both ways.</span>
+      </div>
+    </motion.div>
+  )
+}
+
+/* ── Earnings reveal overlay ─────────────────────────────────────── */
+function EarningsReveal({ earningsReveal, onDismiss }) {
+  if (!earningsReveal) return null
+  const { results, totalBonus } = earningsReveal
+  return (
+    <motion.div key="earnings-reveal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 998, background: 'rgba(0,0,0,0.88)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <motion.div initial={{ scale: 0.85, y: 30 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 200 }}
+        style={{ background: 'rgba(12,10,40,0.98)', border: `1px solid ${totalBonus >= 0 ? 'rgba(212,175,55,0.4)' : 'rgba(248,113,113,0.3)'}`, borderRadius: 20, padding: 24, maxWidth: 340, width: '100%' }}>
+        <div style={{ textAlign: 'center', marginBottom: 16 }}>
+          <div style={{ fontSize: 36, marginBottom: 6 }}>⚡</div>
+          <div style={{ fontSize: 14, fontWeight: 900, color: '#D4AF37', letterSpacing: '.08em', textTransform: 'uppercase' }}>Earnings Results</div>
+          {results.length === 0 && (
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>No held stocks — nothing to score</div>
+          )}
+        </div>
+        <div style={{ marginBottom: 16 }}>
+          {results.map(r => (
+            <div key={r.companyId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', marginBottom: 6, background: r.beat ? 'rgba(74,222,128,0.05)' : 'rgba(248,113,113,0.05)', border: `0.5px solid ${r.beat ? 'rgba(74,222,128,0.2)' : 'rgba(248,113,113,0.2)'}`, borderRadius: 10 }}>
+              <span style={{ fontSize: 18, flexShrink: 0 }}>{r.emoji}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{r.name}</div>
+                <div style={{ fontSize: 10, color: r.beat ? '#4ADE80' : '#F87171', fontWeight: 700, marginTop: 1 }}>
+                  {r.beat ? '✅ BEAT' : '❌ MISS'} · {r.pct >= 0 ? '+' : ''}{r.pct}%
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                {r.prediction ? (
+                  <div style={{ fontSize: 11, fontWeight: 700, color: r.correct ? '#4ADE80' : '#F87171' }}>
+                    {r.correct ? `+₳${r.bonus}` : `−₳${Math.abs(r.bonus)}`}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>no call</div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+        {results.length > 0 && (
+          <div style={{ background: totalBonus >= 0 ? 'rgba(74,222,128,0.08)' : 'rgba(248,113,113,0.08)', border: `0.5px solid ${totalBonus >= 0 ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)'}`, borderRadius: 10, padding: '10px 14px', marginBottom: 14, textAlign: 'center' }}>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 3 }}>Earnings bonus</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: totalBonus >= 0 ? '#4ADE80' : '#F87171' }}>
+              {totalBonus >= 0 ? '+' : ''}₳{fmt(totalBonus)}
+            </div>
+          </div>
+        )}
+        <motion.button whileTap={{ scale: 0.96 }} onClick={onDismiss}
+          style={{ width: '100%', padding: '13px', borderRadius: 12, border: '1px solid rgba(212,175,55,0.35)', background: 'rgba(212,175,55,0.12)', color: '#D4AF37', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>
+          Continue
+        </motion.button>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 /* ── Company detail ──────────────────────────────────────────────── */
 function CompanyDetail({ company, holding, mode, onBack }) {
   const { buy, sell, buyResearch, news, watchlist, toggleWatchlist, insiderTip, buyInsiderTip,
@@ -917,8 +1045,10 @@ export default function CallStreet() {
     watchlist, hotSector, crashEvent, insiderTip,
     macroRegime, macroAnnouncement, prediction, predictionResult,
     shorts, marketBeats, haltBanner,
+    earningsWindow, earningsPredictions, earningsReveal, seasonsPlayed, beatMarketStreak,
     ringTheBell, setMode, clearGrade, toggleWatchlist, clearCrash, buyInsiderTip, freshStart, resetPrices,
     setPrediction, clearPrediction, clearPredictionResult, clearMacroAnnouncement, clearHaltBanner,
+    makeEarningsPrediction, clearEarningsReveal,
   } = useCallStreetStore()
   const { coins, earnCoins: earn } = useCoinStore()
 
@@ -934,8 +1064,14 @@ export default function CallStreet() {
   const [filterSector, setFilterSector] = useState(null)
   const [filterOwned, setFilterOwned] = useState(false)
 
+  const unlockedModes = useMemo(() => getUnlockedModes(marketBeats || 0, seasonsPlayed || 0), [marketBeats, seasonsPlayed])
+  const nextUnlock = useMemo(() => getNextUnlock(marketBeats || 0, seasonsPlayed || 0), [marketBeats, seasonsPlayed])
+
   const visibleCompanies = useMemo(() => {
-    let cos = mode === 'venture' ? companies : companies.filter(c => !c.isStartup)
+    const mainCos = companies.filter(c => !c.isStartup)
+    // Unlock ladder: first 6 companies always visible; rest unlock after 10 seasons
+    const unlockedMain = (seasonsPlayed || 0) >= 10 ? mainCos : mainCos.slice(0, 6)
+    let cos = mode === 'venture' ? [...unlockedMain, ...companies.filter(c => c.isStartup)] : unlockedMain
     if (filterSector) cos = cos.filter(c => c.sector === filterSector)
     if (filterOwned)  cos = cos.filter(c => portfolio.some(p => p.companyId === c.id))
     switch (sortBy) {
@@ -1136,13 +1272,22 @@ export default function CallStreet() {
       {/* Investor mode chips */}
       <div style={{ padding: '10px 16px 4px' }}>
         <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none' }}>
-          {MODES.map(m => (
-            <button key={m.id} onClick={() => setMode(m.id)}
-              style={{ flexShrink: 0, padding: '6px 13px', borderRadius: 20, border: `0.5px solid ${mode === m.id ? 'rgba(165,180,252,0.5)' : 'rgba(255,255,255,0.1)'}`, background: mode === m.id ? 'rgba(124,58,237,0.22)' : 'rgba(255,255,255,0.03)', color: mode === m.id ? '#a5b4fc' : 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: mode === m.id ? 700 : 400, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              {m.label}
-            </button>
-          ))}
+          {MODES.map(m => {
+            const isUnlocked = unlockedModes.has(m.id)
+            const isActive = mode === m.id
+            return (
+              <button key={m.id} onClick={() => isUnlocked && setMode(m.id)} title={!isUnlocked ? `🔒 ${m.unlockDesc}` : ''}
+                style={{ flexShrink: 0, padding: '6px 13px', borderRadius: 20, border: `0.5px solid ${isActive ? 'rgba(165,180,252,0.5)' : isUnlocked ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)'}`, background: isActive ? 'rgba(124,58,237,0.22)' : 'rgba(255,255,255,0.03)', color: isActive ? '#a5b4fc' : isUnlocked ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.18)', fontSize: 12, fontWeight: isActive ? 700 : 400, cursor: isUnlocked ? 'pointer' : 'default', whiteSpace: 'nowrap', opacity: isUnlocked ? 1 : 0.5 }}>
+                {!isUnlocked && '🔒 '}{m.label}
+              </button>
+            )
+          })}
         </div>
+        {nextUnlock && (
+          <div style={{ fontSize: 9, color: 'rgba(212,175,55,0.55)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ color: 'rgba(212,175,55,0.4)' }}>Next unlock:</span> {nextUnlock.label} — {nextUnlock.hint}
+          </div>
+        )}
       </div>
 
       {/* Market movers — animates in/re-enters after each bell ring */}
@@ -1199,12 +1344,22 @@ export default function CallStreet() {
                 initial={isNew ? { opacity: 0, x: -14 } : false}
                 animate={{ opacity: 1, x: 0 }}
                 transition={isNew ? { delay: i * 0.1, duration: 0.28 } : {}}
-                style={{ display: 'flex', gap: 9, padding: '7px 0', borderBottom: '0.5px solid rgba(255,255,255,0.05)', background: n.isFundamental ? (n.positive ? 'rgba(74,222,128,0.04)' : 'rgba(248,113,113,0.04)') : 'transparent', borderRadius: n.isFundamental ? 8 : 0, paddingLeft: n.isFundamental ? 8 : 0 }}>
+                style={{ display: 'flex', gap: 9, padding: '7px 0', borderBottom: '0.5px solid rgba(255,255,255,0.05)', background: n.isFundamental ? (n.positive ? 'rgba(74,222,128,0.04)' : 'rgba(248,113,113,0.04)') : n.isNarrative ? (n.positive ? 'rgba(165,180,252,0.04)' : 'rgba(248,113,113,0.04)') : n.isEarnings ? 'rgba(212,175,55,0.03)' : 'transparent', borderRadius: (n.isFundamental || n.isNarrative || n.isEarnings) ? 8 : 0, paddingLeft: (n.isFundamental || n.isNarrative || n.isEarnings) ? 8 : 0 }}>
                 <span style={{ fontSize: 15, flexShrink: 0 }}>{n.emoji}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   {n.isFundamental && (
                     <div style={{ fontSize: 9, fontWeight: 800, color: n.positive ? '#4ADE80' : '#F87171', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 2 }}>
                       ⚙ Fundamental Change · {n.eventLabel}
+                    </div>
+                  )}
+                  {n.isNarrative && (
+                    <div style={{ fontSize: 9, fontWeight: 800, color: n.positive ? '#a5b4fc' : '#F87171', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 2 }}>
+                      📖 Story Arc · {n.arcName}
+                    </div>
+                  )}
+                  {n.isEarnings && (
+                    <div style={{ fontSize: 9, fontWeight: 800, color: '#D4AF37', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 2 }}>
+                      ⚡ Earnings Season
                     </div>
                   )}
                   <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5 }}>{n.text}</div>
@@ -1214,7 +1369,7 @@ export default function CallStreet() {
                     </div>
                   )}
                 </div>
-                {!n.isFundamental && (
+                {!n.isFundamental && !n.isNarrative && (
                   <div style={{ fontSize: 11, fontWeight: 700, color: n.positive ? '#4ADE80' : '#F87171', flexShrink: 0, alignSelf: 'flex-start', marginTop: 2 }}>
                     {n.positive ? '+' : ''}{Math.round(n.impact * 100)}%
                   </div>
@@ -1364,6 +1519,23 @@ export default function CallStreet() {
           </div>
         </div>
       )}
+
+      {/* Earnings Season widget — Day 8 */}
+      <AnimatePresence>
+        <EarningsWidget
+          earningsWindow={earningsWindow}
+          seasonDay={seasonDay}
+          portfolio={portfolio}
+          companies={companies}
+          earningsPredictions={earningsPredictions}
+          makeEarningsPrediction={makeEarningsPrediction}
+        />
+      </AnimatePresence>
+
+      {/* Earnings reveal overlay */}
+      <AnimatePresence>
+        {earningsReveal && <EarningsReveal earningsReveal={earningsReveal} onDismiss={clearEarningsReveal} />}
+      </AnimatePresence>
 
       {/* Pre-bell prediction */}
       <AnimatePresence mode="wait">
