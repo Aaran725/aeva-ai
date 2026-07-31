@@ -1265,30 +1265,25 @@ async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _at
 }
 
 /* ── Vision streaming — image + text → llama-4-scout ─────────────────────── */
-const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
-
 async function streamGroqVision(base64, mimeType, userText, systemPrompt, onChunk, signal) {
-  const key = nextGroqKey()
-  const content = [
-    { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
-    { type: 'text', text: userText || 'What is in this image? Please teach me about this topic.' },
-  ]
-  const res = await fetch(GROQ_URL, {
+  const res = await fetch('/api/gemini', {
     method: 'POST',
     signal,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: VISION_MODEL,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content },
-      ],
-      stream: true,
-      temperature: 0.55,
-      max_tokens: 900,
+      model: 'gemini-2.0-flash',
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents: [{
+        role: 'user',
+        parts: [
+          { inline_data: { mime_type: mimeType, data: base64 } },
+          { text: userText || 'What is in this image? Please teach me about this topic.' },
+        ],
+      }],
+      generationConfig: { temperature: 0.55, maxOutputTokens: 1200 },
     }),
   })
-  if (!res.ok) throw new Error(`Groq vision error ${res.status}`)
+  if (!res.ok) throw new Error(`Gemini vision error ${res.status}`)
   const reader  = res.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
@@ -1303,8 +1298,8 @@ async function streamGroqVision(base64, mimeType, userText, systemPrompt, onChun
       if (!l.startsWith('data: ') || l === 'data: [DONE]') continue
       try {
         const chunk = JSON.parse(l.slice(6))
-        const delta = chunk.choices?.[0]?.delta?.content
-        if (delta) onChunk(delta)
+        const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text
+        if (text) onChunk(text)
       } catch { /* partial JSON */ }
     }
   }
