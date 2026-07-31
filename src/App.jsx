@@ -6,7 +6,7 @@ import 'katex/dist/katex.min.css'
 import 'mafs/core.css'
 import { Mafs, Coordinates, Plot } from 'mafs'
 import { compile as mathCompile } from 'mathjs'
-import { ArrowUp, ArrowRight, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, ChevronRight, ChevronDown, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Users, FileText, Palette, Home, Map, Clock, Trash2, Calendar, ScanSearch, ClipboardList } from 'lucide-react'
+import { ArrowUp, ArrowRight, Zap, TrendingDown, TrendingUp, Star, MessageCircle, ChevronLeft, ChevronRight, ChevronDown, StopCircle, LogOut, Gamepad2, FlaskConical, Share2, X, Brain, Layers, Camera, BookOpen, PenLine, Timer, Plus, Settings, Menu, Users, FileText, Palette, Home, Map, Clock, Trash2, Calendar, ScanSearch, ClipboardList, Coins } from 'lucide-react'
 import { useAppSettings, SECTION_BG_PRESETS, CARD_STYLES, FONT_STYLES } from './appSettings'
 import { useLanguageStore } from './languageStore'
 import { useT } from './translations'
@@ -60,7 +60,9 @@ const SharedRoadmapView  = lazy(() => import('./SharedRoadmapView'))
 const YourUI             = lazy(() => import('./YourUI'))
 const RevisionCalendar   = lazy(() => import('./RevisionCalendar'))
 const CalibrationHub     = lazy(() => import('./CalibrationHub'))
+const CoinMarket         = lazy(() => import('./CoinMarket'))
 import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
+import { useCoinStore } from './coinStore'
 import { useCalibrationStore } from './calibrationStore'
 import { lookupAnalogy } from './analogyBank'
 import { CALIBRATION_MAP, ENTRY_NODES, SUBJECT_LABELS, SUBJECT_ICONS, FAST_LANE, NODE_CLUSTERS } from './calibrationMap'
@@ -2784,7 +2786,7 @@ function SidebarNavItem({ Icon, icon, label, tooltip, action, badge, accent, col
   )
 }
 
-function LeftSidebar({ collapsed, onToggle, onChatOpen, onLibrary, onBrain, onMirror, onLab, onRoadmap, onSchedule, onArcade, onCalibrate, onDocs, onParents, onTextbook, onProfile, onYourUI, onSettings, onSignOut, labBadge, brainTotal, sessionCount }) {
+function LeftSidebar({ collapsed, onToggle, onChatOpen, onLibrary, onBrain, onMirror, onLab, onRoadmap, onSchedule, onArcade, onCalibrate, onDocs, onParents, onTextbook, onProfile, onYourUI, onSettings, onSignOut, onCoinMarket, labBadge, brainTotal, sessionCount }) {
   const { name } = useUser()
   const W = collapsed ? 0 : 224
 
@@ -2803,6 +2805,9 @@ function LeftSidebar({ collapsed, onToggle, onChatOpen, onLibrary, onBrain, onMi
       { Icon: Gamepad2,    label: 'Arcade',   tooltip: 'Drill challenges & timed practice arena', action: onArcade },
       { Icon: FlaskConical,label: 'Lab',      tooltip: 'Focus modes & specialised study tools',  action: onLab,      badge: labBadge > 0 ? labBadge : null },
       { icon: '📖',        label: 'Textbook', tooltip: 'AI-generated adaptive stories',           action: onTextbook, isEmoji: true },
+    ]},
+    { label: 'ECONOMY', items: [
+      { icon: '₳',         label: 'Coin Market', tooltip: 'Your knowledge portfolio, bonds & dividends', action: onCoinMarket, accent: false },
     ]},
     { label: 'TOOLS', items: [
       { Icon: FileText,    label: 'Docs',     tooltip: 'Upload worksheets & documents to study',  action: onDocs },
@@ -2974,6 +2979,7 @@ function DashboardView({ onChatOpen, onSignOut, onCalibrate, onTextbook }) {
   const [docOpen, setDocOpen]         = useState(false)
   const [yourUIOpen, setYourUIOpen]   = useState(false)
   const [drawerOpen, setDrawerOpen]   = useState(false)
+  const [coinMarketOpen, setCoinMarketOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try { return localStorage.getItem('aeva_sidebar_collapsed') === 'true' } catch { return false }
   })
@@ -3034,6 +3040,7 @@ function DashboardView({ onChatOpen, onSignOut, onCalibrate, onTextbook }) {
           onYourUI={() => setYourUIOpen(true)}
           onSettings={() => setAppSettingsOpen(true)}
           onSignOut={onSignOut}
+          onCoinMarket={() => setCoinMarketOpen(true)}
           labBadge={labBadgeCount}
           brainTotal={brainStats.total}
           sessionCount={sessions.length}
@@ -3326,6 +3333,14 @@ function DashboardView({ onChatOpen, onSignOut, onCalibrate, onTextbook }) {
         {yourUIOpen && (
           <Suspense fallback={null}>
             <YourUI onClose={() => setYourUIOpen(false)} />
+          </Suspense>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {coinMarketOpen && (
+          <Suspense fallback={null}>
+            <CoinMarket onClose={() => setCoinMarketOpen(false)} />
           </Suspense>
         )}
       </AnimatePresence>
@@ -11291,6 +11306,7 @@ export default function App() {
     }
   }, [])
   const { checkStreak } = useXPStore()
+  const { checkDailyBonus: checkCoinBonus } = useCoinStore()
 
   useEffect(() => {
     if (activeMode) setView('chat')
@@ -11310,12 +11326,12 @@ export default function App() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setAuthUser(data.session?.user ?? null)
-      if (data.session?.user) checkStreak()
+      if (data.session?.user) { checkStreak(); checkCoinBonus() }
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       setAuthUser(session?.user ?? null)
       if (!session) { setCurrentUser(null); setView('dashboard'); setShowLogin(false) }
-      if (session?.user) checkStreak()
+      if (session?.user) { checkStreak(); checkCoinBonus() }
     })
     return () => subscription.unsubscribe()
   }, [])
