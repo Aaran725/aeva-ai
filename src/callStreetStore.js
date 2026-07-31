@@ -170,6 +170,7 @@ export const useCallStreetStore = create((set, get) => {
       const allNews = []
       const prevPrices = {}
       state.companies.forEach(c => { prevPrices[c.id] = c.price })
+      const ringId = (state.totalBells || 0) + 1
 
       // 3–5 companies get news events; rest get mild drift
       const numWithNews = 3 + Math.floor(Math.random() * 3)
@@ -202,6 +203,7 @@ export const useCallStreetStore = create((set, get) => {
               type: e.type,
               aevaNote,
               day: state.seasonDay + 1,
+              ringId,
             })
           })
 
@@ -244,7 +246,7 @@ export const useCallStreetStore = create((set, get) => {
       let seasonStartValue = state.seasonStartValue
 
       if (seasonEnds) {
-        pendingGrade = calcGrade(state.portfolio, updatedCompanies, state.seasonStartValue, newIndexHistory)
+        pendingGrade = calcGrade(state.portfolio, updatedCompanies, state.seasonStartValue, newIndexHistory, (state.streak || 0) + 1)
         season = state.season + 1
         seasonDay = 0
         seasonStartValue = state.portfolio.reduce((s, h) => {
@@ -351,7 +353,7 @@ export const useCallStreetStore = create((set, get) => {
   }
 })
 
-function calcGrade(portfolio, companies, seasonStartValue, indexHistory) {
+function calcGrade(portfolio, companies, seasonStartValue, indexHistory, streak = 0) {
   const currentValue = portfolio.reduce((s, h) => {
     const co = companies.find(c => c.id === h.companyId)
     return s + (co ? co.price * h.shares : 0)
@@ -373,5 +375,7 @@ function calcGrade(portfolio, companies, seasonStartValue, indexHistory) {
   else if (returnPct >= 0)                { grade = 'C';  note = "Break-even. You didn't lose, but the market probably did better. Study the fundamentals."; coins = 60 }
   else                                    { grade = 'D';  note = "Rough season. Check the hidden fundamentals before buying — business quality drives prices."; coins = 15 }
 
-  return { grade, returnPct, indexReturn, beatMarket, note, coins, currentValue }
+  const multiplier = streak >= 10 ? 3 : streak >= 6 ? 2 : streak >= 3 ? 1.5 : 1
+  coins = Math.round(coins * multiplier)
+  return { grade, returnPct, indexReturn, beatMarket, note, coins, currentValue, multiplier }
 }

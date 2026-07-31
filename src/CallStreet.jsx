@@ -201,6 +201,11 @@ function SeasonEnd({ grade, onClose, onCollect }) {
       <div style={{ fontSize: 28, fontWeight: 800, color: '#D4AF37', marginBottom: 4 }}>
         {grade.returnPct >= 0 ? '+' : ''}{grade.returnPct}% return
       </div>
+      {grade.multiplier > 1 && (
+        <div style={{ fontSize: 12, color: '#D4AF37', background: 'rgba(212,175,55,0.1)', border: '0.5px solid rgba(212,175,55,0.25)', borderRadius: 8, padding: '4px 14px', marginBottom: 8, display: 'inline-block' }}>
+          🔥 {grade.multiplier}× streak bonus applied!
+        </div>
+      )}
       <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>
         Market index: {grade.indexReturn >= 0 ? '+' : ''}{grade.indexReturn}%
         {grade.beatMarket ? ' · You beat the market! 🎯' : ' · Market beat you'}
@@ -390,6 +395,9 @@ export default function CallStreet() {
 
   const [selected, setSelected] = useState(null)
   const [bellRinging, setBellRinging] = useState(false)
+  const [flashKey, setFlashKey] = useState(0)
+  const [flashMap, setFlashMap] = useState({})
+  const [lastRingId, setLastRingId] = useState(null)
   const [ipoShares, setIpoShares] = useState(5)
   const [ipoMsg, setIpoMsg] = useState(null)
 
@@ -408,11 +416,23 @@ export default function CallStreet() {
     }, 0), [portfolio, companies])
 
   function handleBell() {
+    const prevPrices = {}
+    companies.forEach(c => { prevPrices[c.id] = c.price })
     setBellRinging(true)
+    setFlashKey(k => k + 1)
     setTimeout(() => {
       ringTheBell()
       setBellRinging(false)
-    }, 600)
+      const ns = useCallStreetStore.getState()
+      const map = {}
+      ns.companies.forEach(c => {
+        if (prevPrices[c.id] !== undefined && c.price !== prevPrices[c.id])
+          map[c.id] = c.price > prevPrices[c.id] ? 'up' : 'down'
+      })
+      setFlashMap(map)
+      setLastRingId(ns.totalBells)
+      setTimeout(() => setFlashMap({}), 1600)
+    }, 400)
   }
 
   function handleCollectGrade() {
@@ -447,6 +467,17 @@ export default function CallStreet() {
       <AnimatePresence>
         {pendingGrade && <SeasonEnd grade={pendingGrade} onClose={clearGrade} onCollect={handleCollectGrade} />}
       </AnimatePresence>
+
+      {/* Full-screen bell flash */}
+      {flashKey > 0 && (
+        <motion.div
+          key={flashKey}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: [0, 0.85, 0] }}
+          transition={{ duration: 0.65, times: [0, 0.18, 1] }}
+          style={{ position: 'fixed', inset: 0, background: '#f0f6ff', zIndex: 200, pointerEvents: 'none' }}
+        />
+      )}
 
       {/* Header */}
       <div style={{ padding: '12px 16px 10px' }}>
@@ -488,10 +519,19 @@ export default function CallStreet() {
         </div>
       </div>
 
-      {/* Market movers — appears after first bell ring */}
-      {lastBellChanges?.length > 0 && (
-        <Movers changes={lastBellChanges} onSelect={setSelected} />
-      )}
+      {/* Market movers — animates in/re-enters after each bell ring */}
+      <AnimatePresence mode="wait">
+        {lastBellChanges?.length > 0 && (
+          <motion.div
+            key={flashKey}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.25 }}
+          >
+            <Movers changes={lastBellChanges} onSelect={setSelected} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* IPO banner */}
       {ipoActive && (() => {
@@ -526,22 +566,29 @@ export default function CallStreet() {
       {news.length > 0 && (
         <div style={{ padding: '8px 16px 4px' }}>
           <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.25)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 7 }}>News</div>
-          {news.slice(0, 4).map(n => (
-            <div key={n.id} style={{ display: 'flex', gap: 9, padding: '7px 0', borderBottom: '0.5px solid rgba(255,255,255,0.05)' }}>
-              <span style={{ fontSize: 15, flexShrink: 0 }}>{n.emoji}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5 }}>{n.text}</div>
-                {n.aevaNote && (
-                  <div style={{ fontSize: 10, color: 'rgba(165,180,252,0.6)', marginTop: 2, lineHeight: 1.5 }}>
-                    🎓 {n.aevaNote}
-                  </div>
-                )}
-              </div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: n.positive ? '#4ADE80' : '#F87171', flexShrink: 0, alignSelf: 'flex-start', marginTop: 2 }}>
-                {n.positive ? '+' : ''}{Math.round(n.impact * 100)}%
-              </div>
-            </div>
-          ))}
+          {news.slice(0, 4).map((n, i) => {
+            const isNew = n.ringId === lastRingId
+            return (
+              <motion.div key={n.id}
+                initial={isNew ? { opacity: 0, x: -14 } : false}
+                animate={{ opacity: 1, x: 0 }}
+                transition={isNew ? { delay: i * 0.1, duration: 0.28 } : {}}
+                style={{ display: 'flex', gap: 9, padding: '7px 0', borderBottom: '0.5px solid rgba(255,255,255,0.05)' }}>
+                <span style={{ fontSize: 15, flexShrink: 0 }}>{n.emoji}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5 }}>{n.text}</div>
+                  {n.aevaNote && (
+                    <div style={{ fontSize: 10, color: 'rgba(165,180,252,0.6)', marginTop: 2, lineHeight: 1.5 }}>
+                      🎓 {n.aevaNote}
+                    </div>
+                  )}
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: n.positive ? '#4ADE80' : '#F87171', flexShrink: 0, alignSelf: 'flex-start', marginTop: 2 }}>
+                  {n.positive ? '+' : ''}{Math.round(n.impact * 100)}%
+                </div>
+              </motion.div>
+            )
+          })}
         </div>
       )}
 
@@ -562,6 +609,15 @@ export default function CallStreet() {
               style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 6, background: holding ? 'rgba(99,102,241,0.04)' : co.isStartup ? 'rgba(251,146,60,0.04)' : 'rgba(255,255,255,0.03)', border: `0.5px solid ${holding ? 'rgba(99,102,241,0.22)' : co.isStartup ? 'rgba(251,146,60,0.15)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 12, cursor: 'pointer', position: 'relative' }}>
               {holding && (
                 <div style={{ position: 'absolute', top: 9, right: 10, width: 6, height: 6, borderRadius: '50%', background: '#a5b4fc' }} />
+              )}
+              {flashMap[co.id] && (
+                <motion.div
+                  key={`f-${flashKey}-${co.id}`}
+                  initial={{ opacity: 0.65 }}
+                  animate={{ opacity: 0 }}
+                  transition={{ duration: 1.5, ease: 'easeOut' }}
+                  style={{ position: 'absolute', inset: 0, borderRadius: 12, background: flashMap[co.id] === 'up' ? 'rgba(74,222,128,0.22)' : 'rgba(248,113,113,0.22)', pointerEvents: 'none' }}
+                />
               )}
               <span style={{ fontSize: 20, flexShrink: 0 }}>{co.emoji}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -609,8 +665,13 @@ export default function CallStreet() {
           {bellRinging ? 'Markets moving…' : 'Ring the Bell'}
         </motion.button>
         {(streak || 0) > 0 && (
-          <div style={{ background: 'rgba(74,222,128,0.07)', border: '0.5px solid rgba(74,222,128,0.2)', borderRadius: 12, padding: '10px 14px', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 58 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, color: '#4ADE80', lineHeight: 1 }}>🔥{streak}</div>
+          <div style={{ background: streak >= 3 ? 'rgba(212,175,55,0.08)' : 'rgba(74,222,128,0.07)', border: `0.5px solid ${streak >= 3 ? 'rgba(212,175,55,0.28)' : 'rgba(74,222,128,0.2)'}`, borderRadius: 12, padding: '8px 12px', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 58 }}>
+            {streak >= 3 && (
+              <div style={{ fontSize: 9, color: '#D4AF37', fontWeight: 700, marginBottom: 2 }}>
+                {streak >= 10 ? '3×' : streak >= 6 ? '2×' : '1.5×'} bonus
+              </div>
+            )}
+            <div style={{ fontSize: 15, fontWeight: 800, color: streak >= 3 ? '#D4AF37' : '#4ADE80', lineHeight: 1 }}>🔥{streak}</div>
             <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 3 }}>rings</div>
           </div>
         )}
