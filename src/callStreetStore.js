@@ -223,6 +223,11 @@ function freshState() {
     macroAnnouncement: null,
     prediction: null,
     predictionResult: null,
+    shorts: [],
+    marketBeats: 0,
+    belowFiveCount: {},
+    haltBanner: null,
+    lastDelistingSeason: -99,
   }
 }
 
@@ -333,6 +338,45 @@ export const useCallStreetStore = create((set, get) => {
         }
       }
 
+      // ── Bankruptcy detection (≥3 bells below ₳5, max 1 per 3 seasons) ──
+      const newBelowFiveCount = { ...(state.belowFiveCount || {}) }
+      finalCompanies.forEach(c => {
+        if (!c.delisted) newBelowFiveCount[c.id] = c.price < 5 ? (newBelowFiveCount[c.id] || 0) + 1 : 0
+      })
+
+      let haltBanner = state.haltBanner
+      let lastDelistingSeason = state.lastDelistingSeason ?? -99
+      let updatedShorts = [...(state.shorts || [])]
+      let bankruptId = null
+
+      const seasonsSinceDelist = (state.season || 1) - lastDelistingSeason
+      if (seasonsSinceDelist >= 3) {
+        const entry = Object.entries(newBelowFiveCount).find(([id, count]) => {
+          const co = finalCompanies.find(c => c.id === id)
+          return count >= 3 && co && !co.delisted
+        })
+        if (entry) {
+          bankruptId = entry[0]
+          const bankCo = finalCompanies.find(c => c.id === bankruptId)
+          haltBanner = { companyId: bankruptId, name: bankCo.name, ticker: bankCo.ticker, emoji: bankCo.emoji }
+          lastDelistingSeason = state.season
+          newBelowFiveCount[bankruptId] = 0
+          finalCompanies = finalCompanies.map(c =>
+            c.id === bankruptId ? { ...c, delisted: true, price: 0, priceHistory: [...c.priceHistory.slice(-9), 0] } : c
+          )
+          // Shorts on bankrupt company auto-close profitably (buy at ₳0)
+          updatedShorts = updatedShorts.filter(s => s.companyId !== bankruptId)
+          allNews.unshift({
+            id: `bankrupt-${bankruptId}-${Date.now()}`,
+            companyId: bankruptId, ticker: bankCo.ticker, emoji: bankCo.emoji,
+            text: `🚨 HALT — ${bankCo.name} files for bankruptcy. All shares suspended.`,
+            impact: -1, positive: false, type: 'bankruptcy',
+            aevaNote: "When a company's price collapses for 3 bells, creditors seize assets and shareholders receive nothing. This is why debt and cash burn matter — leverage kills in a downturn.",
+            day: state.seasonDay + 1, ringId,
+          })
+        }
+      }
+
       // Sector rotation — hot sector changes every 3 bells
       const hotSectorBellCount = ((state.hotSectorBellCount || 0) + 1) % 3
       const hotSector = hotSectorBellCount === 0
@@ -404,6 +448,15 @@ export const useCallStreetStore = create((set, get) => {
         const nextRegimeDef = MACRO_REGIMES[Math.floor(Math.random() * MACRO_REGIMES.length)]
         macroRegime = nextRegimeDef.id
         macroAnnouncement = { id: nextRegimeDef.id, label: nextRegimeDef.label, emoji: nextRegimeDef.emoji, aevaNote: nextRegimeDef.aevaNote }
+
+        // Auto-close all open short positions at season end
+        updatedShorts.forEach(s => {
+          const co = finalCompanies.find(c => c.id === s.companyId)
+          if (!co || co.delisted) return
+          const cost = s.shares * co.price
+          if (cost > 0) useCoinStore.getState().spendCoins(cost, `Season end: close short ${s.ticker}`)
+        })
+        updatedShorts = []
       }
 
       // IPO trigger: 30% chance on day 3 of a new season
@@ -436,6 +489,16 @@ export const useCallStreetStore = create((set, get) => {
         macroAnnouncement,
         prediction: null,
         predictionResult,
+        shorts: updatedShorts,
+        marketBeats: seasonEnds && pendingGrade?.beatMarket
+          ? (state.marketBeats || 0) + 1
+          : (state.marketBeats || 0),
+        belowFiveCount: newBelowFiveCount,
+        haltBanner,
+        lastDelistingSeason,
+        portfolio: bankruptId
+          ? state.portfolio.filter(p => p.companyId !== bankruptId)
+          : state.portfolio,
       }
       persist(updated)
       set(updated)
@@ -585,6 +648,51 @@ export const useCallStreetStore = create((set, get) => {
     clearMacroAnnouncement: () => {
       const updated = { ...get(), macroAnnouncement: null }
       persist(updated); set(updated)
+    },
+
+    clearHaltBanner: () => {
+      const updated = { ...get(), haltBanner: null }
+      persist(updated); set(updated)
+    },
+
+    shortSell: (companyId, shares) => {
+      const state = get()
+      if ((state.marketBeats || 0) < 2) return { error: 'Beat the market twice to unlock short selling' }
+      const company = state.companies.find(c => c.id === companyId)
+      if (!company || company.delisted) return { error: 'Company not available' }
+      if (shares < 1 || shares > 10) return { error: 'Short 1–10 shares only' }
+      const existing = (state.shorts || []).find(s => s.companyId === companyId)
+      if (existing && existing.shares + shares > 10) return { error: `Already short ${existing.shares} — max 10 total` }
+      const proceeds = shares * company.price
+      useCoinStore.getState().earnCoins(proceeds, `Short sell: ${shares}× ${company.ticker}`)
+      let shorts
+      if (existing) {
+        const total = existing.shares + shares
+        const avgOpen = Math.round((existing.openPrice * existing.shares + company.price * shares) / total)
+        shorts = state.shorts.map(s => s.companyId === companyId ? { ...s, shares: total, openPrice: avgOpen } : s)
+      } else {
+        shorts = [...(state.shorts || []), { companyId, shares, openPrice: company.price, ticker: company.ticker, emoji: company.emoji }]
+      }
+      const updated = { ...state, shorts }
+      persist(updated); set(updated)
+      return { ok: true, proceeds }
+    },
+
+    closeShort: (companyId, sharesToClose) => {
+      const state = get()
+      const company = state.companies.find(c => c.id === companyId)
+      const short = (state.shorts || []).find(s => s.companyId === companyId)
+      if (!company || !short) return { error: 'No short position found' }
+      if (sharesToClose > short.shares) return { error: 'Cannot close more than position size' }
+      const closeCost = sharesToClose * company.price
+      if (!useCoinStore.getState().spendCoins(closeCost, `Close short: ${sharesToClose}× ${company.ticker}`))
+        return { error: `Need ₳${closeCost} to buy back shares` }
+      const shorts = sharesToClose === short.shares
+        ? state.shorts.filter(s => s.companyId !== companyId)
+        : state.shorts.map(s => s.companyId === companyId ? { ...s, shares: s.shares - sharesToClose } : s)
+      const updated = { ...state, shorts }
+      persist(updated); set(updated)
+      return { ok: true, closeCost }
     },
 
     resetPrices: () => {

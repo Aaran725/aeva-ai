@@ -479,11 +479,13 @@ function DetailChart({ history }) {
 
 /* ── Company detail ──────────────────────────────────────────────── */
 function CompanyDetail({ company, holding, mode, onBack }) {
-  const { buy, sell, buyResearch, news, watchlist, toggleWatchlist, insiderTip, buyInsiderTip } = useCallStreetStore()
+  const { buy, sell, buyResearch, news, watchlist, toggleWatchlist, insiderTip, buyInsiderTip,
+          macroRegime, marketBeats, shorts, shortSell, closeShort } = useCallStreetStore()
   const { coins } = useCoinStore()
   const [qty, setQty] = useState(1)
   const [action, setAction] = useState('buy')
   const [msg, setMsg] = useState(null)
+  const [shortQty, setShortQty] = useState(1)
 
   const theme = SECTOR_THEME[company.sector] || { accent: '#D4AF37', bg: 'rgba(212,175,55,0.12)', glow: 'rgba(212,175,55,0.3)' }
   const change = pctChange(company.priceHistory)
@@ -729,13 +731,70 @@ function CompanyDetail({ company, holding, mode, onBack }) {
           </motion.button>
         </div>
 
+        {/* Short selling */}
+        {(marketBeats || 0) < 2 ? (
+          <div style={{ marginTop: 12, background: 'rgba(248,113,113,0.04)', border: '1px solid rgba(248,113,113,0.12)', borderRadius: 12, padding: '10px 14px', display: 'flex', gap: 10, alignItems: 'center' }}>
+            <span style={{ fontSize: 18 }}>🔒</span>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(248,113,113,0.7)' }}>Short selling locked</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>Beat the market index {2 - (marketBeats || 0)} more time{2 - (marketBeats || 0) !== 1 ? 's' : ''} to unlock. Short selling lets you profit when stocks fall.</div>
+            </div>
+          </div>
+        ) : (() => {
+          const myShort = (shorts || []).find(s => s.companyId === company.id)
+          const maxShort = Math.min(10, Math.max(1, Math.floor(coins / company.price)))
+          const remainCap = myShort ? Math.max(0, 10 - myShort.shares) : 10
+          const shortPnl = myShort ? (myShort.openPrice - company.price) * myShort.shares : 0
+          return (
+            <div style={{ marginTop: 12, background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: 12, padding: 12 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: '#F87171', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 8 }}>📉 Short Selling</div>
+              {myShort && (
+                <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 9, padding: '8px 10px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>Open short</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#F87171' }}>{myShort.shares} shares @ ₳{myShort.openPrice}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>P&L</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: shortPnl >= 0 ? '#4ADE80' : '#F87171' }}>{shortPnl >= 0 ? '+' : ''}₳{fmt(shortPnl)}</div>
+                  </div>
+                </div>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <motion.button whileTap={{ scale: 0.9 }} onClick={() => setShortQty(q => Math.max(1, q - 1))}
+                  style={{ width: 34, height: 34, borderRadius: 8, border: '1px solid rgba(248,113,113,0.2)', background: 'rgba(248,113,113,0.06)', color: '#F87171', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</motion.button>
+                <div style={{ flex: 1, textAlign: 'center', fontSize: 20, fontWeight: 900, color: '#fff' }}>{shortQty}</div>
+                <motion.button whileTap={{ scale: 0.9 }} onClick={() => setShortQty(q => Math.min(remainCap || 1, q + 1))}
+                  style={{ width: 34, height: 34, borderRadius: 8, border: '1px solid rgba(248,113,113,0.2)', background: 'rgba(248,113,113,0.06)', color: '#F87171', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</motion.button>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {remainCap > 0 && (
+                  <motion.button whileTap={{ scale: 0.97 }} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid rgba(248,113,113,0.4)', background: 'rgba(248,113,113,0.14)', color: '#F87171', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+                    onClick={() => { const r = shortSell(company.id, shortQty); if (r?.error) flash(r.error, false); else flash(`Short opened: ${shortQty}×${company.ticker} · ₳${fmt(r.proceeds)} credited`) }}>
+                    Short {shortQty} · +₳{fmt(shortQty * company.price)}
+                  </motion.button>
+                )}
+                {myShort && (
+                  <motion.button whileTap={{ scale: 0.97 }} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid rgba(74,222,128,0.4)', background: 'rgba(74,222,128,0.1)', color: '#4ADE80', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+                    onClick={() => { const r = closeShort(company.id, Math.min(shortQty, myShort.shares)); if (r?.error) flash(r.error, false); else flash(`Short closed · ₳${fmt(r.closeCost)} spent`) }}>
+                    Close {Math.min(shortQty, myShort.shares)} · −₳{fmt(Math.min(shortQty, myShort.shares) * company.price)}
+                  </motion.button>
+                )}
+              </div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginTop: 8, lineHeight: 1.5 }}>
+                🎓 Shorting earns coins now but costs coins to close. You profit if price falls before end of season.
+              </div>
+            </div>
+          )
+        })()}
+
       </div>
     </div>
   )
 }
 
 /* ── Portfolio tab ───────────────────────────────────────────────── */
-function PortfolioTab({ portfolio, companies, indexHistory, seasonDay }) {
+function PortfolioTab({ portfolio, companies, indexHistory, seasonDay, shorts }) {
   const indexNow   = indexHistory[indexHistory.length - 1] || 100
   const indexStart = indexHistory[Math.max(0, indexHistory.length - (seasonDay + 1))] || 100
   const indexReturn = Math.round((indexNow / indexStart - 1) * 100)
@@ -755,7 +814,14 @@ function PortfolioTab({ portfolio, companies, indexHistory, seasonDay }) {
   const totalPnlPct = totalCost > 0 ? Math.round((totalPnl / totalCost) * 100) : 0
   const beatIdx    = totalPnlPct > indexReturn
 
-  if (!portfolio.length) return (
+  const shortPositions = (shorts || []).map(s => {
+    const co = companies.find(c => c.id === s.companyId)
+    if (!co) return null
+    const pnl = (s.openPrice - co.price) * s.shares
+    return { ...s, co, pnl }
+  }).filter(Boolean)
+
+  if (!portfolio.length && !shortPositions.length) return (
     <div style={{ textAlign: 'center', padding: '60px 16px', color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>
       No holdings yet — buy stocks in the Market tab.
     </div>
@@ -782,24 +848,63 @@ function PortfolioTab({ portfolio, companies, indexHistory, seasonDay }) {
         </div>
       </div>
 
+      {holdings.length > 0 && <>
       <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.25)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 8 }}>
         Holdings — sorted by P&L
       </div>
-      {holdings.map(h => (
-        <div key={h.companyId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 6, background: 'rgba(255,255,255,0.03)', border: `1px solid ${h.pnl >= 0 ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.1)'}`, borderRadius: 12 }}>
-          <span style={{ fontSize: 20, flexShrink: 0 }}>{h.co.emoji}</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{h.co.name}</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>{h.shares} shares · avg ₳{h.avgCost}</div>
-          </div>
-          <div style={{ textAlign: 'right', flexShrink: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: '#D4AF37' }}>₳{fmt(h.value)}</div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: h.pnl >= 0 ? '#4ADE80' : '#F87171' }}>
-              {h.pnl >= 0 ? '+' : ''}₳{fmt(h.pnl)} ({h.pnlPct >= 0 ? '+' : ''}{h.pnlPct}%)
+      {holdings.map(h => {
+        const pct = totalValue > 0 ? Math.round((h.value / totalValue) * 100) : 0
+        const concentrated = pct >= 50
+        return (
+          <div key={h.companyId} style={{ marginBottom: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: concentrated ? 'rgba(248,113,113,0.05)' : 'rgba(255,255,255,0.03)', border: `1px solid ${concentrated ? 'rgba(248,113,113,0.25)' : h.pnl >= 0 ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.1)'}`, borderRadius: 12 }}>
+              <span style={{ fontSize: 20, flexShrink: 0 }}>{h.co.emoji}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{h.co.name}</span>
+                  {concentrated && <span style={{ fontSize: 9, fontWeight: 700, color: '#F87171', background: 'rgba(248,113,113,0.12)', borderRadius: 4, padding: '1px 5px' }}>Concentrated {pct}%</span>}
+                </div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>{h.shares} shares · avg ₳{h.avgCost} · {pct}% of portfolio</div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#D4AF37' }}>₳{fmt(h.value)}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: h.pnl >= 0 ? '#4ADE80' : '#F87171' }}>
+                  {h.pnl >= 0 ? '+' : ''}₳{fmt(h.pnl)} ({h.pnlPct >= 0 ? '+' : ''}{h.pnlPct}%)
+                </div>
+              </div>
             </div>
+            {concentrated && (
+              <div style={{ fontSize: 10, color: 'rgba(248,113,113,0.7)', marginTop: 3, paddingLeft: 4, lineHeight: 1.5 }}>
+                🎓 Aeva: Over 50% in one stock is high concentration risk — a single bad headline can hurt your whole portfolio.
+              </div>
+            )}
           </div>
+        )
+      })}
+      </>}
+
+      {shortPositions.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(248,113,113,0.6)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 8 }}>📉 Short Positions</div>
+          {shortPositions.map(s => (
+            <div key={s.companyId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 6, background: 'rgba(248,113,113,0.04)', border: `1px solid ${s.pnl >= 0 ? 'rgba(74,222,128,0.15)' : 'rgba(248,113,113,0.15)'}`, borderRadius: 12 }}>
+              <span style={{ fontSize: 20, flexShrink: 0 }}>{s.co.emoji}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{s.co.name}</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>
+                  {s.shares} short @ ₳{s.openPrice} · now ₳{fmt(s.co.price)}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: s.pnl >= 0 ? '#4ADE80' : '#F87171' }}>
+                  {s.pnl >= 0 ? '+' : ''}₳{fmt(s.pnl)}
+                </div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{s.pnl >= 0 ? 'profit' : 'loss'}</div>
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   )
 }
@@ -811,8 +916,9 @@ export default function CallStreet() {
     indexHistory, pendingGrade, ipoActive, lastBellChanges, streak, seasonStartValue,
     watchlist, hotSector, crashEvent, insiderTip,
     macroRegime, macroAnnouncement, prediction, predictionResult,
+    shorts, marketBeats, haltBanner,
     ringTheBell, setMode, clearGrade, toggleWatchlist, clearCrash, buyInsiderTip, freshStart, resetPrices,
-    setPrediction, clearPrediction, clearPredictionResult, clearMacroAnnouncement,
+    setPrediction, clearPrediction, clearPredictionResult, clearMacroAnnouncement, clearHaltBanner,
   } = useCallStreetStore()
   const { coins, earnCoins: earn } = useCoinStore()
 
@@ -985,6 +1091,32 @@ export default function CallStreet() {
         {macroAnnouncement && <MacroBanner announcement={macroAnnouncement} onDismiss={clearMacroAnnouncement} />}
       </AnimatePresence>
 
+      {/* HALT banner — company bankruptcy */}
+      <AnimatePresence>
+        {haltBanner && (
+          <motion.div key="halt" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(0,0,0,0.88)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+            <motion.div initial={{ scale: 0.85, y: 30 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 200 }}
+              style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.4)', borderRadius: 20, padding: 28, maxWidth: 320, width: '100%', textAlign: 'center' }}>
+              <div style={{ fontSize: 48, marginBottom: 12 }}>🚨</div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#F87171', letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 8 }}>Trading Halted</div>
+              <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', marginBottom: 6 }}>{haltBanner.companyName}</div>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, marginBottom: 16 }}>
+                {haltBanner.companyEmoji} has been declared <span style={{ color: '#F87171', fontWeight: 700 }}>bankrupt</span> and delisted from the market. All shares are worthless.
+              </div>
+              <div style={{ background: 'rgba(165,180,252,0.06)', border: '0.5px solid rgba(165,180,252,0.18)', borderRadius: 10, padding: '10px 14px', marginBottom: 20, textAlign: 'left' }}>
+                <div style={{ fontSize: 10, color: 'rgba(165,180,252,0.6)', marginBottom: 3, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>🎓 Aeva explains</div>
+                <div style={{ fontSize: 11, color: 'rgba(165,180,252,0.75)', lineHeight: 1.6 }}>Bankruptcy happens when a company can't pay its debts. As a stockholder you're last in line — after creditors and bondholders. Diversifying across sectors reduces the impact of any single delisting.</div>
+              </div>
+              <motion.button whileTap={{ scale: 0.96 }} onClick={clearHaltBanner}
+                style={{ width: '100%', padding: '13px', borderRadius: 12, border: '1px solid rgba(248,113,113,0.4)', background: 'rgba(248,113,113,0.15)', color: '#F87171', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>
+                Acknowledged
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Tab bar */}
       <div style={{ display: 'flex', padding: '8px 16px 0', gap: 4, borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 4 }}>
         {[['market','📈 Market'], ['portfolio','💼 Portfolio']].map(([tab, label]) => (
@@ -996,7 +1128,7 @@ export default function CallStreet() {
       </div>
 
       {activeTab === 'portfolio' && (
-        <PortfolioTab portfolio={portfolio} companies={companies} indexHistory={indexHistory} seasonDay={seasonDay} />
+        <PortfolioTab portfolio={portfolio} companies={companies} indexHistory={indexHistory} seasonDay={seasonDay} shorts={shorts} />
       )}
 
       {activeTab === 'market' && <>
@@ -1157,12 +1289,16 @@ export default function CallStreet() {
           const overlay = calcModeOverlay(co, mode, macroRegime)
           const isHot = co.sector === hotSector
           const isWatched = (watchlist || []).includes(co.id)
+          const isDelisted = !!co.delisted
           return (
             <motion.div key={co.id}
               initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.02 }}
-              onClick={() => setSelected(co.id)}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 6, background: isHot ? `${SECTOR_THEME[co.sector]?.bg || 'rgba(255,255,255,0.03)'}` : holding ? 'rgba(99,102,241,0.04)' : co.isStartup ? 'rgba(251,146,60,0.04)' : 'rgba(255,255,255,0.03)', border: `0.5px solid ${isHot ? (SECTOR_THEME[co.sector]?.glow || 'rgba(255,255,255,0.2)') : holding ? 'rgba(99,102,241,0.22)' : co.isStartup ? 'rgba(251,146,60,0.15)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 12, cursor: 'pointer', position: 'relative', boxShadow: isHot ? `0 0 0 1px ${SECTOR_THEME[co.sector]?.glow || 'transparent'}` : 'none' }}>
-              {holding && (
+              onClick={() => !isDelisted && setSelected(co.id)}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 6, background: isDelisted ? 'rgba(255,255,255,0.01)' : isHot ? `${SECTOR_THEME[co.sector]?.bg || 'rgba(255,255,255,0.03)'}` : holding ? 'rgba(99,102,241,0.04)' : co.isStartup ? 'rgba(251,146,60,0.04)' : 'rgba(255,255,255,0.03)', border: `0.5px solid ${isDelisted ? 'rgba(248,113,113,0.15)' : isHot ? (SECTOR_THEME[co.sector]?.glow || 'rgba(255,255,255,0.2)') : holding ? 'rgba(99,102,241,0.22)' : co.isStartup ? 'rgba(251,146,60,0.15)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 12, cursor: isDelisted ? 'default' : 'pointer', position: 'relative', opacity: isDelisted ? 0.45 : 1, boxShadow: isHot ? `0 0 0 1px ${SECTOR_THEME[co.sector]?.glow || 'transparent'}` : 'none' }}>
+              {isDelisted && (
+                <div style={{ position: 'absolute', top: 7, right: 10, fontSize: 8, fontWeight: 800, color: '#F87171', background: 'rgba(248,113,113,0.15)', border: '0.5px solid rgba(248,113,113,0.3)', borderRadius: 4, padding: '1px 5px', letterSpacing: '.06em' }}>HALTED</div>
+              )}
+              {!isDelisted && holding && (
                 <div style={{ position: 'absolute', top: 9, right: 30, width: 6, height: 6, borderRadius: '50%', background: '#a5b4fc' }} />
               )}
               {flashMap[co.id] && (
