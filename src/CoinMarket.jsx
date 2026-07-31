@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Plus, TrendingUp, TrendingDown, Check, ChevronRight, Zap, AlertCircle, RefreshCw, BarChart2, Package, Layers } from 'lucide-react'
+import { X, Plus, TrendingUp, TrendingDown, Check, ChevronRight, Zap, AlertCircle, RefreshCw, BarChart2, Package, Layers, Users, Copy } from 'lucide-react'
 import { useCoinStore, calcTopicPrice, calcTopicDividend, calcBondReturn, ETF_DEFS } from './coinStore'
+import { useSyndicateStore } from './syndicateStore'
+import { supabase } from './supabase'
 
 /* ── helpers ──────────────────────────────────────────────────── */
 function fmt(n) { return Math.round(n).toLocaleString() }
@@ -487,6 +489,9 @@ function MarketTab() {
 
   return (
     <div style={{ padding: '0 16px 32px' }}>
+      {/* Earnings Report */}
+      <EarningsReport />
+
       {/* Sentiment */}
       <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '16px', marginBottom: 16 }}>
         <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.09em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: 8 }}>Market Sentiment</div>
@@ -593,12 +598,304 @@ function Ticker({ portfolio }) {
   )
 }
 
+/* ── Syndicates Tab ───────────────────────────────────────────── */
+function SyndicatesTab() {
+  const { syndicate, memberCheckIns, loading, error, dbAvailable, load, create, join, leave, checkIn, weeklyPayout } = useSyndicateStore()
+  const { coins, spendCoins } = useCoinStore()
+  const [view, setView] = useState('home') // home | create | join
+  const [synName, setSynName] = useState('')
+  const [joinCode, setJoinCode] = useState('')
+  const [copied, setCopied] = useState(false)
+  const [userId, setUserId] = useState(null)
+  const [displayName, setDisplayName] = useState('')
+  const [checkingIn, setCheckingIn] = useState(false)
+  const [accuracy, setAccuracy] = useState(75)
+  const [contribution, setContribution] = useState(50)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user) {
+        setUserId(data.user.id)
+        setDisplayName(data.user.user_metadata?.name || data.user.email?.split('@')[0] || 'Student')
+        load(data.user.id)
+      }
+    })
+  }, [])
+
+  const payout = weeklyPayout()
+
+  const todayKey = new Date().toISOString().split('T')[0]
+  const myTodayCheckIn = memberCheckIns.find(c => c.user_id === userId && c.check_in_date === todayKey)
+
+  // Group check-ins by member for this week
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]
+  const weekCheckIns = memberCheckIns.filter(c => c.check_in_date >= weekAgo)
+  const memberStats = syndicate?.memberIds?.map(id => {
+    const ins = weekCheckIns.filter(c => c.user_id === id)
+    const avgAcc = ins.length ? Math.round(ins.reduce((s, c) => s + c.arena_accuracy, 0) / ins.length) : null
+    const name = ins[0]?.display_name || (id === userId ? displayName : id.slice(0, 8))
+    return { id, name, checkIns: ins.length, avgAcc, isMe: id === userId }
+  }) || []
+
+  if (dbAvailable === false) return (
+    <div style={{ padding: '0 16px 32px' }}>
+      <div style={{ background: 'rgba(186,117,23,0.1)', border: '1px solid rgba(186,117,23,0.3)', borderRadius: 12, padding: '16px', lineHeight: 1.7 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#D4AF37', marginBottom: 8 }}>⚙️ One-time setup required</div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 12 }}>Syndicates need two database tables. Run this SQL in your Supabase dashboard → SQL Editor:</div>
+        <pre style={{ fontSize: 10, color: '#a5b4fc', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 8, padding: 12, overflow: 'auto', lineHeight: 1.6 }}>{`CREATE TABLE coin_syndicates (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  code TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  leader_id TEXT NOT NULL,
+  member_ids TEXT[] DEFAULT '{}',
+  pool_balance INTEGER DEFAULT 0,
+  season_start TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE syndicate_check_ins (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  syndicate_id UUID REFERENCES coin_syndicates(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL,
+  display_name TEXT DEFAULT '',
+  check_in_date DATE DEFAULT CURRENT_DATE,
+  arena_accuracy INTEGER DEFAULT 0,
+  coins_contributed INTEGER DEFAULT 0,
+  UNIQUE(syndicate_id, user_id, check_in_date)
+);
+ALTER TABLE coin_syndicates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE syndicate_check_ins ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "r" ON coin_syndicates FOR SELECT USING (true);
+CREATE POLICY "i" ON coin_syndicates FOR INSERT WITH CHECK (true);
+CREATE POLICY "u" ON coin_syndicates FOR UPDATE USING (true);
+CREATE POLICY "rc" ON syndicate_check_ins FOR SELECT USING (true);
+CREATE POLICY "ic" ON syndicate_check_ins FOR INSERT WITH CHECK (true);`}</pre>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 10 }}>After running the SQL, refresh the page and Syndicates will work.</div>
+      </div>
+    </div>
+  )
+
+  if (!userId) return (
+    <EmptyState icon="🔐" title="Sign in required" body="Syndicates need an account so your group can find you. Sign in to continue." />
+  )
+
+  if (!syndicate) return (
+    <div style={{ padding: '0 16px 32px' }}>
+      <div style={{ background: 'rgba(127,119,221,0.08)', border: '1px solid rgba(127,119,221,0.2)', borderRadius: 12, padding: '12px 14px', marginBottom: 20, fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.7 }}>
+        <strong style={{ color: '#a5b4fc' }}>Study Syndicates</strong> — form a 5-person group. Pool coins weekly. Your collective Arena performance determines the return. One slacker hurts everyone. One star lifts everyone.
+      </div>
+
+      {view === 'home' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setView('create')}
+            style={{ padding: '14px', background: 'linear-gradient(135deg,rgba(99,102,241,0.2),rgba(124,58,237,0.15))', border: '1px solid rgba(99,102,241,0.35)', borderRadius: 14, color: '#a5b4fc', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left' }}>
+            <Plus size={18} />
+            <div><div>Create a Syndicate</div><div style={{ fontSize: 11, color: 'rgba(165,180,252,0.6)', fontWeight: 400, marginTop: 2 }}>Start a group and share the invite code</div></div>
+          </motion.button>
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setView('join')}
+            style={{ padding: '14px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 14, color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left' }}>
+            <Users size={18} />
+            <div><div>Join a Syndicate</div><div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 400, marginTop: 2 }}>Enter a 6-character invite code</div></div>
+          </motion.button>
+        </div>
+      )}
+
+      {view === 'create' && (
+        <div>
+          <button onClick={() => setView('home')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 13, marginBottom: 16, padding: 0, display: 'flex', alignItems: 'center', gap: 6 }}>← Back</button>
+          <label style={labelStyle}>Syndicate name</label>
+          <input value={synName} onChange={e => setSynName(e.target.value)} placeholder="e.g. The Study Squad" style={inputStyle} autoFocus />
+          {error && <div style={{ fontSize: 12, color: '#F87171', marginBottom: 10 }}>{error}</div>}
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            onClick={async () => { if (synName.trim()) await create(userId, displayName, synName.trim()) }}
+            disabled={!synName.trim() || loading}
+            style={{ width: '100%', padding: '11px', background: synName.trim() ? 'linear-gradient(135deg,#4F46E5,#7C3AED)' : 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 10, color: synName.trim() ? '#fff' : 'rgba(255,255,255,0.25)', fontSize: 13, fontWeight: 700, cursor: synName.trim() ? 'pointer' : 'not-allowed' }}>
+            {loading ? 'Creating…' : 'Create & Get Invite Code'}
+          </motion.button>
+        </div>
+      )}
+
+      {view === 'join' && (
+        <div>
+          <button onClick={() => setView('home')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 13, marginBottom: 16, padding: 0, display: 'flex', alignItems: 'center', gap: 6 }}>← Back</button>
+          <label style={labelStyle}>Invite code</label>
+          <input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="ABC123" maxLength={6} style={{ ...inputStyle, fontSize: 20, letterSpacing: '.2em', fontWeight: 700 }} autoFocus />
+          {error && <div style={{ fontSize: 12, color: '#F87171', marginBottom: 10 }}>{error}</div>}
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            onClick={async () => { if (joinCode.length === 6) await join(userId, displayName, joinCode) }}
+            disabled={joinCode.length !== 6 || loading}
+            style={{ width: '100%', padding: '11px', background: joinCode.length === 6 ? 'linear-gradient(135deg,#4F46E5,#7C3AED)' : 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 10, color: joinCode.length === 6 ? '#fff' : 'rgba(255,255,255,0.25)', fontSize: 13, fontWeight: 700, cursor: joinCode.length === 6 ? 'pointer' : 'not-allowed' }}>
+            {loading ? 'Joining…' : 'Join Syndicate'}
+          </motion.button>
+        </div>
+      )}
+    </div>
+  )
+
+  return (
+    <div style={{ padding: '0 16px 32px' }}>
+      {/* Syndicate header */}
+      <div style={{ background: 'linear-gradient(135deg,rgba(99,102,241,0.15),rgba(124,58,237,0.1))', border: '1px solid rgba(99,102,241,0.25)', borderRadius: 14, padding: '14px', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>{syndicate.name}</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{syndicate.memberIds.length}/5 members · {syndicate.role === 'leader' ? '👑 Leader' : 'Member'}</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+              onClick={() => { navigator.clipboard?.writeText(syndicate.code); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 12px', color: copied ? '#4ADE80' : 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, letterSpacing: '.1em' }}>
+              {copied ? <Check size={12} /> : <Copy size={12} />} {syndicate.code}
+            </motion.button>
+          </div>
+        </div>
+
+        {/* Payout projection */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+          <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: '8px 10px' }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '.07em' }}>Pool this week</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#D4AF37', marginTop: 2 }}>₳ {fmt(payout.totalCoins || 0)}</div>
+          </div>
+          <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: '8px 10px' }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '.07em' }}>Avg accuracy</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: payout.avgAccuracy >= 60 ? '#4ADE80' : '#F87171', marginTop: 2 }}>{payout.avgAccuracy || 0}%</div>
+          </div>
+          <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: '8px 10px' }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '.07em' }}>Projected payout</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#4ADE80', marginTop: 2 }}>₳ {fmt(payout.payout || 0)}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Member leaderboard */}
+      <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.09em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: 10 }}>This Week's Performance</div>
+      {memberStats.map((m, i) => (
+        <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', fontWeight: 700, width: 16 }}>#{i + 1}</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: m.isMe ? '#a5b4fc' : '#fff' }}>{m.name}{m.isMe && <span style={{ fontSize: 10, color: 'rgba(165,180,252,0.6)', marginLeft: 6 }}>you</span>}</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{m.checkIns} check-in{m.checkIns !== 1 ? 's' : ''} this week</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            {m.avgAcc !== null
+              ? <div style={{ fontSize: 14, fontWeight: 700, color: m.avgAcc >= 60 ? '#4ADE80' : '#F87171' }}>{m.avgAcc}%</div>
+              : <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)' }}>no data</div>
+            }
+          </div>
+        </div>
+      ))}
+
+      {/* Check In */}
+      {!myTodayCheckIn && (
+        <div style={{ marginTop: 20 }}>
+          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.09em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: 10 }}>Log Today's Performance</div>
+          {!checkingIn ? (
+            <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={() => setCheckingIn(true)}
+              style={{ width: '100%', padding: '11px', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 12, color: '#a5b4fc', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <Check size={14} /> Check In Today
+            </motion.button>
+          ) : (
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 14 }}>
+              <label style={labelStyle}>Arena accuracy today (%)</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                <input type="range" min={0} max={100} value={accuracy} onChange={e => setAccuracy(+e.target.value)} style={{ flex: 1, accentColor: '#7C3AED' }} />
+                <span style={{ fontSize: 14, fontWeight: 700, color: accuracy >= 60 ? '#4ADE80' : '#F87171', minWidth: 36 }}>{accuracy}%</span>
+              </div>
+              <label style={labelStyle}>Coins to contribute to pool</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                <input type="range" min={10} max={Math.min(coins, 500)} step={10} value={contribution} onChange={e => setContribution(+e.target.value)} style={{ flex: 1, accentColor: '#7C3AED' }} />
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#D4AF37', minWidth: 46 }}>₳ {contribution}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setCheckingIn(false)} style={{ flex: 1, padding: '9px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                  onClick={async () => {
+                    if (coins < contribution) return
+                    spendCoins(contribution, `Syndicate pool: ${syndicate.name}`)
+                    await checkIn(userId, displayName, accuracy, contribution)
+                    setCheckingIn(false)
+                  }}
+                  style={{ flex: 2, padding: '9px', background: 'linear-gradient(135deg,#4F46E5,#7C3AED)', border: 'none', borderRadius: 10, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                  Submit Check-In
+                </motion.button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {myTodayCheckIn && (
+        <div style={{ marginTop: 16, padding: '10px 14px', background: 'rgba(29,158,117,0.08)', border: '1px solid rgba(29,158,117,0.2)', borderRadius: 10, fontSize: 12, color: '#4ADE80' }}>
+          ✓ Checked in today — {myTodayCheckIn.arena_accuracy}% accuracy · ₳{myTodayCheckIn.coins_contributed} contributed
+        </div>
+      )}
+
+      <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.97 }}
+        onClick={() => leave(userId)}
+        style={{ width: '100%', marginTop: 24, padding: '9px', background: 'none', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, color: 'rgba(255,255,255,0.25)', fontSize: 12, cursor: 'pointer' }}>
+        Leave Syndicate
+      </motion.button>
+    </div>
+  )
+}
+
+/* ── Earnings Report (inside Market tab) ──────────────────────── */
+function EarningsReport() {
+  const { monthlySnapshots, portfolio, coins, etfHoldings } = useCoinStore()
+  const portfolioValue = portfolio.reduce((s, t) => s + calcTopicPrice(t), 0)
+  const etfValue = etfHoldings.reduce((s, h) => s + h.units * 100, 0)
+  const currentNetWorth = coins + portfolioValue + etfValue
+
+  const thisMonth = new Date().toISOString().slice(0, 7)
+  const lastSnap = monthlySnapshots.filter(s => s.month < thisMonth).slice(-1)[0]
+  const change = lastSnap ? currentNetWorth - lastSnap.netWorth : null
+  const changePct = lastSnap && lastSnap.netWorth > 0 ? Math.round((change / lastSnap.netWorth) * 100) : null
+
+  const maxVal = Math.max(...monthlySnapshots.map(s => s.netWorth), currentNetWorth, 1)
+
+  return (
+    <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '14px', marginBottom: 16 }}>
+      <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.09em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: 10 }}>Monthly Earnings Report</div>
+
+      {monthlySnapshots.length === 0 ? (
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', lineHeight: 1.7 }}>Your first monthly snapshot will be taken at the end of {thisMonth}. Check back next month to see your growth chart.</div>
+      ) : (
+        <>
+          {change !== null && (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 14 }}>
+              <span style={{ fontSize: 22, fontWeight: 800, color: change >= 0 ? '#4ADE80' : '#F87171' }}>
+                {change >= 0 ? '+' : ''}₳ {fmt(Math.abs(change))}
+              </span>
+              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>vs last month ({changePct >= 0 ? '+' : ''}{changePct}%)</span>
+            </div>
+          )}
+
+          {/* Mini bar chart */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 48, marginBottom: 8 }}>
+            {[...monthlySnapshots, { month: thisMonth + '~', netWorth: currentNetWorth }].slice(-6).map((s, i, arr) => {
+              const h = Math.max(4, Math.round((s.netWorth / maxVal) * 48))
+              const isNow = i === arr.length - 1
+              const prev = arr[i - 1]
+              const up = !prev || s.netWorth >= prev.netWorth
+              return (
+                <div key={s.month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                  <div style={{ width: '100%', height: h, borderRadius: '3px 3px 0 0', background: isNow ? (up ? '#4ADE80' : '#F87171') : 'rgba(255,255,255,0.15)' }} />
+                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>{isNow ? 'now' : s.month.slice(5)}</div>
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 /* ── Main Component ───────────────────────────────────────────── */
 const TABS = [
-  { id: 'portfolio', label: 'Portfolio', icon: BarChart2 },
-  { id: 'bonds',     label: 'Bonds',     icon: Layers },
-  { id: 'etfs',      label: 'ETFs',      icon: Package },
-  { id: 'market',    label: 'Market',    icon: TrendingUp },
+  { id: 'portfolio',  label: 'Portfolio',  icon: BarChart2 },
+  { id: 'bonds',      label: 'Bonds',      icon: Layers },
+  { id: 'etfs',       label: 'ETFs',       icon: Package },
+  { id: 'syndicates', label: 'Syndicates', icon: Users },
+  { id: 'market',     label: 'Market',     icon: TrendingUp },
 ]
 
 export default function CoinMarket({ onClose }) {
@@ -673,10 +970,11 @@ export default function CoinMarket({ onClose }) {
       {/* Tab content */}
       <div style={{ flex: 1, overflowY: 'auto', paddingTop: 20 }}>
         <AnimatePresence mode="wait">
-          {tab === 'portfolio' && <motion.div key="p" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><PortfolioTab /></motion.div>}
-          {tab === 'bonds'     && <motion.div key="b" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><BondsTab /></motion.div>}
-          {tab === 'etfs'      && <motion.div key="e" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ETFsTab /></motion.div>}
-          {tab === 'market'    && <motion.div key="m" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><MarketTab /></motion.div>}
+          {tab === 'portfolio'  && <motion.div key="p" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><PortfolioTab /></motion.div>}
+          {tab === 'bonds'      && <motion.div key="b" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><BondsTab /></motion.div>}
+          {tab === 'etfs'       && <motion.div key="e" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ETFsTab /></motion.div>}
+          {tab === 'syndicates' && <motion.div key="s" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><SyndicatesTab /></motion.div>}
+          {tab === 'market'     && <motion.div key="m" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><MarketTab /></motion.div>}
         </AnimatePresence>
       </div>
     </motion.div>

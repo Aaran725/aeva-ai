@@ -43,6 +43,7 @@ const DEFAULT = {
   etfHoldings: [],
   lastDailyBonus: null,
   lastDividendClaim: null,
+  monthlySnapshots: [],  // [{ month: 'YYYY-MM', netWorth, coins, portfolioValue }]
   stats: { totalEarned: 500, totalSpent: 0, bondsCompleted: 0, bondsFailed: 0 },
 }
 
@@ -96,6 +97,21 @@ export const useCoinStore = create((set, get) => {
         return updated
       })
       get().earnCoins(15, 'Daily Login Bonus')
+      get().takeMonthlySnapshot()
+    },
+
+    takeMonthlySnapshot: () => {
+      const state = get()
+      const month = new Date().toISOString().slice(0, 7) // 'YYYY-MM'
+      if (state.monthlySnapshots.some(s => s.month === month)) return
+      const portfolioValue = state.portfolio.reduce((s, t) => s + calcTopicPrice(t), 0)
+      const etfValue = state.etfHoldings.reduce((s, h) => s + h.units * 100, 0)
+      const snapshot = { month, netWorth: state.coins + portfolioValue + etfValue, coins: state.coins, portfolioValue }
+      set(s => {
+        const updated = { ...s, monthlySnapshots: [...s.monthlySnapshots, snapshot].slice(-12) }
+        save(updated)
+        return updated
+      })
     },
 
     addToPortfolio: (topic, accuracy, questionCount, category = '') => {

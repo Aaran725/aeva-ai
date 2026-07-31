@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Copy, Check, Trophy, Zap, Users, ChevronRight, ArrowLeft, Crown } from 'lucide-react'
 import { useArenaStore, ARENA_COLORS, CARD_DEFS } from './arenaStore'
 import { useXPStore } from './xpStore'
+import { useCoinStore } from './coinStore'
 import { supabase } from './supabase'
 import QRCode from 'qrcode'
 
@@ -672,7 +673,7 @@ function QuestionScreen() {
 }
 
 function RevealScreen() {
-  const { stubs, currentQIdx, correctIdx, explanation, aevaLine, answers, players, myUserId, scoreDeltas, effects, playerTiers } = useArenaStore()
+  const { stubs, currentQIdx, correctIdx, explanation, aevaLine, answers, players, myUserId, scoreDeltas, effects, playerTiers, settings } = useArenaStore()
   const stub = stubs[currentQIdx]
   const myAns = answers[myUserId]
   const myTier = playerTiers?.[myUserId] || 'standard'
@@ -682,6 +683,18 @@ function RevealScreen() {
   const isCorrect = myAns?.choiceIdx === correctForMe
   const isBlinded = !!(effects[myUserId] || {}).blinded
   const myDelta = scoreDeltas?.[myUserId] || 0
+
+  // Award ₳ coins for a correct answer — once per question reveal
+  const awardedRef = useRef(false)
+  useEffect(() => {
+    if (!isCorrect || awardedRef.current) return
+    awardedRef.current = true
+    const base = isExpertPlayer ? 18 : 10
+    const streak = players.find(p => p.userId === myUserId)?.streak || 0
+    const bonus = streak >= 5 ? 8 : streak >= 2 ? 4 : 0
+    const topic = settings?.topic || 'Arena'
+    useCoinStore.getState().earnCoins(base + bonus, `Arena correct: ${topic}`)
+  }, [isCorrect])
   const choiceBg  = ['rgba(99,102,241,0.14)', 'rgba(244,63,94,0.14)', 'rgba(16,185,129,0.14)', 'rgba(245,158,11,0.14)']
   const choiceLtr = ['A', 'B', 'C', 'D']
 
