@@ -186,38 +186,155 @@ function Movers({ changes, onSelect }) {
 }
 
 /* ── Season end overlay ──────────────────────────────────────────── */
-function SeasonEnd({ grade, onClose, onCollect }) {
+function tradingSignal(co) {
+  if (co._debtRatio > 0.45)     return 'a debt warning signal'
+  if (co._profitMargin < -0.1)  return 'widening losses'
+  if (co._revGrowth < 0.1)      return 'slowing revenue growth'
+  return 'market headwinds'
+}
+
+function investorStyle(portfolio, companies, beatMarket) {
+  if (!portfolio.length) return { label: 'Observer', emoji: '👁️', desc: 'Watch the market closely before you trade' }
+  const cos = portfolio.map(h => companies.find(c => c.id === h.companyId)).filter(Boolean)
+  const n = cos.length
+  const hasStartups  = cos.some(c => c.isStartup)
+  const growthCount  = cos.filter(c => c._revGrowth > 0.35).length
+  const profitCount  = cos.filter(c => c._profitMargin > 0.15).length
+  const debtCount    = cos.filter(c => c._debtRatio > 0.45).length
+  if (hasStartups || growthCount / n > 0.5)
+    return { label: 'Venture Capitalist', emoji: '🚀', desc: 'High risk, high reward — you backed moonshots' }
+  if (profitCount / n > 0.5 && beatMarket)
+    return { label: 'Value Investor',     emoji: '🏛️', desc: 'Quality businesses, patient approach — Buffett would approve' }
+  if (growthCount / n > 0.3 && beatMarket)
+    return { label: 'Growth Investor',    emoji: '🔍', desc: 'You spotted growth stories before the crowd' }
+  if (debtCount / n > 0.3)
+    return { label: 'Macro Trader',       emoji: '🌎', desc: 'Bold macro bets — risky but sometimes brilliant' }
+  return   { label: 'Balanced Investor',  emoji: '⚖️', desc: 'Steady and diversified — a solid foundation' }
+}
+
+function SeasonEnd({ grade, portfolio, companies, onClose, onCollect, onFreshStart }) {
   const gradeColor = { 'A+': '#D4AF37', A: '#4ADE80', B: '#60A5FA', C: '#fb923c', D: '#F87171' }[grade.grade] || '#fff'
+
+  const holdings = portfolio.map(h => {
+    const co = companies.find(c => c.id === h.companyId)
+    if (!co) return null
+    const gainPct = Math.round(((co.price - h.avgCost) / h.avgCost) * 100)
+    return { ...h, co, gainPct }
+  }).filter(Boolean).sort((a, b) => b.gainPct - a.gainPct)
+
+  const bestTrade  = holdings.find(h => h.gainPct > 0)
+  const worstHeld  = [...holdings].reverse().find(h => h.gainPct < 0)
+  const top2Ids    = holdings.slice(0, 2).map(h => h.companyId)
+  const style      = investorStyle(portfolio, companies, grade.beatMarket)
+
+  const [kept, setKept] = useState(new Set(top2Ids))
+  const toggleKept = id => setKept(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ position: 'absolute', inset: 0, zIndex: 50, background: 'rgba(6,5,24,0.96)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center' }}
+      style={{ position: 'absolute', inset: 0, zIndex: 50, background: 'rgba(6,5,24,0.97)', overflowY: 'auto', padding: '28px 20px 40px' }}
     >
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.35)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 12 }}>Season complete</div>
-      <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
-        style={{ fontSize: 96, fontWeight: 900, color: gradeColor, lineHeight: 1, marginBottom: 8, letterSpacing: '-0.04em' }}>
-        {grade.grade}
-      </motion.div>
-      <div style={{ fontSize: 28, fontWeight: 800, color: '#D4AF37', marginBottom: 4 }}>
-        {grade.returnPct >= 0 ? '+' : ''}{grade.returnPct}% return
+      {/* Grade */}
+      <div style={{ textAlign: 'center', marginBottom: 20 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 10 }}>Season complete</div>
+        <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
+          style={{ fontSize: 88, fontWeight: 900, color: gradeColor, lineHeight: 1, marginBottom: 6, letterSpacing: '-0.04em' }}>
+          {grade.grade}
+        </motion.div>
+        <div style={{ fontSize: 26, fontWeight: 800, color: '#D4AF37', marginBottom: 4 }}>
+          {grade.returnPct >= 0 ? '+' : ''}{grade.returnPct}% return
+        </div>
+        {grade.multiplier > 1 && (
+          <div style={{ fontSize: 11, color: '#D4AF37', background: 'rgba(212,175,55,0.1)', border: '0.5px solid rgba(212,175,55,0.25)', borderRadius: 8, padding: '3px 12px', marginBottom: 6, display: 'inline-block' }}>
+            🔥 {grade.multiplier}× streak bonus applied!
+          </div>
+        )}
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)', marginBottom: 4 }}>
+          Market index: {grade.indexReturn >= 0 ? '+' : ''}{grade.indexReturn}%
+          {grade.beatMarket ? ' · You beat the market! 🎯' : ' · Market beat you'}
+        </div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.7, marginTop: 6 }}>{grade.note}</div>
       </div>
-      {grade.multiplier > 1 && (
-        <div style={{ fontSize: 12, color: '#D4AF37', background: 'rgba(212,175,55,0.1)', border: '0.5px solid rgba(212,175,55,0.25)', borderRadius: 8, padding: '4px 14px', marginBottom: 8, display: 'inline-block' }}>
-          🔥 {grade.multiplier}× streak bonus applied!
+
+      {/* Investor style badge */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
+        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 14, padding: '12px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ fontSize: 30 }}>{style.emoji}</div>
+        <div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 2 }}>Your style this season</div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>{style.label}</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>{style.desc}</div>
+        </div>
+      </motion.div>
+
+      {/* Trade callouts */}
+      {(bestTrade || worstHeld) && (
+        <div style={{ display: 'grid', gridTemplateColumns: bestTrade && worstHeld ? '1fr 1fr' : '1fr', gap: 8, marginBottom: 12 }}>
+          {bestTrade && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
+              style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.18)', borderRadius: 12, padding: '10px 12px' }}>
+              <div style={{ fontSize: 10, color: '#4ADE80', fontWeight: 700, marginBottom: 4 }}>🏆 Best trade</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{bestTrade.co.emoji} {bestTrade.co.name}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 2, lineHeight: 1.5 }}>
+                Bought at ₳{bestTrade.avgCost}, now <span style={{ color: '#4ADE80', fontWeight: 700 }}>+{bestTrade.gainPct}%</span>
+              </div>
+            </motion.div>
+          )}
+          {worstHeld && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+              style={{ background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.18)', borderRadius: 12, padding: '10px 12px' }}>
+              <div style={{ fontSize: 10, color: '#F87171', fontWeight: 700, marginBottom: 4 }}>⚠️ Lesson</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{worstHeld.co.emoji} {worstHeld.co.name}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 2, lineHeight: 1.5 }}>
+                You held through <span style={{ color: '#F87171' }}>{tradingSignal(worstHeld.co)}</span>
+              </div>
+            </motion.div>
+          )}
         </div>
       )}
-      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>
-        Market index: {grade.indexReturn >= 0 ? '+' : ''}{grade.indexReturn}%
-        {grade.beatMarket ? ' · You beat the market! 🎯' : ' · Market beat you'}
-      </div>
-      <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', lineHeight: 1.7, maxWidth: 280, marginBottom: 24 }}>
-        {grade.note}
-      </div>
-      <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={onCollect}
-        style={{ width: '100%', maxWidth: 280, padding: '14px', borderRadius: 14, border: 'none', background: `linear-gradient(135deg,${gradeColor}33,${gradeColor}22)`, outline: `1px solid ${gradeColor}55`, color: gradeColor, fontSize: 16, fontWeight: 800, cursor: 'pointer', marginBottom: 10 }}>
-        Collect ₳{fmt(grade.coins)} reward
+
+      {/* Carry-forward selector */}
+      {holdings.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}
+          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '12px 14px', marginBottom: 16 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 }}>Carry into next season?</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 10 }}>Select positions to keep. The rest will be sold at market price.</div>
+          {holdings.map(h => (
+            <div key={h.companyId} onClick={() => toggleKept(h.companyId)}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', marginBottom: 5, borderRadius: 9, background: kept.has(h.companyId) ? 'rgba(165,180,252,0.1)' : 'rgba(255,255,255,0.02)', border: `1px solid ${kept.has(h.companyId) ? 'rgba(165,180,252,0.35)' : 'rgba(255,255,255,0.06)'}`, cursor: 'pointer' }}>
+              <span style={{ fontSize: 16 }}>{h.co.emoji}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{h.co.name}</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>{h.shares} shares · avg ₳{h.avgCost}</div>
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: h.gainPct >= 0 ? '#4ADE80' : '#F87171' }}>
+                {h.gainPct >= 0 ? '+' : ''}{h.gainPct}%
+              </div>
+              <div style={{ width: 16, height: 16, borderRadius: '50%', border: `2px solid ${kept.has(h.companyId) ? '#a5b4fc' : 'rgba(255,255,255,0.2)'}`, background: kept.has(h.companyId) ? '#a5b4fc' : 'transparent', flexShrink: 0 }} />
+            </div>
+          ))}
+          {kept.size > 0 && (
+            <button onClick={() => { onFreshStart([...kept]); onCollect() }}
+              style={{ width: '100%', marginTop: 8, padding: '10px', borderRadius: 10, border: '1px solid rgba(165,180,252,0.35)', background: 'rgba(124,58,237,0.15)', color: '#a5b4fc', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              Fresh start — keep {kept.size} position{kept.size !== 1 ? 's' : ''}
+            </button>
+          )}
+          {kept.size === 0 && (
+            <button onClick={() => { onFreshStart([]); onCollect() }}
+              style={{ width: '100%', marginTop: 8, padding: '10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              Full reset — sell everything
+            </button>
+          )}
+        </motion.div>
+      )}
+
+      {/* Collect */}
+      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} onClick={onCollect}
+        style={{ width: '100%', padding: '14px', borderRadius: 14, border: 'none', background: `linear-gradient(135deg,${gradeColor}33,${gradeColor}22)`, outline: `1px solid ${gradeColor}55`, color: gradeColor, fontSize: 16, fontWeight: 800, cursor: 'pointer', marginBottom: 10 }}>
+        Collect ₳{fmt(grade.coins)} reward &amp; continue
       </motion.button>
-      <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 13, cursor: 'pointer' }}>
+      <button onClick={onClose} style={{ display: 'block', width: '100%', background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)', fontSize: 12, cursor: 'pointer', padding: '8px 0' }}>
         Skip
       </button>
     </motion.div>
@@ -603,7 +720,7 @@ export default function CallStreet() {
     companies, portfolio, news, mode, seasonDay, season,
     indexHistory, pendingGrade, ipoActive, lastBellChanges, streak, seasonStartValue,
     watchlist, hotSector, crashEvent, insiderTip,
-    ringTheBell, setMode, clearGrade, toggleWatchlist, clearCrash, buyInsiderTip,
+    ringTheBell, setMode, clearGrade, toggleWatchlist, clearCrash, buyInsiderTip, freshStart,
   } = useCallStreetStore()
   const { coins, earnCoins: earn } = useCoinStore()
 
@@ -673,6 +790,10 @@ export default function CallStreet() {
     clearGrade()
   }
 
+  function handleFreshStart(keepIds) {
+    freshStart(keepIds)
+  }
+
   function handleIPO() {
     const ipoCompany = ipoActive && companies.find(c => c.id === ipoActive.companyId)
     if (!ipoCompany) return
@@ -689,7 +810,7 @@ export default function CallStreet() {
       <div style={{ position: 'relative', minHeight: '100%' }}>
         <CompanyDetail company={company} holding={holding} mode={mode} onBack={() => setSelected(null)} />
         <AnimatePresence>
-          {pendingGrade && <SeasonEnd grade={pendingGrade} onClose={clearGrade} onCollect={handleCollectGrade} />}
+          {pendingGrade && <SeasonEnd grade={pendingGrade} portfolio={portfolio} companies={companies} onClose={clearGrade} onCollect={handleCollectGrade} onFreshStart={handleFreshStart} />}
         </AnimatePresence>
       </div>
     )
@@ -698,7 +819,7 @@ export default function CallStreet() {
   return (
     <div style={{ position: 'relative', paddingBottom: 48 }}>
       <AnimatePresence>
-        {pendingGrade && <SeasonEnd grade={pendingGrade} onClose={clearGrade} onCollect={handleCollectGrade} />}
+        {pendingGrade && <SeasonEnd grade={pendingGrade} portfolio={portfolio} companies={companies} onClose={clearGrade} onCollect={handleCollectGrade} onFreshStart={handleFreshStart} />}
       </AnimatePresence>
 
       {/* Full-screen bell flash */}

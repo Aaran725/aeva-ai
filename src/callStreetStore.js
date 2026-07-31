@@ -412,6 +412,21 @@ export const useCallStreetStore = create((set, get) => {
       set(updated)
     },
 
+    freshStart: (keepIds = []) => {
+      const state = get()
+      const toSell = state.portfolio.filter(p => !keepIds.includes(p.companyId))
+      let proceeds = 0
+      toSell.forEach(h => {
+        const co = state.companies.find(c => c.id === h.companyId)
+        if (co) proceeds += h.shares * co.price
+      })
+      if (proceeds > 0) useCoinStore.getState().earnCoins(proceeds, 'Fresh start — sold remaining holdings')
+      const portfolio = state.portfolio.filter(p => keepIds.includes(p.companyId))
+      const updated = { ...state, portfolio }
+      persist(updated)
+      set(updated)
+    },
+
     reset: () => {
       const fresh = freshState()
       persist(fresh)
