@@ -314,6 +314,8 @@ export const useCallStreetStore = create((set, get) => {
       const prevPrices = {}
       state.companies.forEach(c => { prevPrices[c.id] = c.price })
       const ringId = (state.totalBells || 0) + 1
+      const newDay = state.seasonDay + 1
+      const seasonEnds = newDay >= 10
 
       // 3–5 companies get news events; rest get mild drift
       const numWithNews = 3 + Math.floor(Math.random() * 3)
@@ -510,9 +512,6 @@ export const useCallStreetStore = create((set, get) => {
 
       // Expire research reports
       const researchBought = []
-
-      const newDay = state.seasonDay + 1
-      const seasonEnds = newDay >= 10
 
       let pendingGrade = state.pendingGrade
       let season = state.season

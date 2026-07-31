@@ -1046,13 +1046,14 @@ export default function CallStreet() {
     macroRegime, macroAnnouncement, prediction, predictionResult,
     shorts, marketBeats, haltBanner,
     earningsWindow, earningsPredictions, earningsReveal, seasonsPlayed, beatMarketStreak,
-    ringTheBell, setMode, clearGrade, toggleWatchlist, clearCrash, buyInsiderTip, freshStart, resetPrices,
+    ringTheBell, setMode, clearGrade, toggleWatchlist, clearCrash, buyInsiderTip, freshStart, resetPrices, reset,
     setPrediction, clearPrediction, clearPredictionResult, clearMacroAnnouncement, clearHaltBanner,
     makeEarningsPrediction, clearEarningsReveal,
   } = useCallStreetStore()
-  const { coins, earnCoins: earn } = useCoinStore()
+  const { coins, earnCoins: earn, resetToDefault: resetCoins, addCoins } = useCoinStore()
 
   const [selected, setSelected] = useState(null)
+  const [showSettings, setShowSettings] = useState(false)
   const [bellRinging, setBellRinging] = useState(false)
   const [flashKey, setFlashKey] = useState(0)
   const [flashMap, setFlashMap] = useState({})
@@ -1193,9 +1194,9 @@ export default function CallStreet() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <span style={{ fontSize: 15, fontWeight: 900, color: '#D4AF37', letterSpacing: '-0.03em' }}>📈 Call Street</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button onClick={() => { if (confirm('Reset all stock prices to base values? Your portfolio positions are kept.')) resetPrices() }}
-              style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '3px 7px', cursor: 'pointer', letterSpacing: '.04em', textTransform: 'uppercase' }}>
-              ⟳ Reset prices
+            <button onClick={() => setShowSettings(s => !s)}
+              style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '3px 7px', cursor: 'pointer', letterSpacing: '.04em', textTransform: 'uppercase' }}>
+              ⚙️ Settings
             </button>
             <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>Season {season} · Day {seasonDay}/10</span>
           </div>
@@ -1208,6 +1209,64 @@ export default function CallStreet() {
           />
         </div>
       </div>
+
+      {/* Settings panel */}
+      <AnimatePresence>
+        {showSettings && (
+          <motion.div key="settings-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setShowSettings(false)}
+            style={{ position: 'fixed', inset: 0, zIndex: 980, background: 'rgba(0,0,0,0.6)' }}>
+            <motion.div initial={{ y: -16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -16, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              style={{ position: 'absolute', top: 52, right: 16, width: 220, background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 14, padding: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.3)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 10 }}>Reset Options</div>
+              {[
+                {
+                  label: '⟳ Reset Prices',
+                  desc: 'Prices return to base values. Portfolio kept.',
+                  action: () => { if (window.confirm('Reset all stock prices to base values? Portfolio positions are kept.')) { resetPrices(); setShowSettings(false) } },
+                  color: 'rgba(212,175,55,0.8)',
+                },
+                {
+                  label: '💼 Reset Portfolio',
+                  desc: 'Sell all holdings at current price. Add coins back.',
+                  action: () => {
+                    if (window.confirm('Sell all holdings and return coins? This cannot be undone.')) {
+                      freshStart([])
+                      setShowSettings(false)
+                    }
+                  },
+                  color: 'rgba(96,165,250,0.8)',
+                },
+                {
+                  label: '➕ Add ₳500',
+                  desc: 'Top up your wallet by ₳500.',
+                  action: () => { addCoins(500); setShowSettings(false) },
+                  color: 'rgba(52,211,153,0.8)',
+                },
+                {
+                  label: '🔴 Full Reset',
+                  desc: 'Wipe everything — game + wallet — back to start.',
+                  action: () => {
+                    if (window.confirm('Full reset? This wipes your entire game and wallet. Are you sure?')) {
+                      reset()
+                      resetCoins()
+                      setShowSettings(false)
+                    }
+                  },
+                  color: 'rgba(248,113,113,0.8)',
+                },
+              ].map(item => (
+                <button key={item.label} onClick={item.action}
+                  style={{ width: '100%', textAlign: 'left', background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '9px 12px', cursor: 'pointer', marginBottom: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: item.color, marginBottom: 2 }}>{item.label}</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', lineHeight: 1.4 }}>{item.desc}</div>
+                </button>
+              ))}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Scrolling ticker */}
       {news.length > 0 && <TickerTape news={news} />}

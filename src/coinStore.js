@@ -252,6 +252,20 @@ export const useCoinStore = create((set, get) => {
       return total
     },
 
+    resetToDefault: () => {
+      const fresh = { ...DEFAULT, transactions: [], stats: { totalEarned: 500, totalSpent: 0, bondsCompleted: 0, bondsFailed: 0 } }
+      save(fresh)
+      set(fresh)
+    },
+
+    addCoins: (amount) => {
+      set(state => {
+        const updated = { ...state, coins: state.coins + amount, transactions: addTx(state, amount, 'Manual top-up', 'earn'), stats: { ...state.stats, totalEarned: state.stats.totalEarned + amount } }
+        save(updated)
+        return updated
+      })
+    },
+
     buyETF: (etfId, units) => {
       const cost = units * 100
       if (!get().spendCoins(cost, `ETF: ${ETF_DEFS.find(e => e.id === etfId)?.name}`)) return false
