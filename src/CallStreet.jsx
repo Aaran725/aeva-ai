@@ -720,7 +720,7 @@ export default function CallStreet() {
     companies, portfolio, news, mode, seasonDay, season,
     indexHistory, pendingGrade, ipoActive, lastBellChanges, streak, seasonStartValue,
     watchlist, hotSector, crashEvent, insiderTip,
-    ringTheBell, setMode, clearGrade, toggleWatchlist, clearCrash, buyInsiderTip, freshStart,
+    ringTheBell, setMode, clearGrade, toggleWatchlist, clearCrash, buyInsiderTip, freshStart, resetPrices,
   } = useCallStreetStore()
   const { coins, earnCoins: earn } = useCoinStore()
 
@@ -858,7 +858,13 @@ export default function CallStreet() {
       <div style={{ padding: '12px 16px 10px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <span style={{ fontSize: 15, fontWeight: 900, color: '#D4AF37', letterSpacing: '-0.03em' }}>📈 Call Street</span>
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>Season {season} · Day {seasonDay}/10</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={() => { if (confirm('Reset all stock prices to base values? Your portfolio positions are kept.')) resetPrices() }}
+              style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '3px 7px', cursor: 'pointer', letterSpacing: '.04em', textTransform: 'uppercase' }}>
+              ⟳ Reset prices
+            </button>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>Season {season} · Day {seasonDay}/10</span>
+          </div>
         </div>
         <div style={{ height: 2, background: 'rgba(255,255,255,0.07)', borderRadius: 99, overflow: 'hidden' }}>
           <motion.div

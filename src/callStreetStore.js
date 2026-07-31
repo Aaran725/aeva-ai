@@ -67,6 +67,14 @@ const AEVA_LESSONS = {
   crash:    { pos: null, neg: "Market crashes can be buying opportunities for quality companies. Fear is often overblown." },
 }
 
+function calcFairValue(def) {
+  const growthMult  = 1 + Math.max(0, def._revGrowth) * 2.0
+  const profitMult  = 1 + def._profitMargin * 2.0
+  const qualityMult = 0.7 + def._founderScore * 0.6
+  const debtDisc    = 1 - Math.max(0, def._debtRatio - 0.2) * 0.3
+  return Math.max(10, Math.round(def.basePrice * growthMult * Math.max(0.4, profitMult) * qualityMult * debtDisc))
+}
+
 function pickImpact([min, max]) {
   return min + Math.random() * (max - min)
 }
@@ -87,7 +95,8 @@ function generateEventsForCompany(company) {
 function initCompany(def) {
   const variation = 1 + (Math.random() - 0.5) * 0.08
   const price = Math.round(def.basePrice * variation)
-  return { ...def, price, priceHistory: [price], daysHeldByMe: 0, reportUnlocked: false }
+  const fairValue = calcFairValue(def)
+  return { ...def, price, priceHistory: [price], daysHeldByMe: 0, reportUnlocked: false, fairValue }
 }
 
 // ── Sector PE benchmarks (for Buffett mode) ───────────────────────
@@ -192,7 +201,12 @@ export const useCallStreetStore = create((set, get) => {
           const events = generateEventsForCompany(company)
           const totalImpact = events.reduce((s, e) => s + e.impact, 0)
           const startupNoise = company.isStartup ? (Math.random() - 0.45) * (company._volatility || 0.1) : 0
-          const newPrice = Math.max(1, Math.round(company.price * (1 + totalImpact + startupNoise)))
+          const fv = company.fairValue || calcFairValue(company)
+          // Dampen news impact when overvalued; amplify when undervalued
+          const overRatio = company.price / fv
+          const dampen = Math.max(0.15, Math.min(1.5, 1 / Math.pow(overRatio, 1.2)))
+          const meanRev = (fv - company.price) / company.price * 0.08
+          const newPrice = Math.max(1, Math.round(company.price * (1 + (totalImpact + startupNoise) * dampen + meanRev)))
 
           events.forEach(e => {
             const lesson = AEVA_LESSONS[e.type]
@@ -214,10 +228,11 @@ export const useCallStreetStore = create((set, get) => {
 
           return { ...company, price: newPrice, priceHistory: [...company.priceHistory.slice(-9), newPrice], daysHeldByMe: newDaysHeld, reportUnlocked }
         } else {
-          // Mild fundamental drift + tiny random walk
-          const drift = (company._revGrowth - 0.15) * 0.003
-          const noise = (Math.random() - 0.5) * 0.015
-          const newPrice = Math.max(1, Math.round(company.price * (1 + drift + noise)))
+          // Mean reversion toward fair value + small noise; no persistent upward drift
+          const fv = company.fairValue || calcFairValue(company)
+          const meanRev = (fv - company.price) / company.price * 0.10
+          const noise = (Math.random() - 0.5) * 0.025
+          const newPrice = Math.max(1, Math.round(company.price * (1 + meanRev + noise)))
           return { ...company, price: newPrice, priceHistory: [...company.priceHistory.slice(-9), newPrice], daysHeldByMe: newDaysHeld, reportUnlocked }
         }
       })
@@ -431,6 +446,20 @@ export const useCallStreetStore = create((set, get) => {
       const fresh = freshState()
       persist(fresh)
       set(fresh)
+    },
+
+    resetPrices: () => {
+      const state = get()
+      const companies = state.companies.map(c => {
+        const def = allDefs.find(d => d.id === c.id)
+        if (!def) return c
+        const price = Math.round(def.basePrice * (1 + (Math.random() - 0.5) * 0.08))
+        const fairValue = calcFairValue(def)
+        return { ...c, price, priceHistory: [price], fairValue }
+      })
+      const updated = { ...state, companies, indexHistory: [100], lastBellChanges: [] }
+      persist(updated)
+      set(updated)
     },
   }
 })
