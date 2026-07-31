@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Plus, TrendingUp, TrendingDown, Check, ChevronRight, Zap, AlertCircle, RefreshCw, BarChart2, Package, Layers, Users, Copy } from 'lucide-react'
+import { X, Plus, TrendingUp, TrendingDown, Check, ChevronRight, Zap, AlertCircle, RefreshCw, BarChart2, Package, Layers, Users, Copy, Activity, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { useCoinStore, calcTopicPrice, calcTopicDividend, calcBondReturn, ETF_DEFS } from './coinStore'
 import { useSyndicateStore } from './syndicateStore'
+import { usePlayerStockStore } from './playerStockStore'
 import { supabase } from './supabase'
 
 /* ── helpers ──────────────────────────────────────────────────── */
@@ -837,6 +838,379 @@ CREATE POLICY "ic" ON syndicate_check_ins FOR INSERT WITH CHECK (true);`}</pre>
   )
 }
 
+/* ── Players Tab ──────────────────────────────────────────────── */
+function PlayersTab() {
+  const { players, myHoldings, myShorts, myLimitOrders, loading, dbAvailable, loadMarket, buyShares, sellShares, shortSell, coverShort, buyback, setLimitOrder, cancelLimitOrder, detectSqueeze } = usePlayerStockStore()
+  const { coins } = useCoinStore()
+  const [userId, setUserId]     = useState(null)
+  const [display, setDisplay]   = useState(null)
+  const [view, setView]         = useState('market') // market | player | myPositions | orders
+  const [selected, setSelected] = useState(null)
+  const [tradeType, setTradeType] = useState('buy') // buy | sell | short | limit
+  const [qty, setQty]           = useState(1)
+  const [limitType, setLimitType] = useState('buy')
+  const [limitPrice, setLimitPrice] = useState(100)
+  const [msg, setMsg]           = useState(null)
+  const [tab2, setTab2]         = useState('market') // market | mine
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user) {
+        setUserId(data.user.id)
+        setDisplay(data.user.user_metadata?.display_name || data.user.email?.split('@')[0] || 'You')
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    if (userId !== null) loadMarket(userId)
+  }, [userId])
+
+  function flash(m, ok = true) {
+    setMsg({ text: m, ok })
+    setTimeout(() => setMsg(null), 3000)
+  }
+
+  async function handleTrade() {
+    if (!userId || !selected) return
+    let res
+    if (tradeType === 'buy')   res = await buyShares(userId, selected.user_id, qty)
+    if (tradeType === 'sell')  res = await sellShares(userId, selected.user_id, qty)
+    if (tradeType === 'short') res = await shortSell(userId, selected.user_id, qty)
+    if (tradeType === 'limit') res = await setLimitOrder(userId, selected.user_id, limitType, qty, limitPrice)
+    if (res?.error) flash(res.error, false)
+    else flash(tradeType === 'buy' ? `Bought ${qty} shares!` : tradeType === 'sell' ? `Sold ${qty} shares` : tradeType === 'short' ? 'Short opened' : 'Limit order placed')
+  }
+
+  async function handleCover(positionId) {
+    const res = await coverShort(userId, positionId)
+    if (res?.error) flash(res.error, false)
+    else flash(`Short covered — P&L: ₳${res.pnl >= 0 ? '+' : ''}${res.pnl}`)
+  }
+
+  async function handleBuyback(shares) {
+    const res = await buyback(userId, shares)
+    if (res?.error) flash(res.error, false)
+    else flash(`Bought back ${shares} of your own shares`)
+  }
+
+  const myPlayer = players.find(p => p.user_id === userId)
+  const myHoldingsDetail = myHoldings.map(h => ({ ...h, player: players.find(p => p.user_id === h.subject_id) })).filter(h => h.player)
+  const portfolioValue = myHoldingsDetail.reduce((s, h) => s + h.shares * h.player.price, 0)
+
+  if (dbAvailable === false) return (
+    <EmptyState
+      icon="📈"
+      title="Player Stock Market"
+      body={<>Run the SQL shown in <code>src/playerStockStore.js</code> (lines 5–58) in your Supabase SQL editor to enable live player stocks.</>}
+    />
+  )
+
+  // ── Player detail view ─────────────────────────────────────────
+  if (view === 'player' && selected) {
+    const holding = myHoldings.find(h => h.subject_id === selected.user_id)
+    const squeeze = detectSqueeze(selected.user_id)
+    const cost = tradeType === 'limit' ? qty * limitPrice : qty * selected.price
+    const isMe = selected.user_id === userId
+
+    return (
+      <div style={{ padding: '0 16px 32px' }}>
+        <button onClick={() => setView('market')}
+          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer', padding: '0 0 14px', display: 'flex', alignItems: 'center', gap: 5 }}>
+          ← Back
+        </button>
+
+        {msg && (
+          <div style={{ padding: '10px 14px', borderRadius: 10, marginBottom: 12, background: msg.ok ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)', border: `1px solid ${msg.ok ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)'}`, color: msg.ok ? '#4ADE80' : '#F87171', fontSize: 13 }}>
+            {msg.text}
+          </div>
+        )}
+
+        {/* Player card */}
+        <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 16, marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 14, background: 'linear-gradient(135deg,#7C3AED,#4F46E5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700, color: '#fff' }}>
+              {(selected.display_name || '?')[0].toUpperCase()}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 17, fontWeight: 800, color: '#fff', letterSpacing: '-0.03em' }}>{selected.display_name || 'Unknown'}</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>ELO {selected.elo || 1000} · {selected.total_games || 0} games</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 24, fontWeight: 900, color: '#D4AF37', letterSpacing: '-0.04em' }}>₳{selected.price}</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>per share</div>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
+            {[
+              { l: 'W/L', v: `${selected.wins || 0}/${selected.losses || 0}`, c: '#4ADE80' },
+              { l: 'Win %', v: `${selected.wins || selected.losses ? Math.round((selected.wins || 0) / ((selected.wins || 0) + (selected.losses || 0)) * 100) : 0}%`, c: '#a5b4fc' },
+              { l: 'Accuracy', v: `${Math.round((selected.accuracy_pct || 0) * 100)}%`, c: '#fb923c' },
+              { l: 'Avg Score', v: fmt(selected.avg_score || 0), c: '#D4AF37' },
+            ].map(s => (
+              <div key={s.l} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: '6px 8px' }}>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 2 }}>{s.l}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: s.c }}>{s.v}</div>
+              </div>
+            ))}
+          </div>
+          {squeeze && (
+            <div style={{ marginTop: 10, padding: '8px 12px', background: 'rgba(251,146,60,0.12)', border: '1px solid rgba(251,146,60,0.3)', borderRadius: 8, fontSize: 12, color: '#fb923c', display: 'flex', gap: 8, alignItems: 'center' }}>
+              <Zap size={13} /> Short Squeeze Alert! Price up {squeeze.priceIncrease}% — {squeeze.openShorts} shorts at risk
+            </div>
+          )}
+        </div>
+
+        {/* My position */}
+        {holding && (
+          <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: '10px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>Your position</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#a5b4fc' }}>{holding.shares} shares @ avg ₳{holding.avg_cost}</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>P&L</div>
+              {(() => { const pnl = holding.shares * (selected.price - holding.avg_cost); return <div style={{ fontSize: 14, fontWeight: 700, color: pnl >= 0 ? '#4ADE80' : '#F87171' }}>{pnl >= 0 ? '+' : ''}₳{pnl}</div> })()}
+            </div>
+          </div>
+        )}
+
+        {/* Trade panel */}
+        <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 14 }}>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+            {['buy', 'sell', ...(isMe ? ['buyback'] : ['short', 'limit'])].map(t => (
+              <button key={t} onClick={() => setTradeType(t)}
+                style={{ flex: 1, minWidth: 60, padding: '8px 6px', borderRadius: 8, border: `1px solid ${tradeType === t ? (t === 'short' ? 'rgba(248,113,113,0.5)' : 'rgba(124,58,237,0.5)') : 'rgba(255,255,255,0.08)'}`, background: tradeType === t ? (t === 'short' ? 'rgba(248,113,113,0.15)' : 'rgba(124,58,237,0.15)') : 'rgba(0,0,0,0.2)', color: tradeType === t ? (t === 'short' ? '#F87171' : '#a5b4fc') : 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>
+                {t === 'buyback' ? 'Buyback' : t}
+              </button>
+            ))}
+          </div>
+
+          {tradeType === 'limit' && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                {['buy', 'sell'].map(t => (
+                  <button key={t} onClick={() => setLimitType(t)}
+                    style={{ flex: 1, padding: '7px', borderRadius: 8, border: `1px solid ${limitType === t ? 'rgba(124,58,237,0.5)' : 'rgba(255,255,255,0.08)'}`, background: limitType === t ? 'rgba(124,58,237,0.12)' : 'rgba(0,0,0,0.2)', color: limitType === t ? '#a5b4fc' : 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>
+                    Limit {t}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 0 }}>
+                <input type="range" min={20} max={500} value={limitPrice} onChange={e => setLimitPrice(+e.target.value)} style={{ flex: 1, accentColor: '#7C3AED' }} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#D4AF37', minWidth: 46 }}>₳{limitPrice}</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 4 }}>
+                {limitType === 'buy' ? `Fires when price drops to ₳${limitPrice}` : `Fires when price rises to ₳${limitPrice}`} · Current ₳{selected.price}
+              </div>
+            </div>
+          )}
+
+          {tradeType === 'short' && (
+            <div style={{ padding: '8px 10px', background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.15)', borderRadius: 8, marginBottom: 12, fontSize: 12, color: '#F87171', lineHeight: 1.6 }}>
+              Short sells shares you don't own. If price drops, you profit when you cover. Requires 150% collateral.
+            </div>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <input type="range" min={1} max={Math.min(50, tradeType === 'sell' && holding ? holding.shares : 50)} value={qty} onChange={e => setQty(+e.target.value)} style={{ flex: 1, accentColor: '#7C3AED' }} />
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', minWidth: 32 }}>{qty}</span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>
+              {tradeType === 'buy'     && `₳${fmt(cost)} + ₳${Math.ceil(cost * 0.01)} fee`}
+              {tradeType === 'sell'    && `Receive ₳${fmt(cost - Math.ceil(cost * 0.01))}`}
+              {tradeType === 'short'   && `₳${fmt(Math.ceil(cost * 1.5))} collateral`}
+              {tradeType === 'buyback' && `₳${fmt(cost)} + ₳${Math.ceil(cost * 0.01)} fee`}
+              {tradeType === 'limit'   && (limitType === 'buy' ? `Reserve ₳${fmt(qty * limitPrice)}` : 'No coins reserved')}
+            </span>
+            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>Balance: ₳{fmt(coins)}</span>
+          </div>
+
+          <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.97 }} onClick={handleTrade}
+            style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: tradeType === 'short' ? 'linear-gradient(135deg,#991b1b,#7f1d1d)' : tradeType === 'sell' ? 'linear-gradient(135deg,#1D9E75,#0d6e51)' : 'linear-gradient(135deg,#7C3AED,#4F46E5)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', textTransform: 'capitalize' }}>
+            {tradeType === 'buyback' ? 'Buyback Own Shares' : tradeType === 'limit' ? `Place Limit ${limitType} Order` : `${tradeType} ${qty} Share${qty !== 1 ? 's' : ''}`}
+          </motion.button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Main market view ───────────────────────────────────────────
+  return (
+    <div style={{ padding: '0 16px 32px' }}>
+      {msg && (
+        <div style={{ padding: '10px 14px', borderRadius: 10, marginBottom: 12, background: msg.ok ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)', border: `1px solid ${msg.ok ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)'}`, color: msg.ok ? '#4ADE80' : '#F87171', fontSize: 13 }}>
+          {msg.text}
+        </div>
+      )}
+
+      {/* Sub-tabs */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+        {['market', 'mine'].map(t => (
+          <button key={t} onClick={() => setTab2(t)}
+            style={{ flex: 1, padding: '9px', borderRadius: 10, border: `1px solid ${tab2 === t ? 'rgba(124,58,237,0.4)' : 'rgba(255,255,255,0.07)'}`, background: tab2 === t ? 'rgba(124,58,237,0.12)' : 'rgba(255,255,255,0.03)', color: tab2 === t ? '#a5b4fc' : 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            {t === 'market' ? 'Player Market' : 'My Positions'}
+          </button>
+        ))}
+        <button onClick={() => loadMarket(userId)} style={{ padding: '9px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+          <RefreshCw size={13} className={loading ? 'spin' : ''} />
+        </button>
+      </div>
+
+      {tab2 === 'market' && (
+        <>
+          {/* Market stats */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
+            <StatCard label="Listed Players" value={players.length} sub="on market" colour="#7F77DD" />
+            <StatCard label="Market Cap" value={`₳ ${fmt(players.reduce((s, p) => s + p.price * 1000, 0))}`} sub="1000 shares each" colour="#D4AF37" />
+            <StatCard label="My Portfolio" value={`₳ ${fmt(portfolioValue)}`} sub={`${myHoldings.length} positions`} colour="#1D9E75" />
+          </div>
+
+          {loading && players.length === 0 && (
+            <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 13, padding: '32px 0' }}>Loading market…</div>
+          )}
+
+          {players.length === 0 && !loading && (
+            <EmptyState icon="🏟️" title="No players yet" body="Arena players appear here once they've played at least one match. Be the first to start!" />
+          )}
+
+          {players.map((p, i) => {
+            const holding = myHoldings.find(h => h.subject_id === p.user_id)
+            const squeeze = detectSqueeze(p.user_id)
+            const isMe = p.user_id === userId
+            const winRate = p.wins || p.losses ? Math.round((p.wins || 0) / ((p.wins || 0) + (p.losses || 0)) * 100) : 0
+            return (
+              <motion.div key={p.user_id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
+                onClick={() => { setSelected(p); setView('player'); setQty(1); setTradeType('buy') }}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', marginBottom: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${isMe ? 'rgba(99,102,241,0.25)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 12, cursor: 'pointer' }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: isMe ? 'linear-gradient(135deg,#6366F1,#7C3AED)' : 'linear-gradient(135deg,#1e1b2e,#2a2550)', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                  {(p.display_name || '?')[0].toUpperCase()}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{p.display_name || 'Unknown'}</span>
+                    {isMe && <span style={{ fontSize: 9, color: '#a5b4fc', fontWeight: 600, padding: '1px 6px', background: 'rgba(99,102,241,0.15)', borderRadius: 6 }}>YOU</span>}
+                    {squeeze && <Zap size={11} color="#fb923c" />}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>ELO {p.elo || 1000} · {winRate}% wins · {Math.round((p.accuracy_pct || 0) * 100)}% acc</div>
+                  {holding && <div style={{ fontSize: 10, color: '#a5b4fc', marginTop: 3 }}>{holding.shares} shares owned</div>}
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#D4AF37' }}>₳{p.price}</div>
+                  <div style={{ fontSize: 10, color: p.elo >= 1000 ? '#4ADE80' : '#F87171', marginTop: 2 }}>{p.elo >= 1000 ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}{Math.abs(p.elo - 1000)} ELO</div>
+                </div>
+              </motion.div>
+            )
+          })}
+        </>
+      )}
+
+      {tab2 === 'mine' && (
+        <>
+          {/* My stocks (self) */}
+          {myPlayer && (
+            <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 14, padding: '14px', marginBottom: 16 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.09em', textTransform: 'uppercase', color: 'rgba(165,180,252,0.5)', marginBottom: 10 }}>Your Stock</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: '#D4AF37' }}>₳{myPlayer.price}</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>per share · 1000 total outstanding</div>
+                </div>
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                  onClick={() => { setSelected(myPlayer); setView('player'); setTradeType('buyback') }}
+                  style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid rgba(99,102,241,0.4)', background: 'rgba(99,102,241,0.12)', color: '#a5b4fc', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                  Buyback Shares
+                </motion.button>
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', lineHeight: 1.7 }}>
+                Win more Arena matches to raise your stock price. Short squeeze risk increases when others bet against you.
+              </div>
+            </div>
+          )}
+
+          {/* Holdings */}
+          {myHoldingsDetail.length > 0 && (
+            <>
+              <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.09em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: 10 }}>Stock Holdings</div>
+              {myHoldingsDetail.map(h => {
+                const pnl = h.shares * (h.player.price - h.avg_cost)
+                return (
+                  <div key={h.id} onClick={() => { setSelected(h.player); setView('player'); setTradeType('sell') }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', marginBottom: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, cursor: 'pointer' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{h.player.display_name}</div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{h.shares} shares @ avg ₳{h.avg_cost}</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#D4AF37' }}>₳{fmt(h.shares * h.player.price)}</div>
+                      <div style={{ fontSize: 11, color: pnl >= 0 ? '#4ADE80' : '#F87171' }}>{pnl >= 0 ? '+' : ''}₳{pnl}</div>
+                    </div>
+                  </div>
+                )
+              })}
+            </>
+          )}
+
+          {/* Open Shorts */}
+          {myShorts.length > 0 && (
+            <>
+              <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.09em', textTransform: 'uppercase', color: 'rgba(248,113,113,0.5)', marginBottom: 10, marginTop: 16 }}>Open Short Positions</div>
+              {myShorts.map(s => {
+                const p = players.find(pl => pl.user_id === s.subject_id)
+                const pnl = p ? (s.borrow_price - p.price) * s.shares : 0
+                return (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', marginBottom: 8, background: 'rgba(248,113,113,0.05)', border: '1px solid rgba(248,113,113,0.15)', borderRadius: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{p?.display_name || 'Unknown'}</div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{s.shares} shares · borrowed @ ₳{s.borrow_price}</div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Collateral locked: ₳{s.collateral_locked}</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: pnl >= 0 ? '#4ADE80' : '#F87171', marginBottom: 6 }}>{pnl >= 0 ? '+' : ''}₳{pnl}</div>
+                      <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={() => handleCover(s.id)}
+                        style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.4)', background: 'rgba(248,113,113,0.12)', color: '#F87171', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                        Cover
+                      </motion.button>
+                    </div>
+                  </div>
+                )
+              })}
+            </>
+          )}
+
+          {/* Limit Orders */}
+          {myLimitOrders.length > 0 && (
+            <>
+              <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.09em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: 10, marginTop: 16 }}>Pending Limit Orders</div>
+              {myLimitOrders.map(o => {
+                const p = players.find(pl => pl.user_id === o.subject_id)
+                return (
+                  <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', marginBottom: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{o.order_type === 'buy' ? '🟢' : '🔴'} Limit {o.order_type} · {p?.display_name || '?'}</div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{o.shares} shares @ ₳{o.target_price} · Current ₳{p?.price || '?'}</div>
+                    </div>
+                    <button onClick={() => cancelLimitOrder(userId, o.id)}
+                      style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 11, cursor: 'pointer' }}>
+                      Cancel
+                    </button>
+                  </div>
+                )
+              })}
+            </>
+          )}
+
+          {myHoldingsDetail.length === 0 && myShorts.length === 0 && myLimitOrders.length === 0 && (
+            <EmptyState icon="💼" title="No positions yet" body="Head to Player Market to buy your first shares. Prices update after every Arena match." />
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 /* ── Earnings Report (inside Market tab) ──────────────────────── */
 function EarningsReport() {
   const { monthlySnapshots, portfolio, coins, etfHoldings } = useCoinStore()
@@ -895,6 +1269,7 @@ const TABS = [
   { id: 'bonds',      label: 'Bonds',      icon: Layers },
   { id: 'etfs',       label: 'ETFs',       icon: Package },
   { id: 'syndicates', label: 'Syndicates', icon: Users },
+  { id: 'players',    label: 'Players',    icon: Activity },
   { id: 'market',     label: 'Market',     icon: TrendingUp },
 ]
 
@@ -974,6 +1349,7 @@ export default function CoinMarket({ onClose }) {
           {tab === 'bonds'      && <motion.div key="b" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><BondsTab /></motion.div>}
           {tab === 'etfs'       && <motion.div key="e" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ETFsTab /></motion.div>}
           {tab === 'syndicates' && <motion.div key="s" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><SyndicatesTab /></motion.div>}
+          {tab === 'players'    && <motion.div key="pl" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><PlayersTab /></motion.div>}
           {tab === 'market'     && <motion.div key="m" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><MarketTab /></motion.div>}
         </AnimatePresence>
       </div>
