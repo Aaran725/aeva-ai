@@ -224,21 +224,76 @@ function SeasonEnd({ grade, onClose, onCollect }) {
   )
 }
 
+/* ── Sector themes ───────────────────────────────────────────────── */
+const SECTOR_THEME = {
+  tech:        { accent: '#3B82F6', bg: 'rgba(59,130,246,0.12)',  glow: 'rgba(59,130,246,0.3)' },
+  biotech:     { accent: '#22C55E', bg: 'rgba(34,197,94,0.12)',   glow: 'rgba(34,197,94,0.3)' },
+  energy:      { accent: '#F59E0B', bg: 'rgba(245,158,11,0.12)',  glow: 'rgba(245,158,11,0.3)' },
+  logistics:   { accent: '#60A5FA', bg: 'rgba(96,165,250,0.12)',  glow: 'rgba(96,165,250,0.3)' },
+  robotics:    { accent: '#A78BFA', bg: 'rgba(167,139,250,0.12)', glow: 'rgba(167,139,250,0.3)' },
+  environment: { accent: '#34D399', bg: 'rgba(52,211,153,0.12)',  glow: 'rgba(52,211,153,0.3)' },
+  space:       { accent: '#C084FC', bg: 'rgba(192,132,252,0.12)', glow: 'rgba(192,132,252,0.3)' },
+  materials:   { accent: '#94A3B8', bg: 'rgba(148,163,184,0.12)', glow: 'rgba(148,163,184,0.3)' },
+}
+
+/* ── Detail chart (bigger, with price dots per bell ring) ────────── */
+function DetailChart({ history }) {
+  if (!history || history.length < 2) return null
+  const W = 340, H = 160
+  const min = Math.min(...history) * 0.93
+  const max = Math.max(...history) * 1.07
+  const range = max - min || 1
+  const pts = history.map((v, i) => [
+    (i / (history.length - 1)) * W,
+    H - ((v - min) / range) * (H - 16) - 8,
+  ])
+  const line = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
+  const area = `${line} L${W},${H} L0,${H} Z`
+  const c = history[history.length - 1] >= history[0] ? '#4ADE80' : '#F87171'
+  return (
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ display: 'block', height: '100%' }}>
+      <defs>
+        <linearGradient id="dsg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={c} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={c} stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill="url(#dsg)" />
+      <path d={line} fill="none" stroke={c} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+      {pts.map(([x, y], i) => (
+        <circle key={i} cx={x.toFixed(1)} cy={y.toFixed(1)}
+          r={i === pts.length - 1 ? 5 : 3}
+          fill={i === pts.length - 1 ? c : 'rgba(6,5,24,0.85)'}
+          stroke={c} strokeWidth={1.5} />
+      ))}
+    </svg>
+  )
+}
+
 /* ── Company detail ──────────────────────────────────────────────── */
 function CompanyDetail({ company, holding, mode, onBack }) {
-  const { buy, sell, buyResearch } = useCallStreetStore()
+  const { buy, sell, buyResearch, news } = useCallStreetStore()
   const { coins } = useCoinStore()
   const [qty, setQty] = useState(1)
   const [action, setAction] = useState('buy')
   const [msg, setMsg] = useState(null)
 
+  const theme = SECTOR_THEME[company.sector] || { accent: '#D4AF37', bg: 'rgba(212,175,55,0.12)', glow: 'rgba(212,175,55,0.3)' }
   const change = pctChange(company.priceHistory)
   const up = change >= 0
   const overlay = calcModeOverlay(company, mode)
   const pnl = holding ? (company.price - holding.avgCost) * holding.shares : 0
+
+  const maxBuy  = Math.max(1, Math.floor((coins - 100) / company.price))
+  const maxSell = holding?.shares || 0
+  const maxQty  = action === 'sell' ? maxSell : maxBuy
   const cost = qty * company.price
 
+  const companyNews = news.filter(n => n.companyId === company.id).slice(0, 5)
+
   function flash(text, ok = true) { setMsg({ text, ok }); setTimeout(() => setMsg(null), 3000) }
+
+  function adjust(delta) { setQty(q => Math.min(maxQty, Math.max(1, q + delta))) }
 
   function handleTrade() {
     if (action === 'buy') {
@@ -259,126 +314,190 @@ function CompanyDetail({ company, holding, mode, onBack }) {
   }
 
   return (
-    <div style={{ padding: '0 16px 32px' }}>
-      <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer', padding: '0 0 14px', display: 'flex', alignItems: 'center', gap: 5 }}>
-        <ChevronLeft size={14} /> Back
-      </button>
+    <div style={{ paddingBottom: 32 }}>
+
+      {/* Sector-colour header */}
+      <div style={{ background: `linear-gradient(180deg, ${theme.bg} 0%, rgba(6,5,24,0) 100%)`, borderBottom: `1px solid ${theme.glow}`, padding: '10px 16px 16px', position: 'relative' }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${theme.accent}, transparent)` }} />
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer', padding: '0 0 12px', display: 'flex', alignItems: 'center', gap: 5 }}>
+          <ChevronLeft size={14} /> Back
+        </button>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <div style={{ fontSize: 40, lineHeight: 1 }}>{company.emoji}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 20, fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', lineHeight: 1.1 }}>{company.name}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: theme.accent, background: theme.bg, border: `1px solid ${theme.glow}`, borderRadius: 5, padding: '1px 6px', textTransform: 'uppercase', letterSpacing: '.05em' }}>{company.sector}</span>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>{company.ticker}</span>
+            </div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 4, lineHeight: 1.5 }}>{company.desc}</div>
+          </div>
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div style={{ fontSize: 26, fontWeight: 900, color: '#D4AF37', letterSpacing: '-0.04em', lineHeight: 1 }}>₳{fmt(company.price)}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: up ? '#4ADE80' : '#F87171', marginTop: 3 }}>{up ? '▲' : '▼'}{Math.abs(change)}%</div>
+          </div>
+        </div>
+      </div>
 
       {msg && (
         <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-          style={{ padding: '10px 14px', borderRadius: 10, marginBottom: 12, fontSize: 13, background: msg.ok ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)', border: `1px solid ${msg.ok ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)'}`, color: msg.ok ? '#4ADE80' : '#F87171' }}>
+          style={{ margin: '8px 16px 0', padding: '10px 14px', borderRadius: 10, fontSize: 13, background: msg.ok ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)', border: `1px solid ${msg.ok ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)'}`, color: msg.ok ? '#4ADE80' : '#F87171' }}>
           {msg.text}
         </motion.div>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-        <div style={{ fontSize: 36 }}>{company.emoji}</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', letterSpacing: '-0.03em' }}>{company.name}</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>{company.ticker} · {company.sector}</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>{company.desc}</div>
+      {/* Big chart — ~35% of screen height */}
+      <div style={{ height: 'calc(35vh - 60px)', minHeight: 140, margin: '12px 0', borderTop: `1px solid ${theme.glow}`, borderBottom: `1px solid ${theme.glow}`, background: 'rgba(255,255,255,0.015)', padding: '12px 16px 8px', position: 'relative' }}>
+        <DetailChart history={company.priceHistory} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)' }}>{company.priceHistory.length} rings</span>
+          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)' }}>₳{fmt(company.priceHistory[0] || company.price)} → ₳{fmt(company.price)}</span>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 24, fontWeight: 900, color: '#D4AF37', letterSpacing: '-0.04em' }}>₳{fmt(company.price)}</div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: up ? '#4ADE80' : '#F87171' }}>
-            {up ? '▲' : '▼'}{Math.abs(change)}%
+      </div>
+
+      <div style={{ padding: '0 16px' }}>
+
+        {/* Stats row */}
+        <div style={{ display: 'grid', gridTemplateColumns: overlay ? '1fr 1fr 1fr' : '1fr 1fr', gap: 8, marginBottom: 12 }}>
+          {overlay && (
+            <div style={{ background: overlay.highlight ? 'rgba(74,222,128,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${overlay.highlight ? 'rgba(74,222,128,0.25)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 10, padding: '8px 10px' }}>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '.07em' }}>{overlay.label}</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: overlay.highlight ? '#4ADE80' : '#fff', marginTop: 1 }}>{overlay.value}</div>
+              <div style={{ fontSize: 9, color: overlay.highlight ? '#4ADE80' : 'rgba(255,255,255,0.35)', marginTop: 2 }}>{overlay.note}</div>
+            </div>
+          )}
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '8px 10px' }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '.07em' }}>Mkt cap</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginTop: 1 }}>₳{fmt(company.price * 10)}M</div>
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '8px 10px' }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '.07em' }}>10d high</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginTop: 1 }}>₳{fmt(Math.max(...company.priceHistory))}</div>
           </div>
         </div>
-      </div>
 
-      <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '12px 12px 8px', marginBottom: 12 }}>
-        <AreaChart history={company.priceHistory} />
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>10 days</span>
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>₳{fmt(company.priceHistory[0])} → ₳{fmt(company.price)}</span>
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
-        {overlay && (
-          <div style={{ background: overlay.highlight ? 'rgba(74,222,128,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${overlay.highlight ? 'rgba(74,222,128,0.25)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 10, padding: '8px 10px' }}>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '.07em' }}>{overlay.label}</div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: overlay.highlight ? '#4ADE80' : '#fff', marginTop: 1 }}>{overlay.value}</div>
-            <div style={{ fontSize: 9, color: overlay.highlight ? '#4ADE80' : 'rgba(255,255,255,0.35)', marginTop: 2 }}>{overlay.note}</div>
+        {/* Position card */}
+        {holding && (
+          <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: '10px 14px', marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>Your position</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#a5b4fc' }}>{holding.shares} shares @ avg ₳{holding.avgCost}</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>Unrealised P&L</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: pnl >= 0 ? '#4ADE80' : '#F87171' }}>{pnl >= 0 ? '+' : ''}₳{fmt(pnl)}</div>
+            </div>
           </div>
         )}
-        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '8px 10px' }}>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '.07em' }}>Mkt cap</div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginTop: 1 }}>₳{fmt(company.price * 10)}M</div>
-        </div>
-        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '8px 10px' }}>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '.07em' }}>10d high</div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginTop: 1 }}>₳{fmt(Math.max(...company.priceHistory))}</div>
-        </div>
-      </div>
 
-      {holding && (
-        <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: '10px 14px', marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>Your position</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#a5b4fc' }}>{holding.shares} shares @ avg ₳{holding.avgCost}</div>
+        {/* Research report — blurred + overlay unlock when locked */}
+        <div style={{ position: 'relative', marginBottom: 12 }}>
+          <div style={{ background: 'rgba(74,222,128,0.04)', border: `1px solid ${company.reportUnlocked ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 12, padding: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: company.reportUnlocked ? '#4ADE80' : 'rgba(255,255,255,0.2)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <Star size={11} /> Analyst report — {company.name}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, filter: company.reportUnlocked ? 'none' : 'blur(5px)', userSelect: company.reportUnlocked ? 'auto' : 'none' }}>
+              {[
+                { l: 'Revenue growth', v: `${Math.round(company._revGrowth * 100)}%`,        good: company._revGrowth > 0.2 },
+                { l: 'Profit margin',  v: `${Math.round(company._profitMargin * 100)}%`,     good: company._profitMargin > 0 },
+                { l: 'Debt level',     v: company._debtRatio < 0.2 ? 'Low' : company._debtRatio < 0.4 ? 'Medium' : 'High', good: company._debtRatio < 0.3 },
+                { l: 'Founder score',  v: company._founderScore > 0.8 ? 'Excellent' : company._founderScore > 0.65 ? 'Good' : 'Weak', good: company._founderScore > 0.7 },
+                { l: 'R&D investment', v: company._rdSpend > 0.7 ? 'Heavy' : company._rdSpend > 0.45 ? 'Moderate' : 'Light', good: company._rdSpend > 0.5 },
+                { l: 'Overall',        v: company._founderScore > 0.75 && company._revGrowth > 0.2 ? 'BUY' : company._profitMargin < -0.1 ? 'CAUTION' : 'HOLD', good: company._founderScore > 0.75 },
+              ].map(s => (
+                <div key={s.l} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 7, padding: '6px 8px' }}>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{s.l}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: s.good ? '#4ADE80' : '#F87171', marginTop: 1 }}>{s.v}</div>
+                </div>
+              ))}
+            </div>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>Unrealised P&L</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: pnl >= 0 ? '#4ADE80' : '#F87171' }}>{pnl >= 0 ? '+' : ''}₳{fmt(pnl)}</div>
-          </div>
+          {!company.reportUnlocked && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRadius: 12, backdropFilter: 'blur(2px)' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#D4AF37', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+                <Lock size={13} /> Fundamentals locked
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Hold 5 days to unlock free</div>
+              <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={handleResearch}
+                style={{ padding: '10px 22px', borderRadius: 10, border: '1px solid rgba(212,175,55,0.5)', background: 'rgba(212,175,55,0.18)', color: '#D4AF37', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>
+                Unlock for ₳25
+              </motion.button>
+            </div>
+          )}
         </div>
-      )}
 
-      {!company.reportUnlocked ? (
-        <div style={{ background: 'rgba(212,175,55,0.06)', border: '1px solid rgba(212,175,55,0.2)', borderRadius: 12, padding: '10px 14px', marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#D4AF37', display: 'flex', alignItems: 'center', gap: 5 }}><Lock size={11} /> Fundamentals locked</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>Hold 5 days to unlock free · or pay ₳25 now</div>
-          </div>
-          <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={handleResearch}
-            style={{ padding: '7px 12px', borderRadius: 9, border: '1px solid rgba(212,175,55,0.4)', background: 'rgba(212,175,55,0.1)', color: '#D4AF37', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            ₳25 Report
-          </motion.button>
-        </div>
-      ) : (
-        <div style={{ background: 'rgba(74,222,128,0.05)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: 12, padding: 12, marginBottom: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#4ADE80', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}><Star size={11} /> Analyst report — {company.name}</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-            {[
-              { l: 'Revenue growth', v: `${Math.round(company._revGrowth * 100)}%`,        good: company._revGrowth > 0.2 },
-              { l: 'Profit margin',  v: `${Math.round(company._profitMargin * 100)}%`,     good: company._profitMargin > 0 },
-              { l: 'Debt level',     v: company._debtRatio < 0.2 ? 'Low' : company._debtRatio < 0.4 ? 'Medium' : 'High', good: company._debtRatio < 0.3 },
-              { l: 'Founder score',  v: company._founderScore > 0.8 ? 'Excellent' : company._founderScore > 0.65 ? 'Good' : 'Weak', good: company._founderScore > 0.7 },
-              { l: 'R&D investment', v: company._rdSpend > 0.7 ? 'Heavy' : company._rdSpend > 0.45 ? 'Moderate' : 'Light', good: company._rdSpend > 0.5 },
-              { l: 'Overall',        v: company._founderScore > 0.75 && company._revGrowth > 0.2 ? 'BUY' : company._profitMargin < -0.1 ? 'CAUTION' : 'HOLD', good: company._founderScore > 0.75 },
-            ].map(s => (
-              <div key={s.l} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 7, padding: '6px 8px' }}>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{s.l}</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: s.good ? '#4ADE80' : '#F87171', marginTop: 1 }}>{s.v}</div>
+        {/* Company news — Aeva lesson inline below each item */}
+        {companyNews.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.25)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 7 }}>News</div>
+            {companyNews.map(n => (
+              <div key={n.id} style={{ marginBottom: 7, background: 'rgba(255,255,255,0.02)', border: '0.5px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px' }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: 14, flexShrink: 0 }}>{n.emoji}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', lineHeight: 1.55 }}>{n.text}</div>
+                    {n.aevaNote && (
+                      <div style={{ display: 'flex', gap: 5, marginTop: 6, paddingTop: 6, borderTop: '0.5px solid rgba(255,255,255,0.06)', fontSize: 10, color: 'rgba(165,180,252,0.65)', lineHeight: 1.5 }}>
+                        <span style={{ flexShrink: 0 }}>🎓</span>
+                        <span>{n.aevaNote}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: n.positive ? '#4ADE80' : '#F87171', flexShrink: 0, marginTop: 1 }}>
+                    {n.positive ? '+' : ''}{Math.round(n.impact * 100)}%
+                  </div>
+                </div>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
 
-      <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 14 }}>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-          {['buy', 'sell'].map(a => (
-            <button key={a} onClick={() => setAction(a)}
-              style={{ flex: 1, padding: '9px', borderRadius: 9, border: `1px solid ${action === a ? (a === 'sell' ? 'rgba(74,222,128,0.4)' : 'rgba(124,58,237,0.4)') : 'rgba(255,255,255,0.08)'}`, background: action === a ? (a === 'sell' ? 'rgba(74,222,128,0.1)' : 'rgba(124,58,237,0.1)') : 'rgba(0,0,0,0.2)', color: action === a ? (a === 'sell' ? '#4ADE80' : '#a5b4fc') : 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: 700, cursor: 'pointer', textTransform: 'capitalize' }}>
-              {a}
-            </button>
-          ))}
+        {/* Trade panel */}
+        <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 14 }}>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+            {['buy', 'sell'].map(a => (
+              <button key={a} onClick={() => { setAction(a); setQty(1) }}
+                style={{ flex: 1, padding: '9px', borderRadius: 9, border: `1px solid ${action === a ? (a === 'sell' ? 'rgba(74,222,128,0.4)' : 'rgba(124,58,237,0.4)') : 'rgba(255,255,255,0.08)'}`, background: action === a ? (a === 'sell' ? 'rgba(74,222,128,0.1)' : 'rgba(124,58,237,0.1)') : 'rgba(0,0,0,0.2)', color: action === a ? (a === 'sell' ? '#4ADE80' : '#a5b4fc') : 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: 700, cursor: 'pointer', textTransform: 'capitalize' }}>
+                {a}
+              </button>
+            ))}
+          </div>
+
+          {/* +/− qty stepper */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <motion.button whileTap={{ scale: 0.9 }} onClick={() => adjust(-1)}
+              style={{ width: 40, height: 40, borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 22, fontWeight: 300, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              −
+            </motion.button>
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ fontSize: 28, fontWeight: 900, color: '#fff', lineHeight: 1 }}>{qty}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginTop: 1 }}>shares</div>
+            </div>
+            <motion.button whileTap={{ scale: 0.9 }} onClick={() => adjust(1)}
+              style={{ width: 40, height: 40, borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 22, fontWeight: 300, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              +
+            </motion.button>
+            <motion.button whileTap={{ scale: 0.9 }} onClick={() => setQty(maxQty)}
+              style={{ padding: '8px 12px', borderRadius: 10, border: `1px solid ${theme.glow}`, background: theme.bg, color: theme.accent, fontSize: 11, fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}>
+              MAX
+            </motion.button>
+          </div>
+
+          {/* Live cost preview */}
+          <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 9, padding: '9px 12px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>{action === 'buy' ? 'Total cost' : 'You receive'}</span>
+            <span style={{ fontSize: 17, fontWeight: 900, color: action === 'buy' ? '#a5b4fc' : '#4ADE80' }}>₳{fmt(cost)}</span>
+          </div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', marginBottom: 12, textAlign: 'right' }}>
+            After trade: ₳{fmt(action === 'buy' ? coins - cost : coins + cost)}
+          </div>
+
+          <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.97 }} onClick={handleTrade}
+            style={{ width: '100%', padding: '13px', borderRadius: 11, border: 'none', background: action === 'sell' ? 'linear-gradient(135deg,#1D9E75,#0d6e51)' : 'linear-gradient(135deg,#7C3AED,#4F46E5)', color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>
+            {action === 'buy' ? `Buy ${qty} share${qty !== 1 ? 's' : ''}` : `Sell ${qty} share${qty !== 1 ? 's' : ''}`}
+          </motion.button>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <input type="range" min={1} max={action === 'sell' ? (holding?.shares || 1) : Math.max(1, Math.floor((coins - 100) / company.price))} value={qty}
-            onChange={e => setQty(+e.target.value)} style={{ flex: 1, accentColor: '#7C3AED' }} />
-          <span style={{ fontSize: 15, fontWeight: 800, color: '#fff', minWidth: 28, textAlign: 'right' }}>{qty}</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>
-          <span>{action === 'buy' ? `Cost: ₳${fmt(cost)}` : `Receive: ₳${fmt(cost)}`}</span>
-          <span>Balance: ₳{fmt(coins)}</span>
-        </div>
-        <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.97 }} onClick={handleTrade}
-          style={{ width: '100%', padding: '13px', borderRadius: 11, border: 'none', background: action === 'sell' ? 'linear-gradient(135deg,#1D9E75,#0d6e51)' : 'linear-gradient(135deg,#7C3AED,#4F46E5)', color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>
-          {action === 'buy' ? `Buy ${qty} share${qty !== 1 ? 's' : ''}` : `Sell ${qty} share${qty !== 1 ? 's' : ''}`}
-        </motion.button>
+
       </div>
     </div>
   )
