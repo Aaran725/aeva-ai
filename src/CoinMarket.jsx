@@ -4,6 +4,7 @@ import { X, Plus, TrendingUp, TrendingDown, Check, ChevronRight, Zap, AlertCircl
 import { useCoinStore, calcTopicPrice, calcTopicDividend, calcBondReturn, ETF_DEFS } from './coinStore'
 import { useSyndicateStore } from './syndicateStore'
 import { usePlayerStockStore } from './playerStockStore'
+import CallStreet from './CallStreet'
 import { supabase } from './supabase'
 
 /* ── helpers ──────────────────────────────────────────────────── */
@@ -1269,8 +1270,9 @@ const TABS = [
   { id: 'bonds',      label: 'Bonds',      icon: Layers },
   { id: 'etfs',       label: 'ETFs',       icon: Package },
   { id: 'syndicates', label: 'Syndicates', icon: Users },
-  { id: 'players',    label: 'Players',    icon: Activity },
-  { id: 'market',     label: 'Market',     icon: TrendingUp },
+  { id: 'players',     label: 'Players',     icon: Activity },
+  { id: 'callstreet', label: 'Call St.',    icon: TrendingUp },
+  { id: 'market',     label: 'Market',      icon: BarChart2 },
 ]
 
 export default function CoinMarket({ onClose }) {
@@ -1350,6 +1352,7 @@ export default function CoinMarket({ onClose }) {
           {tab === 'etfs'       && <motion.div key="e" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><ETFsTab /></motion.div>}
           {tab === 'syndicates' && <motion.div key="s" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><SyndicatesTab /></motion.div>}
           {tab === 'players'    && <motion.div key="pl" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><PlayersTab /></motion.div>}
+          {tab === 'callstreet' && <motion.div key="cs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><CallStreet /></motion.div>}
           {tab === 'market'     && <motion.div key="m" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><MarketTab /></motion.div>}
         </AnimatePresence>
       </div>
