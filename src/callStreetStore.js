@@ -153,6 +153,8 @@ function freshState() {
     researchBought: [],  // [companyId] — expires next ring
     ipoActive: null,
     totalBells: 0,
+    lastBellChanges: [],
+    streak: 0,
   }
 }
 
@@ -166,6 +168,8 @@ export const useCallStreetStore = create((set, get) => {
     ringTheBell: () => {
       const state = get()
       const allNews = []
+      const prevPrices = {}
+      state.companies.forEach(c => { prevPrices[c.id] = c.price })
 
       // 3–5 companies get news events; rest get mild drift
       const numWithNews = 3 + Math.floor(Math.random() * 3)
@@ -210,6 +214,16 @@ export const useCallStreetStore = create((set, get) => {
           return { ...company, price: newPrice, priceHistory: [...company.priceHistory.slice(-9), newPrice], daysHeldByMe: newDaysHeld, reportUnlocked }
         }
       })
+
+      const lastBellChanges = updatedCompanies
+        .filter(c => !c.isStartup)
+        .map(c => ({
+          id: c.id, ticker: c.ticker, name: c.name, emoji: c.emoji,
+          pctChange: prevPrices[c.id]
+            ? Math.round(((c.price - prevPrices[c.id]) / prevPrices[c.id]) * 100)
+            : 0,
+        }))
+        .sort((a, b) => b.pctChange - a.pctChange)
 
       // Update index (non-startups only)
       const mainCos = updatedCompanies.filter(c => !c.isStartup)
@@ -259,6 +273,8 @@ export const useCallStreetStore = create((set, get) => {
         ipoActive,
         seasonStartValue,
         totalBells: (state.totalBells || 0) + 1,
+        lastBellChanges,
+        streak: (state.streak || 0) + 1,
       }
       persist(updated)
       set(updated)
