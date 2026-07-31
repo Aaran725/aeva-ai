@@ -155,6 +155,11 @@ function freshState() {
     totalBells: 0,
     lastBellChanges: [],
     streak: 0,
+    watchlist: [],
+    hotSector: null,
+    hotSectorBellCount: 0,
+    insiderTip: null,
+    crashEvent: null,
   }
 }
 
@@ -217,7 +222,23 @@ export const useCallStreetStore = create((set, get) => {
         }
       })
 
-      const lastBellChanges = updatedCompanies
+      // Market crash — 4% chance, wipes 15–30% off all prices
+      const crashPct = Math.random() < 0.04 ? 0.15 + Math.random() * 0.15 : 0
+      const crashEvent = crashPct > 0 ? { pct: Math.round(crashPct * 100) } : null
+      const finalCompanies = crashPct > 0
+        ? updatedCompanies.map(c => {
+            const cp = Math.max(1, Math.round(c.price * (1 - crashPct)))
+            return { ...c, price: cp, priceHistory: [...c.priceHistory.slice(-9), cp] }
+          })
+        : updatedCompanies
+
+      // Sector rotation — hot sector changes every 3 bells
+      const hotSectorBellCount = ((state.hotSectorBellCount || 0) + 1) % 3
+      const hotSector = hotSectorBellCount === 0
+        ? ['tech','biotech','energy','logistics','robotics','environment','space','materials'][Math.floor(Math.random() * 8)]
+        : (state.hotSector || null)
+
+      const lastBellChanges = finalCompanies
         .filter(c => !c.isStartup)
         .map(c => ({
           id: c.id, ticker: c.ticker, name: c.name, emoji: c.emoji,
@@ -228,7 +249,7 @@ export const useCallStreetStore = create((set, get) => {
         .sort((a, b) => b.pctChange - a.pctChange)
 
       // Update index (non-startups only)
-      const mainCos = updatedCompanies.filter(c => !c.isStartup)
+      const mainCos = finalCompanies.filter(c => !c.isStartup)
       const avgPriceNow = mainCos.reduce((s, c) => s + c.price, 0) / mainCos.length
       const avgPriceBase = mainCos.reduce((s, c) => s + (c.priceHistory[0] || c.price), 0) / mainCos.length
       const indexNow = Math.round((avgPriceNow / avgPriceBase) * 100 * 10) / 10
@@ -246,11 +267,11 @@ export const useCallStreetStore = create((set, get) => {
       let seasonStartValue = state.seasonStartValue
 
       if (seasonEnds) {
-        pendingGrade = calcGrade(state.portfolio, updatedCompanies, state.seasonStartValue, newIndexHistory, (state.streak || 0) + 1)
+        pendingGrade = calcGrade(state.portfolio, finalCompanies, state.seasonStartValue, newIndexHistory, (state.streak || 0) + 1)
         season = state.season + 1
         seasonDay = 0
         seasonStartValue = state.portfolio.reduce((s, h) => {
-          const co = updatedCompanies.find(c => c.id === h.companyId)
+          const co = finalCompanies.find(c => c.id === h.companyId)
           return s + (co ? co.price * h.shares : 0)
         }, 0)
       }
@@ -258,14 +279,14 @@ export const useCallStreetStore = create((set, get) => {
       // IPO trigger: 30% chance on day 3 of a new season
       let ipoActive = state.ipoActive
       if (seasonDay === 3 && !ipoActive && Math.random() < 0.3) {
-        const ipoCompany = updatedCompanies[Math.floor(Math.random() * updatedCompanies.length)]
+        const ipoCompany = finalCompanies[Math.floor(Math.random() * finalCompanies.length)]
         ipoActive = { companyId: ipoCompany.id, offerPrice: Math.round(ipoCompany.price * 0.85), expiresDay: 5 }
       }
       if (ipoActive && seasonDay > (ipoActive.expiresDay || 5)) ipoActive = null
 
       const updated = {
         ...state,
-        companies: updatedCompanies,
+        companies: finalCompanies,
         news: [...allNews, ...state.news].slice(0, 60),
         seasonDay,
         season,
@@ -277,6 +298,10 @@ export const useCallStreetStore = create((set, get) => {
         totalBells: (state.totalBells || 0) + 1,
         lastBellChanges,
         streak: (state.streak || 0) + 1,
+        crashEvent,
+        hotSector,
+        hotSectorBellCount,
+        insiderTip: null,
       }
       persist(updated)
       set(updated)
@@ -341,6 +366,48 @@ export const useCallStreetStore = create((set, get) => {
 
     clearGrade: () => {
       const updated = { ...get(), pendingGrade: null }
+      persist(updated)
+      set(updated)
+    },
+
+    toggleWatchlist: (id) => {
+      const state = get()
+      const watchlist = (state.watchlist || []).includes(id)
+        ? state.watchlist.filter(w => w !== id)
+        : [...(state.watchlist || []), id]
+      const updated = { ...state, watchlist }
+      persist(updated)
+      set(updated)
+    },
+
+    buyInsiderTip: (companyId) => {
+      const state = get()
+      const company = state.companies.find(c => c.id === companyId)
+      if (!company) return { error: 'Company not found' }
+      if (!useCoinStore.getState().spendCoins(50, `Insider tip: ${company.ticker}`)) return { error: 'Need ₳50' }
+      const score = company._revGrowth * 0.4 + company._profitMargin * 0.3 + company._founderScore * 0.3
+      const bullish = score > 0.18 ? Math.random() > 0.25 : Math.random() > 0.65
+      const bullishHints = [
+        `${company.ticker}: A contact at a hedge fund is quietly building a position.`,
+        `${company.ticker}: Word is the upcoming ring will surprise to the upside.`,
+        `${company.ticker}: Insiders are accumulating — something positive is brewing.`,
+      ]
+      const bearishHints = [
+        `${company.ticker}: Institutional money is rotating out. Expect selling pressure.`,
+        `${company.ticker}: A source warns of margin headwinds — guidance may disappoint.`,
+        `${company.ticker}: Short interest rising. Traders are betting on a pullback.`,
+      ]
+      const pool = bullish ? bullishHints : bearishHints
+      const hint = pool[Math.floor(Math.random() * pool.length)]
+      const insiderTip = { companyId, hint, bullish }
+      const updated = { ...state, insiderTip }
+      persist(updated)
+      set(updated)
+      return { ok: true }
+    },
+
+    clearCrash: () => {
+      const updated = { ...get(), crashEvent: null }
       persist(updated)
       set(updated)
     },

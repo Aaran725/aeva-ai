@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, Bell, Lock, Star, TrendingUp, TrendingDown } from 'lucide-react'
+import { ChevronLeft, Bell, Lock, Star, TrendingUp, TrendingDown, Bookmark } from 'lucide-react'
 import { useCallStreetStore, calcModeOverlay } from './callStreetStore'
 import { useCoinStore } from './coinStore'
 
@@ -272,7 +272,7 @@ function DetailChart({ history }) {
 
 /* ── Company detail ──────────────────────────────────────────────── */
 function CompanyDetail({ company, holding, mode, onBack }) {
-  const { buy, sell, buyResearch, news } = useCallStreetStore()
+  const { buy, sell, buyResearch, news, watchlist, toggleWatchlist, insiderTip, buyInsiderTip } = useCallStreetStore()
   const { coins } = useCoinStore()
   const [qty, setQty] = useState(1)
   const [action, setAction] = useState('buy')
@@ -290,6 +290,8 @@ function CompanyDetail({ company, holding, mode, onBack }) {
   const cost = qty * company.price
 
   const companyNews = news.filter(n => n.companyId === company.id).slice(0, 5)
+  const isWatched = (watchlist || []).includes(company.id)
+  const myTip = insiderTip?.companyId === company.id ? insiderTip : null
 
   function flash(text, ok = true) { setMsg({ text, ok }); setTimeout(() => setMsg(null), 3000) }
 
@@ -319,9 +321,16 @@ function CompanyDetail({ company, holding, mode, onBack }) {
       {/* Sector-colour header */}
       <div style={{ background: `linear-gradient(180deg, ${theme.bg} 0%, rgba(6,5,24,0) 100%)`, borderBottom: `1px solid ${theme.glow}`, padding: '10px 16px 16px', position: 'relative' }}>
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${theme.accent}, transparent)` }} />
-        <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer', padding: '0 0 12px', display: 'flex', alignItems: 'center', gap: 5 }}>
-          <ChevronLeft size={14} /> Back
-        </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 12 }}>
+          <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <ChevronLeft size={14} /> Back
+          </button>
+          <button onClick={() => toggleWatchlist(company.id)}
+            style={{ background: isWatched ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${isWatched ? 'rgba(212,175,55,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 8, padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Star size={13} fill={isWatched ? '#D4AF37' : 'none'} color={isWatched ? '#D4AF37' : 'rgba(255,255,255,0.4)'} />
+            <span style={{ fontSize: 11, fontWeight: 700, color: isWatched ? '#D4AF37' : 'rgba(255,255,255,0.4)' }}>{isWatched ? 'Watching' : 'Watch'}</span>
+          </button>
+        </div>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
           <div style={{ fontSize: 40, lineHeight: 1 }}>{company.emoji}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -452,6 +461,21 @@ function CompanyDetail({ company, holding, mode, onBack }) {
           </div>
         )}
 
+        {/* Insider tip */}
+        {myTip ? (
+          <div style={{ marginBottom: 12, background: myTip.bullish ? 'rgba(74,222,128,0.06)' : 'rgba(248,113,113,0.06)', border: `1px solid ${myTip.bullish ? 'rgba(74,222,128,0.25)' : 'rgba(248,113,113,0.25)'}`, borderRadius: 12, padding: '10px 14px' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: myTip.bullish ? '#4ADE80' : '#F87171', marginBottom: 5, display: 'flex', alignItems: 'center', gap: 5 }}>
+              {myTip.bullish ? '📈' : '📉'} INSIDER TIP
+            </div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', lineHeight: 1.6, fontStyle: 'italic' }}>"{myTip.hint}"</div>
+          </div>
+        ) : (
+          <motion.button whileTap={{ scale: 0.96 }} onClick={() => { const r = buyInsiderTip(company.id); if (r?.error) flash(r.error, false) }}
+            style={{ width: '100%', marginBottom: 12, padding: '10px', borderRadius: 11, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+            🕵️ Buy insider tip · ₳50
+          </motion.button>
+        )}
+
         {/* Trade panel */}
         <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 14 }}>
           <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
@@ -503,12 +527,83 @@ function CompanyDetail({ company, holding, mode, onBack }) {
   )
 }
 
+/* ── Portfolio tab ───────────────────────────────────────────────── */
+function PortfolioTab({ portfolio, companies, indexHistory, seasonDay }) {
+  const indexNow   = indexHistory[indexHistory.length - 1] || 100
+  const indexStart = indexHistory[Math.max(0, indexHistory.length - (seasonDay + 1))] || 100
+  const indexReturn = Math.round((indexNow / indexStart - 1) * 100)
+
+  const holdings = portfolio.map(h => {
+    const co = companies.find(c => c.id === h.companyId)
+    if (!co) return null
+    const value  = co.price * h.shares
+    const pnl    = (co.price - h.avgCost) * h.shares
+    const pnlPct = Math.round(((co.price - h.avgCost) / h.avgCost) * 100)
+    return { ...h, co, value, pnl, pnlPct }
+  }).filter(Boolean).sort((a, b) => b.pnl - a.pnl)
+
+  const totalValue = holdings.reduce((s, h) => s + h.value, 0)
+  const totalCost  = holdings.reduce((s, h) => s + h.avgCost * h.shares, 0)
+  const totalPnl   = totalValue - totalCost
+  const totalPnlPct = totalCost > 0 ? Math.round((totalPnl / totalCost) * 100) : 0
+  const beatIdx    = totalPnlPct > indexReturn
+
+  if (!portfolio.length) return (
+    <div style={{ textAlign: 'center', padding: '60px 16px', color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>
+      No holdings yet — buy stocks in the Market tab.
+    </div>
+  )
+
+  return (
+    <div style={{ padding: '12px 16px 8px' }}>
+      <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 14, marginBottom: 14 }}>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 6 }}>Portfolio Summary</div>
+        <div style={{ fontSize: 26, fontWeight: 900, color: '#D4AF37', letterSpacing: '-0.03em' }}>₳{fmt(totalValue)}</div>
+        <div style={{ display: 'flex', gap: 20, marginTop: 10 }}>
+          <div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>Total P&L</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: totalPnl >= 0 ? '#4ADE80' : '#F87171', marginTop: 2 }}>
+              {totalPnl >= 0 ? '+' : ''}₳{fmt(totalPnl)} ({totalPnlPct >= 0 ? '+' : ''}{totalPnlPct}%)
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>vs Market Index</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: beatIdx ? '#4ADE80' : '#F87171', marginTop: 2 }}>
+              {beatIdx ? '▲ Beating' : '▼ Lagging'} by {Math.abs(totalPnlPct - indexReturn)}%
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.25)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 8 }}>
+        Holdings — sorted by P&L
+      </div>
+      {holdings.map(h => (
+        <div key={h.companyId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 6, background: 'rgba(255,255,255,0.03)', border: `1px solid ${h.pnl >= 0 ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.1)'}`, borderRadius: 12 }}>
+          <span style={{ fontSize: 20, flexShrink: 0 }}>{h.co.emoji}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{h.co.name}</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>{h.shares} shares · avg ₳{h.avgCost}</div>
+          </div>
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#D4AF37' }}>₳{fmt(h.value)}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: h.pnl >= 0 ? '#4ADE80' : '#F87171' }}>
+              {h.pnl >= 0 ? '+' : ''}₳{fmt(h.pnl)} ({h.pnlPct >= 0 ? '+' : ''}{h.pnlPct}%)
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 /* ── Main CallStreet ─────────────────────────────────────────────── */
 export default function CallStreet() {
   const {
     companies, portfolio, news, mode, seasonDay, season,
     indexHistory, pendingGrade, ipoActive, lastBellChanges, streak, seasonStartValue,
-    ringTheBell, setMode, clearGrade,
+    watchlist, hotSector, crashEvent, insiderTip,
+    ringTheBell, setMode, clearGrade, toggleWatchlist, clearCrash, buyInsiderTip,
   } = useCallStreetStore()
   const { coins, earnCoins: earn } = useCoinStore()
 
@@ -519,10 +614,29 @@ export default function CallStreet() {
   const [lastRingId, setLastRingId] = useState(null)
   const [ipoShares, setIpoShares] = useState(5)
   const [ipoMsg, setIpoMsg] = useState(null)
+  const [activeTab, setActiveTab] = useState('market')
+  const [sortBy, setSortBy] = useState('default')
+  const [filterSector, setFilterSector] = useState(null)
+  const [filterOwned, setFilterOwned] = useState(false)
 
-  const visibleCompanies = useMemo(() =>
-    mode === 'venture' ? companies : companies.filter(c => !c.isStartup),
-    [companies, mode])
+  const visibleCompanies = useMemo(() => {
+    let cos = mode === 'venture' ? companies : companies.filter(c => !c.isStartup)
+    if (filterSector) cos = cos.filter(c => c.sector === filterSector)
+    if (filterOwned)  cos = cos.filter(c => portfolio.some(p => p.companyId === c.id))
+    switch (sortBy) {
+      case 'change_desc': return [...cos].sort((a, b) => pctChange(b.priceHistory) - pctChange(a.priceHistory))
+      case 'change_asc':  return [...cos].sort((a, b) => pctChange(a.priceHistory) - pctChange(b.priceHistory))
+      case 'price_desc':  return [...cos].sort((a, b) => b.price - a.price)
+      case 'price_asc':   return [...cos].sort((a, b) => a.price - b.price)
+      case 'sector':      return [...cos].sort((a, b) => a.sector.localeCompare(b.sector))
+      case 'owned':       return [...cos].sort((a, b) => {
+        const ao = portfolio.some(p => p.companyId === a.id) ? 0 : 1
+        const bo = portfolio.some(p => p.companyId === b.id) ? 0 : 1
+        return ao - bo
+      })
+      default: return cos
+    }
+  }, [companies, mode, filterSector, filterOwned, sortBy, portfolio])
 
   const indexNow    = indexHistory[indexHistory.length - 1] || 100
   const indexStart2 = indexHistory[Math.max(0, indexHistory.length - (seasonDay + 1))] || 100
@@ -598,6 +712,27 @@ export default function CallStreet() {
         />
       )}
 
+      {/* Market crash overlay */}
+      <AnimatePresence>
+        {crashEvent && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={clearCrash}
+            style={{ position: 'fixed', inset: 0, zIndex: 210, background: 'rgba(30,0,0,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+          >
+            <motion.div initial={{ scale: 0.6 }} animate={{ scale: [0.6, 1.1, 1] }} transition={{ duration: 0.5 }}>
+              <div style={{ fontSize: 56, marginBottom: 8 }}>📉</div>
+            </motion.div>
+            <div style={{ fontSize: 28, fontWeight: 900, color: '#F87171', letterSpacing: '-0.03em', marginBottom: 6 }}>MARKET CRASH</div>
+            <div style={{ fontSize: 40, fontWeight: 900, color: '#F87171' }}>−{crashEvent.pct}%</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 12, maxWidth: 260, textAlign: 'center', lineHeight: 1.6 }}>
+              A market-wide shock has wiped prices across all sectors. Diversification is your best defence.
+            </div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 24 }}>Tap to continue</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <div style={{ padding: '12px 16px 10px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -625,6 +760,22 @@ export default function CallStreet() {
         portfolio={portfolio}
         companies={companies}
       />
+
+      {/* Tab bar */}
+      <div style={{ display: 'flex', padding: '8px 16px 0', gap: 4, borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 4 }}>
+        {[['market','📈 Market'], ['portfolio','💼 Portfolio']].map(([tab, label]) => (
+          <button key={tab} onClick={() => setActiveTab(tab)}
+            style={{ flex: 1, padding: '8px', borderRadius: '10px 10px 0 0', border: 'none', background: activeTab === tab ? 'rgba(255,255,255,0.06)' : 'transparent', color: activeTab === tab ? '#fff' : 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: activeTab === tab ? 700 : 400, cursor: 'pointer', borderBottom: activeTab === tab ? '2px solid #D4AF37' : '2px solid transparent' }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'portfolio' && (
+        <PortfolioTab portfolio={portfolio} companies={companies} indexHistory={indexHistory} seasonDay={seasonDay} />
+      )}
+
+      {activeTab === 'market' && <>
 
       {/* Investor mode chips */}
       <div style={{ padding: '10px 16px 4px' }}>
@@ -711,23 +862,77 @@ export default function CallStreet() {
         </div>
       )}
 
-      {/* Market board */}
-      <div style={{ padding: '10px 16px 4px' }}>
-        <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)', marginBottom: 8 }}>
-          {mode === 'venture' ? 'All companies + startups' : 'Market board'}
+      {/* Watchlist */}
+      {(watchlist || []).length > 0 && (
+        <div style={{ padding: '8px 16px 4px' }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(212,175,55,0.6)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 6 }}>⭐ Watchlist</div>
+          {(watchlist || []).map(id => {
+            const co = companies.find(c => c.id === id)
+            if (!co) return null
+            const ch = pctChange(co.priceHistory)
+            return (
+              <div key={id} onClick={() => setSelected(id)}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', marginBottom: 5, background: 'rgba(212,175,55,0.04)', border: '0.5px solid rgba(212,175,55,0.18)', borderRadius: 11, cursor: 'pointer' }}>
+                <span style={{ fontSize: 17 }}>{co.emoji}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', flex: 1 }}>{co.name}</span>
+                <Spark history={co.priceHistory} w={44} h={20} />
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#D4AF37' }}>₳{fmt(co.price)}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: ch >= 0 ? '#4ADE80' : '#F87171' }}>{ch >= 0 ? '▲' : '▼'}{Math.abs(ch)}%</div>
+                </div>
+              </div>
+            )
+          })}
         </div>
+      )}
+
+      {/* Market board */}
+      <div style={{ padding: '8px 16px 4px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)' }}>
+            {hotSector ? <span>🔥 <span style={{ color: SECTOR_THEME[hotSector]?.accent || '#D4AF37' }}>{hotSector}</span> is hot</span> : (mode === 'venture' ? 'All companies + startups' : 'Market board')}
+          </div>
+        </div>
+
+        {/* Sort chips */}
+        <div style={{ display: 'flex', gap: 5, overflowX: 'auto', scrollbarWidth: 'none', marginBottom: 10 }}>
+          {[
+            ['default','Default'], ['change_desc','▲ Best'], ['change_asc','▼ Worst'],
+            ['price_desc','Price↑'], ['price_asc','Price↓'], ['owned','Owned'], ['sector','Sector'],
+          ].map(([val, label]) => (
+            <button key={val} onClick={() => setSortBy(val)}
+              style={{ flexShrink: 0, padding: '4px 10px', borderRadius: 16, border: `0.5px solid ${sortBy === val ? 'rgba(165,180,252,0.5)' : 'rgba(255,255,255,0.1)'}`, background: sortBy === val ? 'rgba(124,58,237,0.2)' : 'rgba(255,255,255,0.03)', color: sortBy === val ? '#a5b4fc' : 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: sortBy === val ? 700 : 400, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              {label}
+            </button>
+          ))}
+          {portfolio.length > 0 && (
+            <button onClick={() => setFilterOwned(f => !f)}
+              style={{ flexShrink: 0, padding: '4px 10px', borderRadius: 16, border: `0.5px solid ${filterOwned ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.1)'}`, background: filterOwned ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.03)', color: filterOwned ? '#a5b4fc' : 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: filterOwned ? 700 : 400, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              💼 Held only
+            </button>
+          )}
+          {hotSector && (
+            <button onClick={() => setFilterSector(f => f === hotSector ? null : hotSector)}
+              style={{ flexShrink: 0, padding: '4px 10px', borderRadius: 16, border: `0.5px solid ${filterSector === hotSector ? (SECTOR_THEME[hotSector]?.glow || 'rgba(255,255,255,0.3)') : 'rgba(255,255,255,0.1)'}`, background: filterSector === hotSector ? (SECTOR_THEME[hotSector]?.bg || 'rgba(255,255,255,0.05)') : 'rgba(255,255,255,0.03)', color: filterSector === hotSector ? (SECTOR_THEME[hotSector]?.accent || '#fff') : 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: filterSector === hotSector ? 700 : 400, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              🔥 {hotSector}
+            </button>
+          )}
+        </div>
+
         {visibleCompanies.map((co, i) => {
           const holding = portfolio.find(p => p.companyId === co.id)
           const change = pctChange(co.priceHistory)
           const up = change >= 0
           const overlay = calcModeOverlay(co, mode)
+          const isHot = co.sector === hotSector
+          const isWatched = (watchlist || []).includes(co.id)
           return (
             <motion.div key={co.id}
               initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.02 }}
               onClick={() => setSelected(co.id)}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 6, background: holding ? 'rgba(99,102,241,0.04)' : co.isStartup ? 'rgba(251,146,60,0.04)' : 'rgba(255,255,255,0.03)', border: `0.5px solid ${holding ? 'rgba(99,102,241,0.22)' : co.isStartup ? 'rgba(251,146,60,0.15)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 12, cursor: 'pointer', position: 'relative' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 6, background: isHot ? `${SECTOR_THEME[co.sector]?.bg || 'rgba(255,255,255,0.03)'}` : holding ? 'rgba(99,102,241,0.04)' : co.isStartup ? 'rgba(251,146,60,0.04)' : 'rgba(255,255,255,0.03)', border: `0.5px solid ${isHot ? (SECTOR_THEME[co.sector]?.glow || 'rgba(255,255,255,0.2)') : holding ? 'rgba(99,102,241,0.22)' : co.isStartup ? 'rgba(251,146,60,0.15)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 12, cursor: 'pointer', position: 'relative', boxShadow: isHot ? `0 0 0 1px ${SECTOR_THEME[co.sector]?.glow || 'transparent'}` : 'none' }}>
               {holding && (
-                <div style={{ position: 'absolute', top: 9, right: 10, width: 6, height: 6, borderRadius: '50%', background: '#a5b4fc' }} />
+                <div style={{ position: 'absolute', top: 9, right: 30, width: 6, height: 6, borderRadius: '50%', background: '#a5b4fc' }} />
               )}
               {flashMap[co.id] && (
                 <motion.div
@@ -743,6 +948,7 @@ export default function CallStreet() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{co.name}</span>
                   {co.isStartup && <span style={{ fontSize: 9, color: '#fb923c', fontWeight: 700, padding: '1px 5px', background: 'rgba(251,146,60,0.12)', borderRadius: 4 }}>STARTUP</span>}
+                  {isHot && <span style={{ fontSize: 9, color: SECTOR_THEME[co.sector]?.accent || '#D4AF37', fontWeight: 700 }}>🔥</span>}
                 </div>
                 {overlay ? (
                   <div style={{ fontSize: 10, color: overlay.highlight ? '#4ADE80' : 'rgba(255,255,255,0.3)', marginTop: 1 }}>
@@ -752,9 +958,13 @@ export default function CallStreet() {
                   <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>{co.ticker} · {co.sector}</div>
                 )}
               </div>
-              <div style={{ flexShrink: 0, marginRight: 4 }}>
+              <div style={{ flexShrink: 0, marginRight: 2 }}>
                 <Spark history={co.priceHistory} />
               </div>
+              <button onClick={e => { e.stopPropagation(); toggleWatchlist(co.id) }}
+                style={{ padding: '4px', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                <Star size={12} fill={isWatched ? '#D4AF37' : 'none'} color={isWatched ? '#D4AF37' : 'rgba(255,255,255,0.18)'} />
+              </button>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 800, color: '#D4AF37' }}>₳{fmt(co.price)}</div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: up ? '#4ADE80' : '#F87171' }}>
@@ -771,6 +981,8 @@ export default function CallStreet() {
           </div>
         )}
       </div>
+
+      </>}
 
       {/* Bell + streak */}
       <div style={{ padding: '8px 16px', display: 'flex', gap: 10, alignItems: 'stretch' }}>
