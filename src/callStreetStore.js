@@ -299,6 +299,7 @@ function freshState() {
     seasonsPlayed: 0,
     beatMarketStreak: 0,
     knowledgeViewed: {},
+    stopLosses: {},
   }
 }
 
@@ -610,6 +611,31 @@ export const useCallStreetStore = create((set, get) => {
       }
       if (ipoActive && seasonDay > (ipoActive.expiresDay || 5)) ipoActive = null
 
+      // Stop-loss auto-sells
+      const stopLosses = state.stopLosses || {}
+      let finalPortfolio = bankruptId
+        ? state.portfolio.filter(p => p.companyId !== bankruptId)
+        : [...state.portfolio]
+      finalPortfolio = finalPortfolio.filter(h => {
+        const co = finalCompanies.find(c => c.id === h.companyId)
+        const sl = stopLosses[h.companyId]
+        if (!co || !sl) return true
+        const dropPct = ((co.price - h.avgCost) / h.avgCost) * 100
+        if (dropPct <= -sl) {
+          const proceeds = h.shares * co.price
+          useCoinStore.getState().earnCoins(proceeds, `Stop-loss: ${co.ticker} auto-sold`)
+          allNews.unshift({
+            id: `sl-${h.companyId}-${Date.now()}`,
+            companyId: co.id, ticker: co.ticker, emoji: co.emoji,
+            text: `🛑 Stop-loss triggered: ${co.name} auto-sold at ₳${Math.round(co.price).toLocaleString()} (−${Math.abs(Math.round(dropPct))}% from avg)`,
+            impact: 0, positive: false, type: 'system',
+            severity: 'MAJOR', day: newDay, ringId,
+          })
+          return false
+        }
+        return true
+      })
+
       const updated = {
         ...state,
         companies: finalCompanies,
@@ -639,9 +665,8 @@ export const useCallStreetStore = create((set, get) => {
         belowFiveCount: newBelowFiveCount,
         haltBanner,
         lastDelistingSeason,
-        portfolio: bankruptId
-          ? state.portfolio.filter(p => p.companyId !== bankruptId)
-          : state.portfolio,
+        portfolio: finalPortfolio,
+        stopLosses: state.stopLosses || {},
         earningsWindow: seasonEnds ? false : (newDay === 8 ? true : newDay === 9 ? false : (state.earningsWindow || false)),
         earningsPredictions: (newDay === 8 || seasonEnds) ? {} : (state.earningsPredictions || {}),
         earningsReveal,
@@ -668,6 +693,19 @@ export const useCallStreetStore = create((set, get) => {
       persist(updated)
       set(updated)
       useCoinStore.getState().earnCoins(reward, `Knowledge: ${type} for ${companyId}`)
+    },
+
+    setStopLoss: (companyId, pct) => {
+      const state = get()
+      const stopLosses = { ...(state.stopLosses || {}) }
+      if (pct == null) {
+        delete stopLosses[companyId]
+      } else {
+        stopLosses[companyId] = pct
+      }
+      const updated = { ...state, stopLosses }
+      persist(updated)
+      set(updated)
     },
 
     buy: (companyId, shares) => {

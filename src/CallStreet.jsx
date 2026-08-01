@@ -462,20 +462,31 @@ const SECTOR_THEME = {
   materials:   { accent: '#94A3B8', bg: 'rgba(148,163,184,0.12)', glow: 'rgba(148,163,184,0.3)' },
 }
 
-/* ── Detail chart (bigger, with price dots per bell ring) ────────── */
+/* ── Detail chart — price line + volume bars + benchmark ─────────── */
 function DetailChart({ history }) {
   if (!history || history.length < 2) return null
-  const W = 340, H = 160
+  const W = 340, H = 160, VZONE = 28
+  const chartH = H - VZONE
   const min = Math.min(...history) * 0.93
   const max = Math.max(...history) * 1.07
   const range = max - min || 1
-  const pts = history.map((v, i) => [
-    (i / (history.length - 1)) * W,
-    H - ((v - min) / range) * (H - 16) - 8,
-  ])
+
+  const yOf = v => chartH - ((v - min) / range) * (chartH - 16) - 8
+
+  const pts = history.map((v, i) => [(i / (history.length - 1)) * W, yOf(v)])
   const line = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
-  const area = `${line} L${W},${H} L0,${H} Z`
+  const area = `${line} L${W},${chartH} L0,${chartH} Z`
   const c = history[history.length - 1] >= history[0] ? '#4ADE80' : '#F87171'
+
+  const last10 = history.slice(Math.max(0, history.length - 10))
+  const yHigh = yOf(Math.max(...last10))
+  const yLow  = yOf(Math.min(...last10))
+  const startY = yOf(history[0])
+
+  const changes = history.map((v, i) => i === 0 ? 0.15 : Math.abs(v - history[i - 1]) / range)
+  const maxChange = Math.max(...changes, 0.001)
+  const barW = Math.max(2, W / history.length - 1)
+
   return (
     <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ display: 'block', height: '100%' }}>
       <defs>
@@ -484,15 +495,133 @@ function DetailChart({ history }) {
           <stop offset="100%" stopColor={c} stopOpacity="0.02" />
         </linearGradient>
       </defs>
+
+      {/* 10-day high/low shaded band */}
+      <rect x={0} y={yHigh.toFixed(1)} width={W}
+        height={Math.max(1, yLow - yHigh).toFixed(1)}
+        fill="rgba(255,255,255,0.035)" />
+
+      {/* Dashed benchmark at starting price */}
+      <line x1={0} y1={startY.toFixed(1)} x2={W} y2={startY.toFixed(1)}
+        stroke="rgba(255,255,255,0.22)" strokeWidth={1} strokeDasharray="5 4" />
+
+      {/* Area fill + price line */}
       <path d={area} fill="url(#dsg)" />
       <path d={line} fill="none" stroke={c} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+
+      {/* Price dots */}
       {pts.map(([x, y], i) => (
         <circle key={i} cx={x.toFixed(1)} cy={y.toFixed(1)}
           r={i === pts.length - 1 ? 5 : 3}
           fill={i === pts.length - 1 ? c : 'rgba(6,5,24,0.85)'}
           stroke={c} strokeWidth={1.5} />
       ))}
+
+      {/* Volume bars */}
+      {history.map((v, i) => {
+        const vol = changes[i] / maxChange
+        const bh = Math.max(2, vol * VZONE * 0.85)
+        const x = (i / (history.length - 1)) * W
+        return (
+          <rect key={`v${i}`}
+            x={(x - barW / 2).toFixed(1)} y={(H - bh).toFixed(1)}
+            width={barW.toFixed(1)} height={bh.toFixed(1)}
+            fill={i === 0 || v >= history[i - 1] ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)'}
+          />
+        )
+      })}
     </svg>
+  )
+}
+
+/* ── Analyst radar chart ─────────────────────────────────────────── */
+function RadarChart({ company, unlocked }) {
+  const cx = 100, cy = 95, R = 70
+  const axes = [
+    { label: 'Revenue',  value: Math.min(1, Math.max(0, (company._revGrowth + 0.05) / 0.55)) },
+    { label: 'Margin',   value: Math.min(1, Math.max(0, (company._profitMargin + 0.35) / 0.7)) },
+    { label: 'Low Debt', value: Math.min(1, Math.max(0, 1 - company._debtRatio)) },
+    { label: 'Founder',  value: Math.min(1, Math.max(0, company._founderScore)) },
+    { label: 'R&D',      value: Math.min(1, Math.max(0, company._rdSpend)) },
+    { label: 'Moat',     value: Math.min(1, Math.max(0, company._founderScore * 0.55 + Math.min(0.45, company._revGrowth * 0.9))) },
+  ]
+  const ang = i => (i / 6) * Math.PI * 2 - Math.PI / 2
+  const gridLevels = [0.25, 0.5, 0.75, 1]
+  const dataPoints = axes.map((a, i) => {
+    const a_ = ang(i)
+    return [cx + a.value * R * Math.cos(a_), cy + a.value * R * Math.sin(a_)]
+  })
+  const accent = unlocked ? 'rgba(74,222,128,0.65)' : 'rgba(255,255,255,0.15)'
+  const fill   = unlocked ? 'rgba(74,222,128,0.11)' : 'rgba(255,255,255,0.04)'
+  return (
+    <svg width={200} height={190} style={{ display: 'block', margin: '0 auto', filter: unlocked ? 'none' : 'blur(3px)' }}>
+      {gridLevels.map(lvl => {
+        const pts = axes.map((_, i) => {
+          const a_ = ang(i)
+          return `${(cx + lvl * R * Math.cos(a_)).toFixed(1)},${(cy + lvl * R * Math.sin(a_)).toFixed(1)}`
+        }).join(' ')
+        return <polygon key={lvl} points={pts} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={0.5} />
+      })}
+      {axes.map((_, i) => {
+        const a_ = ang(i)
+        return <line key={i} x1={cx} y1={cy}
+          x2={(cx + R * Math.cos(a_)).toFixed(1)} y2={(cy + R * Math.sin(a_)).toFixed(1)}
+          stroke="rgba(255,255,255,0.07)" strokeWidth={0.5} />
+      })}
+      <polygon points={dataPoints.map(([x,y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ')}
+        fill={fill} stroke={accent} strokeWidth={1.5} strokeLinejoin="round" />
+      {dataPoints.map(([x,y], i) => (
+        <circle key={i} cx={x.toFixed(1)} cy={y.toFixed(1)} r={3}
+          fill={unlocked ? '#4ADE80' : 'rgba(255,255,255,0.2)'} />
+      ))}
+      {axes.map((a, i) => {
+        const a_ = ang(i)
+        const lx = cx + (R + 17) * Math.cos(a_)
+        const ly = cy + (R + 17) * Math.sin(a_)
+        return (
+          <text key={i} x={lx.toFixed(1)} y={ly.toFixed(1)}
+            textAnchor="middle" dominantBaseline="middle"
+            fontSize={8} fill={unlocked ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.15)'}
+            fontFamily="system-ui,-apple-system,sans-serif" fontWeight={600} letterSpacing="0.03em">
+            {a.label}
+          </text>
+        )
+      })}
+    </svg>
+  )
+}
+
+/* ── Sector donut ────────────────────────────────────────────────── */
+function SectorDonut({ holdings, totalValue }) {
+  if (!holdings.length || totalValue <= 0) return null
+  const sectors = {}
+  holdings.forEach(h => { const s = h.co?.sector || 'Other'; sectors[s] = (sectors[s] || 0) + h.value })
+  const entries = Object.entries(sectors).sort((a, b) => b[1] - a[1])
+  const r = 22, cx = 32, cy = 32, circ = 2 * Math.PI * r
+  let cum = 0
+  const slices = entries.map(([sector, val]) => {
+    const dash = (val / totalValue) * circ
+    const slice = { sector, pct: Math.round(val / totalValue * 100), dash, startArc: cum }
+    cum += dash
+    return slice
+  })
+  return (
+    <div style={{ flexShrink: 0, textAlign: 'center' }}>
+      <svg width={64} height={64}>
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={9} />
+        {slices.map(s => (
+          <circle key={s.sector} cx={cx} cy={cy} r={r} fill="none"
+            stroke={SECTOR_THEME[s.sector]?.accent || '#D4AF37'}
+            strokeWidth={9}
+            strokeDasharray={`${s.dash.toFixed(2)} ${(circ - s.dash).toFixed(2)}`}
+            strokeDashoffset={(circ / 4 - s.startArc).toFixed(2)}
+          />
+        ))}
+      </svg>
+      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.28)', marginTop: -6, lineHeight: 1.3 }}>
+        {slices[0]?.pct}% {slices[0]?.sector}
+      </div>
+    </div>
   )
 }
 
@@ -612,7 +741,8 @@ function EarningsReveal({ earningsReveal, onDismiss }) {
 /* ── Company detail ──────────────────────────────────────────────── */
 function CompanyDetail({ company, holding, mode, onBack }) {
   const { buy, sell, buyResearch, news, watchlist, toggleWatchlist, insiderTip, buyInsiderTip,
-          macroRegime, marketBeats, shorts, shortSell, closeShort, earnKnowledge } = useCallStreetStore()
+          macroRegime, marketBeats, shorts, shortSell, closeShort, earnKnowledge,
+          setStopLoss, stopLosses, portfolio: fullPortfolio, companies: allCompanies } = useCallStreetStore()
   const { coins } = useCoinStore()
   const [qty, setQty] = useState(1)
   const [action, setAction] = useState('buy')
@@ -631,6 +761,22 @@ function CompanyDetail({ company, holding, mode, onBack }) {
   const cost = qty * company.price
 
   const companyNews = news.filter(n => n.companyId === company.id).slice(0, 5)
+
+  // Sector impact for position preview
+  const totalPortValue = (fullPortfolio || []).reduce((s, h) => {
+    const co = (allCompanies || []).find(c => c.id === h.companyId)
+    return co ? s + co.price * h.shares : s
+  }, 0)
+  const sectorPortValue = (fullPortfolio || []).reduce((s, h) => {
+    const co = (allCompanies || []).find(c => c.id === h.companyId)
+    return (co && co.sector === company.sector) ? s + co.price * h.shares : s
+  }, 0)
+  const currentSectorPct = totalPortValue > 0 ? Math.round(sectorPortValue / totalPortValue * 100) : 0
+  const tradeValue = qty * company.price
+  const newTotal = action === 'buy' ? totalPortValue + tradeValue : Math.max(0, totalPortValue - tradeValue)
+  const newSector = action === 'buy' ? sectorPortValue + tradeValue : Math.max(0, sectorPortValue - tradeValue)
+  const newSectorPct = newTotal > 0 ? Math.round(newSector / newTotal * 100) : 0
+  const activeStopLoss = (stopLosses || {})[company.id] || null
 
   useEffect(() => {
     if (company.priceHistory?.length > 1) earnKnowledge(company.id, 'chart')
@@ -749,27 +895,18 @@ function CompanyDetail({ company, holding, mode, onBack }) {
           </div>
         )}
 
-        {/* Research report — blurred + overlay unlock when locked */}
+        {/* Research report — radar chart */}
         <div style={{ position: 'relative', marginBottom: 12 }}>
-          <div style={{ background: 'rgba(74,222,128,0.04)', border: `1px solid ${company.reportUnlocked ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 12, padding: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: company.reportUnlocked ? '#4ADE80' : 'rgba(255,255,255,0.2)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
-              <Star size={11} /> Analyst report — {company.name}
+          <div style={{ background: 'rgba(74,222,128,0.04)', border: `1px solid ${company.reportUnlocked ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 12, padding: '12px 12px 8px' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: company.reportUnlocked ? '#4ADE80' : 'rgba(255,255,255,0.2)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <Star size={11} /> Analyst Report — {company.name}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, filter: company.reportUnlocked ? 'none' : 'blur(5px)', userSelect: company.reportUnlocked ? 'auto' : 'none' }}>
-              {[
-                { l: 'Revenue growth', v: `${Math.round(company._revGrowth * 100)}%`,        good: company._revGrowth > 0.2 },
-                { l: 'Profit margin',  v: `${Math.round(company._profitMargin * 100)}%`,     good: company._profitMargin > 0 },
-                { l: 'Debt level',     v: company._debtRatio < 0.2 ? 'Low' : company._debtRatio < 0.4 ? 'Medium' : 'High', good: company._debtRatio < 0.3 },
-                { l: 'Founder score',  v: company._founderScore > 0.8 ? 'Excellent' : company._founderScore > 0.65 ? 'Good' : 'Weak', good: company._founderScore > 0.7 },
-                { l: 'R&D investment', v: company._rdSpend > 0.7 ? 'Heavy' : company._rdSpend > 0.45 ? 'Moderate' : 'Light', good: company._rdSpend > 0.5 },
-                { l: 'Overall',        v: company._founderScore > 0.75 && company._revGrowth > 0.2 ? 'BUY' : company._profitMargin < -0.1 ? 'CAUTION' : 'HOLD', good: company._founderScore > 0.75 },
-              ].map(s => (
-                <div key={s.l} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 7, padding: '6px 8px' }}>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{s.l}</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: s.good ? '#4ADE80' : '#F87171', marginTop: 1 }}>{s.v}</div>
-                </div>
-              ))}
-            </div>
+            {company.reportUnlocked && (
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', marginBottom: 4, textAlign: 'center' }}>
+                {company._founderScore > 0.75 && company._revGrowth > 0.2 ? '🟢 Recommendation: BUY' : company._profitMargin < -0.1 ? '🔴 Recommendation: CAUTION' : '🟡 Recommendation: HOLD'}
+              </div>
+            )}
+            <RadarChart company={company} unlocked={company.reportUnlocked} />
           </div>
           {!company.reportUnlocked && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRadius: 12, backdropFilter: 'blur(2px)' }}>
@@ -871,12 +1008,37 @@ function CompanyDetail({ company, holding, mode, onBack }) {
           </div>
 
           {/* Live cost preview */}
-          <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 9, padding: '9px 12px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 9, padding: '9px 12px', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>{action === 'buy' ? 'Total cost' : 'You receive'}</span>
             <span style={{ fontSize: 17, fontWeight: 900, color: action === 'buy' ? '#a5b4fc' : '#4ADE80' }}>₳{fmt(cost)}</span>
           </div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.22)', marginBottom: 12, textAlign: 'right' }}>
-            After trade: ₳{fmt(action === 'buy' ? coins - cost : coins + cost)}
+
+          {/* Portfolio impact preview */}
+          <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: 9, padding: '7px 12px', marginBottom: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>After trade: ₳{fmt(action === 'buy' ? coins - cost : coins + cost)}</span>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>
+                <span style={{ color: SECTOR_THEME[company.sector]?.accent || '#D4AF37' }}>{company.sector}</span>
+                {' '}
+                <span style={{ color: 'rgba(255,255,255,0.4)' }}>{currentSectorPct}%</span>
+                {' → '}
+                <span style={{ color: newSectorPct > 50 ? '#F87171' : newSectorPct > 30 ? '#FBBF24' : '#4ADE80', fontWeight: 700 }}>{newSectorPct}%</span>
+              </span>
+            </div>
+            {newSectorPct > 50 && (
+              <div style={{ fontSize: 9, color: '#F87171', letterSpacing: '.04em' }}>⚠ High concentration in {company.sector}</div>
+            )}
+          </div>
+
+          {/* Stop-loss toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>Stop-loss:</span>
+            {[null, 10, 20, 30].map(pct => (
+              <button key={String(pct)} onClick={() => setStopLoss(company.id, pct)}
+                style={{ flex: 1, padding: '5px 0', borderRadius: 8, border: `1px solid ${activeStopLoss === pct ? 'rgba(248,113,113,0.5)' : 'rgba(255,255,255,0.08)'}`, background: activeStopLoss === pct ? 'rgba(248,113,113,0.12)' : 'rgba(0,0,0,0.2)', color: activeStopLoss === pct ? '#F87171' : 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: activeStopLoss === pct ? 700 : 400, cursor: 'pointer' }}>
+                {pct == null ? 'Off' : `−${pct}%`}
+              </button>
+            ))}
           </div>
 
           <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.97 }} onClick={handleTrade}
@@ -985,20 +1147,25 @@ function PortfolioTab({ portfolio, companies, indexHistory, seasonDay, shorts })
     <div style={{ padding: '12px 16px 8px' }}>
       <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 14, marginBottom: 14 }}>
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 6 }}>Portfolio Summary</div>
-        <div style={{ fontSize: 26, fontWeight: 900, color: '#D4AF37', letterSpacing: '-0.03em' }}>₳{fmt(totalValue)}</div>
-        <div style={{ display: 'flex', gap: 20, marginTop: 10 }}>
-          <div>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>Total P&L</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: totalPnl >= 0 ? '#4ADE80' : '#F87171', marginTop: 2 }}>
-              {totalPnl >= 0 ? '+' : ''}₳{fmt(totalPnl)} ({totalPnlPct >= 0 ? '+' : ''}{totalPnlPct}%)
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 26, fontWeight: 900, color: '#D4AF37', letterSpacing: '-0.03em' }}>₳{fmt(totalValue)}</div>
+            <div style={{ display: 'flex', gap: 20, marginTop: 10 }}>
+              <div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>Total P&L</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: totalPnl >= 0 ? '#4ADE80' : '#F87171', marginTop: 2 }}>
+                  {totalPnl >= 0 ? '+' : ''}₳{fmt(totalPnl)} ({totalPnlPct >= 0 ? '+' : ''}{totalPnlPct}%)
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>vs Market Index</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: beatIdx ? '#4ADE80' : '#F87171', marginTop: 2 }}>
+                  {beatIdx ? '▲ Beating' : '▼ Lagging'} by {Math.abs(totalPnlPct - indexReturn)}%
+                </div>
+              </div>
             </div>
           </div>
-          <div>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>vs Market Index</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: beatIdx ? '#4ADE80' : '#F87171', marginTop: 2 }}>
-              {beatIdx ? '▲ Beating' : '▼ Lagging'} by {Math.abs(totalPnlPct - indexReturn)}%
-            </div>
-          </div>
+          <SectorDonut holdings={holdings} totalValue={totalValue} />
         </div>
       </div>
 
