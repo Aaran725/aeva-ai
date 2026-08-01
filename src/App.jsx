@@ -4158,19 +4158,14 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false, isDri
           const html = katex.renderToString(mathContent, { throwOnError: false, displayMode: true })
           elements.push(
             <div key={`dmath-${startI}`} style={{
-              position: 'relative', margin: '14px 0', borderRadius: 14,
-              background: isLight ? 'rgba(99,102,241,0.06)' : 'rgba(99,102,241,0.07)',
-              border: isLight ? '1px solid rgba(99,102,241,0.18)' : '1px solid rgba(99,102,241,0.20)',
-            }}>
-              <div style={{
-                position: 'absolute', top: 9, left: 13,
-                fontSize: 9, fontWeight: 800, letterSpacing: '0.10em', textTransform: 'uppercase',
-                color: isLight ? '#6366F1' : '#818CF8', opacity: 0.65, userSelect: 'none',
-              }}>𝑓(𝑥)</div>
-              <div style={{ overflowX: 'auto', padding: '28px 24px 20px', textAlign: 'center', fontSize: 19 }}
-                dangerouslySetInnerHTML={{ __html: html }}
-              />
-            </div>
+              overflowX: 'auto', margin: '16px 0', padding: '26px 28px',
+              textAlign: 'center', borderRadius: 16, fontSize: 19,
+              background: isLight ? 'rgba(99,102,241,0.07)' : 'rgba(14,16,48,0.80)',
+              border: isLight ? '1px solid rgba(99,102,241,0.22)' : '1px solid rgba(99,102,241,0.30)',
+              boxShadow: isLight ? 'none' : '0 4px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(165,170,255,0.07)',
+            }}
+              dangerouslySetInnerHTML={{ __html: html }}
+            />
           )
         } catch {
           elements.push(<p key={`dmath-${startI}`} style={{ fontFamily: 'monospace', color: txtBody }}>{mathContent}</p>)
@@ -4266,19 +4261,14 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false, isDri
         const fsz  = mlen < 20 ? 16 : mlen < 45 ? 17 : 19
         elements.push(
           <div key={`cimath-${i}`} style={{
-            position: 'relative', margin: '10px 0', borderRadius: 14,
-            background: isLight ? 'rgba(99,102,241,0.06)' : 'rgba(99,102,241,0.07)',
-            border: isLight ? '1px solid rgba(99,102,241,0.18)' : '1px solid rgba(99,102,241,0.20)',
-          }}>
-            <div style={{
-              position: 'absolute', top: 8, left: 12,
-              fontSize: 9, fontWeight: 800, letterSpacing: '0.10em', textTransform: 'uppercase',
-              color: isLight ? '#6366F1' : '#818CF8', opacity: 0.65, userSelect: 'none',
-            }}>𝑓(𝑥)</div>
-            <div style={{ overflowX: 'auto', padding: `${pad.split(' ')[0]} 24px`, textAlign: 'center', fontSize: fsz }}
-              dangerouslySetInnerHTML={{ __html: html }}
-            />
-          </div>
+            overflowX: 'auto', margin: '10px 0', padding: pad,
+            textAlign: 'center', borderRadius: 14, fontSize: fsz,
+            background: isLight ? 'rgba(99,102,241,0.07)' : 'rgba(14,16,48,0.80)',
+            border: isLight ? '1px solid rgba(99,102,241,0.22)' : '1px solid rgba(99,102,241,0.30)',
+            boxShadow: isLight ? 'none' : '0 4px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(165,170,255,0.07)',
+          }}
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
         )
       } catch {
         elements.push(<p key={`cimath-${i}`} style={{ fontFamily: 'monospace', fontSize: '0.9em', color: isLight ? 'rgba(0,0,0,0.84)' : 'rgba(255,255,255,0.88)' }}>{mathContent}</p>)
