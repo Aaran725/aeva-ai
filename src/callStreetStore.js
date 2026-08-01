@@ -263,6 +263,31 @@ function loadSaved() { try { return JSON.parse(localStorage.getItem(KEY) || 'nul
 
 const allDefs = [...COMPANIES_DEF, ...STARTUPS_DEF]
 
+// ── Daily challenge definitions ────────────────────────────────────
+export const DAILY_CHALLENGES = [
+  { id: 'hold_low_debt',  reward: 25, regime: null,
+    text: 'Ring the bell holding at least one Low-debt stock',
+    check: (portfolio, companies) => portfolio.some(h => { const co = companies.find(c => c.id === h.companyId); return co && co._debtRatio < 0.2 }) },
+  { id: 'diversify',      reward: 30, regime: null,
+    text: 'Ring the bell holding 3 or more different stocks',
+    check: (portfolio) => portfolio.length >= 3 },
+  { id: 'avoid_high_debt', reward: 30, regime: 'rate_hike',
+    text: 'Ring the bell with no high-debt stocks in your portfolio',
+    check: (portfolio, companies) => portfolio.length > 0 && !portfolio.some(h => { const co = companies.find(c => c.id === h.companyId); return co && co._debtRatio > 0.4 }) },
+  { id: 'hold_growth',    reward: 25, regime: 'innovation_boom',
+    text: 'Hold a tech, biotech, or space stock when you ring the bell',
+    check: (portfolio, companies) => portfolio.some(h => { const co = companies.find(c => c.id === h.companyId); return co && ['tech','biotech','space','robotics'].includes(co.sector) }) },
+  { id: 'stay_defensive', reward: 25, regime: 'bear',
+    text: 'Ring the bell with 2 or fewer positions (stay defensive)',
+    check: (portfolio) => portfolio.length >= 1 && portfolio.length <= 2 },
+  { id: 'first_buy',      reward: 20, regime: null,
+    text: 'Buy your first stock and ring the bell',
+    check: (portfolio) => portfolio.length >= 1 },
+  { id: 'hold_profit',    reward: 25, regime: null,
+    text: 'Ring the bell with at least one position in profit',
+    check: (portfolio, companies) => portfolio.some(h => { const co = companies.find(c => c.id === h.companyId); return co && co.price > h.avgCost }) },
+]
+
 function freshState() {
   return {
     companies: allDefs.map(initCompany),
@@ -300,6 +325,10 @@ function freshState() {
     beatMarketStreak: 0,
     knowledgeViewed: {},
     stopLosses: {},
+    priceTargets: {},
+    dailyChallenge: null,
+    challengeStreak: 0,
+    lastChallengeResult: null,
   }
 }
 
@@ -410,8 +439,8 @@ export const useCallStreetStore = create((set, get) => {
         const co = finalCompanies.find(c => c.id === companyId)
         if (prevP && co) {
           const correct = direction === 'up' ? co.price > prevP : co.price < prevP
-          if (correct) useCoinStore.getState().earnCoins(30, `Prediction correct: ${co.ticker} ${direction}`)
-          predictionResult = { correct, bonus: correct ? 30 : 0, ticker: co.ticker, emoji: co.emoji, direction }
+          if (correct) useCoinStore.getState().earnCoins(100, `Prediction correct: ${co.ticker} ${direction}`)
+          predictionResult = { correct, bonus: correct ? 100 : 0, ticker: co.ticker, emoji: co.emoji, direction }
         }
       }
 
@@ -611,6 +640,28 @@ export const useCallStreetStore = create((set, get) => {
       }
       if (ipoActive && seasonDay > (ipoActive.expiresDay || 5)) ipoActive = null
 
+      // Daily challenge evaluation + generation
+      let challengeStreak = state.challengeStreak || 0
+      let lastChallengeResult = null
+      const prevChallenge = state.dailyChallenge
+      if (prevChallenge && !prevChallenge.collected) {
+        const def = DAILY_CHALLENGES.find(c => c.id === prevChallenge.id)
+        const satisfied = def ? def.check(state.portfolio, state.companies) : false
+        if (satisfied) {
+          challengeStreak = Math.min(challengeStreak + 1, 99)
+          const mult = challengeStreak >= 3 ? 2 : 1
+          const reward = Math.round(prevChallenge.reward * mult)
+          useCoinStore.getState().earnCoins(reward, `Daily challenge: ${prevChallenge.id}`)
+          lastChallengeResult = { completed: true, reward, streakBonus: mult > 1, streak: challengeStreak, text: prevChallenge.text }
+        } else {
+          challengeStreak = 0
+          lastChallengeResult = { completed: false, text: prevChallenge.text }
+        }
+      }
+      const availChallenges = DAILY_CHALLENGES.filter(c => !c.regime || c.regime === macroRegime)
+      const nextChallengeType = availChallenges[newDay % availChallenges.length]
+      const nextChallenge = nextChallengeType ? { id: nextChallengeType.id, text: nextChallengeType.text, reward: nextChallengeType.reward, day: newDay, collected: false } : null
+
       // Stop-loss auto-sells
       const stopLosses = state.stopLosses || {}
       let finalPortfolio = bankruptId
@@ -667,6 +718,10 @@ export const useCallStreetStore = create((set, get) => {
         lastDelistingSeason,
         portfolio: finalPortfolio,
         stopLosses: state.stopLosses || {},
+        priceTargets: state.priceTargets || {},
+        dailyChallenge: nextChallenge,
+        challengeStreak,
+        lastChallengeResult,
         earningsWindow: seasonEnds ? false : (newDay === 8 ? true : newDay === 9 ? false : (state.earningsWindow || false)),
         earningsPredictions: (newDay === 8 || seasonEnds) ? {} : (state.earningsPredictions || {}),
         earningsReveal,
@@ -698,14 +753,23 @@ export const useCallStreetStore = create((set, get) => {
     setStopLoss: (companyId, pct) => {
       const state = get()
       const stopLosses = { ...(state.stopLosses || {}) }
-      if (pct == null) {
-        delete stopLosses[companyId]
-      } else {
-        stopLosses[companyId] = pct
-      }
+      if (pct == null) { delete stopLosses[companyId] } else { stopLosses[companyId] = pct }
       const updated = { ...state, stopLosses }
-      persist(updated)
-      set(updated)
+      persist(updated); set(updated)
+    },
+
+    setPriceTarget: (companyId, price) => {
+      const state = get()
+      const priceTargets = { ...(state.priceTargets || {}) }
+      if (!price || price <= 0) { delete priceTargets[companyId] } else { priceTargets[companyId] = price }
+      const updated = { ...state, priceTargets }
+      persist(updated); set(updated)
+    },
+
+    clearLastChallengeResult: () => {
+      const state = get()
+      const updated = { ...state, lastChallengeResult: null }
+      persist(updated); set(updated)
     },
 
     buy: (companyId, shares) => {

@@ -204,6 +204,13 @@ function Movers({ changes, onSelect }) {
   )
 }
 
+const REGIME_ROTATION = {
+  bull:            { toward: ['High-growth', 'Tech', 'Biotech'],      away: ['Defensives', 'Cash-heavy'] },
+  bear:            { toward: ['Low-debt', 'Cash-rich', 'Defensives'], away: ['High-debt', 'Speculative'] },
+  rate_hike:       { toward: ['Low-debt', 'High-margin', 'Capital-light'], away: ['High-debt', 'Leveraged'] },
+  innovation_boom: { toward: ['Tech', 'Biotech', 'Space', 'Robotics'], away: ['Materials', 'Energy'] },
+}
+
 /* ── Macro regime banner ─────────────────────────────────────────── */
 const REGIME_COLOR = {
   bull:            { accent: '#4ADE80', bg: 'rgba(74,222,128,0.08)',  border: 'rgba(74,222,128,0.25)'  },
@@ -236,60 +243,197 @@ function MacroBanner({ announcement, onDismiss }) {
   )
 }
 
-/* ── Pre-bell prediction widget ──────────────────────────────────── */
+/* ── Pre-bell prediction card ────────────────────────────────────── */
 function PredictionWidget({ companies, prediction, predictionResult, onSetPrediction, onClear, onClearPrediction, bellRinging }) {
-  const [selId, setSelId] = useState(companies[0]?.id || '')
-  const isSet = !!prediction
-  const col = predictionResult ? (predictionResult.correct ? '#4ADE80' : '#F87171') : '#D4AF37'
+  const [selId, setSelId] = useState(companies.find(c => !c.isStartup)?.id || '')
+  const selCo = companies.find(c => c.id === selId)
 
   if (predictionResult) {
     return (
-      <motion.div key="result" initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
-        style={{ margin: '0 12px 8px', padding: '10px 14px', borderRadius: 11, background: predictionResult.correct ? 'rgba(74,222,128,0.09)' : 'rgba(248,113,113,0.07)', border: `1px solid ${predictionResult.correct ? 'rgba(74,222,128,0.28)' : 'rgba(248,113,113,0.22)'}`, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ fontSize: 18 }}>{predictionResult.emoji}</span>
+      <motion.div key="result" initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+        style={{ margin: '0 12px 8px', padding: '12px 14px', borderRadius: 13, background: predictionResult.correct ? 'rgba(74,222,128,0.09)' : 'rgba(248,113,113,0.07)', border: `1px solid ${predictionResult.correct ? 'rgba(74,222,128,0.28)' : 'rgba(248,113,113,0.22)'}`, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span style={{ fontSize: 26 }}>{predictionResult.emoji}</span>
         <div style={{ flex: 1 }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: col }}>
-            {predictionResult.correct ? `🎯 Correct! +₳${predictionResult.bonus}` : '❌ Miss'}
-          </span>
-          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginLeft: 6 }}>
-            {predictionResult.ticker} {predictionResult.direction === 'up' ? '↑' : '↓'} called
-          </span>
+          <div style={{ fontSize: 14, fontWeight: 800, color: predictionResult.correct ? '#4ADE80' : '#F87171', marginBottom: 2 }}>
+            {predictionResult.correct ? `🎯 Correct! +₳${predictionResult.bonus}` : '❌ Missed this one'}
+          </div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+            {predictionResult.ticker} {predictionResult.direction === 'up' ? '↑ Up' : '↓ Down'} called
+          </div>
         </div>
-        <button onClick={onClear} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)', fontSize: 14, cursor: 'pointer' }}>×</button>
+        <button onClick={onClear} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)', fontSize: 18, cursor: 'pointer', lineHeight: 1 }}>×</button>
       </motion.div>
     )
   }
 
-  if (isSet && !predictionResult) {
+  if (prediction) {
     const co = companies.find(c => c.id === prediction.companyId)
     return (
       <motion.div key="set" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-        style={{ margin: '0 12px 8px', padding: '8px 14px', borderRadius: 11, background: 'rgba(212,175,55,0.07)', border: '1px solid rgba(212,175,55,0.22)', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 14 }}>{co?.emoji}</span>
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#D4AF37', flex: 1 }}>
-          {co?.ticker} {prediction.direction === 'up' ? '↑ Up' : '↓ Down'} — ring to reveal
-        </span>
-        <button onClick={onClearPrediction} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)', fontSize: 14, cursor: 'pointer' }}>×</button>
+        style={{ margin: '0 12px 8px', padding: '10px 14px', borderRadius: 13, background: 'rgba(212,175,55,0.07)', border: '1px solid rgba(212,175,55,0.22)', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ fontSize: 20 }}>{co?.emoji}</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#D4AF37' }}>{co?.name}</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>{prediction.direction === 'up' ? '↑ Up' : '↓ Down'} — ring the bell to reveal</div>
+        </div>
+        <button onClick={onClearPrediction} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)', fontSize: 18, cursor: 'pointer', lineHeight: 1 }}>×</button>
       </motion.div>
     )
   }
 
   return (
-    <div style={{ margin: '0 12px 8px', display: 'flex', gap: 6, alignItems: 'center' }}>
-      <select value={selId} onChange={e => setSelId(e.target.value)}
-        style={{ flex: 1, padding: '6px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', fontSize: 11, appearance: 'none', minWidth: 0 }}>
+    <div style={{ margin: '0 12px 8px', background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.16)', borderRadius: 13, padding: '10px 12px' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(212,175,55,0.7)', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+        <span>Which stock moves most today?</span>
+        <span style={{ color: '#4ADE80' }}>+₳100 if correct</span>
+      </div>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
         {companies.filter(c => !c.isStartup).map(c => (
-          <option key={c.id} value={c.id} style={{ background: '#111' }}>{c.emoji} {c.ticker}</option>
+          <button key={c.id} onClick={() => setSelId(c.id)}
+            style={{ flexShrink: 0, padding: '5px 8px', borderRadius: 8, border: `1px solid ${selId === c.id ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.07)'}`, background: selId === c.id ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)', color: selId === c.id ? '#D4AF37' : 'rgba(255,255,255,0.45)', fontSize: 12, cursor: 'pointer', fontWeight: selId === c.id ? 700 : 400 }}>
+            {c.emoji}
+          </button>
         ))}
-      </select>
-      <button onClick={() => onSetPrediction(selId, 'up')} disabled={bellRinging}
-        style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(74,222,128,0.3)', background: 'rgba(74,222,128,0.08)', color: '#4ADE80', fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
-        ↑ Up
-      </button>
-      <button onClick={() => onSetPrediction(selId, 'down')} disabled={bellRinging}
-        style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.08)', color: '#F87171', fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
-        ↓ Down
-      </button>
+      </div>
+      {selCo && (
+        <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ flex: 1, fontSize: 11, color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ fontSize: 14 }}>{selCo.emoji}</span> {selCo.name}
+          </div>
+          <button onClick={() => onSetPrediction(selId, 'up')} disabled={bellRinging}
+            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(74,222,128,0.35)', background: 'rgba(74,222,128,0.09)', color: '#4ADE80', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+            ↑ Up
+          </button>
+          <button onClick={() => onSetPrediction(selId, 'down')} disabled={bellRinging}
+            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.35)', background: 'rgba(248,113,113,0.09)', color: '#F87171', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+            ↓ Down
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Ring progress arc ───────────────────────────────────────────── */
+function RingProgressArc({ streak }) {
+  const thresholds = [3, 6, 10]
+  const s = streak || 0
+  const nextT = thresholds.find(t => s < t) || 10
+  const prevT = thresholds[thresholds.indexOf(nextT) - 1] || 0
+  const progress = Math.min(1, (s - prevT) / (nextT - prevT))
+  const multiplier = s >= 10 ? '3×' : s >= 6 ? '2×' : s >= 3 ? '1.5×' : null
+  const col = multiplier ? '#D4AF37' : '#4ADE80'
+  const r = 22, cx = 30, cy = 30, circ = 2 * Math.PI * r
+  const dash = progress * circ
+  return (
+    <div style={{ width: 60, height: 60, flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <svg width={60} height={60} style={{ position: 'absolute', inset: 0 }}>
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={4} />
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke={col} strokeWidth={4} strokeLinecap="round"
+          strokeDasharray={`${dash.toFixed(2)} ${(circ - dash).toFixed(2)}`}
+          strokeDashoffset={(circ / 4).toFixed(2)} />
+      </svg>
+      <div style={{ position: 'relative', textAlign: 'center' }}>
+        <div style={{ fontSize: 12, fontWeight: 900, color: col, lineHeight: 1 }}>🔥{s}</div>
+        {multiplier && <div style={{ fontSize: 7, color: col, fontWeight: 700, marginTop: 1 }}>{multiplier}</div>}
+      </div>
+    </div>
+  )
+}
+
+/* ── Timed event decision card ───────────────────────────────────── */
+function EventDecisionCard({ event, company, holding, onDismiss }) {
+  const [timeLeft, setTimeLeft] = useState(30)
+  const [decided, setDecided] = useState(null)
+
+  useEffect(() => {
+    const t = setInterval(() => setTimeLeft(s => { if (s <= 1) { onDismiss(); return 0 } return s - 1 }), 1000)
+    return () => clearInterval(t)
+  }, [])
+
+  const smartMoney = company._founderScore > 0.7 && company._profitMargin > 0 ? 'BUY MORE'
+    : company._debtRatio > 0.45 ? 'SELL' : 'HOLD'
+  const smartReason = smartMoney === 'BUY MORE'
+    ? 'Strong fundamentals — a dip on a quality company is often an entry opportunity.'
+    : smartMoney === 'SELL'
+    ? 'High debt + bad news is a dangerous combination. Cutting exposure reduces risk.'
+    : 'News is short-term. Fundamentals are intact — experienced investors ride it out.'
+
+  if (decided) {
+    const correct = decided === smartMoney
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+        style={{ margin: '0 12px 10px', background: 'rgba(0,0,0,0.45)', border: `1px solid ${correct ? 'rgba(74,222,128,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 14, padding: '12px 14px' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: correct ? '#4ADE80' : '#FBBF24', marginBottom: 5 }}>
+          {correct ? '🎯 Smart call — smart money agreed.' : `💡 Smart money said: ${smartMoney}`}
+        </div>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', lineHeight: 1.55, marginBottom: 8 }}>{smartReason}</div>
+        <button onClick={onDismiss} style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Dismiss</button>
+      </motion.div>
+    )
+  }
+
+  const arc = timeLeft / 30, r2 = 10, c2 = 2 * Math.PI * r2
+  return (
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+      style={{ margin: '0 12px 10px', background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.28)', borderRadius: 14, padding: '12px 14px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+        <span style={{ fontSize: 22, flexShrink: 0 }}>{company.emoji}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: '#F87171', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: 3 }}>🚨 Critical Event — You hold this stock</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)', lineHeight: 1.5 }}>{event.text}</div>
+        </div>
+        <svg width={26} height={26} style={{ flexShrink: 0 }}>
+          <circle cx={13} cy={13} r={r2} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={3} />
+          <circle cx={13} cy={13} r={r2} fill="none" stroke={timeLeft > 10 ? '#FBBF24' : '#F87171'} strokeWidth={3}
+            strokeDasharray={`${(arc * c2).toFixed(1)} ${c2.toFixed(1)}`}
+            strokeDashoffset={(c2 / 4).toFixed(1)} />
+          <text x={13} y={17} textAnchor="middle" fontSize={8} fill="rgba(255,255,255,0.5)" fontFamily="system-ui">{timeLeft}</text>
+        </svg>
+      </div>
+      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', marginBottom: 8 }}>
+        {holding.shares} shares @ avg ₳{holding.avgCost} · now ₳{fmt(company.price)}
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        {[['HOLD', '#a5b4fc', 'rgba(165,180,252,0.12)', 'rgba(165,180,252,0.3)'],
+          ['SELL', '#F87171', 'rgba(248,113,113,0.12)', 'rgba(248,113,113,0.3)'],
+          ['BUY MORE', '#4ADE80', 'rgba(74,222,128,0.12)', 'rgba(74,222,128,0.3)']].map(([lbl, col, bg, border]) => (
+          <button key={lbl} onClick={() => setDecided(lbl)}
+            style={{ flex: 1, padding: '8px 4px', borderRadius: 9, border: `1px solid ${border}`, background: bg, color: col, fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>
+            {lbl}
+          </button>
+        ))}
+      </div>
+    </motion.div>
+  )
+}
+
+/* ── Daily challenge card ────────────────────────────────────────── */
+function DailyChallenge({ challenge, lastResult, onClearResult, portfolio, companies }) {
+  if (!challenge && !lastResult) return null
+  if (lastResult) {
+    return (
+      <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+        style={{ margin: '4px 12px 8px', padding: '10px 12px', borderRadius: 12, background: lastResult.completed ? 'rgba(74,222,128,0.09)' : 'rgba(255,255,255,0.03)', border: `1px solid ${lastResult.completed ? 'rgba(74,222,128,0.25)' : 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ fontSize: 18 }}>{lastResult.completed ? '✅' : '❌'}</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: lastResult.completed ? '#4ADE80' : 'rgba(255,255,255,0.4)' }}>
+            {lastResult.completed ? `Challenge complete! +₳${lastResult.reward}${lastResult.streakBonus ? ' · 2× streak bonus' : ''}` : 'Challenge missed'}
+          </div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>{lastResult.text}</div>
+        </div>
+        <button onClick={onClearResult} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', fontSize: 16, cursor: 'pointer', lineHeight: 1 }}>×</button>
+      </motion.div>
+    )
+  }
+  const { DAILY_CHALLENGES: defs } = { DAILY_CHALLENGES: [] }
+  return (
+    <div style={{ margin: '4px 12px 8px', padding: '9px 12px', borderRadius: 12, background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.16)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <span style={{ fontSize: 9, fontWeight: 800, color: 'rgba(212,175,55,0.7)', letterSpacing: '.08em', textTransform: 'uppercase' }}>Daily Challenge</span>
+        <span style={{ fontSize: 9, color: '#4ADE80', fontWeight: 700 }}>+₳{challenge.reward}</span>
+      </div>
+      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>{challenge.text}</div>
     </div>
   )
 }
@@ -742,7 +886,8 @@ function EarningsReveal({ earningsReveal, onDismiss }) {
 function CompanyDetail({ company, holding, mode, onBack }) {
   const { buy, sell, buyResearch, news, watchlist, toggleWatchlist, insiderTip, buyInsiderTip,
           macroRegime, marketBeats, shorts, shortSell, closeShort, earnKnowledge,
-          setStopLoss, stopLosses, portfolio: fullPortfolio, companies: allCompanies } = useCallStreetStore()
+          setStopLoss, stopLosses, setPriceTarget, priceTargets,
+          portfolio: fullPortfolio, companies: allCompanies } = useCallStreetStore()
   const { coins } = useCoinStore()
   const [qty, setQty] = useState(1)
   const [action, setAction] = useState('buy')
@@ -821,11 +966,22 @@ function CompanyDetail({ company, holding, mode, onBack }) {
           <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
             <ChevronLeft size={14} /> Back
           </button>
-          <button onClick={() => toggleWatchlist(company.id)}
-            style={{ background: isWatched ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${isWatched ? 'rgba(212,175,55,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 8, padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
-            <Star size={13} fill={isWatched ? '#D4AF37' : 'none'} color={isWatched ? '#D4AF37' : 'rgba(255,255,255,0.4)'} />
-            <span style={{ fontSize: 11, fontWeight: 700, color: isWatched ? '#D4AF37' : 'rgba(255,255,255,0.4)' }}>{isWatched ? 'Watching' : 'Watch'}</span>
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
+            <button onClick={() => toggleWatchlist(company.id)}
+              style={{ background: isWatched ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${isWatched ? 'rgba(212,175,55,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 8, padding: '5px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <Star size={12} fill={isWatched ? '#D4AF37' : 'none'} color={isWatched ? '#D4AF37' : 'rgba(255,255,255,0.4)'} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: isWatched ? '#D4AF37' : 'rgba(255,255,255,0.4)' }}>{isWatched ? 'Watching' : 'Watch'}</span>
+            </button>
+            {isWatched && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontSize: 9, color: 'rgba(212,175,55,0.5)' }}>Target ₳</span>
+                <input type="number" min="1" placeholder={Math.round(company.price * 1.2)}
+                  value={(priceTargets || {})[company.id] || ''}
+                  onChange={e => setPriceTarget(company.id, +e.target.value || 0)}
+                  style={{ width: 56, background: 'rgba(212,175,55,0.07)', border: '1px solid rgba(212,175,55,0.22)', borderRadius: 6, padding: '3px 6px', color: '#D4AF37', fontSize: 10, textAlign: 'right' }} />
+              </div>
+            )}
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
           <div style={{ fontSize: 40, lineHeight: 1 }}>{company.emoji}</div>
@@ -1233,15 +1389,16 @@ function PortfolioTab({ portfolio, companies, indexHistory, seasonDay, shorts })
 /* ── Main CallStreet ─────────────────────────────────────────────── */
 export default function CallStreet() {
   const {
-    companies, portfolio, news, mode, seasonDay, season,
+    companies, portfolio, news, mode, seasonDay, season, totalBells,
     indexHistory, pendingGrade, ipoActive, lastBellChanges, streak, seasonStartValue,
     watchlist, hotSector, crashEvent, insiderTip,
     macroRegime, macroAnnouncement, prediction, predictionResult,
-    shorts, marketBeats, haltBanner,
+    shorts, marketBeats, haltBanner, priceTargets,
     earningsWindow, earningsPredictions, earningsReveal, seasonsPlayed, beatMarketStreak,
+    dailyChallenge, lastChallengeResult, challengeStreak,
     ringTheBell, setMode, clearGrade, toggleWatchlist, clearCrash, buyInsiderTip, freshStart, resetPrices, reset,
     setPrediction, clearPrediction, clearPredictionResult, clearMacroAnnouncement, clearHaltBanner,
-    makeEarningsPrediction, clearEarningsReveal,
+    makeEarningsPrediction, clearEarningsReveal, clearLastChallengeResult,
   } = useCallStreetStore()
   const { coins, earnCoins: earn, resetToDefault: resetCoins, addCoins } = useCoinStore()
 
@@ -1249,6 +1406,7 @@ export default function CallStreet() {
   const [showSettings, setShowSettings] = useState(false)
   const [bellRinging, setBellRinging] = useState(false)
   const [flashKey, setFlashKey] = useState(0)
+  const [dismissedDecisions, setDismissedDecisions] = useState(new Set())
   const [flashMap, setFlashMap] = useState({})
   const [lastRingId, setLastRingId] = useState(null)
   const [ipoShares, setIpoShares] = useState(5)
@@ -1639,15 +1797,30 @@ export default function CallStreet() {
             const co = companies.find(c => c.id === id)
             if (!co) return null
             const ch = pctChange(co.priceHistory)
+            const target = (priceTargets || {})[id]
+            const targetHit = target > 0 && co.price >= target
             return (
-              <div key={id} onClick={() => setSelected(id)}
-                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', marginBottom: 5, background: 'rgba(212,175,55,0.04)', border: '0.5px solid rgba(212,175,55,0.18)', borderRadius: 11, cursor: 'pointer' }}>
-                <span style={{ fontSize: 17 }}>{co.emoji}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', flex: 1 }}>{co.name}</span>
-                <Spark history={co.priceHistory} w={44} h={20} />
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: '#D4AF37' }}>₳{fmt(co.price)}</div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: ch >= 0 ? '#4ADE80' : '#F87171' }}>{ch >= 0 ? '▲' : '▼'}{Math.abs(ch)}%</div>
+              <div key={id}>
+                {targetHit && (
+                  <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', marginBottom: 3, background: 'rgba(212,175,55,0.12)', border: '0.5px solid rgba(212,175,55,0.4)', borderRadius: 8 }}>
+                    <span style={{ fontSize: 10 }}>{co.emoji}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: '#D4AF37', flex: 1 }}>🎯 {co.ticker} hit your ₳{target} target!</span>
+                    <button onClick={() => setSelected(id)} style={{ fontSize: 9, color: '#D4AF37', background: 'rgba(212,175,55,0.2)', border: '0.5px solid rgba(212,175,55,0.4)', borderRadius: 5, padding: '2px 7px', cursor: 'pointer', fontWeight: 700 }}>Sell?</button>
+                  </motion.div>
+                )}
+                <div onClick={() => setSelected(id)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', marginBottom: 5, background: targetHit ? 'rgba(212,175,55,0.07)' : 'rgba(212,175,55,0.04)', border: `0.5px solid ${targetHit ? 'rgba(212,175,55,0.4)' : 'rgba(212,175,55,0.18)'}`, borderRadius: 11, cursor: 'pointer' }}>
+                  <span style={{ fontSize: 17 }}>{co.emoji}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{co.name}</div>
+                    {target > 0 && <div style={{ fontSize: 9, color: co.price >= target ? '#D4AF37' : 'rgba(255,255,255,0.3)', marginTop: 1 }}>Target ₳{target} {co.price >= target ? '✓ hit' : `· ₳${target - co.price} away`}</div>}
+                  </div>
+                  <Spark history={co.priceHistory} w={44} h={20} />
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: '#D4AF37' }}>₳{fmt(co.price)}</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: ch >= 0 ? '#4ADE80' : '#F87171' }}>{ch >= 0 ? '▲' : '▼'}{Math.abs(ch)}%</div>
+                  </div>
                 </div>
               </div>
             )
@@ -1662,6 +1835,25 @@ export default function CallStreet() {
             {hotSector ? <span>🔥 <span style={{ color: SECTOR_THEME[hotSector]?.accent || '#D4AF37' }}>{hotSector}</span> is hot</span> : (mode === 'venture' ? 'All companies + startups' : 'Market board')}
           </div>
         </div>
+
+        {/* Sector rotation callout */}
+        {macroRegime && REGIME_ROTATION[macroRegime] && (
+          <div style={{ marginBottom: 10, padding: '8px 10px', background: REGIME_COLOR[macroRegime]?.bg || 'rgba(212,175,55,0.06)', border: `0.5px solid ${REGIME_COLOR[macroRegime]?.border || 'rgba(212,175,55,0.2)'}`, borderRadius: 10 }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: REGIME_COLOR[macroRegime]?.accent || '#D4AF37', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 6 }}>
+              {{ bull: '🐂', bear: '🐻', rate_hike: '📈', innovation_boom: '⚡' }[macroRegime]} Sector Rotation
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 8, color: 'rgba(74,222,128,0.55)', marginBottom: 3, fontWeight: 600 }}>↑ Rotate toward</div>
+                <div style={{ fontSize: 10, color: '#4ADE80', fontWeight: 600, lineHeight: 1.4 }}>{REGIME_ROTATION[macroRegime].toward.join(' · ')}</div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 8, color: 'rgba(248,113,113,0.55)', marginBottom: 3, fontWeight: 600 }}>↓ Rotate away from</div>
+                <div style={{ fontSize: 10, color: '#F87171', fontWeight: 600, lineHeight: 1.4 }}>{REGIME_ROTATION[macroRegime].away.join(' · ')}</div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Sort chips */}
         <div style={{ display: 'flex', gap: 5, overflowX: 'auto', scrollbarWidth: 'none', marginBottom: 10 }}>
@@ -1789,6 +1981,41 @@ export default function CallStreet() {
         {earningsReveal && <EarningsReveal earningsReveal={earningsReveal} onDismiss={clearEarningsReveal} />}
       </AnimatePresence>
 
+      {/* Timed event decision cards — CRITICAL news on held stocks */}
+      <AnimatePresence>
+        {(() => {
+          const criticalHeld = news.filter(n =>
+            n.ringId === totalBells &&
+            n.severity === 'CRITICAL' &&
+            n.companyId &&
+            !dismissedDecisions.has(n.id) &&
+            portfolio.some(p => p.companyId === n.companyId)
+          )
+          const evt = criticalHeld[0]
+          if (!evt) return null
+          const co = companies.find(c => c.id === evt.companyId)
+          const holding = portfolio.find(p => p.companyId === evt.companyId)
+          if (!co || !holding) return null
+          return (
+            <EventDecisionCard key={evt.id} event={evt} company={co} holding={holding}
+              onDecide={() => {}}
+              onDismiss={() => setDismissedDecisions(s => new Set([...s, evt.id]))} />
+          )
+        })()}
+      </AnimatePresence>
+
+      {/* Daily challenge result / current challenge */}
+      <AnimatePresence mode="wait">
+        <DailyChallenge
+          key={lastChallengeResult ? 'result' : 'challenge'}
+          challenge={dailyChallenge}
+          lastResult={lastChallengeResult}
+          onClearResult={clearLastChallengeResult}
+          portfolio={portfolio}
+          companies={companies}
+        />
+      </AnimatePresence>
+
       {/* Pre-bell prediction */}
       <AnimatePresence mode="wait">
         <PredictionWidget
@@ -1803,7 +2030,7 @@ export default function CallStreet() {
         />
       </AnimatePresence>
 
-      {/* Bell + streak */}
+      {/* Bell + ring progress arc */}
       <div style={{ padding: '8px 16px', display: 'flex', gap: 10, alignItems: 'stretch' }}>
         <motion.button
           whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.96 }}
@@ -1814,17 +2041,7 @@ export default function CallStreet() {
           <Bell size={18} fill={bellRinging ? '#D4AF37' : 'none'} />
           {bellRinging ? 'Markets moving…' : 'Ring the Bell'}
         </motion.button>
-        {(streak || 0) > 0 && (
-          <div style={{ background: streak >= 3 ? 'rgba(212,175,55,0.08)' : 'rgba(74,222,128,0.07)', border: `0.5px solid ${streak >= 3 ? 'rgba(212,175,55,0.28)' : 'rgba(74,222,128,0.2)'}`, borderRadius: 12, padding: '8px 12px', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 58 }}>
-            {streak >= 3 && (
-              <div style={{ fontSize: 9, color: '#D4AF37', fontWeight: 700, marginBottom: 2 }}>
-                {streak >= 10 ? '3×' : streak >= 6 ? '2×' : '1.5×'} bonus
-              </div>
-            )}
-            <div style={{ fontSize: 15, fontWeight: 800, color: streak >= 3 ? '#D4AF37' : '#4ADE80', lineHeight: 1 }}>🔥{streak}</div>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 3 }}>rings</div>
-          </div>
-        )}
+        <RingProgressArc streak={streak} />
       </div>
     </div>
   )
