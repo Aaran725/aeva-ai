@@ -4158,14 +4158,19 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false, isDri
           const html = katex.renderToString(mathContent, { throwOnError: false, displayMode: true })
           elements.push(
             <div key={`dmath-${startI}`} style={{
-              overflowX: 'auto', margin: '16px 0', padding: '26px 28px',
-              textAlign: 'center', borderRadius: 16, fontSize: 19,
-              background: isLight ? 'rgba(99,102,241,0.07)' : 'rgba(14,16,48,0.80)',
-              border: isLight ? '1px solid rgba(99,102,241,0.22)' : '1px solid rgba(99,102,241,0.30)',
-              boxShadow: isLight ? 'none' : '0 4px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(165,170,255,0.07)',
-            }}
-              dangerouslySetInnerHTML={{ __html: html }}
-            />
+              position: 'relative', margin: '14px 0', borderRadius: 14,
+              background: isLight ? 'rgba(99,102,241,0.06)' : 'rgba(99,102,241,0.07)',
+              border: isLight ? '1px solid rgba(99,102,241,0.18)' : '1px solid rgba(99,102,241,0.20)',
+            }}>
+              <div style={{
+                position: 'absolute', top: 9, left: 13,
+                fontSize: 9, fontWeight: 800, letterSpacing: '0.10em', textTransform: 'uppercase',
+                color: isLight ? '#6366F1' : '#818CF8', opacity: 0.65, userSelect: 'none',
+              }}>𝑓(𝑥)</div>
+              <div style={{ overflowX: 'auto', padding: '28px 24px 20px', textAlign: 'center', fontSize: 19 }}
+                dangerouslySetInnerHTML={{ __html: html }}
+              />
+            </div>
           )
         } catch {
           elements.push(<p key={`dmath-${startI}`} style={{ fontFamily: 'monospace', color: txtBody }}>{mathContent}</p>)
@@ -4261,14 +4266,19 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false, isDri
         const fsz  = mlen < 20 ? 16 : mlen < 45 ? 17 : 19
         elements.push(
           <div key={`cimath-${i}`} style={{
-            overflowX: 'auto', margin: '10px 0', padding: pad,
-            textAlign: 'center', borderRadius: 14, fontSize: fsz,
-            background: isLight ? 'rgba(99,102,241,0.07)' : 'rgba(14,16,48,0.80)',
-            border: isLight ? '1px solid rgba(99,102,241,0.22)' : '1px solid rgba(99,102,241,0.30)',
-            boxShadow: isLight ? 'none' : '0 4px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(165,170,255,0.07)',
-          }}
-            dangerouslySetInnerHTML={{ __html: html }}
-          />
+            position: 'relative', margin: '10px 0', borderRadius: 14,
+            background: isLight ? 'rgba(99,102,241,0.06)' : 'rgba(99,102,241,0.07)',
+            border: isLight ? '1px solid rgba(99,102,241,0.18)' : '1px solid rgba(99,102,241,0.20)',
+          }}>
+            <div style={{
+              position: 'absolute', top: 8, left: 12,
+              fontSize: 9, fontWeight: 800, letterSpacing: '0.10em', textTransform: 'uppercase',
+              color: isLight ? '#6366F1' : '#818CF8', opacity: 0.65, userSelect: 'none',
+            }}>𝑓(𝑥)</div>
+            <div style={{ overflowX: 'auto', padding: `${pad.split(' ')[0]} 24px`, textAlign: 'center', fontSize: fsz }}
+              dangerouslySetInnerHTML={{ __html: html }}
+            />
+          </div>
         )
       } catch {
         elements.push(<p key={`cimath-${i}`} style={{ fontFamily: 'monospace', fontSize: '0.9em', color: isLight ? 'rgba(0,0,0,0.84)' : 'rgba(255,255,255,0.88)' }}>{mathContent}</p>)
@@ -4457,12 +4467,12 @@ function MarkdownRenderer({ text, streaming, cursorColor, isLight = false, isDri
         // Plain blockquote — insight strip
         elements.push(
           <div key={`bq-${i}`} style={{
-            margin: '10px 0', padding: '12px 16px',
-            borderLeft: `4px solid ${isLight ? '#818CF8' : '#7C3AED'}`,
-            background: isLight ? 'rgba(99,102,241,0.07)' : 'rgba(99,102,241,0.10)',
-            borderRadius: 12,
+            margin: '10px 0', padding: '11px 15px',
+            borderLeft: `2px solid ${isLight ? 'rgba(99,102,241,0.35)' : 'rgba(139,143,255,0.25)'}`,
+            background: isLight ? 'rgba(99,102,241,0.04)' : 'rgba(99,102,241,0.06)',
+            borderRadius: '0 10px 10px 0',
             fontSize: 14.5, lineHeight: 1.75, fontStyle: 'italic',
-            color: isLight ? '#3730A3' : 'rgba(220,218,255,0.90)',
+            color: isLight ? 'rgba(55,48,163,0.85)' : 'rgba(220,218,255,0.75)',
           }}>
             {parseInline(content, isLight)}
           </div>
@@ -5242,7 +5252,7 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false, isWidg
       style={{
         display: 'flex',
         justifyContent: isUser ? 'flex-end' : 'flex-start',
-        marginBottom: isWidget ? 16 : 14,
+        marginBottom: isWidget ? 16 : (isUser ? 10 : 12),
         gap: 12,
         alignItems: 'flex-start',
       }}
@@ -5256,7 +5266,7 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false, isWidg
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
         border: isWidget ? widgetBorder : bubbleBorder,
-        borderLeft: (!isWidget && !isUser) ? (isLight ? '2px solid rgba(99,102,241,0.42)' : '2px solid rgba(99,102,241,0.55)') : (isWidget ? widgetBorder : bubbleBorder),
+        borderLeft: isWidget ? widgetBorder : bubbleBorder,
         boxShadow: isWidget ? widgetShadow : bubbleShadow,
         color: textColor,
         fontFamily: "'Inter', system-ui, sans-serif",
@@ -9205,10 +9215,10 @@ If no clear changes: {"changes":[]}`
                             onClick={() => { if (!chipEditMode) { setInput(s.label); inputRef.current?.focus() } }}
                             style={{
                               display: 'inline-flex', alignItems: 'center', gap: 7,
-                              padding: '9px 16px', borderRadius: 99,
-                              background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)',
-                              border: chipEditMode ? '1px solid rgba(239,68,68,0.22)' : isLight ? '1px solid rgba(0,0,0,0.10)' : '1px solid rgba(255,255,255,0.10)',
-                              color: isLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.60)',
+                              padding: '7px 14px', borderRadius: 99,
+                              background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)',
+                              border: chipEditMode ? '1px solid rgba(239,68,68,0.22)' : isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.08)',
+                              color: isLight ? 'rgba(0,0,0,0.50)' : 'rgba(255,255,255,0.55)',
                               fontSize: 13, fontWeight: 500,
                               fontFamily: "'Inter', system-ui, sans-serif",
                               cursor: chipEditMode ? 'default' : 'pointer',
@@ -9304,8 +9314,8 @@ If no clear changes: {"changes":[]}`
                         padding: '5px 13px', borderRadius: 99,
                         background: chipEditMode ? 'rgba(99,102,241,0.12)' : isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)',
                         border: chipEditMode ? '1px solid rgba(99,102,241,0.28)' : isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.07)',
-                        color: chipEditMode ? 'rgba(99,102,241,0.82)' : isLight ? 'rgba(0,0,0,0.32)' : 'rgba(255,255,255,0.22)',
-                        fontSize: 11, fontWeight: 600,
+                        color: chipEditMode ? 'rgba(99,102,241,0.82)' : isLight ? 'rgba(0,0,0,0.22)' : 'rgba(255,255,255,0.16)',
+                        fontSize: 10, fontWeight: 600,
                         fontFamily: "'Inter', system-ui, sans-serif",
                         cursor: 'pointer', transition: 'all 0.2s',
                       }}
