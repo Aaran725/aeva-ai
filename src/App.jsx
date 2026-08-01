@@ -1212,7 +1212,7 @@ async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _at
     messages,
     stream: true,
     temperature:       opts.temperature       ?? 0.75,
-    max_tokens:        opts.maxTokens         ?? 650,
+    max_tokens:        opts.maxTokens         ?? 1800,
     frequency_penalty: opts.frequencyPenalty  ?? 0,
     presence_penalty:  opts.presencePenalty   ?? 0,
   }
