@@ -189,12 +189,12 @@ function generateEventsForCompany(company) {
   if (!eligible.length) return []
   const shuffled = [...eligible].sort(() => Math.random() - 0.5)
   const count = Math.random() < 0.35 ? 2 : 1
-  return shuffled.slice(0, count).map(t => ({
-    type: t.type,
-    text: t.text(company.name),
-    impact: Math.round(pickImpact(t.impact) * 1000) / 1000,
-    positive: t.positive,
-  }))
+  return shuffled.slice(0, count).map(t => {
+    const impact = Math.round(pickImpact(t.impact) * 1000) / 1000
+    const absImpact = Math.abs(impact)
+    const severity = absImpact >= 0.12 ? 'CRITICAL' : absImpact >= 0.06 ? 'MAJOR' : 'MINOR'
+    return { type: t.type, text: t.text(company.name), impact, positive: t.positive, severity }
+  })
 }
 
 function initCompany(def) {
@@ -298,6 +298,7 @@ function freshState() {
     earningsReveal: null,
     seasonsPlayed: 0,
     beatMarketStreak: 0,
+    knowledgeViewed: {},
   }
 }
 
@@ -348,6 +349,8 @@ export const useCallStreetStore = create((set, get) => {
           events.forEach(e => {
             const lesson = AEVA_LESSONS[e.type]
             const aevaNote = lesson ? (e.positive ? lesson.pos : lesson.neg) : null
+            const absImpact = Math.abs(e.impact)
+            const severity = e.severity || (absImpact >= 0.12 ? 'CRITICAL' : absImpact >= 0.06 ? 'MAJOR' : 'MINOR')
             allNews.push({
               id: `${Date.now()}-${company.id}-${Math.random()}`,
               companyId: company.id,
@@ -358,6 +361,7 @@ export const useCallStreetStore = create((set, get) => {
               positive: e.positive,
               type: e.type,
               aevaNote,
+              severity,
               day: state.seasonDay + 1,
               ringId,
             })
@@ -510,8 +514,9 @@ export const useCallStreetStore = create((set, get) => {
       const indexNow = Math.round((avgPriceNow / avgPriceBase) * 100 * 10) / 10
       const newIndexHistory = [...state.indexHistory, indexNow].slice(-20)
 
-      // Expire research reports
+      // Expire research reports + reset daily knowledge tracking
       const researchBought = []
+      const knowledgeViewed = {}
 
       let pendingGrade = state.pendingGrade
       let season = state.season
@@ -546,6 +551,7 @@ export const useCallStreetStore = create((set, get) => {
             text: evt.text(co.name),
             impact: 0, positive: evt.positive, type: 'fundamental',
             aevaNote: evt.aevaNote,
+            severity: 'MAJOR',
             day: newDay, ringId,
             isFundamental: true, eventLabel: evt.label,
           })
@@ -575,6 +581,7 @@ export const useCallStreetStore = create((set, get) => {
             companyId: coId, ticker: co.ticker, emoji: co.emoji,
             text, impact: 0, positive, type: 'arc',
             aevaNote, day: newDay, ringId,
+            severity: 'CRITICAL',
             isNarrative: true, arcName: arc.name,
           })
         })
@@ -642,9 +649,25 @@ export const useCallStreetStore = create((set, get) => {
         beatMarketStreak: seasonEnds
           ? (pendingGrade?.beatMarket ? (state.beatMarketStreak || 0) + 1 : 0)
           : (state.beatMarketStreak || 0),
+        knowledgeViewed,
       }
       persist(updated)
       set(updated)
+    },
+
+    earnKnowledge: (companyId, type) => {
+      const state = get()
+      const viewed = state.knowledgeViewed || {}
+      const already = viewed[companyId] || {}
+      if (already[type]) return
+      const reward = type === 'report' ? 15 : 10
+      const updated = {
+        ...state,
+        knowledgeViewed: { ...viewed, [companyId]: { ...already, [type]: true } },
+      }
+      persist(updated)
+      set(updated)
+      useCoinStore.getState().earnCoins(reward, `Knowledge: ${type} for ${companyId}`)
     },
 
     buy: (companyId, shares) => {

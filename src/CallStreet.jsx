@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, Bell, Lock, Star, TrendingUp, TrendingDown, Bookmark } from 'lucide-react'
 import { useCallStreetStore, calcModeOverlay } from './callStreetStore'
@@ -78,7 +78,7 @@ function AreaChart({ history, w = 280, h = 80 }) {
 }
 
 /* ── Scrolling news ticker ───────────────────────────────────────── */
-function TickerTape({ news }) {
+function TickerTape({ news, onSelect }) {
   if (!news.length) return null
   const items = news.slice(0, 8)
   const doubled = [...items, ...items]
@@ -86,13 +86,17 @@ function TickerTape({ news }) {
     <div style={{ overflow: 'hidden', background: 'rgba(255,255,255,0.02)', borderTop: '0.5px solid rgba(255,255,255,0.05)', borderBottom: '0.5px solid rgba(255,255,255,0.05)', padding: '5px 0' }}>
       <div style={{ display: 'flex', animation: 'tickerScroll 42s linear infinite', width: 'max-content' }}>
         {doubled.map((n, i) => (
-          <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0 18px', fontSize: 11, color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap' }}>
+          <span key={i}
+            onClick={() => n.companyId && onSelect && onSelect(n.companyId)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '0 18px', fontSize: 11, color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap', cursor: n.companyId ? 'pointer' : 'default' }}>
             <span style={{ fontSize: 12 }}>{n.emoji}</span>
             <span style={{ fontWeight: 700, color: n.positive ? '#4ADE80' : '#F87171' }}>{n.ticker}</span>
             <span>{n.text.length > 38 ? n.text.slice(0, 38) + '…' : n.text}</span>
-            <span style={{ fontWeight: 700, color: n.positive ? '#4ADE80' : '#F87171' }}>
-              {n.positive ? '+' : ''}{Math.round(n.impact * 100)}%
-            </span>
+            {n.impact !== 0 && (
+              <span style={{ fontWeight: 700, color: n.positive ? '#4ADE80' : '#F87171' }}>
+                {n.positive ? '+' : ''}{Math.round(n.impact * 100)}%
+              </span>
+            )}
             <span style={{ color: 'rgba(255,255,255,0.12)', margin: '0 4px' }}>◆</span>
           </span>
         ))}
@@ -608,7 +612,7 @@ function EarningsReveal({ earningsReveal, onDismiss }) {
 /* ── Company detail ──────────────────────────────────────────────── */
 function CompanyDetail({ company, holding, mode, onBack }) {
   const { buy, sell, buyResearch, news, watchlist, toggleWatchlist, insiderTip, buyInsiderTip,
-          macroRegime, marketBeats, shorts, shortSell, closeShort } = useCallStreetStore()
+          macroRegime, marketBeats, shorts, shortSell, closeShort, earnKnowledge } = useCallStreetStore()
   const { coins } = useCoinStore()
   const [qty, setQty] = useState(1)
   const [action, setAction] = useState('buy')
@@ -627,6 +631,15 @@ function CompanyDetail({ company, holding, mode, onBack }) {
   const cost = qty * company.price
 
   const companyNews = news.filter(n => n.companyId === company.id).slice(0, 5)
+
+  useEffect(() => {
+    if (company.priceHistory?.length > 1) earnKnowledge(company.id, 'chart')
+    if (companyNews.length > 0) earnKnowledge(company.id, 'news')
+  }, [company.id])
+
+  useEffect(() => {
+    if (company.reportUnlocked) earnKnowledge(company.id, 'report')
+  }, [company.reportUnlocked])
   const isWatched = (watchlist || []).includes(company.id)
   const myTip = insiderTip?.companyId === company.id ? insiderTip : null
 
@@ -776,25 +789,38 @@ function CompanyDetail({ company, holding, mode, onBack }) {
         {companyNews.length > 0 && (
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.25)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 7 }}>News</div>
-            {companyNews.map(n => (
-              <div key={n.id} style={{ marginBottom: 7, background: 'rgba(255,255,255,0.02)', border: '0.5px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px' }}>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: 14, flexShrink: 0 }}>{n.emoji}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', lineHeight: 1.55 }}>{n.text}</div>
-                    {n.aevaNote && (
-                      <div style={{ display: 'flex', gap: 5, marginTop: 6, paddingTop: 6, borderTop: '0.5px solid rgba(255,255,255,0.06)', fontSize: 10, color: 'rgba(165,180,252,0.65)', lineHeight: 1.5 }}>
-                        <span style={{ flexShrink: 0 }}>🎓</span>
-                        <span>{n.aevaNote}</span>
-                      </div>
+            {companyNews.map(n => {
+              const sev = n.severity || (Math.abs(n.impact) >= 0.12 ? 'CRITICAL' : Math.abs(n.impact) >= 0.06 ? 'MAJOR' : 'MINOR')
+              const sevStyle = sev === 'CRITICAL'
+                ? { color: '#F87171', bg: 'rgba(248,113,113,0.12)', border: 'rgba(248,113,113,0.3)' }
+                : sev === 'MAJOR'
+                ? { color: '#FBBF24', bg: 'rgba(251,191,36,0.10)', border: 'rgba(251,191,36,0.28)' }
+                : { color: 'rgba(255,255,255,0.35)', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.12)' }
+              return (
+                <div key={n.id} style={{ marginBottom: 8, background: 'rgba(255,255,255,0.02)', border: '0.5px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '10px 12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                    <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.08em', color: sevStyle.color, background: sevStyle.bg, border: `1px solid ${sevStyle.border}`, borderRadius: 4, padding: '2px 6px' }}>{sev}</span>
+                    {n.impact !== 0 && (
+                      <span style={{ fontSize: 11, fontWeight: 700, color: n.positive ? '#4ADE80' : '#F87171', marginLeft: 'auto' }}>
+                        {n.positive ? '+' : ''}{Math.round(n.impact * 100)}%
+                      </span>
                     )}
                   </div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: n.positive ? '#4ADE80' : '#F87171', flexShrink: 0, marginTop: 1 }}>
-                    {n.positive ? '+' : ''}{Math.round(n.impact * 100)}%
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: 14, flexShrink: 0 }}>{n.emoji}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.82)', lineHeight: 1.6 }}>{n.text}</div>
+                      {n.aevaNote && (
+                        <div style={{ display: 'flex', gap: 5, marginTop: 7, paddingTop: 7, borderTop: '0.5px solid rgba(255,255,255,0.06)', fontSize: 10, color: 'rgba(165,180,252,0.65)', lineHeight: 1.5 }}>
+                          <span style={{ flexShrink: 0 }}>🎓</span>
+                          <span>{n.aevaNote}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
@@ -1269,7 +1295,7 @@ export default function CallStreet() {
       </AnimatePresence>
 
       {/* Scrolling ticker */}
-      {news.length > 0 && <TickerTape news={news} />}
+      {news.length > 0 && <TickerTape news={news} onSelect={setSelected} />}
 
       {/* Portfolio hero */}
       <PortfolioHero
@@ -1398,41 +1424,40 @@ export default function CallStreet() {
           <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.25)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 7 }}>News</div>
           {news.slice(0, 4).map((n, i) => {
             const isNew = n.ringId === lastRingId
+            const sev = n.severity || (Math.abs(n.impact) >= 0.12 ? 'CRITICAL' : Math.abs(n.impact) >= 0.06 ? 'MAJOR' : 'MINOR')
+            const sevStyle = sev === 'CRITICAL'
+              ? { color: '#F87171', bg: 'rgba(248,113,113,0.12)', border: 'rgba(248,113,113,0.3)' }
+              : sev === 'MAJOR'
+              ? { color: '#FBBF24', bg: 'rgba(251,191,36,0.10)', border: 'rgba(251,191,36,0.28)' }
+              : { color: 'rgba(255,255,255,0.35)', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.12)' }
             return (
               <motion.div key={n.id}
                 initial={isNew ? { opacity: 0, x: -14 } : false}
                 animate={{ opacity: 1, x: 0 }}
                 transition={isNew ? { delay: i * 0.1, duration: 0.28 } : {}}
-                style={{ display: 'flex', gap: 9, padding: '7px 0', borderBottom: '0.5px solid rgba(255,255,255,0.05)', background: n.isFundamental ? (n.positive ? 'rgba(74,222,128,0.04)' : 'rgba(248,113,113,0.04)') : n.isNarrative ? (n.positive ? 'rgba(165,180,252,0.04)' : 'rgba(248,113,113,0.04)') : n.isEarnings ? 'rgba(212,175,55,0.03)' : 'transparent', borderRadius: (n.isFundamental || n.isNarrative || n.isEarnings) ? 8 : 0, paddingLeft: (n.isFundamental || n.isNarrative || n.isEarnings) ? 8 : 0 }}>
-                <span style={{ fontSize: 15, flexShrink: 0 }}>{n.emoji}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  {n.isFundamental && (
-                    <div style={{ fontSize: 9, fontWeight: 800, color: n.positive ? '#4ADE80' : '#F87171', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 2 }}>
-                      ⚙ Fundamental Change · {n.eventLabel}
-                    </div>
-                  )}
-                  {n.isNarrative && (
-                    <div style={{ fontSize: 9, fontWeight: 800, color: n.positive ? '#a5b4fc' : '#F87171', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 2 }}>
-                      📖 Story Arc · {n.arcName}
-                    </div>
-                  )}
-                  {n.isEarnings && (
-                    <div style={{ fontSize: 9, fontWeight: 800, color: '#D4AF37', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 2 }}>
-                      ⚡ Earnings Season
-                    </div>
-                  )}
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5 }}>{n.text}</div>
-                  {n.aevaNote && (
-                    <div style={{ fontSize: 10, color: 'rgba(165,180,252,0.6)', marginTop: 2, lineHeight: 1.5 }}>
-                      🎓 {n.aevaNote}
-                    </div>
+                style={{ padding: '9px 0', borderBottom: '0.5px solid rgba(255,255,255,0.05)', background: n.isFundamental ? (n.positive ? 'rgba(74,222,128,0.04)' : 'rgba(248,113,113,0.04)') : n.isNarrative ? (n.positive ? 'rgba(165,180,252,0.04)' : 'rgba(248,113,113,0.04)') : n.isEarnings ? 'rgba(212,175,55,0.03)' : 'transparent', borderRadius: (n.isFundamental || n.isNarrative || n.isEarnings) ? 8 : 0, paddingLeft: (n.isFundamental || n.isNarrative || n.isEarnings) ? 8 : 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                  <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.08em', color: sevStyle.color, background: sevStyle.bg, border: `1px solid ${sevStyle.border}`, borderRadius: 4, padding: '2px 6px' }}>{sev}</span>
+                  {n.isFundamental && <span style={{ fontSize: 9, fontWeight: 700, color: n.positive ? '#4ADE80' : '#F87171', letterSpacing: '.06em', textTransform: 'uppercase' }}>⚙ Fundamental · {n.eventLabel}</span>}
+                  {n.isNarrative && <span style={{ fontSize: 9, fontWeight: 700, color: n.positive ? '#a5b4fc' : '#F87171', letterSpacing: '.06em', textTransform: 'uppercase' }}>📖 Arc · {n.arcName}</span>}
+                  {n.isEarnings && <span style={{ fontSize: 9, fontWeight: 700, color: '#D4AF37', letterSpacing: '.06em', textTransform: 'uppercase' }}>⚡ Earnings</span>}
+                  {!n.isFundamental && !n.isNarrative && n.impact !== 0 && (
+                    <span style={{ fontSize: 11, fontWeight: 700, color: n.positive ? '#4ADE80' : '#F87171', marginLeft: 'auto' }}>
+                      {n.positive ? '+' : ''}{Math.round(n.impact * 100)}%
+                    </span>
                   )}
                 </div>
-                {!n.isFundamental && !n.isNarrative && (
-                  <div style={{ fontSize: 11, fontWeight: 700, color: n.positive ? '#4ADE80' : '#F87171', flexShrink: 0, alignSelf: 'flex-start', marginTop: 2 }}>
-                    {n.positive ? '+' : ''}{Math.round(n.impact * 100)}%
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: 15, flexShrink: 0 }}>{n.emoji}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.82)', lineHeight: 1.55 }}>{n.text}</div>
+                    {n.aevaNote && (
+                      <div style={{ fontSize: 10, color: 'rgba(165,180,252,0.6)', marginTop: 4, lineHeight: 1.5 }}>
+                        🎓 {n.aevaNote}
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </motion.div>
             )
           })}
@@ -1508,7 +1533,7 @@ export default function CallStreet() {
             <motion.div key={co.id}
               initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.02 }}
               onClick={() => !isDelisted && setSelected(co.id)}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 6, background: isDelisted ? 'rgba(255,255,255,0.01)' : isHot ? `${SECTOR_THEME[co.sector]?.bg || 'rgba(255,255,255,0.03)'}` : holding ? 'rgba(99,102,241,0.04)' : co.isStartup ? 'rgba(251,146,60,0.04)' : 'rgba(255,255,255,0.03)', border: `0.5px solid ${isDelisted ? 'rgba(248,113,113,0.15)' : isHot ? (SECTOR_THEME[co.sector]?.glow || 'rgba(255,255,255,0.2)') : holding ? 'rgba(99,102,241,0.22)' : co.isStartup ? 'rgba(251,146,60,0.15)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 12, cursor: isDelisted ? 'default' : 'pointer', position: 'relative', opacity: isDelisted ? 0.45 : 1, boxShadow: isHot ? `0 0 0 1px ${SECTOR_THEME[co.sector]?.glow || 'transparent'}` : 'none' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 12px', marginBottom: 6, background: isDelisted ? 'rgba(255,255,255,0.01)' : isHot ? `${SECTOR_THEME[co.sector]?.bg || 'rgba(255,255,255,0.03)'}` : holding ? 'rgba(99,102,241,0.04)' : co.isStartup ? 'rgba(251,146,60,0.04)' : 'rgba(255,255,255,0.03)', border: `0.5px solid ${isDelisted ? 'rgba(248,113,113,0.15)' : isHot ? (SECTOR_THEME[co.sector]?.glow || 'rgba(255,255,255,0.2)') : holding ? 'rgba(99,102,241,0.22)' : co.isStartup ? 'rgba(251,146,60,0.15)' : 'rgba(255,255,255,0.07)'}`, borderLeft: `3px solid ${SECTOR_THEME[co.sector]?.accent || '#D4AF37'}`, borderRadius: 12, cursor: isDelisted ? 'default' : 'pointer', position: 'relative', opacity: isDelisted ? 0.45 : 1, boxShadow: isHot ? `0 0 0 1px ${SECTOR_THEME[co.sector]?.glow || 'transparent'}` : 'none' }}>
               {isDelisted && (
                 <div style={{ position: 'absolute', top: 7, right: 10, fontSize: 8, fontWeight: 800, color: '#F87171', background: 'rgba(248,113,113,0.15)', border: '0.5px solid rgba(248,113,113,0.3)', borderRadius: 4, padding: '1px 5px', letterSpacing: '.06em' }}>HALTED</div>
               )}
@@ -1537,8 +1562,9 @@ export default function CallStreet() {
                   )}
                 </div>
                 {overlay ? (
-                  <div style={{ fontSize: 10, color: overlay.highlight ? '#4ADE80' : 'rgba(255,255,255,0.3)', marginTop: 1 }}>
-                    {overlay.label}: {overlay.value} · {overlay.note}
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span>{overlay.label}: {overlay.value}</span>
+                    <span style={{ color: overlay.note?.includes('Undervalued') ? '#4ADE80' : overlay.note?.includes('Pricey') || overlay.note?.includes('Slow') ? '#F87171' : 'rgba(255,255,255,0.35)' }}>· {overlay.note}</span>
                   </div>
                 ) : (
                   <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>{co.ticker} · {co.sector}</div>
