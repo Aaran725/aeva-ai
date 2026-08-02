@@ -5969,6 +5969,8 @@ function ChatView({ onBack }) {
   const [currentCalibQuestion, setCurrentCalibQuestion] = useState(null)  // { text, nodeId, tier, qNum, isFastLane }
   const [calibEvaluating, setCalibEvaluating]   = useState(false)         // critic is running
   const [lastCalibFeedback, setLastCalibFeedback] = useState(null)        // { understanding, note, correctAnswer, ts }
+  const [calibSpeculativeScore, setCalibSpeculativeScore] = useState(null) // ghost gauge position when probing harder level
+  const calibPrevBandRef = useRef(null)                                    // band label before latest answer — for level-up toast
   const pendingCalibAdvanceRef = useRef(null)                              // deferred advance fn — called after student acknowledges feedback
   const [calibResumeOffer, setCalibResumeOffer]   = useState(null)        // checkpoint to offer resume for
   const [calibInsights, setCalibInsights]         = useState(null)        // AI insights for result screen (Phase 4)
@@ -6559,8 +6561,16 @@ RULES:
     const isGood = understanding === 'solid' || understanding === 'mastery'
     const isPartial = understanding === 'partial'
 
-    // ── Tier escalation 1: partial retry (tiers 1→2→3) ──────────────────────
-    // Give one harder-tier retry before deciding direction (existing behaviour)
+    // ── Binary search: on "none" at tier ≥ 2, drop to tier 1 for a lower check ─
+    // This bisects difficulty: student failed the medium question → confirm at easy.
+    if (understanding === 'none' && cs.tierAtNode >= 2 && !cs.binaryRetried) {
+      cs.binaryRetried = true
+      cs.tierAtNode = 1
+      return cs.currentNode  // retry same node at foundational level
+    }
+
+    // ── Tier escalation 1: partial retry (tiers 2→3) ─────────────────────────
+    // Give one harder-tier retry before deciding direction.
     if (isPartial && !cs.partialAtNode && cs.tierAtNode < 3) {
       cs.partialAtNode = true
       cs.tierAtNode += 1
@@ -6589,7 +6599,8 @@ RULES:
     cs.skillMap[cs.currentNode] = status
     cs.partialAtNode = false
     cs.masteryProbed = false
-    cs.tierAtNode = 1
+    cs.binaryRetried = false
+    cs.tierAtNode = 2  // binary search: start new nodes at medium difficulty
 
     // ── Cluster tracking (maths — and any subject with NODE_CLUSTERS entries) ──
     const clusterMap  = NODE_CLUSTERS[cs.subject]
@@ -6619,13 +6630,12 @@ RULES:
     if (isGood || isPartial) {
       // ── Advance ────────────────────────────────────────────────────────────
 
-      // Step 1: Cluster jump — after 3 consecutive questions in the same cluster,
-      // leap to a different cluster to improve breadth.
-      // FIX: try clusters in order (least assessed first); only use one if the
-      // closest available node is within ±2.5 bandOrder steps of the student's
-      // current estimate. This prevents a Grade 7 student jumping to AP nodes.
-      const CLUSTER_JUMP_MAX_DELTA = 2.5
-      if (clusterMap && nodeCluster && (cs.clusterStreak || 0) >= 3) {
+      // Step 1: Cluster jump — after 3 questions in the same cluster (total, not
+      // just consecutive), leap to a different untested cluster for breadth.
+      // Allow a wider band-order delta so topic coverage isn't blocked by level gaps.
+      const CLUSTER_JUMP_MAX_DELTA = 4.0
+      const clusterTotal = cs.clustersAssessed[nodeCluster] || 0
+      if (clusterMap && nodeCluster && (clusterTotal >= 3 || (cs.clusterStreak || 0) >= 3)) {
         const allClusters   = [...new Set(Object.values(clusterMap))]
         const otherClusters = allClusters
           .filter(c => c !== nodeCluster)
@@ -6910,7 +6920,8 @@ Rules:
       subject, language,
       currentNode: entryNode,
       skillMap: {}, nodeCount: 0, questionsAsked: 0,
-      tierAtNode: 1, partialAtNode: false, masteryProbed: false,
+      tierAtNode: 2, partialAtNode: false, masteryProbed: false,
+      binaryRetried: false,   // has a none-at-tier≥2 retry been used on this node?
       nodesVisited: [], startTime: Date.now(),
       // Cluster-aware traversal
       clustersAssessed: {},  // { cluster → count of nodes assessed }
@@ -7212,6 +7223,20 @@ Rules:
 
     currentCalibQRef.current = questionText
     setCurrentCalibQuestion({ text: questionText, nodeId: cs.currentNode, tier: cs.tierAtNode, qNum: cs.questionsAsked, isFastLane: false })
+
+    // 2.4 — Set speculative gauge when probing a harder level (tier ≥ 3 or cluster jump)
+    const subjectMapForSpec = CALIBRATION_MAP[cs.subject] || {}
+    const currentNodeForSpec = subjectMapForSpec[cs.currentNode]
+    if (currentNodeForSpec && cs.tierAtNode >= 3) {
+      // Speculative score = node's band order + tier offset (harder tier = aims higher)
+      const specOffset = cs.tierAtNode >= 4 ? 2.0 : 1.0
+      setCalibSpeculativeScore((currentNodeForSpec.bandOrder ?? 0) + specOffset)
+    } else if (cs.clusterStreak === 0 && cs.questionsAsked > 0) {
+      // Just jumped clusters — show speculative at node's own level
+      setCalibSpeculativeScore(currentNodeForSpec?.bandOrder ?? null)
+    } else {
+      setCalibSpeculativeScore(null)
+    }
   }
 
   /** Start: fire the first question into the CalibrationExperience overlay. */
@@ -7222,6 +7247,7 @@ Rules:
 
   /** Called when student taps "Next →" on the per-question feedback card. */
   const handleFeedbackAcknowledged = () => {
+    setCalibSpeculativeScore(null)  // clear ghost gauge before next question loads
     if (pendingCalibAdvanceRef.current) {
       pendingCalibAdvanceRef.current()
       pendingCalibAdvanceRef.current = null
@@ -7255,7 +7281,9 @@ Rules:
       const understanding = result.understanding
 
       // ── Feedback (with note from critic) — advance deferred until acknowledged ──
-      setLastCalibFeedback({ understanding, note: result.note || '', correctAnswer: result.correctAnswer || '', ts: Date.now() })
+      // Capture current band before skillMap changes so we can detect level-ups in the card
+      const prevBandForFeedback = calibPrevBandRef.current
+      setLastCalibFeedback({ understanding, note: result.note || '', correctAnswer: result.correctAnswer || '', prevBand: prevBandForFeedback, ts: Date.now() })
 
       // ── Advance state ───────────────────────────────────────────────────
       const passed = understanding === 'solid' || understanding === 'mastery'
@@ -7329,9 +7357,10 @@ Rules:
       skillMap:         cs.skillMap         || {},
       nodeCount:        cs.nodeCount        || 0,
       questionsAsked:   cs.questionsAsked   || 0,
-      tierAtNode:       cs.tierAtNode       || 1,
+      tierAtNode:       cs.tierAtNode       || 2,
       partialAtNode:    cs.partialAtNode    || false,
       masteryProbed:    cs.masteryProbed    || false,
+      binaryRetried:    cs.binaryRetried    || false,
       nodesVisited:     cs.nodesVisited     || [],
       startTime:        cs.startTime        || Date.now(),
       clustersAssessed: cs.clustersAssessed || {},
@@ -8426,7 +8455,11 @@ If no clear changes: {"changes":[]}`
     const n            = entries.length
     const priorBandOrd = CALIBRATION_MAP[cs.subject]?.[ENTRY_NODES[cs.subject]]?.bandOrder ?? 0
     const priorWeight  = Math.max(0, 6 - n)
-    return (rawAvg * n + priorBandOrd * priorWeight) / (n + priorWeight)
+    const score = (rawAvg * n + priorBandOrd * priorWeight) / (n + priorWeight)
+    // Track band label so handleCalibAnswer can detect level-ups
+    const band = BANDS.find(b => score >= b.min)?.label || null
+    calibPrevBandRef.current = band
+    return score
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calibTick, calibMode])
 
@@ -10430,6 +10463,7 @@ If no clear changes: {"changes":[]}`
             language={calibStateRef.current.language || 'en'}
             isEvaluating={calibEvaluating}
             lastFeedback={lastCalibFeedback}
+            speculativeScore={calibSpeculativeScore}
             isLight={isLight}
             clusterInfo={liveClusterInfo}
             onAnswer={handleCalibAnswer}

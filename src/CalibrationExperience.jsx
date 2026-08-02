@@ -71,7 +71,7 @@ function QuestionText({ text, noMath = false }) {
 }
 
 // ── Vertical level arc ────────────────────────────────────────────────────────
-function LevelArc({ liveScore, nodeCount, isLight }) {
+function LevelArc({ liveScore, speculativeScore, nodeCount, isLight }) {
   const HEIGHT = 320
   const hasScore = liveScore !== null && liveScore !== undefined
 
@@ -83,7 +83,9 @@ function LevelArc({ liveScore, nodeCount, isLight }) {
   const topY       = Math.max(0,      HEIGHT * (1 - Math.min(1, position + halfRange)))
   const bottomY    = Math.min(HEIGHT, HEIGHT * (1 - Math.max(0, position - halfRange)))
 
-  const currentBand = hasScore ? getBand(liveScore) : null
+  const currentBand  = hasScore ? getBand(liveScore) : null
+  const ghostBand    = speculativeScore != null ? getBand(speculativeScore) : null
+  const ghostY       = ghostBand ? HEIGHT * (1 - toPos(speculativeScore)) : null
 
   const trackCol = isLight ? 'rgba(0,0,0,0.08)'  : 'rgba(255,255,255,0.08)'
   const mutedCol = isLight ? 'rgba(0,0,0,0.28)'  : 'rgba(255,255,255,0.28)'
@@ -103,6 +105,7 @@ function LevelArc({ liveScore, nodeCount, isLight }) {
         {BANDS.map(band => {
           const y      = HEIGHT * (1 - toPos(band.min))
           const active = currentBand?.label === band.label
+          const ghost  = ghostBand?.label === band.label && ghostBand?.label !== currentBand?.label
           return (
             <div key={band.label} style={{ position: 'absolute', top: y, left: 0, right: 0, display: 'flex', alignItems: 'center', transform: 'translateY(-50%)' }}>
               {/* tick left of dot */}
@@ -110,12 +113,12 @@ function LevelArc({ liveScore, nodeCount, isLight }) {
               {/* dot */}
               <div style={{
                 width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-                background: active ? band.color : tickCol,
+                background: active ? band.color : ghost ? `${band.color}50` : tickCol,
                 boxShadow: active ? `0 0 8px ${band.color}88` : 'none',
                 transition: 'all 0.4s',
               }} />
               {/* label */}
-              <div style={{ paddingLeft: 9, fontSize: 9.5, fontWeight: active ? 800 : 500, color: active ? band.color : mutedCol, whiteSpace: 'nowrap', transition: 'all 0.35s' }}>
+              <div style={{ paddingLeft: 9, fontSize: 9.5, fontWeight: active ? 800 : ghost ? 600 : 500, color: active ? band.color : ghost ? `${band.color}70` : mutedCol, whiteSpace: 'nowrap', transition: 'all 0.35s' }}>
                 {band.label}
               </div>
             </div>
@@ -129,6 +132,25 @@ function LevelArc({ liveScore, nodeCount, isLight }) {
             background: `${currentBand?.color || '#818CF8'}26`, borderRadius: 7,
             transition: 'background 0.4s',
           }} />
+        )}
+
+        {/* Ghost needle — speculative target (pulsing dashed ring) */}
+        {ghostBand && ghostY !== null && ghostBand.label !== currentBand?.label && (
+          <motion.div
+            animate={{ top: ghostY }}
+            transition={{ type: 'spring', stiffness: 70, damping: 14 }}
+            style={{ position: 'absolute', left: 63, transform: 'translate(-50%, -50%)', zIndex: 1 }}
+          >
+            <motion.div
+              animate={{ opacity: [0.3, 0.7, 0.3], scale: [0.92, 1.05, 0.92] }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+              style={{
+                width: 18, height: 18, borderRadius: '50%',
+                background: 'transparent',
+                border: `2px dashed ${ghostBand.color}`,
+              }}
+            />
+          </motion.div>
         )}
 
         {/* Animated glowing marker */}
@@ -152,7 +174,7 @@ function LevelArc({ liveScore, nodeCount, isLight }) {
       </div>
 
       {/* Band label below arc */}
-      <div style={{ marginTop: 16, textAlign: 'center', minHeight: 38 }}>
+      <div style={{ marginTop: 16, textAlign: 'center', minHeight: 52 }}>
         <AnimatePresence mode="wait">
           {currentBand ? (
             <motion.div key={currentBand.label} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} transition={{ duration: 0.22 }}>
@@ -165,9 +187,32 @@ function LevelArc({ liveScore, nodeCount, isLight }) {
             </motion.div>
           )}
         </AnimatePresence>
+        {/* "Pushing to..." hint when probing higher level */}
+        <AnimatePresence>
+          {ghostBand && ghostBand.label !== currentBand?.label && (
+            <motion.div
+              key={ghostBand.label}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: [0.55, 0.85, 0.55] }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ fontSize: 9, color: ghostBand.color, marginTop: 6, fontWeight: 600, letterSpacing: '0.02em' }}
+            >
+              Pushing to {ghostBand.label}…
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   )
+}
+
+// ── Difficulty tier labels ────────────────────────────────────────────────────
+const TIER_LABELS = {
+  1: { label: 'Foundation', color: '#4ADE80' },
+  2: { label: 'Standard',   color: '#818CF8' },
+  3: { label: 'Advanced',   color: '#F59E0B' },
+  4: { label: 'Challenge',  color: '#F87171' },
 }
 
 // ── Feedback flash configs ────────────────────────────────────────────────────
@@ -337,12 +382,13 @@ function parseMSOptions(questionText) {
 export function CalibrationExperience({
   question,                 // { text, nodeId, tier, qNum, isFastLane }
   liveScore,                // weighted band average score (null until first node assessed)
+  speculativeScore,         // ghost gauge target when probing a harder level
   nodeCount,                // distinct nodes assessed so far
   questionsAsked,           // total questions (including retries)
   subject,
   language = 'en',          // 'en' | 'ja'
   isEvaluating,             // critic is running — disable input
-  lastFeedback,             // { understanding, note, correctAnswer, ts }
+  lastFeedback,             // { understanding, note, correctAnswer, prevBand, ts }
   isLight,
   clusterInfo,              // { hit, total } — cluster coverage for maths (null for other subjects)
   onAnswer,                 // (text: string) => void
@@ -357,6 +403,7 @@ export function CalibrationExperience({
   const [activeFeedback, setActiveFeedback] = useState(null)
   const [selectedMC, setSelectedMC]     = useState(null)  // key of tapped MC option
   const [selectedMS, setSelectedMS]     = useState([])    // keys of toggled multi-select options
+  const [levelUpToast, setLevelUpToast] = useState(null)  // { from, to, color } — transient band-change banner
   const mcSubmitRef                     = useRef(null)     // pending MC auto-submit timer
   const inputRef = useRef(null)
 
@@ -375,6 +422,17 @@ export function CalibrationExperience({
     if (!lastFeedback) return
     setActiveFeedback(lastFeedback)
     setShowFeedback(true)
+
+    // Level-up toast when the band changes
+    if (lastFeedback.prevBand && liveScore !== null && liveScore !== undefined) {
+      const newBand = getBand(liveScore)
+      if (newBand && newBand.label !== lastFeedback.prevBand) {
+        setLevelUpToast({ from: lastFeedback.prevBand, to: newBand.label, color: newBand.color })
+        const tid = setTimeout(() => setLevelUpToast(null), 3800)
+        return () => clearTimeout(tid)
+      }
+    }
+
     if (question?.isFastLane) {
       const t = setTimeout(() => setShowFeedback(false), 1200)
       return () => clearTimeout(t)
@@ -530,6 +588,31 @@ export function CalibrationExperience({
         </button>
       </div>
 
+      {/* ── Level-up toast ──────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {levelUpToast && (
+          <motion.div
+            key={levelUpToast.to}
+            initial={{ opacity: 0, y: -12, scale: 0.96 }}
+            animate={{ opacity: 1,  y: 0,  scale: 1    }}
+            exit={  { opacity: 0,  y: -8,  scale: 0.96 }}
+            transition={{ duration: 0.22 }}
+            style={{
+              position: 'absolute', top: 58, left: '50%', transform: 'translateX(-50%)',
+              zIndex: 100,
+              background: `${levelUpToast.color}18`,
+              border: `1.5px solid ${levelUpToast.color}50`,
+              borderRadius: 12, padding: '9px 18px',
+              fontSize: 12, fontWeight: 700, color: levelUpToast.color,
+              whiteSpace: 'nowrap', letterSpacing: '0.01em',
+              pointerEvents: 'none',
+            }}
+          >
+            ↑ Level updated: {levelUpToast.from} → {levelUpToast.to}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ── Progress bar ────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 3, padding: '10px 28px 0', flexShrink: 0 }}>
         {Array.from({ length: segCount }).map((_, i) => (
@@ -565,10 +648,24 @@ export function CalibrationExperience({
               transition={{ duration: 0.22, ease: 'easeOut' }}
               style={{
                 background: cardBg, border: `1px solid ${borderCol}`, borderRadius: 18,
-                padding: '28px 32px',
+                padding: '28px 32px', position: 'relative',
                 fontSize: 16.5, lineHeight: 1.78, color: textCol, fontWeight: 440,
               }}
             >
+              {/* Difficulty chip — top-right corner */}
+              {question.tier && TIER_LABELS[question.tier] && !question.isFastLane && (
+                <div style={{
+                  position: 'absolute', top: 14, right: 16,
+                  fontSize: 9, fontWeight: 800, letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: TIER_LABELS[question.tier].color,
+                  background: `${TIER_LABELS[question.tier].color}1A`,
+                  border: `1px solid ${TIER_LABELS[question.tier].color}40`,
+                  borderRadius: 6, padding: '3px 8px',
+                }}>
+                  {TIER_LABELS[question.tier].label}
+                </div>
+              )}
               {/* For MC/MS questions show only the stem; options rendered below */}
               <QuestionText
                 text={msData ? msData.stem : mcData ? mcData.stem : question.text}
@@ -1048,7 +1145,12 @@ export function CalibrationExperience({
         </div>
 
         {/* ── Right: live level arc ─────────────────────────────────────────── */}
-        <LevelArc liveScore={question?.isFastLane ? null : liveScore} nodeCount={nodeCount} isLight={isLight} />
+        <LevelArc
+          liveScore={question?.isFastLane ? null : liveScore}
+          speculativeScore={question?.isFastLane ? null : speculativeScore}
+          nodeCount={nodeCount}
+          isLight={isLight}
+        />
       </div>
     </motion.div>
   )
