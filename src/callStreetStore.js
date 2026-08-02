@@ -329,6 +329,8 @@ function freshState() {
     dailyChallenge: null,
     challengeStreak: 0,
     lastChallengeResult: null,
+    tradeHistory: [],
+    playerXP: 0,
   }
 }
 
@@ -361,20 +363,34 @@ export const useCallStreetStore = create((set, get) => {
 
         if (withNews.has(company.id)) {
           const events = generateEventsForCompany(company)
+
+          // Fundamental drift — news events permanently nudge company stats
+          const fundDrift = {}
+          events.forEach(e => {
+            if (e.type === 'debt'    && !e.positive) fundDrift._debtRatio    = Math.min(0.85, (fundDrift._debtRatio    ?? company._debtRatio)    + 0.04)
+            if (e.type === 'revenue' && e.positive)  fundDrift._revGrowth    = Math.min(0.90, (fundDrift._revGrowth    ?? company._revGrowth)    + 0.025)
+            if (e.type === 'profit'  && !e.positive) fundDrift._profitMargin = Math.max(-0.45,(fundDrift._profitMargin ?? company._profitMargin) - 0.025)
+            if (e.type === 'rd'      && e.positive)  fundDrift._rdSpend      = Math.min(1.00, (fundDrift._rdSpend      ?? company._rdSpend)      + 0.020)
+            if (e.type === 'founder' && !e.positive) fundDrift._founderScore = Math.max(0.35, (fundDrift._founderScore ?? company._founderScore)  - 0.04)
+          })
+          const drifted = Object.keys(fundDrift).length
+            ? { ...company, ...fundDrift, fairValue: calcFairValue({ ...company, ...fundDrift }) }
+            : company
+
           let totalImpact = events.reduce((s, e) => s + e.impact, 0)
           // Innovation Boom: amplify positive news for tech/biotech/space
-          if (state.macroRegime === 'innovation_boom' && ['tech','biotech','space'].includes(company.sector) && totalImpact > 0)
+          if (state.macroRegime === 'innovation_boom' && ['tech','biotech','space'].includes(drifted.sector) && totalImpact > 0)
             totalImpact *= 1.5
           // Rate Hike: dampen positive news for high-debt stocks
-          if (state.macroRegime === 'rate_hike' && company._debtRatio > 0.40 && totalImpact > 0)
+          if (state.macroRegime === 'rate_hike' && drifted._debtRatio > 0.40 && totalImpact > 0)
             totalImpact *= 0.4
-          const startupNoise = company.isStartup ? (Math.random() - 0.45) * (company._volatility || 0.1) : 0
-          const fv = company.fairValue || calcFairValue(company)
+          const startupNoise = drifted.isStartup ? (Math.random() - 0.45) * (drifted._volatility || 0.1) : 0
+          const fv = drifted.fairValue || calcFairValue(drifted)
           // Dampen news impact when overvalued; amplify when undervalued
-          const overRatio = company.price / fv
+          const overRatio = drifted.price / fv
           const dampen = Math.max(0.15, Math.min(1.5, 1 / Math.pow(overRatio, 1.2)))
-          const meanRev = (fv - company.price) / company.price * 0.08
-          const newPrice = Math.max(1, Math.round(company.price * (1 + (totalImpact + startupNoise) * dampen + meanRev)))
+          const meanRev = (fv - drifted.price) / drifted.price * 0.08
+          const newPrice = Math.max(1, Math.round(drifted.price * (1 + (totalImpact + startupNoise) * dampen + meanRev)))
 
           events.forEach(e => {
             const lesson = AEVA_LESSONS[e.type]
@@ -382,10 +398,10 @@ export const useCallStreetStore = create((set, get) => {
             const absImpact = Math.abs(e.impact)
             const severity = e.severity || (absImpact >= 0.12 ? 'CRITICAL' : absImpact >= 0.06 ? 'MAJOR' : 'MINOR')
             allNews.push({
-              id: `${Date.now()}-${company.id}-${Math.random()}`,
-              companyId: company.id,
-              ticker: company.ticker,
-              emoji: company.emoji,
+              id: `${Date.now()}-${drifted.id}-${Math.random()}`,
+              companyId: drifted.id,
+              ticker: drifted.ticker,
+              emoji: drifted.emoji,
               text: e.text,
               impact: e.impact,
               positive: e.positive,
@@ -397,7 +413,7 @@ export const useCallStreetStore = create((set, get) => {
             })
           })
 
-          return { ...company, price: newPrice, priceHistory: [...company.priceHistory.slice(-9), newPrice], daysHeldByMe: newDaysHeld, reportUnlocked }
+          return { ...drifted, price: newPrice, priceHistory: [...drifted.priceHistory.slice(-9), newPrice], daysHeldByMe: newDaysHeld, reportUnlocked }
         } else {
           // Mean reversion toward fair value + small noise; no persistent upward drift
           const fv = company.fairValue || calcFairValue(company)
@@ -483,42 +499,50 @@ export const useCallStreetStore = create((set, get) => {
         }
       }
 
-      // ── Earnings Season (Day 9 bell reveals results; Day 8 bell opens window) ──
+      // ── Earnings Season (Day 5 simultaneous reveal for ALL stocks) ──
       let earningsReveal = null
-      if ((state.earningsWindow) && newDay === 9) {
+      if (state.earningsWindow && newDay === 5) {
         const heldIds = new Set(state.portfolio.map(h => h.companyId))
-        const earningsResults = []
-        finalCompanies.forEach(co => {
-          if (!heldIds.has(co.id) || co.delisted) return
+        const allEarningsResults = []
+        finalCompanies.filter(co => !co.delisted).forEach(co => {
           const beatScore = co._revGrowth * 0.40 + co._profitMargin * 0.30 + co._founderScore * 0.30
           const beatProb = Math.min(0.80, Math.max(0.20, 0.50 + beatScore * 1.5))
           const beat = Math.random() < beatProb
-          const pct = beat ? 0.14 + Math.random() * 0.13 : -(0.14 + Math.random() * 0.13)
-          const prediction = (state.earningsPredictions || {})[co.id] || null
-          const correct = prediction ? prediction === (beat ? 'beat' : 'miss') : null
-          const bonus = correct === true ? 20 : correct === false ? -10 : 0
-          if (bonus > 0) useCoinStore.getState().earnCoins(bonus, `Earnings correct: ${co.ticker}`)
-          if (bonus < 0) useCoinStore.getState().spendCoins(Math.abs(bonus), `Earnings wrong: ${co.ticker}`)
-          earningsResults.push({ companyId: co.id, ticker: co.ticker, emoji: co.emoji, name: co.name, beat, pct: Math.round(pct * 100), prediction, correct, bonus })
-          allNews.unshift({
-            id: `earnings-${co.id}-${Date.now()}-${Math.random()}`,
-            companyId: co.id, ticker: co.ticker, emoji: co.emoji,
-            text: beat ? `📈 ${co.name} BEATS earnings — revenue and margins exceed expectations` : `📉 ${co.name} MISSES earnings — guidance cut sends shares lower`,
-            impact: pct, positive: beat, type: 'earnings',
-            aevaNote: beat
-              ? "Earnings beats drive short-term price jumps. Ask: is this a one-off or a sign of durable improvement? Consistent beats over multiple quarters are what build lasting wealth."
-              : "Earnings misses hurt — but ask whether the business model is broken or facing temporary headwinds. Great companies miss sometimes; how management responds tells you more than the miss itself.",
-            day: newDay, ringId, isEarnings: true,
-          })
+          const rawPct = beat ? 0.08 + Math.random() * 0.15 : -(0.08 + Math.random() * 0.15)
+          const pct = Math.round(rawPct * 100)
+          const outcome = Math.abs(pct) <= 4 ? 'inline' : (beat ? 'beat' : 'miss')
+          const isHeld = heldIds.has(co.id)
+          let bonus = 0, prediction = null, correct = null
+          if (isHeld) {
+            prediction = (state.earningsPredictions || {})[co.id] || null
+            correct = prediction ? prediction === (beat ? 'beat' : 'miss') : null
+            bonus = correct === true ? 20 : correct === false ? -10 : 0
+            if (bonus > 0) useCoinStore.getState().earnCoins(bonus, `Earnings correct: ${co.ticker}`)
+            if (bonus < 0) useCoinStore.getState().spendCoins(Math.abs(bonus), `Earnings wrong: ${co.ticker}`)
+          }
+          allEarningsResults.push({ companyId: co.id, ticker: co.ticker, emoji: co.emoji, name: co.name, beat, outcome, pct, isHeld, prediction: isHeld ? prediction : null, correct: isHeld ? correct : null, bonus })
+          if (isHeld) {
+            allNews.unshift({
+              id: `earnings-${co.id}-${Date.now()}-${Math.random()}`,
+              companyId: co.id, ticker: co.ticker, emoji: co.emoji,
+              text: beat ? `📈 ${co.name} BEATS earnings — revenue and margins exceed expectations` : `📉 ${co.name} MISSES earnings — guidance cut sends shares lower`,
+              impact: pct / 100, positive: beat, type: 'earnings',
+              aevaNote: beat
+                ? "Earnings beats drive short-term price jumps. Ask: is this a one-off or a sign of durable improvement? Consistent beats over multiple quarters are what build lasting wealth."
+                : "Earnings misses hurt — but ask whether the business model is broken or facing temporary headwinds. Great companies miss sometimes; how management responds tells you more than the miss itself.",
+              day: newDay, ringId, isEarnings: true,
+            })
+          }
         })
-        // Apply price impact from earnings
+        // Apply price impact from earnings to ALL stocks
         finalCompanies = finalCompanies.map(co => {
-          const r = earningsResults.find(r => r.companyId === co.id)
-          if (!r) return co
+          const r = allEarningsResults.find(r => r.companyId === co.id)
+          if (!r || co.delisted) return co
           const np = Math.max(1, Math.round(co.price * (1 + r.pct / 100)))
           return { ...co, price: np, priceHistory: [...co.priceHistory.slice(-9), np] }
         })
-        earningsReveal = { results: earningsResults, totalBonus: earningsResults.reduce((s, r) => s + (r.bonus || 0), 0) }
+        const heldResults = allEarningsResults.filter(r => r.isHeld)
+        earningsReveal = { results: heldResults, allResults: allEarningsResults, totalBonus: heldResults.reduce((s, r) => s + (r.bonus || 0), 0) }
       }
 
       // Sector rotation — hot sector changes every 3 bells
@@ -556,7 +580,7 @@ export const useCallStreetStore = create((set, get) => {
       let macroAnnouncement = state.macroAnnouncement
 
       if (seasonEnds) {
-        pendingGrade = calcGrade(state.portfolio, finalCompanies, state.seasonStartValue, newIndexHistory, (state.streak || 0) + 1)
+        pendingGrade = calcGrade(state.portfolio, finalCompanies, state.seasonStartValue, newIndexHistory, (state.streak || 0) + 1, state.macroRegime)
         season = state.season + 1
         seasonDay = 0
         seasonStartValue = state.portfolio.reduce((s, h) => {
@@ -667,6 +691,7 @@ export const useCallStreetStore = create((set, get) => {
       let finalPortfolio = bankruptId
         ? state.portfolio.filter(p => p.companyId !== bankruptId)
         : [...state.portfolio]
+      const newTradeEntries = []
       finalPortfolio = finalPortfolio.filter(h => {
         const co = finalCompanies.find(c => c.id === h.companyId)
         const sl = stopLosses[h.companyId]
@@ -674,6 +699,7 @@ export const useCallStreetStore = create((set, get) => {
         const dropPct = ((co.price - h.avgCost) / h.avgCost) * 100
         if (dropPct <= -sl) {
           const proceeds = h.shares * co.price
+          const realized = Math.round((co.price - h.avgCost) * h.shares)
           useCoinStore.getState().earnCoins(proceeds, `Stop-loss: ${co.ticker} auto-sold`)
           allNews.unshift({
             id: `sl-${h.companyId}-${Date.now()}`,
@@ -682,6 +708,7 @@ export const useCallStreetStore = create((set, get) => {
             impact: 0, positive: false, type: 'system',
             severity: 'MAJOR', day: newDay, ringId,
           })
+          newTradeEntries.push({ id: `sl-${h.companyId}-${Date.now()}`, type: 'stop_loss', companyId: co.id, ticker: co.ticker, emoji: co.emoji, name: co.name, shares: h.shares, price: co.price, avgCost: h.avgCost, realized, gainPct: Math.round(dropPct), day: newDay, season: state.season })
           return false
         }
         return true
@@ -722,10 +749,12 @@ export const useCallStreetStore = create((set, get) => {
         dailyChallenge: nextChallenge,
         challengeStreak,
         lastChallengeResult,
-        earningsWindow: seasonEnds ? false : (newDay === 8 ? true : newDay === 9 ? false : (state.earningsWindow || false)),
-        earningsPredictions: (newDay === 8 || seasonEnds) ? {} : (state.earningsPredictions || {}),
+        earningsWindow: seasonEnds ? false : (newDay === 4 ? true : newDay === 5 ? false : (state.earningsWindow || false)),
+        earningsPredictions: (newDay === 4 || seasonEnds) ? {} : (state.earningsPredictions || {}),
         earningsReveal,
         seasonsPlayed: seasonEnds ? (state.seasonsPlayed || 0) + 1 : (state.seasonsPlayed || 0),
+        tradeHistory: [...(state.tradeHistory || []), ...newTradeEntries],
+        playerXP: (state.playerXP || 0) + 5 + (seasonEnds && pendingGrade ? (pendingGrade.xpAward || 0) : 0),
         beatMarketStreak: seasonEnds
           ? (pendingGrade?.beatMarket ? (state.beatMarketStreak || 0) + 1 : 0)
           : (state.beatMarketStreak || 0),
@@ -789,7 +818,9 @@ export const useCallStreetStore = create((set, get) => {
       } else {
         portfolio = [...state.portfolio, { companyId, shares, avgCost: company.price, boughtDay: state.seasonDay }]
       }
-      const updated = { ...state, portfolio }
+      const relatedNews = (state.news || []).find(n => n.companyId === companyId)?.text || null
+      const tradeEntry = { id: `buy-${companyId}-${Date.now()}`, type: 'buy', companyId, ticker: company.ticker, emoji: company.emoji, name: company.name, shares, price: company.price, totalCost: cost, day: state.seasonDay, season: state.season, relatedNews }
+      const updated = { ...state, portfolio, tradeHistory: [...(state.tradeHistory || []), tradeEntry] }
       persist(updated)
       set(updated)
       return { ok: true, cost }
@@ -801,11 +832,15 @@ export const useCallStreetStore = create((set, get) => {
       const holding = state.portfolio.find(p => p.companyId === companyId)
       if (!company || !holding || holding.shares < shares) return { error: 'Invalid position' }
       const proceeds = shares * company.price
+      const realized = Math.round((company.price - holding.avgCost) * shares)
+      const gainPct = Math.round(((company.price - holding.avgCost) / holding.avgCost) * 100)
       useCoinStore.getState().earnCoins(proceeds, `Call Street: Sell ${shares}× ${company.ticker}`)
       const portfolio = holding.shares === shares
         ? state.portfolio.filter(p => p.companyId !== companyId)
         : state.portfolio.map(p => p.companyId === companyId ? { ...p, shares: p.shares - shares } : p)
-      const updated = { ...state, portfolio }
+      const relatedNews = (state.news || []).find(n => n.companyId === companyId)?.text || null
+      const tradeEntry = { id: `sell-${companyId}-${Date.now()}`, type: 'sell', companyId, ticker: company.ticker, emoji: company.emoji, name: company.name, shares, price: company.price, avgCost: holding.avgCost, realized, gainPct, day: state.seasonDay, season: state.season, relatedNews }
+      const updated = { ...state, portfolio, tradeHistory: [...(state.tradeHistory || []), tradeEntry] }
       persist(updated)
       set(updated)
       return { ok: true, proceeds }
@@ -990,7 +1025,44 @@ export const useCallStreetStore = create((set, get) => {
   }
 })
 
-function calcGrade(portfolio, companies, seasonStartValue, indexHistory, streak = 0) {
+function generateLesson(portfolio, companies, macroRegime) {
+  const holdings = portfolio.map(h => {
+    const co = companies.find(c => c.id === h.companyId)
+    if (!co) return null
+    const gainPct = co.price > 0 ? Math.round(((co.price - h.avgCost) / h.avgCost) * 100) : -100
+    return { h, co, gainPct }
+  }).filter(Boolean).sort((a, b) => a.gainPct - b.gainPct)
+
+  if (holdings.length === 0) return { text: "You didn't hold any positions when the season ended. Conviction is key — time in the market beats timing the market every decade.", icon: '💡' }
+
+  const worst = holdings[0]
+  const best  = holdings[holdings.length - 1]
+
+  if (macroRegime === 'rate_hike' && worst.co._debtRatio > 0.4 && worst.gainPct < 0)
+    return { icon: '📈', text: `You held ${worst.co.name} (high-debt) during a Rate Hike Cycle — down ${Math.abs(worst.gainPct)}%. Rising rates raise the cost of debt: margins compress, investors flee. Buffett's rule: avoid companies that can't survive a bad year without borrowing more.` }
+
+  if (macroRegime === 'bear' && worst.co._profitMargin < 0 && worst.gainPct < 0)
+    return { icon: '🐻', text: `${worst.co.name} was burning cash heading into a Bear Market — down ${Math.abs(worst.gainPct)}%. Loss-making companies get sold first in downturns. Quality and cash flows win when fear spikes.` }
+
+  if (macroRegime === 'bear' && portfolio.length > 3 && holdings.filter(h => h.gainPct < 0).length > Math.floor(portfolio.length / 2))
+    return { icon: '🐻', text: `You held ${portfolio.length} positions through a Bear Market. In downturns, concentration beats diversification — 1–2 high-quality, low-debt companies outperform a spread portfolio when everything sells off.` }
+
+  if (worst.co._debtRatio > 0.55 && worst.gainPct < -10)
+    return { icon: '⚠️', text: `${worst.co.name}'s high debt became a liability — down ${Math.abs(worst.gainPct)}%. The #1 killer of otherwise good businesses is leverage. High-debt companies can't survive a bad year without borrowing even more.` }
+
+  if (worst.co._profitMargin < -0.15 && worst.gainPct < -10)
+    return { icon: '💸', text: `${worst.co.name} was deep in the red with no clear path to profit — down ${Math.abs(worst.gainPct)}%. Losses are only acceptable with a credible monetisation roadmap. Amazon lost money for a decade — but it had a plan.` }
+
+  if (macroRegime === 'innovation_boom' && best.gainPct > 20)
+    return { icon: '⚡', text: `You caught the Innovation Boom — ${best.co.name} up ${best.gainPct}%. Tech re-ratings happen fast: speculative fundamentals one quarter become "priced in" the next. Soros mode is built for exactly this regime.` }
+
+  if (holdings.every(h => h.gainPct >= 0))
+    return { icon: '🏆', text: `Every position finished in the green. Quality compounds quietly: strong fundamentals don't just drive prices up — they recover faster after dips, which is where long-term wealth is actually built.` }
+
+  return { icon: '📊', text: `Study the analyst report before your next buy — revenue growth, profit margin, and debt ratio predict long-term prices better than any short-term headline. The numbers don't lie; they just take time.` }
+}
+
+function calcGrade(portfolio, companies, seasonStartValue, indexHistory, streak = 0, macroRegime = null) {
   const currentValue = portfolio.reduce((s, h) => {
     const co = companies.find(c => c.id === h.companyId)
     return s + (co ? co.price * h.shares : 0)
@@ -1014,5 +1086,7 @@ function calcGrade(portfolio, companies, seasonStartValue, indexHistory, streak 
 
   const multiplier = streak >= 10 ? 3 : streak >= 6 ? 2 : streak >= 3 ? 1.5 : 1
   coins = Math.round(coins * multiplier)
-  return { grade, returnPct, indexReturn, beatMarket, note, coins, currentValue, multiplier }
+  const xpAward = { 'A+': 500, 'A': 350, 'B': 200, 'C': 100, 'D': 50 }[grade] || 50
+  const lesson = generateLesson(portfolio, companies, macroRegime)
+  return { grade, returnPct, indexReturn, beatMarket, note, coins, currentValue, multiplier, xpAward, lesson }
 }

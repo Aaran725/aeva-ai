@@ -465,8 +465,13 @@ function investorStyle(portfolio, companies, beatMarket) {
   return   { label: 'Balanced Investor',  emoji: '⚖️', desc: 'Steady and diversified — a solid foundation' }
 }
 
-function SeasonEnd({ grade, portfolio, companies, onClose, onCollect, onFreshStart }) {
+function SeasonEnd({ grade, portfolio, companies, onClose, onCollect, onFreshStart, playerXP = 0 }) {
   const gradeColor = { 'A+': '#D4AF37', A: '#4ADE80', B: '#60A5FA', C: '#fb923c', D: '#F87171' }[grade.grade] || '#fff'
+  const xpBefore   = Math.max(0, (playerXP || 0))
+  const xpAfter    = xpBefore + (grade.xpAward || 0)
+  const xpLevel    = n => Math.floor(n / 500) + 1
+  const xpPct      = n => ((n % 500) / 500) * 100
+  const leveledUp  = xpLevel(xpAfter) > xpLevel(xpBefore)
 
   const holdings = portfolio.map(h => {
     const co = companies.find(c => c.id === h.companyId)
@@ -546,6 +551,41 @@ function SeasonEnd({ grade, portfolio, companies, onClose, onCollect, onFreshSta
           )}
         </div>
       )}
+
+      {/* Named lesson */}
+      {grade.lesson && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.44 }}
+          style={{ background: 'rgba(165,180,252,0.05)', border: '1px solid rgba(165,180,252,0.18)', borderRadius: 14, padding: '14px 16px', marginBottom: 12 }}>
+          <div style={{ fontSize: 9, fontWeight: 800, color: '#a5b4fc', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 7 }}>
+            {grade.lesson.icon} Aeva's lesson
+          </div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)', lineHeight: 1.65 }}>{grade.lesson.text}</div>
+        </motion.div>
+      )}
+
+      {/* XP award */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.50 }}
+        style={{ background: 'rgba(212,175,55,0.04)', border: '1px solid rgba(212,175,55,0.14)', borderRadius: 14, padding: '12px 16px', marginBottom: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(212,175,55,0.65)', textTransform: 'uppercase', letterSpacing: '.1em' }}>
+            Level {xpLevel(xpBefore)}{leveledUp ? ` → ${xpLevel(xpAfter)} ✨` : ''}
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#D4AF37' }}>+{grade.xpAward || 0} XP</div>
+        </div>
+        {/* XP progress bar */}
+        <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 6, height: 6, overflow: 'hidden', position: 'relative' }}>
+          <motion.div
+            initial={{ width: `${xpPct(xpBefore)}%` }}
+            animate={{ width: `${xpPct(xpAfter)}%` }}
+            transition={{ delay: 0.7, duration: 1, ease: 'easeOut' }}
+            style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg,#D4AF37,#F5D76E)', borderRadius: 6 }}
+          />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)' }}>{xpBefore % 500} XP</div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)' }}>500 XP</div>
+        </div>
+      </motion.div>
 
       {/* Carry-forward selector */}
       {holdings.length > 0 && (
@@ -771,7 +811,7 @@ function SectorDonut({ holdings, totalValue }) {
 
 /* ── Earnings widget ─────────────────────────────────────────────── */
 function EarningsWidget({ earningsWindow, seasonDay, portfolio, companies, earningsPredictions, makeEarningsPrediction }) {
-  if (!earningsWindow || seasonDay !== 8) return null
+  if (!earningsWindow || seasonDay !== 4) return null
   const held = portfolio.map(h => companies.find(c => c.id === h.companyId)).filter(Boolean)
   const predCount = Object.keys(earningsPredictions || {}).length
   return (
@@ -783,7 +823,7 @@ function EarningsWidget({ earningsWindow, seasonDay, portfolio, companies, earni
           <div style={{ fontSize: 10, color: 'rgba(212,175,55,0.7)', fontWeight: 600 }}>{predCount}/{held.length} predicted</div>
         </div>
         <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>
-          Call Beat or Miss before the Day 9 bell · +₳20 correct · −₳10 wrong
+          Call Beat or Miss before Day 5 · +₳20 correct · −₳10 wrong
         </div>
       </div>
       <div style={{ padding: '0 14px 6px' }}>
@@ -830,54 +870,84 @@ function EarningsWidget({ earningsWindow, seasonDay, portfolio, companies, earni
 /* ── Earnings reveal overlay ─────────────────────────────────────── */
 function EarningsReveal({ earningsReveal, onDismiss }) {
   if (!earningsReveal) return null
-  const { results, totalBonus } = earningsReveal
+  const { results, allResults = [], totalBonus } = earningsReveal
+
+  const OUTCOME_STYLE = {
+    beat:   { label: 'BEAT',    color: '#4ADE80', bg: 'rgba(74,222,128,0.12)',   border: 'rgba(74,222,128,0.3)',  arrow: '▲' },
+    miss:   { label: 'MISS',    color: '#F87171', bg: 'rgba(248,113,113,0.12)',  border: 'rgba(248,113,113,0.3)', arrow: '▼' },
+    inline: { label: 'IN-LINE', color: '#D4AF37', bg: 'rgba(212,175,55,0.08)',   border: 'rgba(212,175,55,0.25)', arrow: '≈' },
+  }
+
+  const display = allResults.length > 0 ? allResults : results
+
   return (
     <motion.div key="earnings-reveal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ position: 'fixed', inset: 0, zIndex: 998, background: 'rgba(0,0,0,0.88)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <motion.div initial={{ scale: 0.85, y: 30 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 200 }}
-        style={{ background: 'rgba(12,10,40,0.98)', border: `1px solid ${totalBonus >= 0 ? 'rgba(212,175,55,0.4)' : 'rgba(248,113,113,0.3)'}`, borderRadius: 20, padding: 24, maxWidth: 340, width: '100%' }}>
-        <div style={{ textAlign: 'center', marginBottom: 16 }}>
-          <div style={{ fontSize: 36, marginBottom: 6 }}>⚡</div>
-          <div style={{ fontSize: 14, fontWeight: 900, color: '#D4AF37', letterSpacing: '.08em', textTransform: 'uppercase' }}>Earnings Results</div>
-          {results.length === 0 && (
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 8 }}>No held stocks — nothing to score</div>
-          )}
-        </div>
-        <div style={{ marginBottom: 16 }}>
-          {results.map(r => (
-            <div key={r.companyId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', marginBottom: 6, background: r.beat ? 'rgba(74,222,128,0.05)' : 'rgba(248,113,113,0.05)', border: `0.5px solid ${r.beat ? 'rgba(74,222,128,0.2)' : 'rgba(248,113,113,0.2)'}`, borderRadius: 10 }}>
-              <span style={{ fontSize: 18, flexShrink: 0 }}>{r.emoji}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{r.name}</div>
-                <div style={{ fontSize: 10, color: r.beat ? '#4ADE80' : '#F87171', fontWeight: 700, marginTop: 1 }}>
-                  {r.beat ? '✅ BEAT' : '❌ MISS'} · {r.pct >= 0 ? '+' : ''}{r.pct}%
+      style={{ position: 'fixed', inset: 0, zIndex: 998, background: 'rgba(4,3,20,0.96)', overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '28px 16px 40px' }}>
+
+      {/* Header */}
+      <motion.div initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 260, delay: 0.05 }}
+        style={{ textAlign: 'center', marginBottom: 20 }}>
+        <div style={{ fontSize: 42, marginBottom: 4 }}>⚡</div>
+        <div style={{ fontSize: 18, fontWeight: 900, color: '#D4AF37', letterSpacing: '.1em', textTransform: 'uppercase' }}>Earnings Season</div>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>All companies report simultaneously</div>
+      </motion.div>
+
+      {/* All-stock grid */}
+      <div style={{ width: '100%', maxWidth: 360, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, marginBottom: 18 }}>
+        {display.map((r, i) => {
+          const outcome = r.outcome || (r.beat ? 'beat' : 'miss')
+          const os = OUTCOME_STYLE[outcome] || OUTCOME_STYLE.beat
+          const isHeld = r.isHeld
+          return (
+            <motion.div key={r.companyId}
+              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 + i * 0.06, type: 'spring', stiffness: 280 }}
+              style={{ background: isHeld ? os.bg : 'rgba(255,255,255,0.02)', border: `1px solid ${isHeld ? os.border : 'rgba(255,255,255,0.07)'}`, borderRadius: 12, padding: '10px 10px 8px', position: 'relative', opacity: isHeld ? 1 : 0.6 }}>
+              {isHeld && <div style={{ position: 'absolute', top: 5, right: 7, fontSize: 7, fontWeight: 800, color: '#D4AF37', letterSpacing: '.06em' }}>HELD</div>}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 5 }}>
+                <span style={{ fontSize: 18 }}>{r.emoji}</span>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{r.ticker}</div>
+                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>{r.name}</div>
                 </div>
               </div>
-              <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                {r.prediction ? (
-                  <div style={{ fontSize: 11, fontWeight: 700, color: r.correct ? '#4ADE80' : '#F87171' }}>
-                    {r.correct ? `+₳${r.bonus}` : `−₳${Math.abs(r.bonus)}`}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>no call</div>
-                )}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 9, fontWeight: 800, color: os.color, background: `${os.color}22`, padding: '2px 7px', borderRadius: 5, letterSpacing: '.05em' }}>
+                  {os.arrow} {os.label}
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: os.color }}>
+                  {r.pct >= 0 ? '+' : ''}{r.pct}%
+                </span>
               </div>
-            </div>
-          ))}
-        </div>
-        {results.length > 0 && (
-          <div style={{ background: totalBonus >= 0 ? 'rgba(74,222,128,0.08)' : 'rgba(248,113,113,0.08)', border: `0.5px solid ${totalBonus >= 0 ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)'}`, borderRadius: 10, padding: '10px 14px', marginBottom: 14, textAlign: 'center' }}>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 3 }}>Earnings bonus</div>
-            <div style={{ fontSize: 22, fontWeight: 900, color: totalBonus >= 0 ? '#4ADE80' : '#F87171' }}>
-              {totalBonus >= 0 ? '+' : ''}₳{fmt(totalBonus)}
-            </div>
+              {isHeld && r.prediction && (
+                <div style={{ marginTop: 5, fontSize: 9, fontWeight: 700, color: r.correct ? '#4ADE80' : '#F87171', textAlign: 'right' }}>
+                  {r.correct ? `✓ correct +₳${r.bonus}` : `✗ wrong −₳${Math.abs(r.bonus)}`}
+                </div>
+              )}
+            </motion.div>
+          )
+        })}
+      </div>
+
+      {/* Held-stocks bonus summary */}
+      {results.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+          style={{ width: '100%', maxWidth: 360, background: totalBonus >= 0 ? 'rgba(74,222,128,0.07)' : 'rgba(248,113,113,0.07)', border: `0.5px solid ${totalBonus >= 0 ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)'}`, borderRadius: 12, padding: '12px 16px', textAlign: 'center', marginBottom: 16 }}>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>Prediction bonus (held stocks)</div>
+          <div style={{ fontSize: 26, fontWeight: 900, color: totalBonus >= 0 ? '#4ADE80' : '#F87171' }}>
+            {totalBonus >= 0 ? '+' : ''}₳{Math.abs(totalBonus).toLocaleString()}
           </div>
-        )}
-        <motion.button whileTap={{ scale: 0.96 }} onClick={onDismiss}
-          style={{ width: '100%', padding: '13px', borderRadius: 12, border: '1px solid rgba(212,175,55,0.35)', background: 'rgba(212,175,55,0.12)', color: '#D4AF37', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>
-          Continue
-        </motion.button>
-      </motion.div>
+        </motion.div>
+      )}
+      {results.length === 0 && (
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginBottom: 16, textAlign: 'center' }}>Buy stocks before Day 4 to predict earnings and earn bonuses.</div>
+      )}
+
+      <motion.button whileTap={{ scale: 0.96 }} onClick={onDismiss}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}
+        style={{ width: '100%', maxWidth: 360, padding: '14px', borderRadius: 14, border: '1px solid rgba(212,175,55,0.4)', background: 'rgba(212,175,55,0.12)', color: '#D4AF37', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>
+        Continue
+      </motion.button>
     </motion.div>
   )
 }
@@ -1265,6 +1335,86 @@ function CompanyDetail({ company, holding, mode, onBack }) {
   )
 }
 
+/* ── History tab ─────────────────────────────────────────────────── */
+function HistoryTab({ tradeHistory }) {
+  if (!tradeHistory || tradeHistory.length === 0) {
+    return (
+      <div style={{ padding: '40px 24px', textAlign: 'center', color: 'rgba(255,255,255,0.28)', fontSize: 12, lineHeight: 1.7 }}>
+        No trades yet.<br />Your trade journal builds here as you buy and sell.
+      </div>
+    )
+  }
+
+  const sorted = [...tradeHistory].reverse()
+  const bySeason = {}
+  sorted.forEach(t => {
+    const k = t.season || 1
+    if (!bySeason[k]) bySeason[k] = []
+    bySeason[k].push(t)
+  })
+
+  const totalRealized = tradeHistory
+    .filter(t => t.type === 'sell' || t.type === 'stop_loss')
+    .reduce((s, t) => s + (t.realized || 0), 0)
+
+  const TYPE_STYLE = {
+    buy:       { label: 'BUY',  color: '#60A5FA' },
+    sell:      { label: 'SELL', color: '#A78BFA' },
+    stop_loss: { label: 'STOP', color: '#F59E0B' },
+  }
+
+  return (
+    <div style={{ padding: '8px 16px 32px' }}>
+      {/* Summary bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', marginBottom: 4, borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{tradeHistory.length} trade{tradeHistory.length !== 1 ? 's' : ''}</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: totalRealized >= 0 ? '#4ADE80' : '#F87171' }}>
+          Realized P&amp;L: {totalRealized >= 0 ? '+' : ''}₳{Math.abs(totalRealized).toLocaleString()}
+        </div>
+      </div>
+
+      {Object.entries(bySeason).sort(([a],[b]) => +b - +a).map(([season, trades]) => (
+        <div key={season}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.22)', letterSpacing: '.1em', textTransform: 'uppercase', margin: '14px 0 6px' }}>
+            Season {season}
+          </div>
+          {trades.map(t => {
+            const isSell = t.type === 'sell' || t.type === 'stop_loss'
+            const ts = TYPE_STYLE[t.type] || TYPE_STYLE.buy
+            const realizedPositive = (t.realized || 0) >= 0
+            return (
+              <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: '9px 10px', marginBottom: 4, background: 'rgba(255,255,255,0.02)', borderRadius: 10, border: '0.5px solid rgba(255,255,255,0.055)' }}>
+                <span style={{ fontSize: 17, flexShrink: 0, marginTop: 1 }}>{t.emoji}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{t.ticker}</span>
+                    <span style={{ fontSize: 8, fontWeight: 800, color: ts.color, background: `${ts.color}22`, padding: '1px 6px', borderRadius: 5, letterSpacing: '.07em' }}>{ts.label}</span>
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>Day {t.day} · {t.shares}×</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.38)', marginTop: 3 }}>
+                    {isSell ? (
+                      <>₳{t.avgCost} → ₳{t.price} &nbsp;·&nbsp; <span style={{ color: realizedPositive ? '#4ADE80' : '#F87171', fontWeight: 700 }}>
+                        {realizedPositive ? '+' : ''}₳{Math.abs(t.realized || 0).toLocaleString()} ({t.gainPct >= 0 ? '+' : ''}{t.gainPct}%)
+                      </span></>
+                    ) : (
+                      <>₳{t.price} × {t.shares} = ₳{(t.totalCost || t.price * t.shares).toLocaleString()}</>
+                    )}
+                  </div>
+                  {t.relatedNews && (
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', marginTop: 3, fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {t.relatedNews}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 /* ── Portfolio tab ───────────────────────────────────────────────── */
 function PortfolioTab({ portfolio, companies, indexHistory, seasonDay, shorts }) {
   const indexNow   = indexHistory[indexHistory.length - 1] || 100
@@ -1396,6 +1546,7 @@ export default function CallStreet() {
     shorts, marketBeats, haltBanner, priceTargets,
     earningsWindow, earningsPredictions, earningsReveal, seasonsPlayed, beatMarketStreak,
     dailyChallenge, lastChallengeResult, challengeStreak,
+    tradeHistory, playerXP,
     ringTheBell, setMode, clearGrade, toggleWatchlist, clearCrash, buyInsiderTip, freshStart, resetPrices, reset,
     setPrediction, clearPrediction, clearPredictionResult, clearMacroAnnouncement, clearHaltBanner,
     makeEarningsPrediction, clearEarningsReveal, clearLastChallengeResult,
@@ -1496,7 +1647,7 @@ export default function CallStreet() {
       <div style={{ position: 'relative', minHeight: '100%' }}>
         <CompanyDetail company={company} holding={holding} mode={mode} onBack={() => setSelected(null)} />
         <AnimatePresence>
-          {pendingGrade && <SeasonEnd grade={pendingGrade} portfolio={portfolio} companies={companies} onClose={clearGrade} onCollect={handleCollectGrade} onFreshStart={handleFreshStart} />}
+          {pendingGrade && <SeasonEnd grade={pendingGrade} portfolio={portfolio} companies={companies} onClose={clearGrade} onCollect={handleCollectGrade} onFreshStart={handleFreshStart} playerXP={playerXP} />}
         </AnimatePresence>
       </div>
     )
@@ -1505,7 +1656,7 @@ export default function CallStreet() {
   return (
     <div style={{ position: 'relative', paddingBottom: 48 }}>
       <AnimatePresence>
-        {pendingGrade && <SeasonEnd grade={pendingGrade} portfolio={portfolio} companies={companies} onClose={clearGrade} onCollect={handleCollectGrade} onFreshStart={handleFreshStart} />}
+        {pendingGrade && <SeasonEnd grade={pendingGrade} portfolio={portfolio} companies={companies} onClose={clearGrade} onCollect={handleCollectGrade} onFreshStart={handleFreshStart} playerXP={playerXP} />}
       </AnimatePresence>
 
       {/* Full-screen bell flash */}
@@ -1665,9 +1816,9 @@ export default function CallStreet() {
 
       {/* Tab bar */}
       <div style={{ display: 'flex', padding: '8px 16px 0', gap: 4, borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 4 }}>
-        {[['market','📈 Market'], ['portfolio','💼 Portfolio']].map(([tab, label]) => (
+        {[['market','📈 Market'], ['portfolio','💼 Portfolio'], ['history','📋 History']].map(([tab, label]) => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            style={{ flex: 1, padding: '8px', borderRadius: '10px 10px 0 0', border: 'none', background: activeTab === tab ? 'rgba(255,255,255,0.06)' : 'transparent', color: activeTab === tab ? '#fff' : 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: activeTab === tab ? 700 : 400, cursor: 'pointer', borderBottom: activeTab === tab ? '2px solid #D4AF37' : '2px solid transparent' }}>
+            style={{ flex: 1, padding: '8px', borderRadius: '10px 10px 0 0', border: 'none', background: activeTab === tab ? 'rgba(255,255,255,0.06)' : 'transparent', color: activeTab === tab ? '#fff' : 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: activeTab === tab ? 700 : 400, cursor: 'pointer', borderBottom: activeTab === tab ? '2px solid #D4AF37' : '2px solid transparent' }}>
             {label}
           </button>
         ))}
@@ -1675,6 +1826,10 @@ export default function CallStreet() {
 
       {activeTab === 'portfolio' && (
         <PortfolioTab portfolio={portfolio} companies={companies} indexHistory={indexHistory} seasonDay={seasonDay} shorts={shorts} />
+      )}
+
+      {activeTab === 'history' && (
+        <HistoryTab tradeHistory={tradeHistory} />
       )}
 
       {activeTab === 'market' && <>
