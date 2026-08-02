@@ -226,9 +226,9 @@ Grading rules:
       }
     }
 
-    return { understanding, correct: understanding === 'solid', note: parsed.note || '' }
+    return { understanding, correct: understanding === 'solid', note: parsed.note || '', correctAnswer: parsed.my_answer || '' }
   } catch {
-    return { understanding: 'partial', correct: false, note: '' }
+    return { understanding: 'partial', correct: false, note: '', correctAnswer: '' }
   }
 }
 
@@ -325,9 +325,9 @@ Grading rules:
     const json   = await res.json()
     const parsed = JSON.parse(json.choices?.[0]?.message?.content || '{}')
     const understanding = ['none', 'partial', 'solid'].includes(parsed.understanding) ? parsed.understanding : 'partial'
-    return { understanding, correct: understanding === 'solid', note: parsed.note || '' }
+    return { understanding, correct: understanding === 'solid', note: parsed.note || '', correctAnswer: parsed.my_answer || '' }
   } catch {
-    return { understanding: 'partial', correct: false, note: '' }
+    return { understanding: 'partial', correct: false, note: '', correctAnswer: '' }
   }
 }
 
@@ -5968,7 +5968,8 @@ function ChatView({ onBack }) {
   // ── Dedicated calibration experience state ─────────────────────────────────
   const [currentCalibQuestion, setCurrentCalibQuestion] = useState(null)  // { text, nodeId, tier, qNum, isFastLane }
   const [calibEvaluating, setCalibEvaluating]   = useState(false)         // critic is running
-  const [lastCalibFeedback, setLastCalibFeedback] = useState(null)        // { understanding, ts }
+  const [lastCalibFeedback, setLastCalibFeedback] = useState(null)        // { understanding, note, correctAnswer, ts }
+  const pendingCalibAdvanceRef = useRef(null)                              // deferred advance fn — called after student acknowledges feedback
   const [calibResumeOffer, setCalibResumeOffer]   = useState(null)        // checkpoint to offer resume for
   const [calibInsights, setCalibInsights]         = useState(null)        // AI insights for result screen (Phase 4)
   const [calibResultOpen, setCalibResultOpen]     = useState(false)       // show full-screen result overlay
@@ -6533,11 +6534,13 @@ RULES:
    *    English Lit/Economics (2 clusters): extend if <2 covered
    *  Hard cap 16: always exit. */
   const shouldCalibStop = (cs, next) => {
-    if (!next) return true
-    if (cs.nodeCount >= 16) return true
+    if (cs.questionsAsked >= 15) return true                    // hard question cap
+    if (!next) return true                                      // node graph exhausted
+    if (cs.nodeCount >= 16) return true                         // node cap
+    if (cs.questionsAsked < 12) return false                    // enforce minimum questions
     if (cs.nodeCount >= 12) {
       const clusterMap = NODE_CLUSTERS[cs.subject]
-      if (!clusterMap) return true                              // no cluster map → stop at 12
+      if (!clusterMap) return true
       const totalClusters = new Set(Object.values(clusterMap)).size
       const minToExtend   = Math.min(3, Math.max(2, Math.floor(totalClusters * 0.6)))
       const clustersHit   = Object.keys(cs.clustersAssessed || {}).length
@@ -6686,6 +6689,23 @@ RULES:
           )
         nextNode = siblingCandidates[0] || null
       }
+    }
+
+    // Final fallback — any unvisited node across all clusters, prioritising
+    // least-assessed cluster then closest band-order to current estimate.
+    // This prevents early termination when the local node graph runs dry.
+    if (!nextNode) {
+      const allUntested = Object.keys(subjectMap)
+        .filter(id => !cs.skillMap[id] && !cs.nodesVisited.includes(id) && id !== cs.currentNode)
+        .sort((a, b) => {
+          const ca = clusterMap?.[a], cb = clusterMap?.[b]
+          const aLoad = cs.clustersAssessed[ca] || 0
+          const bLoad = cs.clustersAssessed[cb] || 0
+          if (aLoad !== bLoad) return aLoad - bLoad
+          return Math.abs((subjectMap[a].bandOrder ?? 0) - estimatedBandOrder) -
+                 Math.abs((subjectMap[b].bandOrder ?? 0) - estimatedBandOrder)
+        })
+      nextNode = allUntested[0] || null
     }
 
     cs.nodesVisited.push(cs.currentNode)
@@ -7078,15 +7098,26 @@ Rules:
 
     } else {
       // ── English STEM / other subjects ─────────────────────────────────────
+      const stemTypeGuide = tier === 1
+        ? `Question type: multiple-choice. End with exactly 4 options in this format:
+(a) option one  (b) option two  (c) option three  (d) option four
+One must be clearly correct; the rest are plausible distractors. The stem must end with a question mark before the options.`
+        : tier <= 3
+        ? `Question type: alternate between computation and conceptual. For computational, give specific numbers to work with. For conceptual, ask the student to explain, compare, or reason (e.g. "Explain why...", "What happens when...", "Compare..."). Do NOT ask two things at once — one clear question only.`
+        : `Question type: open-ended conceptual or proof. Ask the student to justify, derive, or explain the reasoning behind a method — not just compute an answer.`
+
       systemPrompt = `You write diagnostic questions for a student placement test.
 Subject: ${subjectLabel}. Topic: ${node.label}. Level: ${node.band}.
 Difficulty tier: ${tier}/5 — ${stemTierDesc}.
+
+${stemTypeGuide}
 
 Rules:
 - Return ONLY the question text. No label, no preamble, no explanation.
 - The question must be self-contained and unambiguous.
 - Write all maths in plain readable format (e.g. x^2 + 3x - 10 = 0, not LaTeX).
-- Match the difficulty exactly: tier ${tier}/5.`
+- Match the difficulty exactly: tier ${tier}/5.
+- Keep it to ONE question. Never bundle two questions into one prompt.`
     }
 
     const userMsg = language === 'ja' ? '問題を書いてください。' : 'Write the question.'
@@ -7189,6 +7220,14 @@ Rules:
     injectNextCalibQuestion()
   }
 
+  /** Called when student taps "Next →" on the per-question feedback card. */
+  const handleFeedbackAcknowledged = () => {
+    if (pendingCalibAdvanceRef.current) {
+      pendingCalibAdvanceRef.current()
+      pendingCalibAdvanceRef.current = null
+    }
+  }
+
   /** Handle a student's submitted answer within CalibrationExperience. */
   const handleCalibAnswer = async (answerText) => {
     if (calibEvaluating) return
@@ -7215,14 +7254,14 @@ Rules:
         : await runCalibCritic(questionText, answerText)
       const understanding = result.understanding
 
-      // ── Instant feedback flash ──────────────────────────────────────────
-      setLastCalibFeedback({ understanding, ts: Date.now() })
+      // ── Feedback (with note from critic) — advance deferred until acknowledged ──
+      setLastCalibFeedback({ understanding, note: result.note || '', correctAnswer: result.correctAnswer || '', ts: Date.now() })
 
       // ── Advance state ───────────────────────────────────────────────────
       const passed = understanding === 'solid' || understanding === 'mastery'
 
       if (calibFastLaneRef.current.active && FAST_LANE[cs.subject]) {
-        // Fast lane routing (mirrors existing sendWithText logic)
+        // Fast lane: advance immediately (placement Qs don't pause for feedback)
         const fl      = FAST_LANE[cs.subject]
         const bracket = fl[calibFastLaneRef.current.bracketIdx]
 
@@ -7254,7 +7293,7 @@ Rules:
         injectNextCalibQuestion()
 
       } else {
-        // Normal calibration: use calibAdvance (handles tier escalation)
+        // Normal calibration: advance is held until student acknowledges the feedback card
         const prevNode = cs.currentNode
         const next     = calibAdvance(understanding)
         const isRetry  = next === prevNode
@@ -7263,12 +7302,14 @@ Rules:
         if (!isRetry) cs.nodeCount += 1
         setCalibTick(t => t + 1)
 
-        if (shouldCalibStop(cs, next)) {
-          clearCalibCheckpoint()
-          finishCalibration()
-        } else {
-          saveCalibCheckpoint()
-          injectNextCalibQuestion()
+        pendingCalibAdvanceRef.current = () => {
+          if (shouldCalibStop(cs, next)) {
+            clearCalibCheckpoint()
+            finishCalibration()
+          } else {
+            saveCalibCheckpoint()
+            injectNextCalibQuestion()
+          }
         }
       }
 
@@ -10393,6 +10434,7 @@ If no clear changes: {"changes":[]}`
             clusterInfo={liveClusterInfo}
             onAnswer={handleCalibAnswer}
             onSkip={() => handleCalibAnswer('skip')}
+            onFeedbackAcknowledged={handleFeedbackAcknowledged}
             onExit={() => {
               saveCalibCheckpoint()
               calibModeRef.current = false

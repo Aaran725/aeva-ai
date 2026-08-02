@@ -335,19 +335,20 @@ function parseMSOptions(questionText) {
 
 // ── Main export ───────────────────────────────────────────────────────────────
 export function CalibrationExperience({
-  question,           // { text, nodeId, tier, qNum, isFastLane }
-  liveScore,          // weighted band average score (null until first node assessed)
-  nodeCount,          // distinct nodes assessed so far
-  questionsAsked,     // total questions (including retries)
+  question,                 // { text, nodeId, tier, qNum, isFastLane }
+  liveScore,                // weighted band average score (null until first node assessed)
+  nodeCount,                // distinct nodes assessed so far
+  questionsAsked,           // total questions (including retries)
   subject,
-  language = 'en',    // 'en' | 'ja'
-  isEvaluating,       // critic is running — disable input
-  lastFeedback,       // { understanding, ts } — triggers flash
+  language = 'en',          // 'en' | 'ja'
+  isEvaluating,             // critic is running — disable input
+  lastFeedback,             // { understanding, note, correctAnswer, ts }
   isLight,
-  clusterInfo,        // { hit, total } — cluster coverage for maths (null for other subjects)
-  onAnswer,           // (text: string) => void
-  onSkip,             // () => void
-  onExit,             // () => void
+  clusterInfo,              // { hit, total } — cluster coverage for maths (null for other subjects)
+  onAnswer,                 // (text: string) => void
+  onSkip,                   // () => void
+  onExit,                   // () => void
+  onFeedbackAcknowledged,   // () => void — called when student taps "Next →" on feedback card
 }) {
   const t = getUIText(language, subject)
   const [input, setInput]               = useState('')
@@ -360,28 +361,35 @@ export function CalibrationExperience({
   const inputRef = useRef(null)
 
   // Parse question type: multi-select takes priority over single-choice MC
-  const msData = subject === 'reading' ? parseMSOptions(question?.text) : null
-  const mcData = !msData && subject === 'reading' ? parseMCOptions(question?.text) : null
+  // MCQ/MS detection is enabled for all subjects (reading and STEM)
+  const msData = parseMSOptions(question?.text)
+  const mcData = !msData ? parseMCOptions(question?.text) : null
   const sqData = !msData && !mcData ? parseSubQuestions(question?.text) : null
 
   const subjectLabel = SUBJECT_LABELS[subject] || subject
   const subjectIcon  = SUBJECT_ICONS[subject]  || '📚'
 
-  // Feedback flash: triggers whenever lastFeedback.ts changes
+  // Feedback card: shows when new feedback arrives, persists until student taps "Next →"
+  // Fast-lane (placement) questions auto-dismiss after 1.2s so the session stays snappy
   useEffect(() => {
     if (!lastFeedback) return
     setActiveFeedback(lastFeedback)
     setShowFeedback(true)
-    const t = setTimeout(() => setShowFeedback(false), 1700)
-    return () => clearTimeout(t)
-  }, [lastFeedback?.ts])
+    if (question?.isFastLane) {
+      const t = setTimeout(() => setShowFeedback(false), 1200)
+      return () => clearTimeout(t)
+    }
+    // Normal diagnostic — persist until acknowledged
+  }, [lastFeedback?.ts]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Clear input / MC / MS / sub-question state and re-focus when question changes
+  // Clear input / MC / MS / sub-question state and feedback when question changes
   useEffect(() => {
     setInput('')
     setSubInputs({})
     setSelectedMC(null)
     setSelectedMS([])
+    setShowFeedback(false)
+    setActiveFeedback(null)
     if (mcSubmitRef.current) { clearTimeout(mcSubmitRef.current); mcSubmitRef.current = null }
     if (!mcData && !msData && !sqData) {
       const t = setTimeout(() => inputRef.current?.focus(), 180)
@@ -569,27 +577,96 @@ export function CalibrationExperience({
             </motion.div>
           </AnimatePresence>
 
-          {/* Feedback flash */}
-          <AnimatePresence>
-            {showFeedback && fbCfg && (
+          {/* Per-question feedback card — persists until student taps Next → */}
+          <AnimatePresence mode="wait">
+            {showFeedback && fbCfg && activeFeedback && (
               <motion.div
-                initial={{ opacity: 0, y: -10, scale: 0.97 }}
-                animate={{ opacity: 1,  y: 0,   scale: 1    }}
-                exit={  { opacity: 0,           scale: 0.97 }}
-                transition={{ duration: 0.16 }}
+                key={activeFeedback.ts}
+                initial={{ opacity: 0, y: 12, scale: 0.97 }}
+                animate={{ opacity: 1,  y: 0,  scale: 1    }}
+                exit={  { opacity: 0,  y: -8,  scale: 0.97 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
                 style={{
-                  background: fbCfg.bg, border: `1px solid ${fbCfg.border}`,
-                  borderRadius: 12, padding: '10px 18px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  background: fbCfg.bg,
+                  border: `1.5px solid ${fbCfg.border}`,
+                  borderRadius: 16,
+                  padding: '18px 22px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 12,
                 }}
               >
-                <span style={{ fontSize: 13.5, fontWeight: 700, color: fbCfg.color }}>{t.feedback[activeFeedback?.understanding]?.label}</span>
-                <span style={{ fontSize: 11, color: fbCfg.color, opacity: 0.65 }}>{t.feedback[activeFeedback?.understanding]?.sub}</span>
+                {/* Header row */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 15, fontWeight: 800, color: fbCfg.color }}>
+                      {t.feedback[activeFeedback.understanding]?.label}
+                    </span>
+                    <span style={{ fontSize: 11, color: fbCfg.color, opacity: 0.6 }}>
+                      {t.feedback[activeFeedback.understanding]?.sub}
+                    </span>
+                  </div>
+                  {/* Next → button (only for non-fast-lane; fast-lane auto-dismisses) */}
+                  {!question?.isFastLane && onFeedbackAcknowledged && (
+                    <button
+                      onClick={() => {
+                        setShowFeedback(false)
+                        onFeedbackAcknowledged()
+                      }}
+                      style={{
+                        background: fbCfg.color, border: 'none', borderRadius: 10,
+                        padding: '8px 16px', cursor: 'pointer',
+                        fontSize: 12.5, fontWeight: 700, color: '#fff',
+                        display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0,
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      Next <ChevronRight size={13} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Critic note */}
+                {activeFeedback.note && (
+                  <p style={{
+                    margin: 0, fontSize: 13, lineHeight: 1.6,
+                    color: isLight ? 'rgba(0,0,0,0.70)' : 'rgba(255,255,255,0.72)',
+                  }}>
+                    {activeFeedback.note}
+                  </p>
+                )}
+
+                {/* Correct working — shown when student got it wrong or partial */}
+                {activeFeedback.correctAnswer && activeFeedback.understanding !== 'solid' && activeFeedback.understanding !== 'mastery' && (
+                  <div style={{
+                    background: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`,
+                    borderRadius: 10,
+                    padding: '10px 14px',
+                  }}>
+                    <div style={{
+                      fontSize: 9.5, fontWeight: 800, letterSpacing: '0.10em',
+                      textTransform: 'uppercase', color: fbCfg.color, opacity: 0.7,
+                      marginBottom: 5,
+                    }}>
+                      Correct approach
+                    </div>
+                    <p style={{
+                      margin: 0, fontSize: 12.5, lineHeight: 1.65,
+                      color: isLight ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.60)',
+                      fontFamily: "'Inter', system-ui, sans-serif",
+                      whiteSpace: 'pre-wrap',
+                    }}>
+                      {activeFeedback.correctAnswer}
+                    </p>
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
 
-          {msData ? (
+          {/* Answer area — hidden while the feedback card is open (non-fast-lane) */}
+          {!(showFeedback && !question?.isFastLane) && (msData ? (
             /* ── Multi-select option buttons ───────────────────────────────── */
             <>
               <div style={{ fontSize: 11, color: 'rgba(129,140,248,0.8)', fontWeight: 600, marginTop: -4 }}>
@@ -967,7 +1044,7 @@ export function CalibrationExperience({
                 {t.hint}
               </div>
             </>
-          )}
+          ))}
         </div>
 
         {/* ── Right: live level arc ─────────────────────────────────────────── */}
