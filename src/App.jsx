@@ -65,7 +65,7 @@ import { useXPStore, ORBS, levelFromXP, xpIntoLevel } from './xpStore'
 import { useCoinStore } from './coinStore'
 import { useCalibrationStore } from './calibrationStore'
 import { lookupAnalogy } from './analogyBank'
-import { CALIBRATION_MAP, ENTRY_NODES, SUBJECT_LABELS, SUBJECT_ICONS, FAST_LANE, NODE_CLUSTERS } from './calibrationMap'
+import { CALIBRATION_MAP, ENTRY_NODES, SUBJECT_LABELS, SUBJECT_ICONS, FAST_LANE, NODE_CLUSTERS, CLUSTER_LABELS } from './calibrationMap'
 import CalibrationResult from './CalibrationResult'
 import { useEchoStore } from './echoStore'
 import { useMemoryStore } from './memoryStore'
@@ -5700,7 +5700,7 @@ function ChatToolsMenu({ onLens, onPhoto, onDoc, onDrill, onWorking, photoAttach
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.88 }}
         onClick={() => setOpen(v => !v)}
-        title="Tools"
+        title="Aeva tools — photo, docs, lens & more"
         style={{
           flexShrink: 0, width: 32, height: 32, borderRadius: '50%',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -5748,6 +5748,7 @@ function ChatToolsMenu({ onLens, onPhoto, onDoc, onDrill, onWorking, photoAttach
                 whileHover={{ background: 'rgba(255,255,255,0.07)' }}
                 whileTap={{ scale: 0.97 }}
                 onClick={tool.onClick}
+                title={`${tool.label} — ${tool.sub}`}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: '8px 10px', borderRadius: 10,
@@ -8497,9 +8498,14 @@ If no clear changes: {"changes":[]}`
     const cs = calibStateRef.current
     const clusterMap = NODE_CLUSTERS[cs.subject]
     if (!clusterMap) return null
-    const total = new Set(Object.values(clusterMap)).size
-    const hit   = Object.keys(cs.clustersAssessed || {}).length
-    return { hit, total }
+    const total        = new Set(Object.values(clusterMap)).size
+    const hit          = Object.keys(cs.clustersAssessed || {}).length
+    const clusterKey   = clusterMap[cs.currentNode]
+    const clusterLabel = clusterKey ? (CLUSTER_LABELS[cs.subject]?.[clusterKey] || clusterKey) : null
+    // Confidence: depth (60%) + breadth (40%) — same formula as finishCalibration
+    const n           = Object.keys(cs.skillMap || {}).length
+    const confidence  = Math.round(Math.min(1, n / 12) * 60 + Math.min(1, hit / Math.max(1, total)) * 40)
+    return { hit, total, clusterLabel, confidence }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calibTick, calibMode])
 
@@ -10353,7 +10359,7 @@ If no clear changes: {"changes":[]}`
                   <div style={{ fontSize: 15, fontWeight: 800, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.02em' }}>
                     🎯 {calibrationStore.hasAnyCalibration() ? 'Calibrate another subject' : 'Calibrate your level'}
                   </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 3 }}>Up to 12 questions · adapts to your answers</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginTop: 3 }}>~10 minutes · 12–15 questions · covers all major topics</div>
                 </div>
                 <motion.button whileTap={{ scale: 0.9 }} onClick={() => setCalibSubjectPicker(false)}
                   style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.45)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -10384,6 +10390,10 @@ If no clear changes: {"changes":[]}`
                       }}
                     >
                       {SUBJECT_ICONS[subject]} {SUBJECT_LABELS[subject]}
+                      {(() => {
+                        const n = new Set(Object.values(NODE_CLUSTERS[subject] || {})).size
+                        return n > 0 ? <span style={{ fontSize: 10, opacity: 0.45 }}>{n} topics</span> : null
+                      })()}
                       {already && <span style={{ fontSize: 10, opacity: 0.6 }}>↺</span>}
                     </motion.button>
                   )

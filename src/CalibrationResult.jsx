@@ -759,6 +759,12 @@ export default function CalibrationResult({
   const confColor  = confidence == null ? null
     : confidence >= 75 ? '#4ADE80' : confidence >= 50 ? '#FBBF24' : '#F87171'
 
+  // Detect significant level-up (≥2 band positions above last result)
+  const prevResult  = history && history.length >= 2 ? history[history.length - 2] : null
+  const prevOrder   = prevResult ? (BAND_ORDER[prevResult.band] ?? -1) : -1
+  const currOrder   = BAND_ORDER[result?.band] ?? -1
+  const isLevelUp   = prevOrder >= 0 && currOrder - prevOrder >= 2
+
   // ── Theme tokens ─────────────────────────────────────────────────────────
   const bg         = isLight ? '#f4f5fa'                  : '#0d0e16'
   const cardBg     = isLight ? '#ffffff'                  : '#161826'
@@ -822,16 +828,51 @@ export default function CalibrationResult({
               }}
             >
               <div style={{ fontSize: 11, fontWeight: 700, color: bandColor, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
-                {t.yourLevel}
+                {isLevelUp ? '🎉 Level up!' : t.yourLevel}
               </div>
               <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.1, type: 'spring', stiffness: 250, damping: 22 }}
-                style={{ fontSize: 38, fontWeight: 900, color: bandColor, lineHeight: 1, letterSpacing: '-0.02em', marginBottom: 2 }}
+                initial={{ opacity: 0, scale: 0.72, y: 12 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ delay: 0.08, type: 'spring', stiffness: 180, damping: 16 }}
+                style={{ position: 'relative', display: 'inline-block' }}
               >
-                {result.band || 'Calibrated'}
+                <motion.div
+                  animate={isLevelUp ? {
+                    textShadow: [`0 0 0px ${bandColor}`, `0 0 28px ${bandColor}88`, `0 0 0px ${bandColor}`],
+                  } : {}}
+                  transition={{ delay: 0.35, duration: 1.2, ease: 'easeOut' }}
+                  style={{ fontSize: 38, fontWeight: 900, color: bandColor, lineHeight: 1, letterSpacing: '-0.02em', marginBottom: 2 }}
+                >
+                  {result.band || 'Calibrated'}
+                </motion.div>
+                {/* Burst ring for significant level-ups */}
+                {isLevelUp && (
+                  <motion.div
+                    initial={{ opacity: 0.9, scale: 0.5 }}
+                    animate={{ opacity: 0, scale: 2.4 }}
+                    transition={{ delay: 0.12, duration: 0.8, ease: 'easeOut' }}
+                    style={{
+                      position: 'absolute', inset: -4, borderRadius: 12,
+                      border: `2px solid ${bandColor}`,
+                      pointerEvents: 'none',
+                    }}
+                  />
+                )}
               </motion.div>
+              {/* "Level has been set" moment for first-timers or level-ups */}
+              {(isLevelUp || !prevResult) && (
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5, duration: 0.3 }}
+                  style={{
+                    fontSize: 11, fontWeight: 700, color: bandColor, marginBottom: 4, marginTop: 2,
+                    opacity: 0.75, letterSpacing: '0.03em',
+                  }}
+                >
+                  {isLevelUp ? `↑ Up from ${prevResult?.band}` : '✓ Your level has been set'}
+                </motion.div>
+              )}
 
               {/* Band range (low confidence only) */}
               {result.bandLow && result.bandHigh && (

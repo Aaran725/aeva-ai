@@ -390,7 +390,7 @@ export function CalibrationExperience({
   isEvaluating,             // critic is running — disable input
   lastFeedback,             // { understanding, note, correctAnswer, prevBand, ts }
   isLight,
-  clusterInfo,              // { hit, total } — cluster coverage for maths (null for other subjects)
+  clusterInfo,              // { hit, total, clusterLabel, confidence } — live cluster info
   onAnswer,                 // (text: string) => void
   onSkip,                   // () => void
   onExit,                   // () => void
@@ -565,10 +565,16 @@ export function CalibrationExperience({
           {question.isFastLane
             ? <span style={{ fontSize: 10.5, fontWeight: 700, color: '#FBBF24', letterSpacing: '0.05em' }}>{t.fastLaneLabel}</span>
             : (
-              <span style={{ fontSize: 11, color: mutedCol, fontWeight: 600 }}>
+              <span style={{ fontSize: 11, color: mutedCol, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
                 {t.diagnosticLabel(questionsAsked + 1)}
+                {clusterInfo?.clusterLabel && (
+                  <>
+                    <span style={{ opacity: 0.4 }}>·</span>
+                    <span style={{ color: '#818CF8', fontWeight: 700 }}>{clusterInfo.clusterLabel}</span>
+                  </>
+                )}
                 {clusterInfo && clusterInfo.hit > 0 && (
-                  <span style={{ marginLeft: 6, color: clusterInfo.hit >= 3 ? '#4ADE80' : mutedCol }}>
+                  <span style={{ color: clusterInfo.hit >= 3 ? '#4ADE80' : mutedCol }}>
                     {t.topicsLabel(clusterInfo.hit, clusterInfo.total)}
                   </span>
                 )}
@@ -673,6 +679,37 @@ export function CalibrationExperience({
               />
             </motion.div>
           </AnimatePresence>
+
+          {/* Context row — Qs remaining + live confidence bar */}
+          {!question.isFastLane && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '0 2px' }}>
+              {/* Questions remaining */}
+              <span style={{ fontSize: 10.5, color: mutedCol, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                {Math.max(0, 12 - questionsAsked)} – {Math.max(0, 15 - questionsAsked)} left
+              </span>
+              {/* Live confidence bar */}
+              {clusterInfo?.confidence != null && (
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ flex: 1, height: 3, borderRadius: 99, background: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                    <motion.div
+                      animate={{ width: `${clusterInfo.confidence}%` }}
+                      transition={{ type: 'spring', stiffness: 60, damping: 18 }}
+                      style={{
+                        height: '100%', borderRadius: 99,
+                        background: clusterInfo.confidence >= 75 ? '#4ADE80' : clusterInfo.confidence >= 50 ? '#818CF8' : '#FBBF24',
+                      }}
+                    />
+                  </div>
+                  <span style={{
+                    fontSize: 9.5, fontWeight: 800, whiteSpace: 'nowrap',
+                    color: clusterInfo.confidence >= 75 ? '#4ADE80' : clusterInfo.confidence >= 50 ? '#818CF8' : '#FBBF24',
+                  }}>
+                    {clusterInfo.confidence >= 75 ? '✓ Confirmed' : `${clusterInfo.confidence}% confidence`}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Per-question feedback card — persists until student taps Next → */}
           <AnimatePresence mode="wait">
