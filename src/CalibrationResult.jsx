@@ -3,8 +3,9 @@
  * Phase 4 & 5: Full-screen result overlay with AI insights + history timeline.
  * Replaces the old inline chat card.
  */
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, RotateCcw, ChevronRight, Layers } from 'lucide-react'
+import { X, RotateCcw, ChevronRight, ChevronDown, Layers } from 'lucide-react'
 import { SUBJECT_LABELS, SUBJECT_ICONS, CALIBRATION_MAP, NODE_CLUSTERS, CLUSTER_LABELS } from './calibrationMap'
 
 // ── Lower-bound threshold for each band (mirrors calibBand thresholds in App.jsx) ──
@@ -202,7 +203,7 @@ const TOPIC_STATUS = {
   untested:   { icon: '—', color: 'rgba(255,255,255,0.25)', bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.10)', label: 'Not tested' },
 }
 
-function TopicBreakdown({ subject, skillMap, isLight, lang = 'en' }) {
+function TopicBreakdown({ subject, skillMap, isLight, lang = 'en', onRunMiniDiagnostic }) {
   const t = getT(lang)
   const clusterMap  = NODE_CLUSTERS[subject]
   const labelMap    = CLUSTER_LABELS[subject]
@@ -280,8 +281,23 @@ function TopicBreakdown({ subject, skillMap, isLight, lang = 'en' }) {
                   </div>
                 )}
                 {status === 'untested' && (
-                  <div style={{ fontSize: 10.5, color: mutedCol, marginTop: 2 }}>
-                    {t.notReached}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 3, gap: 8 }}>
+                    <div style={{ fontSize: 10.5, color: mutedCol }}>
+                      {t.notReached}
+                    </div>
+                    {onRunMiniDiagnostic && (
+                      <button
+                        onClick={() => onRunMiniDiagnostic(key)}
+                        style={{
+                          background: 'none', border: `1px solid ${isLight ? 'rgba(129,140,248,0.35)' : 'rgba(129,140,248,0.30)'}`,
+                          borderRadius: 8, padding: '3px 9px', cursor: 'pointer',
+                          fontSize: 10, fontWeight: 700, color: '#818CF8',
+                          fontFamily: 'inherit', whiteSpace: 'nowrap', flexShrink: 0,
+                        }}
+                      >
+                        Quick test →
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -417,6 +433,9 @@ const REC_STATUS = {
   next: { icon: '→', label: 'Next step',   color: '#4ADE80' },
 }
 
+// Estimated time-to-master heuristic based on rec status
+const STEP_TIME = { gap: '~2 sessions', shaky: '~1 session', next: '~3 sessions' }
+
 function RecommendationCards({ recommendations, subjectMap, bandColor, isLight, onStartTopic, subject, lang = 'en' }) {
   if (!recommendations?.length) return null
   const t       = getT(lang)
@@ -440,6 +459,10 @@ function RecommendationCards({ recommendations, subjectMap, bandColor, isLight, 
           const isPrimary   = i === 0
           const cfg         = t.recStatus[rec.status] || REC_STATUS[rec.status] || { icon: '→', label: 'Topic', color: bandColor }
           const statusColor = cfg.color
+          const timeEst     = STEP_TIME[rec.status] || '~2 sessions'
+          const unlockCount = rec.reasonN || (rec.reasonKey === 'unlocks2' ? 2 : rec.reasonKey === 'unlocks1' ? 1 : null)
+          const whyLine     = rec.reasonKey ? t.resolveReason(rec.reasonKey, rec.reasonN) : rec.reason
+
           return (
             <motion.div
               key={rec.nodeId}
@@ -456,23 +479,54 @@ function RecommendationCards({ recommendations, subjectMap, bandColor, isLight, 
                 borderLeft: `3px solid ${isPrimary ? statusColor : (isLight ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.08)')}`,
               }}
             >
+              {/* Step number + status row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
+                <span style={{
+                  fontSize: 9, fontWeight: 900, color: isLight ? 'rgba(0,0,0,0.28)' : 'rgba(255,255,255,0.28)',
+                  letterSpacing: '0.04em',
+                }}>
+                  STEP {i + 1}
+                </span>
+                {isPrimary && (
+                  <>
+                    <span style={{ color: mutedCol, fontSize: 9 }}>·</span>
+                    <span style={{ fontSize: 9, fontWeight: 800, color: statusColor, letterSpacing: '0.09em', textTransform: 'uppercase' }}>
+                      {t.startHere}
+                    </span>
+                  </>
+                )}
+              </div>
+
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  {isPrimary && (
-                    <div style={{ fontSize: 9, fontWeight: 800, color: statusColor, letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: 4 }}>
-                      {t.startHere}
-                    </div>
-                  )}
-                  <div style={{ fontSize: isPrimary ? 14 : 12.5, fontWeight: isPrimary ? 800 : 600, color: textCol, marginBottom: 4, lineHeight: 1.3 }}>
+                  <div style={{ fontSize: isPrimary ? 14 : 12.5, fontWeight: isPrimary ? 800 : 600, color: textCol, marginBottom: 5, lineHeight: 1.3 }}>
                     {rec.label}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+
+                  {/* Why + time estimate */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', marginBottom: isPrimary ? 6 : 0 }}>
                     <span style={{ fontSize: 9.5, fontWeight: 700, color: statusColor }}>
                       {cfg.icon} {cfg.label}
                     </span>
                     <span style={{ fontSize: 9.5, color: mutedCol }}>·</span>
-                    <span style={{ fontSize: 9.5, color: mutedCol }}>{rec.reasonKey ? t.resolveReason(rec.reasonKey, rec.reasonN) : rec.reason}</span>
+                    <span style={{ fontSize: 9.5, color: mutedCol }}>{whyLine}</span>
+                    <span style={{ fontSize: 9.5, color: mutedCol }}>·</span>
+                    <span style={{ fontSize: 9.5, color: mutedCol }}>{timeEst}</span>
                   </div>
+
+                  {/* Primary card: unlock chain + lesson prompt */}
+                  {isPrimary && (
+                    <div style={{
+                      fontSize: 11, lineHeight: 1.5, color: mutedCol, fontStyle: 'italic',
+                      borderTop: `1px solid ${isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'}`,
+                      paddingTop: 6, marginTop: 4,
+                    }}>
+                      {unlockCount != null
+                        ? `Mastering this unlocks ${unlockCount} related skill${unlockCount !== 1 ? 's' : ''} — it's the highest-leverage place to start.`
+                        : `This is your next unlock — addressing it now compounds your progress fastest.`
+                      }
+                    </div>
+                  )}
                 </div>
                 {isPrimary && (
                   <button
@@ -573,6 +627,113 @@ function HistoryTimeline({ history, currentBand, isLight, lang = 'en' }) {
   )
 }
 
+// ── Missed questions replay (collapsible) ────────────────────────────────────
+function MissedQuestionsReplay({ questionLog, isLight }) {
+  const [expanded, setExpanded] = useState(false)
+  const mistakes = (questionLog || []).filter(e => e.understanding === 'none' || e.understanding === 'partial')
+  if (!mistakes.length) return null
+
+  const cardBg   = isLight ? '#ffffff'                  : '#161826'
+  const borderCol= isLight ? 'rgba(0,0,0,0.08)'        : 'rgba(255,255,255,0.07)'
+  const textCol  = isLight ? '#0f1117'                  : 'rgba(255,255,255,0.88)'
+  const mutedCol = isLight ? 'rgba(0,0,0,0.38)'        : 'rgba(255,255,255,0.35)'
+  const innerBg  = isLight ? 'rgba(0,0,0,0.025)'       : 'rgba(255,255,255,0.03)'
+  const innerBd  = isLight ? 'rgba(0,0,0,0.07)'        : 'rgba(255,255,255,0.06)'
+  const correctBg= isLight ? 'rgba(0,0,0,0.035)'       : 'rgba(255,255,255,0.045)'
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.20, duration: 0.26 }}
+      style={{ background: cardBg, border: `1px solid ${borderCol}`, borderRadius: 20, overflow: 'hidden' }}
+    >
+      {/* Toggle header */}
+      <button
+        onClick={() => setExpanded(e => !e)}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          width: '100%', padding: '18px 24px', background: 'none', border: 'none',
+          cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.10em', color: mutedCol, textTransform: 'uppercase' }}>
+            Review your mistakes
+          </span>
+          <span style={{
+            fontSize: 9.5, fontWeight: 800, padding: '2px 8px', borderRadius: 99,
+            background: 'rgba(248,113,113,0.12)', color: '#F87171',
+            border: '1px solid rgba(248,113,113,0.28)',
+          }}>
+            {mistakes.length}
+          </span>
+        </div>
+        <ChevronDown
+          size={14}
+          style={{ color: mutedCol, transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', flexShrink: 0 }}
+        />
+      </button>
+
+      {/* Expandable list */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div style={{ padding: '0 24px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {mistakes.map((entry, i) => {
+                const isPartial = entry.understanding === 'partial'
+                const sc = isPartial ? '#FBBF24' : '#F87171'
+                const sl = isPartial ? 'Partial' : 'Missed'
+                return (
+                  <div key={i} style={{
+                    borderRadius: 14, padding: '13px 15px',
+                    background: innerBg, border: `1px solid ${innerBd}`,
+                    borderLeft: `3px solid ${sc}`,
+                  }}>
+                    {/* Topic + status */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 7 }}>
+                      <span style={{ fontSize: 9.5, fontWeight: 800, color: sc, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{sl}</span>
+                      <span style={{ fontSize: 9.5, color: mutedCol }}>·</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: mutedCol }}>{entry.nodeLabel}</span>
+                    </div>
+                    {/* Question text */}
+                    <p style={{ margin: '0 0 7px', fontSize: 13, lineHeight: 1.55, color: textCol, fontWeight: 440 }}>
+                      {entry.q.length > 240 ? entry.q.slice(0, 240) + '…' : entry.q}
+                    </p>
+                    {/* Critic note */}
+                    {entry.note && (
+                      <p style={{ margin: '0 0 9px', fontSize: 11.5, lineHeight: 1.5, color: mutedCol, fontStyle: 'italic' }}>
+                        {entry.note}
+                      </p>
+                    )}
+                    {/* Correct working */}
+                    {entry.correctAnswer && (
+                      <div style={{ borderRadius: 10, padding: '9px 13px', background: correctBg, border: `1px solid ${innerBd}` }}>
+                        <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.10em', textTransform: 'uppercase', color: sc, opacity: 0.75, marginBottom: 4 }}>
+                          Correct approach
+                        </div>
+                        <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.6, color: textCol, whiteSpace: 'pre-wrap' }}>
+                          {entry.correctAnswer}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  )
+}
+
 // ── Main export — full-screen result overlay ──────────────────────────────────
 export default function CalibrationResult({
   result,
@@ -583,6 +744,7 @@ export default function CalibrationResult({
   onStartTopic,
   onRecalibrate,
   onAnotherSubject,
+  onRunMiniDiagnostic,
   onClose,
 }) {
   const subjectLabel = SUBJECT_LABELS[subject] || subject
@@ -696,10 +858,19 @@ export default function CalibrationResult({
                     background: `${confColor}18`, color: confColor,
                     border: `1px solid ${confColor}35`, letterSpacing: '0.03em',
                   }}>
-                    {t.confidence(confidence)}
+                    {confidence >= 75 ? '✓ Level confirmed' : t.confidence(confidence)}
                   </span>
                 )}
               </div>
+              {/* Confidence explanation — always visible, tells students what it means */}
+              {confidence != null && (
+                <div style={{ marginTop: 8, fontSize: 11, lineHeight: 1.5, color: confidence >= 75 ? '#4ADE80' : mutedCol }}>
+                  {confidence >= 75
+                    ? 'High confidence — your level is well established across multiple topics.'
+                    : `${100 - confidence}% of your level is still uncertain. Run more questions to pin down your exact grade.`
+                  }
+                </div>
+              )}
             </motion.div>
 
             {/* Topic breakdown card */}
@@ -710,9 +881,12 @@ export default function CalibrationResult({
                 transition={{ delay: 0.12, duration: 0.26 }}
                 style={{ background: cardBg, border: `1px solid ${borderCol}`, borderRadius: 20, padding: '24px 28px' }}
               >
-                <TopicBreakdown subject={subject} skillMap={result.skillMap} isLight={isLight} lang={lang} />
+                <TopicBreakdown subject={subject} skillMap={result.skillMap} isLight={isLight} lang={lang} onRunMiniDiagnostic={onRunMiniDiagnostic} />
               </motion.div>
             )}
+
+            {/* Missed questions replay — collapsible; shown when there are wrong/partial answers */}
+            <MissedQuestionsReplay questionLog={result.questionLog} isLight={isLight} />
 
             {/* Skill breakdown card */}
             <motion.div

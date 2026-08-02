@@ -338,6 +338,14 @@ async function generateCalibInsights(result, subject, calibrationMap, subjectLab
     const subjectMap = calibrationMap[subject] || {}
     const label      = subjectLabels[subject] || subject
     const fmt = status => Object.entries(result.skillMap || {}).filter(([,v]) => v === status).map(([id]) => subjectMap[id]?.label || id).join(', ') || 'none'
+
+    // Build specific mistake context from the question log — the key ingredient for falsifiable insights
+    const mistakes = (result.questionLog || [])
+      .filter(e => e.understanding === 'none' || e.understanding === 'partial')
+      .slice(0, 4)
+      .map(e => `Topic: ${e.nodeLabel}\nQ: ${e.q.slice(0, 150)}\nStudent answer: ${e.a.slice(0, 100)}\nFeedback: ${e.note}\nCorrect: ${e.correctAnswer.slice(0, 120)}`)
+      .join('\n---\n')
+
     const prompt = `You are Aeva, a sharp AI tutor. A student just completed a ${label} diagnostic.
 
 Level: ${result.band}
@@ -345,17 +353,20 @@ Mastery: ${fmt('mastery')}
 Solid: ${fmt('solid')}
 Shaky: ${fmt('shaky')}
 Gaps: ${fmt('gap')}
+${mistakes ? `\nSpecific mistakes from this student's actual run:\n${mistakes}` : ''}
 
-Write exactly 3 insights for this student — each one sentence, specific and concrete.
-Insight 1: a pattern or connection you notice in what they know.
-Insight 2: the single most important gap to address and why.
-Insight 3: a specific next action they should take.
+Write exactly 3 insights. Each must be ONE sentence. Rules:
+- Every insight must be falsifiable — it could only have been written for THIS student's specific run.
+- Reference specific topics, mistakes, or patterns from the data above. NEVER write generic praise.
+- Insight 1: a precise pattern in what they know or where they slip (cite a specific topic or error if you have one).
+- Insight 2: the single most important gap and the exact consequence of leaving it unaddressed.
+- Insight 3: a concrete first step — not "study X", but the specific thing to do first (e.g. "Start with the formula for X, then practice applying it to Y").
 Return ONLY valid JSON: {"insights":["...","...","..."]}`
 
     const res = await fetch(GROQ_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
-      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }], temperature: 0.55, max_tokens: 320, response_format: { type: 'json_object' } }),
+      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }], temperature: 0.45, max_tokens: 420, response_format: { type: 'json_object' } }),
     })
     if (!res.ok) return []
     const json   = await res.json()
@@ -6927,6 +6938,7 @@ Rules:
       clustersAssessed: {},  // { cluster → count of nodes assessed }
       clusterStreak:    0,   // consecutive questions in the same cluster
       lastCluster:      null,
+      questionLog:      [],  // { q, a, understanding, note, correctAnswer, nodeLabel, tier }
     }
     // Initialise fast lane if this subject has one
     calibFastLaneRef.current = FAST_LANE[subject]
@@ -7280,6 +7292,20 @@ Rules:
         : await runCalibCritic(questionText, answerText)
       const understanding = result.understanding
 
+      // ── Log Q&A for missed-questions replay and personalized insights ──────
+      if (!calibFastLaneRef.current.active && answerText !== 'skip') {
+        const nodeLabel = CALIBRATION_MAP[cs.subject]?.[cs.currentNode]?.label || cs.currentNode
+        cs.questionLog.push({
+          q: questionText,
+          a: answerText,
+          understanding,
+          note: result.note || '',
+          correctAnswer: result.correctAnswer || '',
+          nodeLabel,
+          tier: cs.tierAtNode,
+        })
+      }
+
       // ── Feedback (with note from critic) — advance deferred until acknowledged ──
       // Capture current band before skillMap changes so we can detect level-ups in the card
       const prevBandForFeedback = calibPrevBandRef.current
@@ -7366,6 +7392,7 @@ Rules:
       clustersAssessed: cs.clustersAssessed || {},
       clusterStreak:    cs.clusterStreak    || 0,
       lastCluster:      cs.lastCluster      || null,
+      questionLog:      cs.questionLog      || [],
     }
     calibFastLaneRef.current = fastLaneState || { active: false, bracketIdx: 0 }
     calibModeRef.current = true
@@ -7428,6 +7455,7 @@ Rules:
       language: cs.language || 'en',
       questionsAsked: cs.questionsAsked,
       durationMs: Date.now() - (cs.startTime || Date.now()),
+      questionLog: cs.questionLog || [],
     }
     clearCalibCheckpoint()
     calibrationStore.saveResult(cs.subject, result)
