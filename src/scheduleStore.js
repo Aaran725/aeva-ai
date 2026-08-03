@@ -189,6 +189,43 @@ export const useScheduleStore = create((set, get) => {
       })
     },
 
+    /** Move a scheduled item from one date to another (matched by topic or nodeId). */
+    moveItem: (fromDate, topicOrNodeId, toDate) => {
+      set(s => {
+        const fromDay = s.schedule[fromDate]
+        if (!fromDay) return s
+        const item = fromDay.find(i =>
+          i.nodeId === topicOrNodeId ||
+          i.topic.toLowerCase() === (topicOrNodeId || '').toLowerCase()
+        )
+        if (!item) return s
+        const newFrom = fromDay.filter(i => i !== item)
+        const newTo   = [...(s.schedule[toDate] || []), item]
+        const schedule = { ...s.schedule, [fromDate]: newFrom, [toDate]: newTo }
+        if (!newFrom.length) delete schedule[fromDate]
+        const next = { ...s, schedule }
+        save(next)
+        return next
+      })
+    },
+
+    /** Remove a scheduled item from a date (matched by topic or nodeId). */
+    removeItem: (dateStr, topicOrNodeId) => {
+      set(s => {
+        const day = s.schedule[dateStr]
+        if (!day) return s
+        const newDay = day.filter(i =>
+          i.nodeId !== topicOrNodeId &&
+          i.topic.toLowerCase() !== (topicOrNodeId || '').toLowerCase()
+        )
+        const schedule = { ...s.schedule, [dateStr]: newDay }
+        if (!newDay.length) delete schedule[dateStr]
+        const next = { ...s, schedule }
+        save(next)
+        return next
+      })
+    },
+
     /** Items scheduled for today. */
     getTodayItems: () => get().schedule[todayKey()] || [],
 

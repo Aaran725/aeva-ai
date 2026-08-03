@@ -5305,25 +5305,80 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false, isWidg
                 <span style={{ fontSize: 11.5, fontWeight: 700, color: '#A5B4FC', letterSpacing: '-0.01em' }}>{msg.aevaAction.label}</span>
               </motion.div>
             )}
-            {msg.aevaRoadmapChanges?.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25, duration: 0.3 }}
-                style={{ marginTop: 12, borderRadius: 14, background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.28)', overflow: 'hidden' }}
-              >
-                <div style={{ padding: '10px 14px 8px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid rgba(99,102,241,0.15)' }}>
-                  <span style={{ fontSize: 13 }}>🗺️</span>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: '#A5B4FC', letterSpacing: '-0.01em' }}>Roadmap updated · {msg.aevaRoadmapChanges.length} change{msg.aevaRoadmapChanges.length > 1 ? 's' : ''}</span>
-                </div>
-                <div style={{ padding: '8px 14px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {msg.aevaRoadmapChanges.map((c, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                      <span style={{ fontSize: 12, flexShrink: 0, marginTop: 1 }}>{c.icon}</span>
-                      <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.75)', lineHeight: 1.4 }}>{c.text}</span>
+            {msg.aevaRoadmapChanges?.length > 0 && (() => {
+              const snap = msg.aevaRoadmapSnapshot
+              const changedSet = new Set(snap?.changedTopics || [])
+              const CHANGE_COLOR = { flag: '#FBBF24', skip: '#F87171', inject: '#4ADE80', reprioritise: '#60A5FA', crunch: '#FB923C' }
+              const STATUS_COLOR = { complete: '#4ADE80', available: '#818CF8', locked: 'rgba(255,255,255,0.18)', shaky: '#FBBF24' }
+              const TYPE_BADGE   = { learn: { label: 'Learn', bg: '#818CF820', color: '#818CF8' }, drill: { label: 'Drill', bg: '#34D39920', color: '#34D399' }, check: { label: 'Check', bg: '#60A5FA20', color: '#60A5FA' }, mock: { label: 'Mock', bg: '#FBBF2420', color: '#FBBF24' } }
+              return (
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25, duration: 0.3 }}
+                  style={{ marginTop: 12, borderRadius: 14, background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.22)', overflow: 'hidden' }}
+                >
+                  {/* Header */}
+                  <div style={{ padding: '10px 14px 9px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid rgba(99,102,241,0.13)', background: 'rgba(99,102,241,0.06)' }}>
+                    <span style={{ fontSize: 13 }}>🗺️</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: '#A5B4FC', letterSpacing: '-0.01em' }}>
+                        {snap ? snap.title : 'Roadmap'} updated
+                      </span>
+                      {snap && (
+                        <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 600, color: '#4ADE80' }}>
+                          {snap.readiness}% ready
+                        </span>
+                      )}
                     </div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: 'rgba(165,180,252,0.55)', flexShrink: 0 }}>
+                      {msg.aevaRoadmapChanges.length} change{msg.aevaRoadmapChanges.length > 1 ? 's' : ''}
+                    </span>
+                  </div>
+
+                  {/* Change pills */}
+                  <div style={{ padding: '9px 14px 2px', display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    {msg.aevaRoadmapChanges.map((c, i) => {
+                      const col = CHANGE_COLOR[c.changeType] || '#A5B4FC'
+                      return (
+                        <motion.div key={i} initial={{ opacity: 0, scale: 0.88 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.15 + i * 0.06 }}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 9px', borderRadius: 99, background: `${col}16`, border: `1px solid ${col}38`, maxWidth: 280 }}>
+                          <span style={{ fontSize: 11, flexShrink: 0 }}>{c.icon}</span>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: col, lineHeight: 1.35, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.text}</span>
+                        </motion.div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Snapshot node list */}
+                  {snap?.nodes?.length > 0 && (
+                    <div style={{ margin: '8px 14px 12px', borderRadius: 10, background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                      <div style={{ padding: '6px 10px 5px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)' }}>Updated roadmap</span>
+                      </div>
+                      <div style={{ maxHeight: 200, overflowY: 'auto', scrollbarWidth: 'none' }}>
+                        {snap.nodes.map((n, i) => {
+                          const isChanged = changedSet.has(n.topic)
+                          const isDone    = n.status === 'complete'
+                          const badge     = TYPE_BADGE[n.type] || TYPE_BADGE.learn
+                          const dotColor  = STATUS_COLOR[n.status] || STATUS_COLOR.locked
+                          return (
+                            <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 + i * 0.025 }}
+                              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5.5px 10px', borderBottom: i < snap.nodes.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', background: isChanged ? 'rgba(99,102,241,0.07)' : 'transparent', transition: 'background 0.15s' }}>
+                              <div style={{ width: 5, height: 5, borderRadius: '50%', background: dotColor, flexShrink: 0, boxShadow: isChanged ? `0 0 5px ${dotColor}` : 'none' }} />
+                              <span style={{ flex: 1, fontSize: 11.5, fontWeight: isChanged ? 700 : 500, color: isDone ? 'rgba(255,255,255,0.28)' : isChanged ? 'rgba(255,255,255,0.90)' : 'rgba(255,255,255,0.60)', textDecoration: isDone ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {n.flagged && <span style={{ marginRight: 4 }}>🚩</span>}
+                                {n.topic}
+                              </span>
+                              <span style={{ fontSize: 9.5, fontWeight: 700, color: badge.color, background: badge.bg, padding: '1px 5px', borderRadius: 4, flexShrink: 0 }}>{badge.label}</span>
+                              {isChanged && <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(165,180,252,0.60)', flexShrink: 0 }}>edited</span>}
+                            </motion.div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              )
+            })()}
           </>
         )}
       </div>
@@ -8180,20 +8235,23 @@ If no clear changes: {"changes":[]}`
                   )
                 }
 
+                const changedTopics = new Set()
                 for (const act of actions) {
                   if (act.type === 'flag') {
                     const node = findByTopic(act.topic)
                     if (node) {
                       store.flagNode(activeRm.id, node.id, true)
                       store.logAevaAction(activeRm.id, { type: 'flag', topic: node.topic, description: act.reason || 'Flagged as urgent' })
-                      changes.push({ icon: '🚩', text: `Flagged urgent: ${node.topic}` })
+                      changes.push({ icon: '🚩', text: `Flagged urgent: ${node.topic}`, changeType: 'flag', topic: node.topic })
+                      changedTopics.add(node.topic)
                     }
                   } else if (act.type === 'skip') {
                     const node = findByTopic(act.topic)
                     if (node) {
                       store.skipNode(activeRm.id, node.id, act.reason || '')
                       store.logAevaAction(activeRm.id, { type: 'skip', topic: node.topic, description: act.reason || 'Removed — not needed' })
-                      changes.push({ icon: '⏭', text: `Removed: ${node.topic}${act.reason ? ` — ${act.reason}` : ''}` })
+                      changes.push({ icon: '⏭', text: `Removed: ${node.topic}${act.reason ? ` — ${act.reason}` : ''}`, changeType: 'skip', topic: node.topic })
+                      changedTopics.add(node.topic)
                     }
                   } else if (act.type === 'inject') {
                     // Guard: topic must share keywords with the roadmap subject
@@ -8211,25 +8269,47 @@ If no clear changes: {"changes":[]}`
                       description: act.reason || 'Added by Aeva.',
                     }, available?.id || null)
                     store.logAevaAction(activeRm.id, { type: 'inject', topic: act.topic, description: `Added: ${act.reason || ''}` })
-                    changes.push({ icon: '➕', text: `Added: ${act.topic}` })
+                    changes.push({ icon: '➕', text: `Added: ${act.topic}`, changeType: 'inject', topic: act.topic })
+                    changedTopics.add(act.topic)
                   } else if (act.type === 'reprioritise') {
                     const topics = act.topics || (act.topic ? [act.topic] : [])
                     if (topics.length) {
                       store.reprioritiseNodes(activeRm.id, topics)
                       store.logAevaAction(activeRm.id, { type: 'reprioritise', topic: topics.join(', '), description: 'Moved to top priority' })
-                      changes.push({ icon: '🔀', text: `Prioritised: ${topics.slice(0, 2).join(', ')}` })
+                      changes.push({ icon: '🔀', text: `Prioritised: ${topics.slice(0, 2).join(', ')}`, changeType: 'reprioritise', topic: topics.join(', ') })
+                      topics.forEach(t => changedTopics.add(t))
                     }
                   } else if (act.type === 'crunch') {
                     store.crunchMode(activeRm.id)
                     store.logAevaAction(activeRm.id, { type: 'crunch', topic: '', description: 'Crunch mode — non-essentials removed' })
-                    changes.push({ icon: '⚡', text: 'Crunch mode — roadmap trimmed to essentials' })
+                    changes.push({ icon: '⚡', text: 'Crunch mode — roadmap trimmed to essentials', changeType: 'crunch', topic: '' })
                   }
                 }
 
                 if (changes.length > 0) {
+                  // Capture a snapshot of the roadmap AFTER all mutations have been applied
+                  const afterRm = useRoadmapStore.getState().getActive()
+                  const totalNodes = afterRm?.nodes?.length || 0
+                  const doneNodes  = afterRm?.nodes?.filter(n => n.status === 'complete').length || 0
+                  const aevaRoadmapSnapshot = afterRm ? {
+                    title:       afterRm.title,
+                    readiness:   totalNodes > 0 ? Math.round((doneNodes / totalNodes) * 100) : 0,
+                    changedTopics: [...changedTopics],
+                    nodes: (afterRm.nodes || [])
+                      .filter(n => n.status !== 'skipped')
+                      .slice(0, 20)
+                      .map(n => ({
+                        topic:   n.topic,
+                        status:  n.status,
+                        type:    n.type,
+                        flagged: !!n.flagged,
+                        phase:   n.phase || '',
+                      })),
+                  } : null
+
                   setMessages(prev => {
                     const copy = [...prev]
-                    copy[copy.length - 1] = { ...copy[copy.length - 1], aevaRoadmapChanges: changes }
+                    copy[copy.length - 1] = { ...copy[copy.length - 1], aevaRoadmapChanges: changes, aevaRoadmapSnapshot }
                     return copy
                   })
                   useAevaControlStore.getState().showCommandToast(`Roadmap updated · ${changes.length} change${changes.length > 1 ? 's' : ''}`, 'roadmap_edit')
