@@ -3514,10 +3514,11 @@ function parseInline(text, isLight = false) {
     const mathMatch = remaining.match(/^(.*?)\$([^$\n]+?)\$/)
     if (mathMatch) {
       const mathContent = mathMatch[2]
-      // Reject false positives: "$20, prose text $" — starts with digits+comma, or long prose without math operators
+      // Reject false positives: "$20 something" or "$4,000" — digit-only amounts with no math operators
+      const hasMathOp = /[\\^_=+\-\/<>{}*]/.test(mathContent)
       const isMath = !(
-        /^\d+[,\s]/.test(mathContent) ||
-        (mathContent.length > 25 && !/[\\^_=+\-/<>{}]/.test(mathContent) && (mathContent.match(/\s/g) || []).length > 3)
+        (/^\d+[,\s]/.test(mathContent) && !hasMathOp) ||
+        (mathContent.length > 25 && !hasMathOp && (mathContent.match(/\s/g) || []).length > 3)
       )
       if (isMath) {
         pushPrefix(mathMatch[1])
