@@ -3687,16 +3687,42 @@ function MafsGraph({ exprs, isLight }) {
 
 // ── sanitizeMermaid — fix common AI-generated Mermaid syntax errors ───────────
 function sanitizeMermaid(src) {
-  // Wrap node labels that contain special chars (parens, commas, slashes, &) in double-quotes
-  // Handles: A[Label (with parens)] → A["Label (with parens)"]
-  //          A(Label (nested)) → A("Label (nested)")
-  return src
-    // Square bracket labels: [some text with () or , or /]
-    .replace(/\[([^\]"]*[(),/&+][^\]"]*)\]/g, (_, inner) => `["${inner.replace(/"/g, "'")}"]`)
-    // Round bracket labels: (some text with () or , or /)
-    .replace(/\(([^)"]*[(),/&+][^)"]*)\)/g, (_, inner) => `("${inner.replace(/"/g, "'")}") `)
-    // Curly bracket labels: {some text with special chars}
-    .replace(/\{([^}"]*[(),/&+][^}"]*)\}/g, (_, inner) => `{"${inner.replace(/"/g, "'")}"}`)
+  let s = src.trim()
+
+  // 1. Strip fenced code block markers if the AI double-wrapped them
+  s = s.replace(/^```mermaid\s*/i, '').replace(/```\s*$/, '').trim()
+
+  // 2. Remove LaTeX math delimiters ($...$, $$...$$) from inside labels — KaTeX is not Mermaid
+  s = s.replace(/\$\$?([^$]+?)\$\$?/g, (_, m) => m.trim())
+
+  // 3. Node IDs cannot start with a digit — prefix with 'n'
+  s = s.replace(/(?<=[(\s,;]|^)(\d[\w]*)\s*(\[|\(|\{)/gm, (_, id, bracket) => `n${id}${bracket}`)
+
+  // 4. Encode HTML entities that break Mermaid parsers
+  s = s.replace(/&(?!amp;|lt;|gt;|quot;|apos;)/g, '&amp;')
+
+  // 5. Strip inline HTML/SVG tags that may appear in labels
+  s = s.replace(/<[^>]+>/g, '')
+
+  // 6. Wrap labels containing special chars in double-quotes
+  const quoteInner = (inner) => `"${inner.replace(/"/g, "'").replace(/\n/g, ' ')}"`
+  // Square-bracket labels: [label with special chars]
+  s = s.replace(/\[([^\]"]*[(),/:;&|{}\\<>!@#%^*+=[^\]"]*[^\]"]*)\]/g,
+    (_, inner) => `[${quoteInner(inner)}]`)
+  // Round-bracket labels: (label)
+  s = s.replace(/\(([^)"]*[(),/:;&|{}\\<>!@#%^*+=[^)"]*[^)"]*)\)/g,
+    (_, inner) => `(${quoteInner(inner)})`)
+  // Curly-bracket labels: {label}
+  s = s.replace(/\{([^}"]*[(),/:;&|{}\\<>!@#%^*+=[^}"]*[^}"]*)\}/g,
+    (_, inner) => `{${quoteInner(inner)}}`)
+
+  // 7. Remove trailing semicolons on node lines (invalid in many diagram types)
+  s = s.replace(/;(\s*\n)/g, '$1')
+
+  // 8. Collapse truly empty lines to avoid parser blank-line errors
+  s = s.replace(/\n{3,}/g, '\n\n')
+
+  return s
 }
 
 // ── MermaidDiagram — inline Mermaid diagram render ────────────────────────────
@@ -3704,57 +3730,74 @@ function MermaidDiagram({ src, isLight }) {
   const containerRef = useRef(null)
   const [svg, setSvg] = useState(null)
   const [err, setErr] = useState(null)
+  const [showRaw, setShowRaw] = useState(false)
   const idRef = useRef(`mermaid-${Math.random().toString(36).slice(2)}`)
 
   useEffect(() => {
     let cancelled = false
     const sanitized = sanitizeMermaid(src)
-    import('mermaid').then(({ default: mermaid }) => {
-      mermaid.initialize({
-        startOnLoad: false,
-        theme: isLight ? 'default' : 'dark',
-        securityLevel: 'loose',
-        themeVariables: isLight ? {} : {
-          background: '#0d0f1e',
-          primaryColor: '#1e1f3a',
-          primaryTextColor: '#c4b5fd',
-          primaryBorderColor: '#4338ca',
-          lineColor: '#6366F1',
-          secondaryColor: '#1e1f3a',
-          tertiaryColor: '#12132a',
-          edgeLabelBackground: '#12132a',
-          fontSize: '14px',
-        },
+
+    const tryRender = (source, attempt) =>
+      import('mermaid').then(({ default: mermaid }) => {
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: isLight ? 'default' : 'dark',
+          securityLevel: 'loose',
+          themeVariables: isLight ? {} : {
+            background: '#0d0f1e',
+            primaryColor: '#1e1f3a',
+            primaryTextColor: '#c4b5fd',
+            primaryBorderColor: '#4338ca',
+            lineColor: '#6366F1',
+            secondaryColor: '#1e1f3a',
+            tertiaryColor: '#12132a',
+            edgeLabelBackground: '#12132a',
+            fontSize: '14px',
+          },
+        })
+        return mermaid.render(`${idRef.current}_${attempt}`, source)
       })
-      mermaid.render(idRef.current, sanitized).then(({ svg: rendered }) => {
-        if (!cancelled) {
-          setSvg(rendered)
-          // After paint: fill width + fix background to match Aeva theme
-          requestAnimationFrame(() => {
-            const s = containerRef.current?.querySelector('svg')
-            if (s) {
-              s.style.width = '100%'
-              s.style.height = 'auto'
-              s.removeAttribute('width')
-              s.style.background = isLight ? '#fff' : '#0d0f1e'
-              // Override any explicit background rect Mermaid injects
-              const allRects = s.querySelectorAll('rect')
-              if (allRects.length > 0) {
-                const bg = allRects[0]
-                const fill = bg.getAttribute('fill')
-                if (fill && fill !== 'none' && !fill.startsWith('url')) {
-                  bg.setAttribute('fill', isLight ? '#fff' : '#0d0f1e')
-                }
-              }
-            }
-          })
-        }
+
+    // First attempt: fully sanitized source
+    tryRender(sanitized, 0).then(({ svg: rendered }) => {
+      if (!cancelled) setSvg(rendered)
+    }).catch(() => {
+      if (cancelled) return
+      // Second attempt: strip everything down to just alphanumeric labels
+      const stripped = sanitized
+        .replace(/\[([^\]"]*)\]/g, (_, t) => `["${t.replace(/[^\w\s]/g, ' ').trim()}"]`)
+        .replace(/\(([^)"]*)\)/g, (_, t) => `("${t.replace(/[^\w\s]/g, ' ').trim()}")`)
+        .replace(/\{([^}"]*)\}/g, (_, t) => `{"${t.replace(/[^\w\s]/g, ' ').trim()}"}`)
+      tryRender(stripped, 1).then(({ svg: rendered }) => {
+        if (!cancelled) setSvg(rendered)
       }).catch(() => {
         if (!cancelled) setErr(true)
       })
     })
+
     return () => { cancelled = true }
   }, [src, isLight])
+
+  useEffect(() => {
+    if (!svg || !containerRef.current) return
+    requestAnimationFrame(() => {
+      const s = containerRef.current?.querySelector('svg')
+      if (s) {
+        s.style.width = '100%'
+        s.style.height = 'auto'
+        s.removeAttribute('width')
+        s.style.background = isLight ? '#fff' : '#0d0f1e'
+        const allRects = s.querySelectorAll('rect')
+        if (allRects.length > 0) {
+          const bg = allRects[0]
+          const fill = bg.getAttribute('fill')
+          if (fill && fill !== 'none' && !fill.startsWith('url')) {
+            bg.setAttribute('fill', isLight ? '#fff' : '#0d0f1e')
+          }
+        }
+      }
+    })
+  }, [svg, isLight])
 
   const headerBar = (
     <div style={{
@@ -3773,13 +3816,22 @@ function MermaidDiagram({ src, isLight }) {
     }}>
       {headerBar}
       <div style={{
-        padding: '20px 16px', background: isLight ? '#f9f9fc' : '#0d0f1e',
-        display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center',
+        padding: '14px 16px', background: isLight ? '#f9f9fc' : '#0d0f1e',
+        display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center',
       }}>
         <span style={{ fontSize: 18 }}>⚠️</span>
         <span style={{ fontSize: 13, color: isLight ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.35)', textAlign: 'center' }}>
-          Couldn't render this diagram — the syntax may be too complex.
+          Diagram couldn't render
         </span>
+        <button onClick={() => setShowRaw(r => !r)}
+          style={{ fontSize: 11.5, fontWeight: 700, padding: '4px 12px', borderRadius: 99, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.30)', color: '#818CF8', cursor: 'pointer' }}>
+          {showRaw ? 'Hide source' : 'View source'}
+        </button>
+        {showRaw && (
+          <pre style={{ width: '100%', margin: 0, padding: '10px 12px', borderRadius: 10, background: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.04)', fontSize: 11.5, color: isLight ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.55)', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'monospace', lineHeight: 1.6 }}>
+            {src}
+          </pre>
+        )}
       </div>
     </div>
   )
