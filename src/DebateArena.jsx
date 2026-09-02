@@ -139,7 +139,7 @@ Be specific, honest, and reference actual arguments made.`
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b',
       temperature: 0.25,
       max_tokens: 500,
       messages: [{ role: 'user', content: prompt }],
@@ -843,7 +843,7 @@ export default function DebateArena({ onBack }) {
         signal: abortRef.current.signal,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: 'openai/gpt-oss-120b',
           temperature: activeCfg.level === 'advanced' ? 0.70 : 0.75,
           max_tokens: 280,
           stream: true,

@@ -26,7 +26,7 @@ async function canvasExplain(changes, topic) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: 'openai/gpt-oss-20b',
         messages: [{
           role: 'user',
           content: `Topic: "${topic}". Parameter changed: ${changes.join(', ')}. Write exactly ONE sentence under 20 words explaining what this change means visually or mathematically. Be specific with the numbers. No fluff.`,

@@ -46,7 +46,7 @@ async function generateBreakQuestion(topic) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: 'openai/gpt-oss-20b',
         messages: [
           { role: 'system', content: 'Generate ONE short quiz question to test recall. Output ONLY the question. No preamble, no quotes.' },
           { role: 'user',   content: `Topic: ${topic}. Give a sharp one-sentence recall question.` },
@@ -65,7 +65,7 @@ async function checkAnswer(question, answer, topic) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: 'openai/gpt-oss-20b',
         messages: [
           { role: 'system', content: 'Evaluate the student answer in ONE line. Start with ✅, ⚠️, or ❌ then a max 15-word verdict or correction. Nothing else.' },
           { role: 'user',   content: `Topic: ${topic}\nQuestion: ${question}\nAnswer: ${answer}` },

@@ -92,7 +92,7 @@ Rules: markScheme array length MUST equal marks. Each point is worth 1 mark. Inc
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
     body: JSON.stringify({
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b',
       messages: [
         { role: 'system', content: 'Educational content generator. Return ONLY the requested JSON. No markdown, no explanation, no extra text.' },
         { role: 'user', content: prompts[drillType] },
@@ -113,7 +113,7 @@ async function markExamAnswer(question, marks, markScheme, studentAnswer) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
     body: JSON.stringify({
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b',
       messages: [
         { role: 'system', content: 'You are a strict but fair exam marker. Award marks only for points explicitly covered in the mark scheme. Return ONLY valid JSON.' },
         { role: 'user', content: `Question: ${question}
@@ -144,7 +144,7 @@ async function generateDrillAnalysis(drillType, topic, wrongItems) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
     body: JSON.stringify({
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b',
       messages: [
         { role: 'system', content: 'You are a precise tutor. Give a short, specific analysis of what the student got wrong and why. Be direct and concise.' },
         { role: 'user', content: `Student drilled "${topic}" (${drillType} format) and missed these:\n${itemText}\n\nIn 2-3 sentences: what is the pattern in their misunderstanding, and what should they review? Be specific, not generic.` },
@@ -162,7 +162,7 @@ async function gradeFeynmanExplanation(topic, userExplanation, keyPoints, common
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
     body: JSON.stringify({
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b',
       messages: [
         { role: 'system', content: 'You are a precise educational evaluator. Grade a student explanation and return ONLY JSON.' },
         { role: 'user', content: `Topic: "${topic}"
@@ -196,7 +196,7 @@ async function generateCardExplanation(topic, question, correctAnswer) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
     body: JSON.stringify({
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b',
       messages: [
         { role: 'system', content: 'Concise tutor. Explain in 2-3 sentences. Direct, specific, no fluff.' },
         { role: 'user', content: `Topic: "${topic}"\nQuestion: "${question}"\nCorrect answer: "${correctAnswer}"\n\nWhy is this the correct answer? What concept underpins it? 2-3 sentences max.` },
@@ -1490,7 +1490,7 @@ async function gradeShortAnswer(topic, question, modelAnswer, keyPoints, userAns
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
     body: JSON.stringify({
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b',
       messages: [
         { role: 'system', content: 'Grade a student short-answer response. Return ONLY JSON.' },
         { role: 'user', content: `Topic: "${topic}"\nQuestion: "${question}"\nModel Answer: "${modelAnswer}"\nKey Points Required: ${JSON.stringify(keyPoints)}\n\nStudent's Answer: "${userAnswer}"\n\nReturn ONLY: {"score":0-100,"covered":["points covered"],"missing":["points missed"],"feedback":"1 sentence: what was good and what to improve","grade":"Excellent"|"Good"|"Partial"|"Weak"}` },

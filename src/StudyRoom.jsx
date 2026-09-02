@@ -1458,7 +1458,7 @@ function StatsScreen() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
           body: JSON.stringify({
-            model: 'llama-3.1-8b-instant',
+            model: 'openai/gpt-oss-20b',
             messages: [{ role: 'user', content:
               `You are Aeva. Write a 2-sentence session verdict. Be direct, no emojis.
 Mode: ${modeInfo?.label}. Focus: ${focusPct}%. XP: ${totalXP}. Subject: ${subject || 'mixed'}.

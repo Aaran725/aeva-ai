@@ -220,7 +220,7 @@ export const useStudyRoomStore = create((set, get) => ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
         body: JSON.stringify({
-          model: 'llama-3.1-8b-instant',
+          model: 'openai/gpt-oss-20b',
           messages: [{ role: 'user', content:
             `Score this answer.\nQuestion: "${currentQuestion.question}"\nIdeal: "${currentQuestion.ideal_answer}"\nAnswer: "${text}"\nReturn ONLY: { "stars": 1|2|3, "feedback": "one sentence" }` }],
           response_format: { type: 'json_object' },
@@ -581,7 +581,7 @@ export const useStudyRoomStore = create((set, get) => ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
         body: JSON.stringify({
-          model: 'llama-3.1-8b-instant',
+          model: 'openai/gpt-oss-20b',
           messages: [{ role: 'user', content:
             `Generate ONE challenging exam question about "${subject || 'general knowledge'}".${mode === 'weakspot' ? ' Focus on commonly misunderstood concepts.' : ' Make it competitive and thought-provoking.'}
 Return ONLY valid JSON: { "question": "...", "hint": "...", "ideal_answer": "..." }
@@ -609,7 +609,7 @@ Question must require explanation, not just recall. 2-3 sentences max.` }],
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
         body: JSON.stringify({
-          model: 'llama-3.1-8b-instant',
+          model: 'openai/gpt-oss-20b',
           messages: [{ role: 'user', content:
             `You are Aeva. Write ONE observation for a group study room. Max 12 words. Direct, no emojis.
 Round: ${sessionNumber}. Subject: ${subject || 'mixed'}. Avg focus: ${avgFocus}%. People: ${members.length}.` }],
@@ -652,7 +652,7 @@ Round: ${sessionNumber}. Subject: ${subject || 'mixed'}. Avg focus: ${avgFocus}%
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
         body: JSON.stringify({
-          model: 'llama-3.1-8b-instant',
+          model: 'openai/gpt-oss-20b',
           messages: [{ role: 'user', content:
             `Generate exactly 10 multiple choice questions about "${subject || 'general knowledge'}". Test specific facts, definitions, formulas. Keep each question under 20 words.
 Return ONLY valid JSON: {"questions":[{"q":"...","opts":["A)...","B)...","C)...","D)..."],"ans":0,"exp":"one sentence"}]}
@@ -719,7 +719,7 @@ ans is the 0-indexed correct option. No partial sentences.` }],
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
         body: JSON.stringify({
-          model: 'llama-3.1-8b-instant',
+          model: 'openai/gpt-oss-20b',
           messages: [{ role: 'user', content:
             `Create ONE essay/explanation question about "${subject || 'general knowledge'}" that requires ${numParts} distinct parts to answer fully.
 Return ONLY valid JSON: {"question":"...","parts":[{"num":1,"task":"one focused sub-task","hint":"short hint"}]}
@@ -753,7 +753,7 @@ Generate exactly ${numParts} parts. Each part should be independently answerable
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
         body: JSON.stringify({
-          model: 'llama-3.1-8b-instant',
+          model: 'openai/gpt-oss-20b',
           messages: [{ role: 'user', content:
             `Score this collaborative answer to: "${tagRound.question}"\n\n${combined}\n\nRate the overall answer 1-5 stars and give brief individual feedback.
 Return ONLY valid JSON: {"stars":1-5,"feedback":"one sentence overall","perPart":[{"num":1,"stars":1-5,"note":"brief"}]}` }],

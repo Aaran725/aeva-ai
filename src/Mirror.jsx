@@ -278,7 +278,7 @@ export default function Mirror({ onClose, name }) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
         signal: ab.signal,
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: 'openai/gpt-oss-120b',
           messages: [{ role: 'system', content: systemPrompt }, ...history],
           temperature: 0.82,
           max_tokens: 500,

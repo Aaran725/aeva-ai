@@ -59,7 +59,7 @@ Return ONLY valid JSON — no markdown, no extra text:
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
     body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
+      model: 'openai/gpt-oss-120b',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.7,
       max_tokens: 3000,
@@ -100,7 +100,7 @@ Return ONLY valid JSON:
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
     body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
+      model: 'openai/gpt-oss-120b',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.1,
       max_tokens: 500,

@@ -127,7 +127,7 @@ async function groqJSON(prompt, maxTokens = 1400) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
     body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
+      model: 'openai/gpt-oss-120b',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.78,
       max_tokens: maxTokens,

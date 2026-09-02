@@ -855,7 +855,7 @@ export const useArenaStore = create((set, get) => ({
       const res = await fetch(GROQ_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
-        body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: prompt }], temperature: 0.7, max_tokens: 4000 }),
+        body: JSON.stringify({ model: 'openai/gpt-oss-120b', messages: [{ role: 'user', content: prompt }], temperature: 0.7, max_tokens: 4000 }),
       })
       const d    = await res.json()
       rawResponse = d
@@ -912,7 +912,7 @@ Return ONLY a JSON array (same length as input):
         const res  = await fetch(GROQ_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
-          body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: expertPrompt }], temperature: 0.7, max_tokens: 3000 }),
+          body: JSON.stringify({ model: 'openai/gpt-oss-120b', messages: [{ role: 'user', content: expertPrompt }], temperature: 0.7, max_tokens: 3000 }),
         })
         const d   = await res.json()
         const raw = d.choices[0]?.message?.content?.trim() || '[]'
@@ -1103,7 +1103,7 @@ Return ONLY a JSON array (same length as input):
       const r   = await fetch(GROQ_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
-        body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: `You are Aeva, a sharp and slightly ruthless quiz host. ${ctx}.${histCtx} One sentence, max 12 words, no emojis, no quotes. Reference a player's history if it's ironic or savage.` }], max_tokens: 40, temperature: 1.0 }),
+        body: JSON.stringify({ model: 'openai/gpt-oss-120b', messages: [{ role: 'user', content: `You are Aeva, a sharp and slightly ruthless quiz host. ${ctx}.${histCtx} One sentence, max 12 words, no emojis, no quotes. Reference a player's history if it's ironic or savage.` }], max_tokens: 40, temperature: 1.0 }),
       })
       const d   = await r.json()
       aevaLine  = d.choices[0]?.message?.content?.trim() || ''
