@@ -11,7 +11,20 @@ import { useSRStore } from './srStore'
 import { supabase } from './supabase'
 import { useXPStore } from './xpStore'
 import { useAevaControlStore } from './aevaControlStore'
-import { nextGroqKey as gKey, GROQ_URL } from './groqClient'
+import { nextGroqKey as gKey, GROQ_URL, GROQ_KEYS } from './groqClient'
+
+async function groqFetch(init, attempt = 0) {
+  const MAX = GROQ_KEYS.length * 2
+  const res = await groqFetch({
+    ...init,
+  })
+  if (res.status === 429 && attempt < MAX) {
+    const secs = attempt < GROQ_KEYS.length ? 0 : Math.min(4 * Math.pow(2, attempt - GROQ_KEYS.length), 30)
+    if (secs > 0) await new Promise(r => setTimeout(r, secs * 1000))
+    return groqFetch(init, attempt + 1)
+  }
+  return res
+}
 import { matchTemplate } from './syllabusTemplates'
 
 export async function generateRoadmapNodes(title, examDate, assessmentInfo, options = {}) {
@@ -81,9 +94,7 @@ TOPIC NAMES: 3-6 words, specific not vague (e.g. "Quadratic Formula & Discrimina
 SUBTOPICS: For every "learn" node include 3-5 specific exam-relevant subtopics that will be covered (e.g. for "Photosynthesis": ["Light-dependent reactions & photolysis", "Photosystem I & II electron transport", "Calvin cycle & carbon fixation", "Factors limiting rate"]). For drill/check/mock nodes, subtopics may be omitted or left as [].
 ORDER: strict prerequisites — foundational concepts always before applications`
 
-  const res = await fetch(GROQ_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
+  const res = await groqFetch({
     body: JSON.stringify({
       model: 'qwen/qwen3.8-27b',
       messages: [{ role: 'user', content: prompt }],
@@ -1113,9 +1124,7 @@ Return ONLY valid JSON:
 
 Rules: 2-4 tasks. Focus on current topic. If weak areas exist, add a review task for the weakest.`
 
-  const res = await fetch(GROQ_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
+  const res = await groqFetch({
     body: JSON.stringify({
       model: 'groq/compound-mini',
       messages: [{ role: 'user', content: prompt }],
@@ -1957,9 +1966,7 @@ function GapAnalysisPanel({ nodes, drillHistory, onDrill, onRelearn }) {
 
 /* ── Completion gate — generates 3 MCQs; need 2/3 to pass ───────────────── */
 async function generateGateQuestions(topic, difficulty = 2) {
-  const res = await fetch(GROQ_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
+  const res = await groqFetch({
     body: JSON.stringify({
       model: 'groq/compound-mini',
       messages: [{ role: 'user', content: `Write exactly 3 multiple-choice questions to check understanding of "${topic}". Vary the difficulty: first easy (${Math.max(1,difficulty-1)}/5), then medium (${difficulty}/5), then harder (${Math.min(5,difficulty+1)}/5).
@@ -2298,9 +2305,7 @@ async function generateExamQuestion(topic, roadmapTitle, difficulty = 2) {
   const cmd = commandWords[Math.floor(Math.random() * commandWords.length)]
   const marks = difficulty <= 2 ? 4 : difficulty <= 3 ? 5 : 6
 
-  const res = await fetch(GROQ_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
+  const res = await groqFetch({
     body: JSON.stringify({
       model: 'groq/compound-mini',
       messages: [{ role: 'user', content: `Write one exam-style question on "${topic}" for ${roadmapTitle}. Command word: "${cmd}". Marks: ${marks}. Make it specific — include numbers, context, or a scenario where appropriate. No multiple choice. Return ONLY valid JSON: { "question": "Full question text here.", "marks": ${marks}, "markScheme": ["Mark scheme point 1 (1 mark)", "Mark scheme point 2 (1 mark)", "Mark scheme point 3 (1 mark)"] }. Include exactly ${marks} mark scheme bullet points. Keep question under 60 words.` }],
@@ -2314,9 +2319,7 @@ async function generateExamQuestion(topic, roadmapTitle, difficulty = 2) {
 }
 
 async function gradeExamAnswer(question, marks, markScheme, studentAnswer) {
-  const res = await fetch(GROQ_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
+  const res = await groqFetch({
     body: JSON.stringify({
       model: 'qwen/qwen3.8-27b',
       messages: [{ role: 'user', content: `You are an exam marker. Grade this student answer strictly against the mark scheme.

@@ -7,6 +7,23 @@ import { useUITheme } from './uiThemeStore'
 import { useAevaControlStore } from './aevaControlStore'
 import { useExamStore } from './examStore'
 import { nextGroqKey as gKey, GROQ_URL } from './groqClient'
+import { GROQ_KEYS } from './groqClient'
+
+async function groqFetch(init, attempt = 0) {
+  const MAX = GROQ_KEYS.length * 2
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
+    ...init,
+  })
+  if (res.status === 429 && attempt < MAX) {
+    const secs = attempt < GROQ_KEYS.length ? 0 : Math.min(4 * Math.pow(2, attempt - GROQ_KEYS.length), 30)
+    if (secs > 0) await new Promise(r => setTimeout(r, secs * 1000))
+    return groqFetch(init, attempt + 1)
+  }
+  return res
+}
+
 
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
 const TYPE_ICON  = { learn: <BookOpen size={10} />, drill: <Zap size={10} />, check: <CheckSquare size={10} />, mock: <FileText size={10} /> }
@@ -90,9 +107,7 @@ function AIEditBar({ schedule, weekStart, onApplyEdit }) {
     }).join('\n')
 
     try {
-      const res = await fetch(GROQ_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
+      const res = await groqFetch({
         body: JSON.stringify({
           model: 'groq/compound-mini',
           messages: [{ role: 'user', content: `Parse this revision schedule edit request into actions.

@@ -81,6 +81,22 @@ import { useStudyRoomStore } from './studyRoomStore'
 import './index.css'
 
 /* ─── Groq API (keys + URL imported at top of file) ─── */
+/** Drop-in fetch wrapper: rotates keys on 429, retries up to keys.length * 2 times.
+ *  Accepts same init object as fetch — just omit method/headers/url. */
+async function groqFetch(init, attempt = 0) {
+  const MAX = GROQ_KEYS.length * 2
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
+    ...init,
+  })
+  if (res.status === 429 && attempt < MAX) {
+    const secs = attempt < GROQ_KEYS.length ? 0 : Math.min(4 * Math.pow(2, attempt - GROQ_KEYS.length), 30)
+    if (secs > 0) await new Promise(r => setTimeout(r, secs * 1000))
+    return groqFetch(init, attempt + 1)
+  }
+  return res
+}
 
 /* ─── Chat customisation ─── */
 const CHIP_DEFAULTS = [
@@ -172,9 +188,7 @@ const CRITIC_FALLBACK = { understanding: 'partial', lazy_thinking: false, mode: 
  *  This "show your working before judging" pattern eliminates most arithmetic verification errors. */
 async function runCalibCritic(questionText, userAnswer) {
   try {
-    const res = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
+    const res = await groqFetch({
       body: JSON.stringify({
         model: 'qwen/qwen3.8-27b',
         messages: [
@@ -240,9 +254,7 @@ const CALIB_SKIP_WORDS = /^(skip|idk|i don'?t know|pass|no idea|dunno|\?+|-)$/i
  *  arithmetic errors. Returns { confirmed_wrong: boolean }. */
 async function verifyCriticNone(questionText, userAnswer) {
   try {
-    const res = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
+    const res = await groqFetch({
       body: JSON.stringify({
         model: 'qwen/qwen3.8-27b',
         messages: [
@@ -286,9 +298,7 @@ Rules:
  *  No single "correct" answer — scores on relevance, evidence use, and analytical depth. */
 async function runCalibCriticRubric(questionText, userAnswer) {
   try {
-    const res = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
+    const res = await groqFetch({
       body: JSON.stringify({
         model: 'qwen/qwen3.8-27b',
         messages: [
@@ -363,9 +373,7 @@ Write exactly 3 insights. Each must be ONE sentence. Rules:
 - Insight 3: a concrete first step — not "study X", but the specific thing to do first (e.g. "Start with the formula for X, then practice applying it to Y").
 Return ONLY valid JSON: {"insights":["...","...","..."]}`
 
-    const res = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
+    const res = await groqFetch({
       body: JSON.stringify({ model: 'qwen/qwen3.8-27b', messages: [{ role: 'user', content: prompt }], temperature: 0.45, max_tokens: 420, response_format: { type: 'json_object' } }),
     })
     if (!res.ok) return []
@@ -382,9 +390,7 @@ async function runCritic(history, userMessage) {
       content: m.text,
     }))
 
-    const res = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
+    const res = await groqFetch({
       body: JSON.stringify({
         model: 'groq/compound-mini',
         messages: [
@@ -923,9 +929,7 @@ async function analyzeForOrders(messages, struggleZones, addOrder, setOrderToast
     ).join('\n')
     const struggles = struggleZones.slice(0, 5).join(', ')
 
-    const res = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
+    const res = await groqFetch({
       body: JSON.stringify({
         model: 'groq/compound-mini',
         messages: [{
@@ -1030,9 +1034,7 @@ async function summariseSessionBackground(messages, userName, topics, addMemory)
       `${m.role === 'model' ? 'Aeva' : userName}: ${m.text?.slice(0, 300)}`
     ).join('\n')
 
-    const res = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
+    const res = await groqFetch({
       body: JSON.stringify({
         model: 'groq/compound-mini',
         messages: [{
@@ -1084,9 +1086,7 @@ async function generateSessionSummary(messages, userName, concepts) {
       .map(([topic, understanding]) => `${topic}: ${understanding}`)
       .join(', ') || 'none tracked'
 
-    const res = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
+    const res = await groqFetch({
       body: JSON.stringify({
         model: 'groq/compound-mini',
         messages: [{
@@ -1131,9 +1131,7 @@ async function generateWorksheet(messages, userName, sessionConcepts) {
     .map(([t, u]) => `${t}: ${u}`)
     .join(', ') || 'general topics'
 
-  const res = await fetch(GROQ_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
+  const res = await groqFetch({
     body: JSON.stringify({
       model: 'qwen/qwen3.8-27b',
       messages: [{
@@ -4838,9 +4836,7 @@ Rules:
 Conversation:${visualContext}
 ${conversationText}`
 
-    fetch(GROQ_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
+    groqFetch({
       body: JSON.stringify({
         model: 'groq/compound-mini',
         messages: [{ role: 'user', content: prompt }],
@@ -7082,9 +7078,7 @@ Rules:
     const cacheKey = `${text}__${targetLang}`
     if (translationCache.current[cacheKey]) return translationCache.current[cacheKey]
     try {
-      const res = await fetch(GROQ_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
+      const res = await groqFetch({
         body: JSON.stringify({
           model: 'groq/compound-mini',
           messages: [
@@ -7257,9 +7251,7 @@ Rules:
     const maxTokens = isReading ? 350 : 200
 
     try {
-      const res = await fetch(GROQ_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
+      const res = await groqFetch({
         body: JSON.stringify({
           model: 'groq/compound-mini',
           messages: [
@@ -8255,9 +8247,7 @@ Output format:
 
 If no clear changes: {"changes":[]}`
 
-            const extractRes = await fetch(GROQ_URL, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
+            const extractRes = await groqFetch({
               body: JSON.stringify({
                 model: 'groq/compound-mini',
                 messages: [{ role: 'user', content: extractionPrompt }],
