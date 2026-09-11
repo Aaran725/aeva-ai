@@ -1211,9 +1211,16 @@ General rules for all worksheets:
 async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _attempt = 0) {
   const MAX_RETRIES = GROQ_KEYS.length * 2  // try each key twice before giving up
 
+  // Cap system prompt at 6000 chars and each history message at 2000 chars to stay under Groq's 413 limit
+  const safeSystem = systemPrompt.length > 6000
+    ? systemPrompt.slice(0, 6000) + '\n[context trimmed]'
+    : systemPrompt
   const messages = [
-    { role: 'system', content: systemPrompt },
-    ...history.map(m => ({ role: m.role === 'model' ? 'assistant' : 'user', content: m.text })),
+    { role: 'system', content: safeSystem },
+    ...history.map(m => {
+      const text = (m.text || '').slice(0, 2000)
+      return { role: m.role === 'model' ? 'assistant' : 'user', content: text }
+    }),
   ]
 
   const body = {
@@ -1237,7 +1244,6 @@ async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _at
 
   if (res.status === 429) {
     if (_attempt >= MAX_RETRIES) throw new Error('Groq error 429')
-    // Try next key immediately for first few attempts, then back off
     const hasUntriedKey = _attempt < GROQ_KEYS.length - 1
     const secs = hasUntriedKey ? 0 : Math.min(8 * Math.pow(2, _attempt - (GROQ_KEYS.length - 1)), 60)
     if (secs > 0) {
@@ -1246,6 +1252,13 @@ async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _at
     }
     if (signal?.aborted) return
     return streamGroq(history, systemPrompt, onChunk, signal, opts, _attempt + 1)
+  }
+
+  if (res.status === 413) {
+    // Payload too large — retry with shorter history (drop oldest messages)
+    if (_attempt >= 3) throw new Error('Groq error 413')
+    const trimmedHistory = history.slice(Math.floor(history.length / 2))
+    return streamGroq(trimmedHistory, systemPrompt, onChunk, signal, opts, _attempt + 1)
   }
 
   if (!res.ok) throw new Error(`Groq error ${res.status}`)
