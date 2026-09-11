@@ -274,7 +274,7 @@ export default function CustomDrill({ onClose, preloadedSession = null }) {
         signal: abortRef.current.signal,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
         body: JSON.stringify({
-          model: 'openai/gpt-oss-120b',
+          model: 'qwen/qwen3.8-27b',
           temperature: 0.2,
           max_tokens: 900,
           messages: [{ role: 'user', content: buildPrompt(text) }],

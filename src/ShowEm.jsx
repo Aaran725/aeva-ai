@@ -73,7 +73,7 @@ async function callGroqParent(systemPrompt, history) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
-      model: 'openai/gpt-oss-120b',
+      model: 'qwen/qwen3.8-27b',
       messages: [{ role: 'system', content: systemPrompt }, ...history],
       max_tokens: 220,
       temperature: 0.65,

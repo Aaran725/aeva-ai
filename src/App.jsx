@@ -176,7 +176,7 @@ async function runCalibCritic(questionText, userAnswer) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-120b',
+        model: 'qwen/qwen3.8-27b',
         messages: [
           {
             role: 'system',
@@ -244,7 +244,7 @@ async function verifyCriticNone(questionText, userAnswer) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-120b',
+        model: 'qwen/qwen3.8-27b',
         messages: [
           {
             role: 'system',
@@ -290,7 +290,7 @@ async function runCalibCriticRubric(questionText, userAnswer) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-120b',
+        model: 'qwen/qwen3.8-27b',
         messages: [
           {
             role: 'system',
@@ -366,7 +366,7 @@ Return ONLY valid JSON: {"insights":["...","...","..."]}`
     const res = await fetch(GROQ_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
-      body: JSON.stringify({ model: 'openai/gpt-oss-120b', messages: [{ role: 'user', content: prompt }], temperature: 0.45, max_tokens: 420, response_format: { type: 'json_object' } }),
+      body: JSON.stringify({ model: 'qwen/qwen3.8-27b', messages: [{ role: 'user', content: prompt }], temperature: 0.45, max_tokens: 420, response_format: { type: 'json_object' } }),
     })
     if (!res.ok) return []
     const json   = await res.json()
@@ -386,7 +386,7 @@ async function runCritic(history, userMessage) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-20b',
+        model: 'groq/compound-mini',
         messages: [
           {
             role: 'system',
@@ -927,7 +927,7 @@ async function analyzeForOrders(messages, struggleZones, addOrder, setOrderToast
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-20b',
+        model: 'groq/compound-mini',
         messages: [{
           role: 'user',
           content: `Analyze this tutoring conversation and identify ONE specific knowledge gap worth drilling.
@@ -1034,7 +1034,7 @@ async function summariseSessionBackground(messages, userName, topics, addMemory)
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-20b',
+        model: 'groq/compound-mini',
         messages: [{
           role: 'user',
           content: `Analyse this tutoring session. Return ONLY valid JSON, no markdown.
@@ -1088,7 +1088,7 @@ async function generateSessionSummary(messages, userName, concepts) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-20b',
+        model: 'groq/compound-mini',
         messages: [{
           role: 'user',
           content: `Analyse this tutoring session and return ONLY valid JSON.
@@ -1135,7 +1135,7 @@ async function generateWorksheet(messages, userName, sessionConcepts) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
     body: JSON.stringify({
-      model: 'openai/gpt-oss-120b',
+      model: 'qwen/qwen3.8-27b',
       messages: [{
         role: 'user',
         content: `You are generating a printable student practice worksheet based on a tutoring session.
@@ -1219,7 +1219,7 @@ async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _at
   ]
 
   const body = {
-    model: opts.model || 'openai/gpt-oss-120b',
+    model: opts.model || 'qwen/qwen3.8-27b',
     messages,
     stream: true,
     temperature:       opts.temperature       ?? 0.75,
@@ -1276,7 +1276,7 @@ async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _at
 }
 
 /* ── Vision streaming — image + text → llama-4-scout ─────────────────────── */
-const VISION_MODEL = 'qwen/qwen3.6-27b'
+const VISION_MODEL = 'qwen/qwen3.8-27b'
 
 async function streamGroqVision(base64, mimeType, userText, systemPrompt, onChunk, signal) {
   const key = nextGroqKey()
@@ -3963,7 +3963,7 @@ SYNTAX RULES:
       await streamGroq([], prompt, chunk => {
         raw += chunk
         setDrillText(raw)
-      }, controller.signal, { model: 'openai/gpt-oss-120b', maxTokens: 300, temperature: 0.5 })
+      }, controller.signal, { model: 'qwen/qwen3.8-27b', maxTokens: 300, temperature: 0.5 })
     } catch { /* silent fail */ }
     finally { setLoading(false) }
   }
@@ -4842,7 +4842,7 @@ ${conversationText}`
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-20b',
+        model: 'groq/compound-mini',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.2,
         max_tokens: 700,
@@ -7086,7 +7086,7 @@ Rules:
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
         body: JSON.stringify({
-          model: 'openai/gpt-oss-20b',
+          model: 'groq/compound-mini',
           messages: [
             {
               role: 'system',
@@ -7261,7 +7261,7 @@ Rules:
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
         body: JSON.stringify({
-          model: 'openai/gpt-oss-20b',
+          model: 'groq/compound-mini',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userMsg },
@@ -7939,7 +7939,7 @@ Rules:
       const streamOpts = isMission
         ? (MISSION_OPTS[activeMode] || {})
         : calibModeRef.current
-          ? { model: 'openai/gpt-oss-20b', maxTokens: 20, temperature: 0.4 }  // ack only — tiny + fast
+          ? { model: 'groq/compound-mini', maxTokens: 20, temperature: 0.4 }  // ack only — tiny + fast
           : {}
 
       await streamGroq(
@@ -8259,7 +8259,7 @@ If no clear changes: {"changes":[]}`
               method: 'POST',
               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
               body: JSON.stringify({
-                model: 'openai/gpt-oss-20b',
+                model: 'groq/compound-mini',
                 messages: [{ role: 'user', content: extractionPrompt }],
                 response_format: { type: 'json_object' },
                 temperature: 0,

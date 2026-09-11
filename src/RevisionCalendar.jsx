@@ -94,7 +94,7 @@ function AIEditBar({ schedule, weekStart, onApplyEdit }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
         body: JSON.stringify({
-          model: 'openai/gpt-oss-20b',
+          model: 'groq/compound-mini',
           messages: [{ role: 'user', content: `Parse this revision schedule edit request into actions.
 
 Current week schedule:

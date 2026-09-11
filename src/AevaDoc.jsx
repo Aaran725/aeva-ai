@@ -23,7 +23,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mi
 const DocCtx = createContext(null)
 
 const VISION = 'meta-llama/llama-4-scout-17b-16e-instruct'
-const TEXT   = 'openai/gpt-oss-120b'
+const TEXT   = 'qwen/qwen3.8-27b'
 
 // ─── PDF text extraction ──────────────────────────────────────────────────────
 async function extractPDFText(file) {

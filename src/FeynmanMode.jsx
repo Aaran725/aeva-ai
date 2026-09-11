@@ -74,7 +74,7 @@ Be precise. Generic feedback is useless.`
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-20b',
+        model: 'groq/compound-mini',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.15,
         max_tokens: 500,
@@ -112,7 +112,7 @@ async function streamStudentResponse(history, topic, onChunk, signal) {
     method: 'POST', signal,
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
-      model: 'openai/gpt-oss-120b',
+      model: 'qwen/qwen3.8-27b',
       messages,
       stream: true,
       temperature: 0.88,
