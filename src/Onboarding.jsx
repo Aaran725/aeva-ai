@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowRight, Calendar, Trophy } from 'lucide-react'
 import AevaOrb from './AevaOrb'
@@ -796,8 +796,305 @@ function StepDots({ total, current }) {
   )
 }
 
+// ─── Step 5b: Feature Tour ────────────────────────────────────────────────────
+const FEATURES = [
+  {
+    icon: '🗺️',
+    color: ['139,143,255', '#818CF8'],
+    title: 'Your Roadmap',
+    desc: 'Aeva builds a phase-by-phase study plan for your exact exam — with topics ordered by importance and difficulty.',
+    detail: 'Nodes auto-complete as you study. Flag hard topics and Aeva reschedules around them.',
+  },
+  {
+    icon: '💬',
+    color: ['52,211,153', '#34D399'],
+    title: 'Smart Chat',
+    desc: 'Ask anything — Aeva explains concepts, runs drills, and builds on what you\'ve already covered in your roadmap.',
+    detail: 'Context-aware. Aeva always knows where you are in your revision.',
+  },
+  {
+    icon: '📅',
+    color: ['96,165,250', '#60A5FA'],
+    title: 'Revision Calendar',
+    desc: 'Your schedule is built automatically. Just say "move Physics to Thursday" and Aeva does it.',
+    detail: 'AI-powered edits with instant undo. Your week, your way.',
+  },
+  {
+    icon: '🎯',
+    color: ['251,191,36', '#FBBF24'],
+    title: 'Calibration',
+    desc: 'Not sure where to start? Aeva diagnoses your weak spots with an adaptive quiz and adjusts your plan.',
+    detail: 'Used by students who jumped an entire grade in 4 weeks.',
+  },
+]
+
+function StepFeatureTour({ name, onNext }) {
+  const [active, setActive] = useState(0)
+  const firstName = name?.split(' ')[0] || 'there'
+
+  return (
+    <motion.div
+      key="feature-tour"
+      initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
+      transition={{ duration: 0.35 }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 20 }}
+    >
+      <div style={{ textAlign: 'center' }}>
+        <p style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.30)', margin: '0 0 12px' }}>
+          What you're getting
+        </p>
+        <h2 style={{ fontSize: 24, fontWeight: 900, color: 'rgba(255,255,255,0.94)', letterSpacing: '-0.04em', margin: '0 0 4px', lineHeight: 1.15 }}>
+          Your full toolkit, {firstName}
+        </h2>
+        <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.36)', margin: 0 }}>
+          Everything works together. Tap to explore.
+        </p>
+      </div>
+
+      {/* Feature cards */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {FEATURES.map((f, i) => {
+          const [rgb, hex] = f.color
+          const isActive = active === i
+          return (
+            <motion.div
+              key={i}
+              layout
+              onClick={() => setActive(i)}
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+              style={{
+                borderRadius: 16, cursor: 'pointer', overflow: 'hidden',
+                background: isActive ? `rgba(${rgb},0.10)` : 'rgba(255,255,255,0.03)',
+                border: isActive ? `1.5px solid rgba(${rgb},0.35)` : '1.5px solid rgba(255,255,255,0.07)',
+                boxShadow: isActive ? `0 0 24px rgba(${rgb},0.12)` : 'none',
+                transition: 'background 0.2s, border 0.2s, box-shadow 0.2s',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px' }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+                  background: `rgba(${rgb},0.15)`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 20,
+                  boxShadow: isActive ? `0 0 16px rgba(${rgb},0.30)` : 'none',
+                  transition: 'box-shadow 0.2s',
+                }}>
+                  {f.icon}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 800, fontSize: 14, color: isActive ? hex : 'rgba(255,255,255,0.80)', marginBottom: 2, transition: 'color 0.2s' }}>
+                    {f.title}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.42)', lineHeight: 1.45, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: isActive ? 'normal' : 'nowrap' }}>
+                    {f.desc}
+                  </div>
+                </div>
+                <motion.div
+                  animate={{ rotate: isActive ? 90 : 0 }}
+                  style={{ fontSize: 16, color: `rgba(${rgb},${isActive ? '0.80' : '0.25'})`, flexShrink: 0, lineHeight: 1, transition: 'color 0.2s' }}
+                >
+                  ›
+                </motion.div>
+              </div>
+
+              <AnimatePresence>
+                {isActive && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.22 }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <div style={{ padding: '0 16px 14px 70px', fontSize: 12, color: `rgba(${rgb},0.75)`, lineHeight: 1.55, fontStyle: 'italic' }}>
+                      {f.detail}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )
+        })}
+      </div>
+
+      {/* Tab dots */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 5 }}>
+        {FEATURES.map((f, i) => {
+          const [rgb] = f.color
+          return (
+            <motion.div key={i}
+              onClick={() => setActive(i)}
+              animate={{ background: active === i ? `rgb(${rgb})` : 'rgba(255,255,255,0.15)', width: active === i ? 14 : 6 }}
+              style={{ height: 6, borderRadius: 3, cursor: 'pointer', transition: 'background 0.2s' }}
+            />
+          )
+        })}
+      </div>
+
+      <motion.button
+        whileHover={{ scale: 1.02, boxShadow: '0 8px 28px rgba(99,102,241,0.38)' }}
+        whileTap={{ scale: 0.97 }}
+        onClick={onNext}
+        style={{
+          padding: '14px', borderRadius: 13,
+          background: 'linear-gradient(135deg, #3D40A8, #5558D4)',
+          border: '1px solid rgba(139,143,255,0.40)',
+          color: 'white', fontSize: 15, fontWeight: 700,
+          cursor: 'pointer', fontFamily: 'inherit',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        }}
+      >
+        I'm ready — let's go <ArrowRight size={16} />
+      </motion.button>
+    </motion.div>
+  )
+}
+
+// ─── Step 6: Daily Commitment ─────────────────────────────────────────────────
+const GOALS = [
+  { mins: 15,  label: '15 min',  sub: 'Quick daily sessions',    emoji: '⚡' },
+  { mins: 30,  label: '30 min',  sub: 'Steady consistent pace',  emoji: '📚' },
+  { mins: 60,  label: '1 hour',  sub: 'Serious revision mode',   emoji: '🔥' },
+  { mins: 120, label: '2+ hours',sub: 'Exam crunch mode',        emoji: '🚀' },
+]
+
+function StepDailyGoal({ name, onNext }) {
+  const [selected, setSelected] = useState(30)
+  const firstName = name?.split(' ')[0] || 'there'
+
+  return (
+    <motion.div
+      key="daily-goal"
+      initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
+      transition={{ duration: 0.35 }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 20 }}
+    >
+      <div style={{ textAlign: 'center' }}>
+        <p style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.10em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.30)', margin: '0 0 12px' }}>
+          Make a commitment
+        </p>
+        <h2 style={{ fontSize: 24, fontWeight: 900, color: 'rgba(255,255,255,0.94)', letterSpacing: '-0.04em', margin: '0 0 4px', lineHeight: 1.15 }}>
+          How much daily study,<br />{firstName}?
+        </h2>
+        <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.36)', margin: 0 }}>
+          Aeva paces your roadmap around this target.
+        </p>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {GOALS.map(g => {
+          const isSelected = selected === g.mins
+          return (
+            <motion.button
+              key={g.mins}
+              whileHover={{ scale: 1.01, y: -1 }}
+              whileTap={{ scale: 0.99 }}
+              onClick={() => setSelected(g.mins)}
+              style={{
+                width: '100%', textAlign: 'left', padding: '14px 18px', borderRadius: 14,
+                cursor: 'pointer', fontFamily: 'inherit',
+                background: isSelected ? 'rgba(99,102,241,0.14)' : 'rgba(255,255,255,0.04)',
+                border: isSelected ? '1.5px solid rgba(99,102,241,0.45)' : '1.5px solid rgba(255,255,255,0.08)',
+                boxShadow: isSelected ? '0 0 20px rgba(99,102,241,0.15)' : 'none',
+                transition: 'all 0.18s',
+                display: 'flex', alignItems: 'center', gap: 14,
+              }}
+            >
+              <span style={{ fontSize: 22, width: 32, textAlign: 'center', flexShrink: 0 }}>{g.emoji}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 800, fontSize: 15, color: isSelected ? '#A5B4FC' : 'rgba(255,255,255,0.80)', marginBottom: 2, transition: 'color 0.2s' }}>
+                  {g.label}
+                </div>
+                <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.40)' }}>{g.sub}</div>
+              </div>
+              <div style={{
+                width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                background: isSelected ? '#6366F1' : 'rgba(255,255,255,0.08)',
+                border: isSelected ? 'none' : '1.5px solid rgba(255,255,255,0.12)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 0.2s',
+              }}>
+                {isSelected && <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'white' }} />}
+              </div>
+            </motion.button>
+          )
+        })}
+      </div>
+
+      {/* Visual commitment bar */}
+      <div style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+          <span style={{ fontSize: 11.5, color: 'rgba(165,180,252,0.70)', fontWeight: 600 }}>Weekly commitment</span>
+          <span style={{ fontSize: 11.5, color: 'rgba(165,180,252,0.90)', fontWeight: 800 }}>
+            {Math.round(selected * 7 / 60 * 10) / 10}h / week
+          </span>
+        </div>
+        <div style={{ height: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 99, overflow: 'hidden' }}>
+          <motion.div
+            animate={{ width: `${Math.min(100, (selected / 120) * 100)}%` }}
+            transition={{ duration: 0.4, ease: 'easeOut' }}
+            style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #6366F1, #A78BFA)' }}
+          />
+        </div>
+      </div>
+
+      <motion.button
+        whileHover={{ scale: 1.02, boxShadow: '0 8px 28px rgba(99,102,241,0.38)' }}
+        whileTap={{ scale: 0.97 }}
+        onClick={() => {
+          try { localStorage.setItem('aeva_daily_goal_mins', String(selected)) } catch {}
+          onNext()
+        }}
+        style={{
+          padding: '14px', borderRadius: 13,
+          background: 'linear-gradient(135deg, #3D40A8, #5558D4)',
+          border: '1px solid rgba(139,143,255,0.40)',
+          color: 'white', fontSize: 15, fontWeight: 700,
+          cursor: 'pointer', fontFamily: 'inherit',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        }}
+      >
+        Lock it in <ArrowRight size={16} />
+      </motion.button>
+    </motion.div>
+  )
+}
+
+// ─── Animated floating particles ─────────────────────────────────────────────
+function FloatingParticles({ count = 18 }) {
+  const particles = useMemo(() =>
+    Array.from({ length: count }, (_, i) => ({
+      id:    i,
+      x:     Math.random() * 100,
+      y:     Math.random() * 100,
+      size:  1.5 + Math.random() * 2.5,
+      delay: Math.random() * 6,
+      dur:   7 + Math.random() * 8,
+      drift: (Math.random() - 0.5) * 30,
+    }))
+  , [count])
+
+  return (
+    <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+      {particles.map(p => (
+        <motion.div key={p.id}
+          initial={{ opacity: 0, x: `${p.x}vw`, y: `${p.y}vh` }}
+          animate={{ opacity: [0, 0.55, 0.55, 0], y: [`${p.y}vh`, `${p.y - 25}vh`], x: [`${p.x}vw`, `${p.x + p.drift / 10}vw`] }}
+          transition={{ duration: p.dur, delay: p.delay, repeat: Infinity, ease: 'easeInOut' }}
+          style={{
+            position: 'absolute', borderRadius: '50%',
+            width: p.size, height: p.size,
+            background: Math.random() > 0.5 ? 'rgba(139,143,255,0.6)' : 'rgba(233,163,100,0.5)',
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 // ═══ MAIN ONBOARDING ══════════════════════════════════════════════════════════
-// Steps:  0=Arrival  1=Name  2=Style  3=YourExam  4=Generating  5=AevaOpener
+// Steps:  0=Arrival  1=Name  2=Style  3=YourExam  4=Generating  5=FeatureTour  6=DailyGoal  7=AevaOpener
 //         dots shown: steps 1–3 only (3 dots)
 
 export default function Onboarding({ name: authName, onComplete }) {
@@ -806,10 +1103,11 @@ export default function Onboarding({ name: authName, onComplete }) {
   const [step,         setStep]         = useState(0)
   const [displayName,  setDisplayName]  = useState(authName?.split(' ')[0] || '')
   const [styleId,      setStyleId]      = useState('')
-  const [examData,     setExamData]     = useState(null) // { subject, examName, examDate, targetGrade }
+  const [examData,     setExamData]     = useState(null)
 
+  const transparentSteps = new Set([0, 4])
   const showDots = step >= 1 && step <= 3
-  const dotCurrent = step - 1 // maps step 1→dot 0, step 2→dot 1, step 3→dot 2
+  const dotCurrent = step - 1
 
   const handleComplete = () => {
     const style = STYLES.find(s => s.id === styleId)
@@ -831,18 +1129,19 @@ export default function Onboarding({ name: authName, onComplete }) {
       {/* Background glows */}
       <div aria-hidden style={{ position: 'absolute', top: '10%', left: '15%', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle, rgba(45,48,142,0.22) 0%, transparent 70%)', filter: 'blur(80px)', pointerEvents: 'none' }} />
       <div aria-hidden style={{ position: 'absolute', bottom: '10%', right: '10%', width: 450, height: 450, borderRadius: '50%', background: 'radial-gradient(circle, rgba(233,163,100,0.10) 0%, transparent 70%)', filter: 'blur(70px)', pointerEvents: 'none' }} />
+      <FloatingParticles count={22} />
 
       <motion.div
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        style={{ width: '100%', maxWidth: step === 0 ? 400 : 460, padding: '0 20px', position: 'relative', zIndex: 1 }}
+        style={{ width: '100%', maxWidth: step === 0 ? 400 : 480, padding: '0 20px', position: 'relative', zIndex: 1 }}
       >
         <div style={{
-          background: step === 0 || step === 4 ? 'transparent' : 'rgba(255,255,255,0.05)',
-          backdropFilter: step === 0 || step === 4 ? 'none' : 'blur(32px)',
-          border: step === 0 || step === 4 ? 'none' : '1px solid rgba(255,255,255,0.10)',
+          background: transparentSteps.has(step) ? 'transparent' : 'rgba(255,255,255,0.05)',
+          backdropFilter: transparentSteps.has(step) ? 'none' : 'blur(32px)',
+          border: transparentSteps.has(step) ? 'none' : '1px solid rgba(255,255,255,0.10)',
           borderRadius: 28,
-          padding: step === 0 || step === 4 ? '0' : '28px 24px',
+          padding: transparentSteps.has(step) ? '0' : '28px 24px',
           display: 'flex', flexDirection: 'column', gap: 22,
         }}>
           {showDots && <StepDots total={3} current={dotCurrent} />}
@@ -852,45 +1151,25 @@ export default function Onboarding({ name: authName, onComplete }) {
               <StepArrival key="s0" onNext={() => setStep(1)} />
             )}
             {step === 1 && (
-              <StepName
-                key="s1"
-                value={displayName}
-                onChange={setDisplayName}
-                onNext={() => setStep(2)}
-              />
+              <StepName key="s1" value={displayName} onChange={setDisplayName} onNext={() => setStep(2)} />
             )}
             {step === 2 && (
-              <StepStyle
-                key="s2"
-                name={displayName}
-                selected={styleId}
-                onSelect={setStyleId}
-                onNext={() => setStep(3)}
-              />
+              <StepStyle key="s2" name={displayName} selected={styleId} onSelect={setStyleId} onNext={() => setStep(3)} />
             )}
             {step === 3 && (
-              <StepYourExam
-                key="s3"
-                name={displayName}
-                onNext={(data) => { setExamData(data); setStep(4) }}
-              />
+              <StepYourExam key="s3" name={displayName} onNext={(data) => { setExamData(data); setStep(4) }} />
             )}
             {step === 4 && examData && (
-              <StepGenerating
-                key="s4"
-                examData={examData}
-                styleId={styleId}
-                onDone={() => setStep(5)}
-              />
+              <StepGenerating key="s4" examData={examData} styleId={styleId} onDone={() => setStep(5)} />
             )}
             {step === 5 && (
-              <StepAevaOpener
-                key="s5"
-                name={displayName}
-                styleId={styleId}
-                examData={examData}
-                onStart={handleComplete}
-              />
+              <StepFeatureTour key="s5" name={displayName} onNext={() => setStep(6)} />
+            )}
+            {step === 6 && (
+              <StepDailyGoal key="s6" name={displayName} onNext={() => setStep(7)} />
+            )}
+            {step === 7 && (
+              <StepAevaOpener key="s7" name={displayName} styleId={styleId} examData={examData} onStart={handleComplete} />
             )}
           </AnimatePresence>
         </div>

@@ -145,6 +145,7 @@ export const useScheduleStore = create((set, get) => {
   return {
     schedule:    saved.schedule    || {},
     generatedAt: saved.generatedAt || null,
+    _history:    [], // undo stack — snapshots of schedule before AI mutations
 
     /** Build a fresh schedule from current roadmap data. */
     generate: (roadmaps) => {
@@ -189,8 +190,28 @@ export const useScheduleStore = create((set, get) => {
       })
     },
 
+    /** Push current schedule onto undo stack (max 20 snapshots). */
+    saveSnapshot: () => {
+      set(s => ({
+        _history: [...s._history.slice(-19), JSON.parse(JSON.stringify(s.schedule))],
+      }))
+    },
+
+    /** Restore the previous schedule snapshot. */
+    undo: () => {
+      set(s => {
+        if (!s._history.length) return s
+        const history = [...s._history]
+        const schedule = history.pop()
+        const next = { ...s, schedule, _history: history }
+        save(next)
+        return next
+      })
+    },
+
     /** Move a scheduled item from one date to another (matched by topic or nodeId). */
     moveItem: (fromDate, topicOrNodeId, toDate) => {
+      get().saveSnapshot()
       set(s => {
         const fromDay = s.schedule[fromDate]
         if (!fromDay) return s
@@ -211,6 +232,7 @@ export const useScheduleStore = create((set, get) => {
 
     /** Remove a scheduled item from a date (matched by topic or nodeId). */
     removeItem: (dateStr, topicOrNodeId) => {
+      get().saveSnapshot()
       set(s => {
         const day = s.schedule[dateStr]
         if (!day) return s

@@ -87,15 +87,20 @@ function useLaunchNode() {
 
 /* ── AI Edit Bar ────────────────────────────────────────────────────────────── */
 function AIEditBar({ schedule, weekStart, onApplyEdit }) {
-  const [input, setInput]   = useState('')
-  const [loading, setLoading] = useState(false)
-  const [result, setResult]  = useState(null) // null | 'done' | 'none' | 'error'
-  const accent = useUITheme(s => s.accent)
+  const [input, setInput]         = useState('')
+  const [loading, setLoading]     = useState(false)
+  const [result, setResult]       = useState(null) // null | 'done' | 'none' | 'error'
+  const [pending, setPending]     = useState(null) // actions awaiting confirm
+  const [appliedCount, setAppliedCount] = useState(0)
+  const accent    = useUITheme(s => s.accent)
+  const canUndo   = useScheduleStore(s => s._history.length > 0)
+  const undoStore = useScheduleStore(s => s.undo)
 
-  const handleSubmit = useCallback(async () => {
+  const parseAndStage = useCallback(async () => {
     if (!input.trim() || loading) return
     setLoading(true)
     setResult(null)
+    setPending(null)
 
     const days = weekDays(weekStart)
     const weekContext = days.map(d => {
@@ -133,19 +138,19 @@ Match topic names exactly. If the request is unclear return {"actions":[]}.` }],
       })
       const data = await res.json()
       const parsed = JSON.parse(data.choices[0].message.content)
-      const actions = parsed.actions || []
-      let applied = 0
-      for (const action of actions) {
-        if (action.type === 'move' && action.topic && action.fromDate && action.toDate) {
-          onApplyEdit({ type: 'move', topic: action.topic, fromDate: action.fromDate, toDate: action.toDate })
-          applied++
-        } else if (action.type === 'remove' && action.topic && action.date) {
-          onApplyEdit({ type: 'remove', topic: action.topic, date: action.date })
-          applied++
-        }
+      const actions = (parsed.actions || []).filter(a =>
+        (a.type === 'move' && a.topic && a.fromDate && a.toDate) ||
+        (a.type === 'remove' && a.topic && a.date)
+      )
+      if (!actions.length) { setResult('none'); return }
+
+      const hasRemove = actions.some(a => a.type === 'remove')
+      if (hasRemove) {
+        // Stage for confirmation before applying destructive removes
+        setPending(actions)
+      } else {
+        applyActions(actions)
       }
-      setResult(applied > 0 ? 'done' : 'none')
-      if (applied > 0) setInput('')
     } catch {
       setResult('error')
     } finally {
@@ -153,40 +158,98 @@ Match topic names exactly. If the request is unclear return {"actions":[]}.` }],
     }
   }, [input, loading, schedule, weekStart, onApplyEdit])
 
+  const applyActions = useCallback((actions) => {
+    let applied = 0
+    for (const action of actions) {
+      if (action.type === 'move') {
+        onApplyEdit({ type: 'move', topic: action.topic, fromDate: action.fromDate, toDate: action.toDate })
+        applied++
+      } else if (action.type === 'remove') {
+        onApplyEdit({ type: 'remove', topic: action.topic, date: action.date })
+        applied++
+      }
+    }
+    setAppliedCount(applied)
+    setResult(applied > 0 ? 'done' : 'none')
+    if (applied > 0) setInput('')
+    setPending(null)
+  }, [onApplyEdit])
+
+  const summaryText = (actions) => {
+    if (!actions) return ''
+    return actions.map(a =>
+      a.type === 'move'
+        ? `Move "${a.topic}" → ${a.toDate}`
+        : `Remove "${a.topic}" from ${a.date}`
+    ).join(' · ')
+  }
+
   return (
     <div style={{ padding: '0 14px 12px' }}>
+      {/* Input row */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '9px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', transition: 'border 0.15s' }}>
         <Sparkles size={13} color="rgba(165,180,252,0.55)" style={{ flexShrink: 0 }} />
         <input
           value={input}
-          onChange={e => { setInput(e.target.value); if (result) setResult(null) }}
-          onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-          placeholder="Move Physics to Thursday, swap Biology to Friday…"
+          onChange={e => { setInput(e.target.value); if (result) setResult(null); setPending(null) }}
+          onKeyDown={e => e.key === 'Enter' && parseAndStage()}
+          placeholder="Move Physics to Thursday, remove Biology on Friday…"
           style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: 'rgba(255,255,255,0.82)', fontSize: 13, fontFamily: "'Inter', system-ui, sans-serif", minWidth: 0 }}
         />
         <motion.button
           whileTap={{ scale: 0.91 }}
-          onClick={handleSubmit}
+          onClick={parseAndStage}
           disabled={!input.trim() || loading}
           style={{ padding: '5px 12px', borderRadius: 8, background: input.trim() && !loading ? `${accent}22` : 'rgba(255,255,255,0.05)', border: `1px solid ${input.trim() && !loading ? accent + '44' : 'rgba(255,255,255,0.08)'}`, color: input.trim() && !loading ? accent : 'rgba(255,255,255,0.20)', fontSize: 12, fontWeight: 700, cursor: input.trim() && !loading ? 'pointer' : 'default', fontFamily: 'inherit', flexShrink: 0, transition: 'all 0.15s' }}>
           {loading ? '…' : 'Edit'}
         </motion.button>
       </div>
-      <AnimatePresence>
-        {result === 'done' && (
-          <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            style={{ marginTop: 6, fontSize: 11, color: '#4ADE80', display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 2 }}>
-            <Check size={10} strokeWidth={3} /> Schedule updated
+
+      <AnimatePresence mode="wait">
+        {/* Confirm prompt for destructive actions */}
+        {pending && (
+          <motion.div key="confirm" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            style={{ marginTop: 8, padding: '10px 12px', borderRadius: 10, background: 'rgba(251,146,60,0.08)', border: '1px solid rgba(251,146,60,0.22)' }}>
+            <div style={{ fontSize: 11.5, color: 'rgba(251,186,100,0.9)', marginBottom: 8, lineHeight: 1.5 }}>
+              {summaryText(pending)}
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <motion.button whileTap={{ scale: 0.95 }} onClick={() => applyActions(pending)}
+                style={{ flex: 1, padding: '6px 0', borderRadius: 7, background: 'rgba(251,146,60,0.18)', border: '1px solid rgba(251,146,60,0.35)', color: '#FBBF24', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Confirm
+              </motion.button>
+              <motion.button whileTap={{ scale: 0.95 }} onClick={() => setPending(null)}
+                style={{ flex: 1, padding: '6px 0', borderRadius: 7, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.40)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Cancel
+              </motion.button>
+            </div>
           </motion.div>
         )}
-        {result === 'none' && (
-          <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+
+        {/* Success row with undo */}
+        {result === 'done' && !pending && (
+          <motion.div key="done" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 2 }}>
+            <span style={{ fontSize: 11, color: '#4ADE80', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Check size={10} strokeWidth={3} /> {appliedCount} change{appliedCount !== 1 ? 's' : ''} applied
+            </span>
+            {canUndo && (
+              <motion.button whileTap={{ scale: 0.93 }} onClick={() => { undoStore(); setResult(null) }}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.45)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                <RotateCcw size={9} /> Undo
+              </motion.button>
+            )}
+          </motion.div>
+        )}
+
+        {result === 'none' && !pending && (
+          <motion.div key="none" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
             style={{ marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,0.35)', paddingLeft: 2 }}>
             Couldn't match that — try using the exact topic name
           </motion.div>
         )}
-        {result === 'error' && (
-          <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+        {result === 'error' && !pending && (
+          <motion.div key="error" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
             style={{ marginTop: 6, fontSize: 11, color: '#F87171', paddingLeft: 2 }}>
             Edit failed — try again
           </motion.div>
