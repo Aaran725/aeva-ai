@@ -15,7 +15,9 @@ import { nextGroqKey as gKey, GROQ_URL, GROQ_KEYS } from './groqClient'
 
 async function groqFetch(init, attempt = 0) {
   const MAX = GROQ_KEYS.length * 2
-  const res = await groqFetch({
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${gKey()}` },
     ...init,
   })
   if (res.status === 429 && attempt < MAX) {
