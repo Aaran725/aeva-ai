@@ -8078,12 +8078,14 @@ Rules:
       if (err.name !== 'AbortError') {
         console.error('[Aeva send error]', err)
         const friendly = err.message?.includes('429')
-          ? 'Rate limit hit — Groq is busy. Wait a few seconds and try again.'
+          ? 'Too many requests — wait a moment and try again.'
+          : err.message?.includes('model_not_found') || err.message?.includes('404')
+          ? 'AI model unavailable — try again in a moment.'
           : err.message?.includes('401') || err.message?.includes('403')
           ? 'API key issue. Check your Groq key in settings.'
           : err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')
           ? 'No internet connection. Check your network and try again.'
-          : `Something went wrong (${err.message || 'unknown error'}). Try again.`
+          : `Something went wrong. Try again.`
         setMessages(prev => {
           const copy = [...prev]
           copy[copy.length - 1] = { role: 'model', text: friendly, streaming: false }

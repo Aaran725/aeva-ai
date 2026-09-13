@@ -378,7 +378,7 @@ export default function SOSMode({ onClose }) {
         signal: ac.signal,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
         body: JSON.stringify({
-          model: 'qwen/qwen3-8b-27b',
+          model: 'qwen/qwen3.8-27b',
           messages: [
             { role: 'system', content: 'You are Aeva, an expert tutor. Explain clearly and concisely. Use simple, plain language. Give one analogy if it helps. Be direct — no intro fluff, no "Great question!". Max 180 words.' },
             { role: 'user', content: `Explain "${t}" simply. I genuinely don't understand it.` },
