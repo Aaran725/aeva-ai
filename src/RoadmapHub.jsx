@@ -105,7 +105,17 @@ ORDER: strict prerequisites — foundational concepts always before applications
       max_tokens: 3200,
     }),
   })
+  if (!res.ok) {
+    const errText = await res.text()
+    console.error('[generateRoadmapNodes] API error', res.status, errText)
+    throw new Error(`API error ${res.status}: ${errText}`)
+  }
   const data = await res.json()
+  console.log('[generateRoadmapNodes] raw response', JSON.stringify(data).slice(0, 300))
+  if (!data.choices?.[0]?.message?.content) {
+    console.error('[generateRoadmapNodes] unexpected response shape', data)
+    throw new Error('Unexpected API response — no content field')
+  }
   const parsed = JSON.parse(data.choices[0].message.content)
   const nodes = (parsed.nodes || []).map((n, i) => ({
     ...n,
@@ -1068,7 +1078,8 @@ function GeneratingView({ formData, onDone }) {
         clearInterval(stepInterval)
         onDone(nodes)  // pass nodes to verification view
       } catch (e) {
-        if (!cancelled) setError('Generation failed — check your connection and try again.')
+        console.error('[GeneratingView] generation error:', e)
+        if (!cancelled) setError(`Generation failed — ${e?.message || 'check your connection and try again.'}`)
         clearInterval(stepInterval)
       }
     }
@@ -1134,7 +1145,16 @@ Rules: 2-4 tasks. Focus on current topic. If weak areas exist, add a review task
       temperature: 0.4, max_tokens: 400,
     }),
   })
+  if (!res.ok) {
+    const errText = await res.text()
+    console.error('[generateDailyMission] API error', res.status, errText)
+    throw new Error(`Daily mission API error ${res.status}`)
+  }
   const data = await res.json()
+  if (!data.choices?.[0]?.message?.content) {
+    console.error('[generateDailyMission] unexpected response shape', data)
+    throw new Error('Unexpected API response — no content field')
+  }
   return JSON.parse(data.choices[0].message.content)
 }
 
