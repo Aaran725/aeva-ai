@@ -3181,40 +3181,24 @@ function DashboardView({ onChatOpen, onSignOut, onCalibrate, onTextbook }) {
         />
 
         {/* ── SOS Button ── */}
-        <div style={{ padding: isMobile ? '0 14px 4px' : '0 28px 4px' }}>
+        <div style={{ padding: isMobile ? '8px 14px 0' : '10px 28px 0', display: 'flex' }}>
           <motion.button
-            whileHover={{ scale: 1.01, boxShadow: '0 8px 32px rgba(239,68,68,0.30)' }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={{ scale: 1.03, boxShadow: '0 4px 20px rgba(239,68,68,0.25)' }}
+            whileTap={{ scale: 0.96 }}
             onClick={() => setSosOpen(true)}
             style={{
-              width: '100%', padding: isMobile ? '14px 18px' : '16px 22px',
-              borderRadius: 16, cursor: 'pointer', fontFamily: 'inherit',
-              background: 'linear-gradient(135deg, rgba(220,38,38,0.14), rgba(239,68,68,0.08))',
-              border: '1.5px solid rgba(239,68,68,0.28)',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-              transition: 'all 0.18s',
+              padding: '8px 16px 8px 10px',
+              borderRadius: 99, cursor: 'pointer', fontFamily: 'inherit',
+              background: 'rgba(239,68,68,0.12)',
+              border: '1px solid rgba(239,68,68,0.22)',
+              display: 'flex', alignItems: 'center', gap: 7,
+              transition: 'all 0.15s',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <motion.span
-                animate={{ scale: [1, 1.15, 1] }}
-                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                style={{ fontSize: 22 }}
-              >
-                🆘
-              </motion.span>
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ fontSize: isMobile ? 14 : 15, fontWeight: 800, color: '#FCA5A5', letterSpacing: '-0.02em' }}>
-                  Don't get something?
-                </div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)', marginTop: 1 }}>
-                  Type any topic — Aeva explains it and checks you got it
-                </div>
-              </div>
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(248,113,113,0.70)', flexShrink: 0 }}>
-              Ask now →
-            </div>
+            <span style={{ fontSize: 14, lineHeight: 1 }}>🆘</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#FCA5A5', letterSpacing: '-0.01em' }}>
+              Don't get something?
+            </span>
           </motion.button>
         </div>
 
