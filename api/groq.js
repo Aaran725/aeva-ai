@@ -8,6 +8,8 @@ const KEYS = [
   process.env.GROQ_API_KEY_3,
 ].filter(Boolean)
 
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+
 export default async function handler(req) {
   if (req.method !== 'POST') {
     return new Response('Method not allowed', { status: 405 })
@@ -22,7 +24,8 @@ export default async function handler(req) {
 
   const body = await req.text()
 
-  // Try each key in order, rotating on 429
+  // Try each key; on 429 wait briefly before trying the next
+  let lastRes
   for (let i = 0; i < KEYS.length; i++) {
     const upstream = await fetch(GROQ_UPSTREAM, {
       method: 'POST',
@@ -33,15 +36,28 @@ export default async function handler(req) {
       body,
     })
 
-    if (upstream.status === 429 && i < KEYS.length - 1) continue
+    if (upstream.status !== 429) {
+      return new Response(upstream.body, {
+        status: upstream.status,
+        headers: {
+          'Content-Type': upstream.headers.get('Content-Type') ?? 'application/json',
+          'Cache-Control': 'no-cache, no-store',
+          'X-Accel-Buffering': 'no',
+        },
+      })
+    }
 
-    return new Response(upstream.body, {
-      status: upstream.status,
-      headers: {
-        'Content-Type': upstream.headers.get('Content-Type') ?? 'application/json',
-        'Cache-Control': 'no-cache, no-store',
-        'X-Accel-Buffering': 'no',
-      },
-    })
+    lastRes = upstream
+    // Wait 1s before trying the next key (avoids hammering Groq)
+    if (i < KEYS.length - 1) await sleep(1000)
   }
+
+  // All keys exhausted — pass through the 429
+  return new Response(lastRes.body, {
+    status: 429,
+    headers: {
+      'Content-Type': lastRes.headers.get('Content-Type') ?? 'application/json',
+      'Cache-Control': 'no-cache, no-store',
+    },
+  })
 }

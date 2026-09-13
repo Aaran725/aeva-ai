@@ -1210,7 +1210,7 @@ General rules for all worksheets:
 
 /* ─── Stream Aeva response ─── */
 async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _attempt = 0) {
-  const MAX_RETRIES = GROQ_KEYS.length * 2  // try each key twice before giving up
+  const MAX_RETRIES = Math.max(4, GROQ_KEYS.length * 2)  // at least 4 retries even with no client keys
 
   // Cap system prompt at 6000 chars and each history message at 2000 chars to stay under Groq's 413 limit
   const safeSystem = systemPrompt.length > 6000
@@ -1245,12 +1245,10 @@ async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _at
 
   if (res.status === 429) {
     if (_attempt >= MAX_RETRIES) throw new Error('Groq error 429')
-    const hasUntriedKey = _attempt < GROQ_KEYS.length - 1
-    const secs = hasUntriedKey ? 0 : Math.min(8 * Math.pow(2, _attempt - (GROQ_KEYS.length - 1)), 60)
-    if (secs > 0) {
-      opts.onRetry?.(_attempt + 1, MAX_RETRIES, secs)
-      await new Promise(r => setTimeout(r, secs * 1000))
-    }
+    // Always wait at least 3s on first retry, exponential after that
+    const secs = Math.min(3 * Math.pow(2, _attempt), 30)
+    opts.onRetry?.(_attempt + 1, MAX_RETRIES, secs)
+    await new Promise(r => setTimeout(r, secs * 1000))
     if (signal?.aborted) return
     return streamGroq(history, systemPrompt, onChunk, signal, opts, _attempt + 1)
   }
