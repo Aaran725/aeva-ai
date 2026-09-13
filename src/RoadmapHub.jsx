@@ -2590,12 +2590,11 @@ function PathView() {
     startNodeSession(roadmap.id, node)
 
     if (node.type === 'learn') {
-      const subtopicLine = node.subtopics?.length
-        ? ` Specifically cover: ${node.subtopics.join(', ')}.`
+      const subtopicLines = node.subtopics?.length
+        ? `\n\nSubtopics to cover (in this order):\n${node.subtopics.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
         : ''
-      const phaseLine = node.phase ? ` (Phase: ${node.phase}, Difficulty: ${node.difficulty || 2}/5)` : ''
       setPendingChatPrompt(
-        `Teach me "${node.topic}" for my ${roadmap.title}.${phaseLine}${node.description ? ' ' + node.description : ''}${subtopicLine} I have ${daysLeft} days until the exam. Start from the core concepts, use examples, and check my understanding as we go.`
+        `START NODE SESSION: "${node.topic}" — ${roadmap.title}. ${daysLeft} days to exam.${node.description ? `\nGoal: ${node.description}` : ''}${subtopicLines}\n\nBegin the session now. Start with subtopic 1 — give a clear explanation with an example, then ask me a question to check I've got it before moving on.`
       )
       closeRoadmapHub()
     } else if (node.type === 'drill') {

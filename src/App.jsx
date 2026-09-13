@@ -438,18 +438,36 @@ Rules:
 /* ─── Node session context — injected when user is studying a specific node ─── */
 function buildNodeContext(node) {
   if (!node) return ''
-  const TYPE_LABEL = { learn: 'Teaching session', drill: 'Drill practice', check: 'Knowledge check', mock: 'Mock test' }
-  const subtopicBlock = node.subtopics?.length
-    ? `\nSubtopics to cover: ${node.subtopics.join(' · ')}`
+  const TYPE_LABEL = { learn: 'TEACH', drill: 'DRILL', check: 'CHECK', mock: 'MOCK TEST' }
+  const subtopicList = node.subtopics?.length
+    ? node.subtopics.map((s, i) => `  ${i + 1}. ${s}`).join('\n')
     : ''
+  const subtopicBlock = subtopicList
+    ? `\n\nSUBTOPICS YOU MUST COVER IN ORDER:\n${subtopicList}\n\nDo NOT skip any subtopic. Do NOT move to the next subtopic until the student shows they understand the current one.`
+    : ''
+
+  const typeInstructions = {
+    learn: `Your job: teach this topic from scratch, building understanding step by step. Start with a clear 1-sentence definition, then explain each subtopic with an example. Ask a checking question after each subtopic to confirm understanding before moving on.`,
+    drill: `Your job: drill the student on this topic. Present a problem, wait for their answer, give targeted feedback, repeat. Do NOT just explain — make them do the work. Vary difficulty within the topic.`,
+    check: `Your job: knowledge check. Ask 3-4 targeted questions on this topic to surface gaps. Do NOT teach proactively — respond only to what they reveal. Identify and flag weak spots.`,
+    mock: `Your job: full exam simulation. Present exam-style questions on this topic under time pressure. Give mark-scheme style feedback after each answer. Be strict — no hints during the question.`,
+  }
+
   return `
-━━━ ACTIVE NODE SESSION ━━━
-Type: ${TYPE_LABEL[node.type] || node.type}
-Topic: "${node.topic}"
-Phase: ${node.phase || 'Core Topics'} | Difficulty: ${node.difficulty || 2}/5 | Est. ${node.estimatedMinutes || 20} min${subtopicBlock}
-${node.description ? `Goal: ${node.description}` : ''}
-INSTRUCTION: This is a structured node session. Cover all subtopics above before ending. Once the student demonstrates solid understanding (CONSOLIDATION phase, ≥5 exchanges), signal readiness with: [NODE_READY]
-━━━━━━━━━━━━━━━━━━━━━━━━━━`
+🔒 NODE SESSION — HIGHEST PRIORITY INSTRUCTION 🔒
+You are currently running a structured node session. Ignore no instruction below overrides this.
+
+MODE: ${TYPE_LABEL[node.type] || node.type}
+TOPIC: "${node.topic}"
+PHASE: ${node.phase || 'Core Topics'} | DIFFICULTY: ${node.difficulty || 2}/5 | EST: ${node.estimatedMinutes || 20} min
+${node.description ? `GOAL: ${node.description}` : ''}${subtopicBlock}
+
+TASK: ${typeInstructions[node.type] || typeInstructions.learn}
+
+SCOPE RULE: Stay 100% on "${node.topic}". If the student goes off-topic, bring them back: "Let's keep focused on ${node.topic} for now — we can cover that later."
+
+COMPLETION: Once all subtopics are covered and the student demonstrates solid understanding (minimum 4 exchanges), add [NODE_READY] at the end of your response. Only signal [NODE_READY] when ALL subtopics have been addressed.
+🔒━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━🔒`
 }
 
 /* ─── Roadmap context builder — gives Aeva full visibility ─── */
@@ -1213,8 +1231,8 @@ async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _at
   const MAX_RETRIES = Math.max(4, GROQ_KEYS.length * 2)  // at least 4 retries even with no client keys
 
   // Cap system prompt at 6000 chars and each history message at 2000 chars to stay under Groq's 413 limit
-  const safeSystem = systemPrompt.length > 6000
-    ? systemPrompt.slice(0, 6000) + '\n[context trimmed]'
+  const safeSystem = systemPrompt.length > 9000
+    ? systemPrompt.slice(0, 9000) + '\n[context trimmed]'
     : systemPrompt
   const messages = [
     { role: 'system', content: safeSystem },
@@ -7956,7 +7974,8 @@ Rules:
             handleCalibCriticResult(understanding)
           }
         } else {
-          systemPrompt = feedbackPrefix + orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, fullMemory + roadmapCtx + nodeCtx, extras, T.aevaLanguageDirective, detectedSubject)
+          // nodeCtx first so it's never truncated — it's the most critical context in a node session
+          systemPrompt = nodeCtx + feedbackPrefix + orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, fullMemory + roadmapCtx, extras, T.aevaLanguageDirective, detectedSubject)
         }
 
         if (socraticActive && !calibMode) {
