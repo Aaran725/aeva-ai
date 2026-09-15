@@ -74,8 +74,18 @@ const Q_TIME       = 15   // fallback default
 const ELO_K        = 32
 const SHOP_DURATION = 25  // seconds
 
-// 6.4: Difficulty modes → question complexity + time limit
-const DIFF_TIMERS = { casual: 20, competitive: 15, brutal: 10 }
+// 6.4: Difficulty slider (0-100) → question complexity + time limit
+export function difficultyFromSlider(val) {
+  if (val <= 15)  return { key: 'easy',      label: 'Easy',       emoji: '😊', timer: 22, multiplier: 0.8,  color: '#4ADE80', prompt: 'very simple, basic recall questions only, obvious wrong answers, beginner-friendly', sabotageFreq: 0.3 }
+  if (val <= 30)  return { key: 'normal',    label: 'Normal',     emoji: '🙂', timer: 18, multiplier: 1.0,  color: '#86EFAC', prompt: 'moderately straightforward, some nuance, plausible distractors', sabotageFreq: 0.5 }
+  if (val <= 50)  return { key: 'hard',      label: 'Hard',       emoji: '😤', timer: 14, multiplier: 1.3,  color: '#FCD34D', prompt: 'challenging with plausible wrong answers, requires genuine understanding', sabotageFreq: 0.7 }
+  if (val <= 65)  return { key: 'expert',    label: 'Expert',     emoji: '🧠', timer: 11, multiplier: 1.6,  color: '#FB923C', prompt: 'expert-level, highly deceptive distractors, nuanced distinctions, edge cases', sabotageFreq: 0.85 }
+  if (val <= 80)  return { key: 'savage',    label: 'Savage',     emoji: '💀', timer: 8,  multiplier: 2.0,  color: '#F87171', prompt: 'brutal expert-level with near-identical wrong answers, requires deep mastery, trick questions allowed', sabotageFreq: 1.0 }
+  if (val <= 92)  return { key: 'nightmare', label: 'NIGHTMARE',  emoji: '🔥', timer: 6,  multiplier: 2.5,  color: '#EF4444', prompt: 'nightmarish difficulty, PhD-level nuance, answers that require precise technical knowledge, extremely deceptive distractors, no mercy', sabotageFreq: 1.0 }
+  return             { key: 'impossible', label: 'IMPOSSIBLE', emoji: '☠️', timer: 5,  multiplier: 3.0,  color: '#DC2626', prompt: 'MAXIMUM DIFFICULTY — questions should be nearly impossible even for subject experts, hyper-specific details, trick questions, adversarial distractors designed to fool even experts', sabotageFreq: 1.0 }
+}
+
+const DIFF_TIMERS = { casual: 20, competitive: 15, brutal: 10, easy: 22, normal: 18, hard: 14, expert: 11, savage: 8, nightmare: 6, impossible: 5 }
 const DIFF_PROMPT = {
   casual:      'simple and beginner-friendly, straightforward distractors',
   competitive: 'moderately challenging with plausible wrong answers',
@@ -215,7 +225,7 @@ export const useArenaStore = create((set, get) => ({
   },
 
   // 5.1: players start with 100 coins and no cards — earned through gameplay
-  createRoom: async ({ topic, difficulty, questionCount, userId, displayName }) => {
+  createRoom: async ({ topic, difficulty, questionCount, userId, displayName, difficultyValue }) => {
     const code  = genCode()
     const tabId = `${userId}-${TAB_ID}`
     const color = ARENA_COLORS[0]
@@ -225,7 +235,7 @@ export const useArenaStore = create((set, get) => ({
     set({
       code, isHost: true, isSpectator: false,
       myUserId: tabId, myBaseUserId: userId, myDisplayName: displayName, myColor: color,
-      settings: { topic, difficulty, questionCount: Number(questionCount) },
+      settings: { topic, difficulty, questionCount: Number(questionCount), difficultyValue: difficultyValue ?? 40 },
       phase: 'lobby', _channel: ch,
     })
   },
@@ -553,7 +563,7 @@ export const useArenaStore = create((set, get) => ({
       if (get().isHost) return
       const { qIdx, qTime } = payload
       get()._clearTimer()
-      const timer = qTime || DIFF_TIMERS[get().settings?.difficulty] || Q_TIME
+      const s = get().settings; const timer = qTime || (s?.difficultyValue != null ? difficultyFromSlider(s.difficultyValue).timer : DIFF_TIMERS[s?.difficulty]) || Q_TIME
       set({ currentQIdx: qIdx, timerSeconds: timer, currentQTime: timer, answers: {}, correctIdx: null, sabotagePlayed: [], aevaLine: '', phase: 'question' })
       get()._startTimer()
     })
@@ -784,7 +794,7 @@ export const useArenaStore = create((set, get) => ({
   _generateAndStart: async () => {
     const { settings, players, _channel } = get()
     const topicKey = settings.topic.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').slice(0, 80)
-    const diffDesc = DIFF_PROMPT[settings.difficulty] || DIFF_PROMPT.competitive
+    const diffDesc = settings.difficultyValue != null ? difficultyFromSlider(settings.difficultyValue).prompt : (DIFF_PROMPT[settings.difficulty] || DIFF_PROMPT.competitive)
 
     // ── 6.1 + 6.2: Fetch all player profiles for topic history ──────────────────
     const baseUserIds = players.map(p => p.baseUserId || p.userId.split('-')[0]).filter(Boolean)
@@ -976,7 +986,7 @@ Return ONLY a JSON array (same length as input):
     const stub = stubs[qIdx]
     if (!stub) { get()._endGame(); return }
     get()._clearTimer()
-    const qTime = DIFF_TIMERS[settings?.difficulty] || Q_TIME
+    const qTime = (settings?.difficultyValue != null ? difficultyFromSlider(settings.difficultyValue).timer : DIFF_TIMERS[settings?.difficulty]) || Q_TIME
     set({ currentQIdx: qIdx, timerSeconds: qTime, currentQTime: qTime, answers: {}, correctIdx: null, sabotagePlayed: [], aevaLine: '', scoreDeltas: {}, phase: 'question', hostPreviewQ: null, isPaused: false })
     if (isHost) {
       _channel?.send({ type: 'broadcast', event: 'question_start', payload: { qIdx, qTime } })
@@ -1010,7 +1020,7 @@ Return ONLY a JSON array (same length as input):
     const q = questions[currentQIdx]
     if (!q) return
     const correctIdx = q.correct
-    const qTime = DIFF_TIMERS[settings?.difficulty] || Q_TIME
+    const qTime = (settings?.difficultyValue != null ? difficultyFromSlider(settings.difficultyValue).timer : DIFF_TIMERS[settings?.difficulty]) || Q_TIME
 
     const scoreDeltas   = {}
     const playerUpdates = {}

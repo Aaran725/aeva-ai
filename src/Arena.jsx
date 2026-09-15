@@ -5,7 +5,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Copy, Check, Trophy, Zap, Users, ChevronRight, ArrowLeft, Crown } from 'lucide-react'
-import { useArenaStore, ARENA_COLORS, CARD_DEFS } from './arenaStore'
+import { useArenaStore, ARENA_COLORS, CARD_DEFS, difficultyFromSlider } from './arenaStore'
 import { useXPStore } from './xpStore'
 import { useCoinStore } from './coinStore'
 import { supabase } from './supabase'
@@ -99,16 +99,17 @@ function CreateScreen() {
   const { createRoom } = useArenaStore()
   const { name } = (() => { try { return { name: localStorage.getItem('aeva_display_name') || 'Player' } } catch { return { name: 'Player' } } })()
   const [topic, setTopic] = useState('')
-  const [difficulty, setDifficulty] = useState('competitive')
+  const [diffSlider, setDiffSlider] = useState(40)
   const [questionCount, setQuestionCount] = useState(10)
   const [loading, setLoading] = useState(false)
 
   const userId = (() => { try { return localStorage.getItem('aeva_anon_id') || `anon-${Math.random().toString(36).slice(2,8)}` } catch { return `anon-${Math.random().toString(36).slice(2,8)}` } })()
+  const diffInfo = difficultyFromSlider(diffSlider)
 
   const handleCreate = async () => {
     if (!topic.trim()) return
     setLoading(true)
-    await createRoom({ topic: topic.trim(), difficulty, questionCount, userId, displayName: name })
+    await createRoom({ topic: topic.trim(), difficulty: diffInfo.key, questionCount, userId, displayName: name, difficultyValue: diffSlider })
     setLoading(false)
   }
 
@@ -131,23 +132,34 @@ function CreateScreen() {
       </div>
 
       <div>
-        <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.40)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 7 }}>Mode</label>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {[
-            { key: 'casual',      label: 'Casual',      sub: '20s',  color: '#10B981' },
-            { key: 'competitive', label: 'Competitive', sub: '15s',  color: '#F59E0B' },
-            { key: 'brutal',      label: 'Brutal',      sub: '10s',  color: '#EF4444' },
-          ].map(({ key, label, sub, color }) => (
-            <motion.button key={key} whileTap={{ scale: 0.95 }} onClick={() => setDifficulty(key)}
-              style={{ flex: 1, padding: '8px 0 7px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
-                background: difficulty === key ? `${color}22` : 'rgba(255,255,255,0.05)',
-                border: `1.5px solid ${difficulty === key ? `${color}88` : 'rgba(255,255,255,0.08)'}`,
-                color: difficulty === key ? '#fff' : 'rgba(255,255,255,0.40)',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-              <span>{label}</span>
-              <span style={{ fontSize: 9, opacity: 0.6, fontWeight: 600 }}>{sub}</span>
-            </motion.button>
-          ))}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.40)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Difficulty</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 16 }}>{diffInfo.emoji}</span>
+            <span style={{ fontSize: 13, fontWeight: 800, color: diffInfo.color, letterSpacing: '-0.01em' }}>{diffInfo.label}</span>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>{diffInfo.timer}s · ×{diffInfo.multiplier}</span>
+          </div>
+        </div>
+        <div style={{ position: 'relative', padding: '6px 0' }}>
+          <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 6, borderRadius: 3, transform: 'translateY(-50%)',
+            background: `linear-gradient(to right, #4ADE80, #FCD34D 40%, #FB923C 65%, #EF4444 82%, #991B1B)`,
+            opacity: 0.35 }} />
+          <div style={{ position: 'absolute', top: '50%', left: 0, height: 6, borderRadius: 3, transform: 'translateY(-50%)',
+            width: `${diffSlider}%`,
+            background: `linear-gradient(to right, #4ADE80, #FCD34D 40%, #FB923C 65%, #EF4444 82%, #991B1B)`,
+            transition: 'width 0.05s' }} />
+          <input type="range" min={0} max={100} value={diffSlider}
+            onChange={e => setDiffSlider(Number(e.target.value))}
+            style={{ position: 'relative', width: '100%', appearance: 'none', WebkitAppearance: 'none', background: 'transparent', height: 18, cursor: 'pointer', margin: 0 }} />
+        </div>
+        <style>{`
+          input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: ${diffInfo.color}; border: 2.5px solid rgba(255,255,255,0.9); box-shadow: 0 0 10px ${diffInfo.color}88; cursor: pointer; transition: background 0.2s, box-shadow 0.2s; }
+          input[type=range]::-webkit-slider-runnable-track { background: transparent; height: 18px; }
+          input[type=range]:focus { outline: none; }
+        `}</style>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
+          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', fontWeight: 600 }}>← EASIER</span>
+          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', fontWeight: 600 }}>HARDER →</span>
         </div>
       </div>
 
@@ -267,7 +279,7 @@ function LobbyScreen() {
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>⚔️ Arena · Sabotage</div>
         <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', letterSpacing: '-0.03em' }}>{settings.topic}</div>
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 3 }}>
-          {settings.questionCount} questions · {settings.difficulty} · {settings.difficulty === 'casual' ? '20s' : settings.difficulty === 'brutal' ? '10s' : '15s'}/q
+          {(() => { const d = difficultyFromSlider(settings.difficultyValue ?? 40); return `${settings.questionCount} questions · ${d.emoji} ${d.label} · ${d.timer}s/q` })()}
         </div>
       </div>
 
