@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Plus, TrendingUp, TrendingDown, Check, ChevronRight, Zap, AlertCircle, RefreshCw, BarChart2, Package, Layers, Users, Copy, Activity, ArrowUpRight, ArrowDownRight } from 'lucide-react'
-import { useCoinStore, calcTopicPrice, calcTopicDividend, calcBondReturn, ETF_DEFS } from './coinStore'
+import { X, Plus, TrendingUp, TrendingDown, Check, ChevronRight, ChevronLeft, Zap, AlertCircle, RefreshCw, BarChart2, Package, Layers, Users, Copy, Activity, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { useCoinStore, calcTopicPrice, calcTopicDividend, calcBondReturn, ETF_DEFS, KNOWLEDGE_COMPANIES } from './coinStore'
 import { useSyndicateStore } from './syndicateStore'
 import { usePlayerStockStore } from './playerStockStore'
 import CallStreet from './CallStreet'
@@ -1264,6 +1264,385 @@ function EarningsReport() {
   )
 }
 
+/* ── Knowledge Stock Market ───────────────────────────────────── */
+
+function Sparkline({ data, color = '#4ADE80', width = 64, height = 28 }) {
+  if (!data || data.length < 2) return null
+  const min = Math.min(...data)
+  const max = Math.max(...data)
+  const range = max - min || 1
+  const pts = data.map((v, i) => `${(i / (data.length - 1)) * width},${height - ((v - min) / range) * height}`).join(' ')
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: 'block', overflow: 'visible' }}>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function CompanyResearch({ company, onClose, priceState, position }) {
+  const { coins, buyStock, sellStock } = useCoinStore()
+  const [tradeMode, setTradeMode] = useState('buy')
+  const [qty, setQty] = useState(1)
+  const [msg, setMsg] = useState(null)
+  const [activeTab, setActiveTab] = useState('overview')
+
+  const state = priceState[company.ticker] || { price: company.basePrice, change24h: 0, history: [company.basePrice] }
+  const price = state.price
+  const change = state.change24h
+  const isUp = change >= 0
+  const upside = Math.round(((company.fundamentals.targetPrice - price) / price) * 100)
+  const pnl = position ? Math.round((price - position.avgCost) * position.shares) : 0
+  const cost = Math.round(price * qty * 1.01)
+  const proceeds = Math.round(price * qty * 0.99)
+
+  const ratingColor = { 'STRONG BUY': '#4ADE80', BUY: '#86EFAC', HOLD: '#FCD34D', SELL: '#F87171' }[company.fundamentals.analystRating] || '#fff'
+  const ceoColor = { 'A+': '#4ADE80', A: '#86EFAC', 'A-': '#BEF264', 'B+': '#FCD34D', B: '#FBBF24' }[company.ceo.rating] || '#fff'
+
+  function flash(text, ok = true) { setMsg({ text, ok }); setTimeout(() => setMsg(null), 3000) }
+  function handleTrade() {
+    if (tradeMode === 'buy') { buyStock(company.ticker, qty) ? flash(`Bought ${qty}× ${company.ticker}!`) : flash('Insufficient coins', false) }
+    else { sellStock(company.ticker, qty) ? flash(`Sold ${qty}× ${company.ticker}`) : flash('Not enough shares', false) }
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0, y: '100%' }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: '100%' }}
+      transition={{ type: 'spring', stiffness: 340, damping: 35 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg,#07061a 0%,#090820 100%)', fontFamily: "'Inter', system-ui, sans-serif" }}>
+      {/* Header */}
+      <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+        <motion.button whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }} onClick={onClose}
+          style={{ background: 'rgba(255,255,255,0.07)', border: 'none', borderRadius: 10, width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
+          <ChevronLeft size={18} />
+        </motion.button>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <span style={{ fontSize: 20, fontWeight: 900, color: '#fff', letterSpacing: '-0.04em' }}>{company.emoji} {company.ticker}</span>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>{company.name}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
+            <span style={{ fontSize: 24, fontWeight: 900, color: '#D4AF37', letterSpacing: '-0.04em' }}>₳{price}</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: isUp ? '#4ADE80' : '#F87171', display: 'flex', alignItems: 'center', gap: 2 }}>
+              {isUp ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
+              {isUp ? '+' : ''}{change}%
+            </span>
+          </div>
+        </div>
+        {position && (
+          <div style={{ textAlign: 'right', padding: '6px 10px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 10 }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>My Position</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: pnl >= 0 ? '#4ADE80' : '#F87171' }}>{pnl >= 0 ? '+' : ''}₳{fmt(pnl)}</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>{position.shares} shares</div>
+          </div>
+        )}
+      </div>
+
+      {/* Sub tabs */}
+      <div style={{ display: 'flex', gap: 8, padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
+        {['overview', 'trade'].map(t => (
+          <button key={t} onClick={() => setActiveTab(t)}
+            style={{ flex: 1, padding: '8px', borderRadius: 10, border: `1px solid ${activeTab === t ? 'rgba(212,175,55,0.35)' : 'rgba(255,255,255,0.08)'}`, background: activeTab === t ? 'rgba(212,175,55,0.1)' : 'transparent', color: activeTab === t ? '#D4AF37' : 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>
+            {t === 'overview' ? '📊 Research' : '💰 Trade'}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 40px' }}>
+        {msg && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+            style={{ padding: '10px 14px', borderRadius: 10, marginBottom: 16, background: msg.ok ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)', border: `1px solid ${msg.ok ? 'rgba(74,222,128,0.3)' : 'rgba(248,113,113,0.3)'}`, color: msg.ok ? '#4ADE80' : '#F87171', fontSize: 13 }}>
+            {msg.text}
+          </motion.div>
+        )}
+
+        {activeTab === 'overview' && (
+          <>
+            {/* Price chart */}
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '14px 16px', marginBottom: 14 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.09em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: 12 }}>7-Day Price Chart</div>
+              <Sparkline data={state.history} color={isUp ? '#4ADE80' : '#F87171'} width={320} height={56} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+                {(state.history || []).map((_, i) => (
+                  <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)' }}>{['7d', '6d', '5d', '4d', '3d', '2d', 'Now'][i]}</div>
+                ))}
+              </div>
+            </div>
+
+            {/* CEO card */}
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '14px 16px', marginBottom: 14 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.09em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: 10 }}>Executive Leadership</div>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 10 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: company.color + '22', border: `1px solid ${company.color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>{company.emoji}</div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 3 }}>{company.ceo.name}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, color: ceoColor, background: ceoColor + '18', border: `1px solid ${ceoColor}33`, borderRadius: 6, padding: '2px 8px', letterSpacing: '.05em' }}>CEO {company.ceo.rating}</span>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Chief Executive Officer</span>
+                  </div>
+                </div>
+              </div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.65, marginBottom: 10 }}>{company.ceo.background}</div>
+              <div style={{ padding: '10px 14px', background: company.color + '10', border: `1px solid ${company.color}22`, borderRadius: 10, borderLeft: `3px solid ${company.color}` }}>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', fontStyle: 'italic', lineHeight: 1.6 }}>"{company.ceo.quote}"</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginTop: 4 }}>— {company.ceo.name.split(' ').slice(-1)[0]}</div>
+              </div>
+            </div>
+
+            {/* Fundamentals */}
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '14px 16px', marginBottom: 14 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.09em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: 12 }}>Key Fundamentals</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                {[
+                  { l: 'P/E Ratio', v: company.fundamentals.pe, c: '#a5b4fc' },
+                  { l: 'Rev. Growth', v: `+${company.fundamentals.revenueGrowth}%`, c: '#4ADE80' },
+                  { l: 'Analyst Target', v: `₳${company.fundamentals.targetPrice}`, c: '#D4AF37' },
+                  { l: 'Market Cap', v: company.fundamentals.marketCap, c: '#fff' },
+                  { l: 'Beta', v: company.fundamentals.beta, c: company.fundamentals.beta > 1.2 ? '#F87171' : '#94a3b8' },
+                  { l: 'Analyst Rating', v: company.fundamentals.analystRating.replace('STRONG ', 'STR. '), c: ratingColor },
+                ].map(m => (
+                  <div key={m.l} style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 10, padding: '8px 10px' }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>{m.l}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: m.c, letterSpacing: '-0.02em' }}>{m.v}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Insider intelligence */}
+            <div style={{ background: 'rgba(212,175,55,0.06)', border: '1px solid rgba(212,175,55,0.18)', borderRadius: 14, padding: '12px 16px' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#D4AF37', marginBottom: 5 }}>💡 Insider Intelligence</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.65 }}>
+                Study <strong style={{ color: 'rgba(255,255,255,0.7)' }}>{company.insiderTopic}</strong> and add it to your Knowledge Portfolio to gain an insider edge — your practice sessions boost {company.ticker} stock by up to 2.5% per market refresh.
+              </div>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'trade' && (
+          <>
+            {/* Trade toggle */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+              {['buy', 'sell'].map(t => (
+                <button key={t} onClick={() => { setTradeMode(t); setQty(1) }}
+                  style={{ flex: 1, padding: '10px', borderRadius: 12, border: `1px solid ${tradeMode === t ? (t === 'buy' ? 'rgba(74,222,128,0.4)' : 'rgba(248,113,113,0.4)') : 'rgba(255,255,255,0.08)'}`, background: tradeMode === t ? (t === 'buy' ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)') : 'rgba(0,0,0,0.2)', color: tradeMode === t ? (t === 'buy' ? '#4ADE80' : '#F87171') : 'rgba(255,255,255,0.4)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                  {t === 'buy' ? '▲ Buy' : '▼ Sell'}
+                </button>
+              ))}
+            </div>
+
+            {/* Price overview */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 14px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>Market Price</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: '#D4AF37', letterSpacing: '-0.04em' }}>₳{price}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>Analyst Target</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: company.color }}>₳{company.fundamentals.targetPrice}</div>
+                <div style={{ fontSize: 10, color: upside >= 0 ? '#4ADE80' : '#F87171' }}>{upside >= 0 ? '+' : ''}{upside}% upside</div>
+              </div>
+            </div>
+
+            {/* Quantity slider */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>Quantity</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <input type="range" min={1}
+                  max={tradeMode === 'sell' && position ? position.shares : Math.max(1, Math.min(100, Math.floor(coins / Math.max(1, price))))}
+                  value={qty} onChange={e => setQty(+e.target.value)}
+                  style={{ flex: 1, accentColor: company.color }} />
+                <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', minWidth: 36, textAlign: 'right' }}>{qty}</div>
+              </div>
+            </div>
+
+            {/* Order summary */}
+            <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 14, marginBottom: 20 }}>
+              {tradeMode === 'buy' ? (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>{qty} × ₳{price}</span>
+                    <span style={{ fontSize: 12, color: '#fff' }}>₳{fmt(qty * price)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: 4 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}>Total (incl. 1% fee)</span>
+                    <span style={{ fontSize: 15, fontWeight: 800, color: '#F87171' }}>−₳{fmt(cost)}</span>
+                  </div>
+                  {coins < cost && <div style={{ marginTop: 10, fontSize: 12, color: '#F87171', display: 'flex', alignItems: 'center', gap: 5 }}><AlertCircle size={12} /> Need ₳{fmt(cost - coins)} more</div>}
+                </>
+              ) : (
+                !position ? (
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: '8px 0' }}>No position in {company.ticker}</div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}>Net Proceeds (−1% fee)</span>
+                      <span style={{ fontSize: 15, fontWeight: 800, color: '#4ADE80' }}>+₳{fmt(proceeds)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Avg cost ₳{position.avgCost} · {position.shares} shares held</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: (price - position.avgCost) * qty >= 0 ? '#4ADE80' : '#F87171' }}>
+                        P&L {(price - position.avgCost) * qty >= 0 ? '+' : ''}₳{fmt((price - position.avgCost) * qty)}
+                      </span>
+                    </div>
+                  </>
+                )
+              )}
+            </div>
+
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} onClick={handleTrade}
+              disabled={tradeMode === 'buy' ? coins < cost : !position || position.shares < qty}
+              style={{ width: '100%', padding: '14px', borderRadius: 14, border: 'none', background: (tradeMode === 'buy' && coins >= cost) || (tradeMode === 'sell' && position && position.shares >= qty) ? (tradeMode === 'buy' ? 'linear-gradient(135deg,#22C55E,#16A34A)' : 'linear-gradient(135deg,#EF4444,#DC2626)') : 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer', letterSpacing: '-0.02em' }}>
+              {tradeMode === 'buy' ? `Buy ${qty} Share${qty !== 1 ? 's' : ''} — ₳${fmt(cost)}` : `Sell ${qty} Share${qty !== 1 ? 's' : ''} — Receive ₳${fmt(proceeds)}`}
+            </motion.button>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', textAlign: 'center', marginTop: 10 }}>
+              Balance after: ₳{fmt(tradeMode === 'buy' ? coins - cost : coins + proceeds)}
+            </div>
+          </>
+        )}
+      </div>
+    </motion.div>
+  )
+}
+
+function StocksTab() {
+  const { portfolio, stockPositions, marketNews, stockPriceState, refreshMarket, coins } = useCoinStore()
+  const [search, setSearch] = useState('')
+  const [sectorFilter, setSectorFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('cap')
+  const [selected, setSelected] = useState(null)
+
+  useEffect(() => { refreshMarket(portfolio) }, [])
+
+  const SECTOR_COLORS = { sciences: '#34D399', maths: '#818CF8', history: '#FBBF24', languages: '#F9A8D4', arts: '#F472B6' }
+
+  const totalChange = KNOWLEDGE_COMPANIES.reduce((s, co) => s + (stockPriceState[co.ticker]?.change24h || 0), 0) / KNOWLEDGE_COMPANIES.length
+  const stocksUp = KNOWLEDGE_COMPANIES.filter(co => (stockPriceState[co.ticker]?.change24h || 0) > 0).length
+  const myPosValue = Object.entries(stockPositions).reduce((s, [ticker, pos]) => {
+    const price = stockPriceState[ticker]?.price || KNOWLEDGE_COMPANIES.find(c => c.ticker === ticker)?.basePrice || 0
+    return s + pos.shares * price
+  }, 0)
+  const myPosCount = Object.keys(stockPositions).length
+
+  const filtered = KNOWLEDGE_COMPANIES
+    .filter(co => {
+      if (sectorFilter !== 'all' && co.sector !== sectorFilter) return false
+      if (search && !co.name.toLowerCase().includes(search.toLowerCase()) && !co.ticker.toLowerCase().includes(search.toLowerCase())) return false
+      return true
+    })
+    .sort((a, b) => {
+      if (sortBy === 'price') return (stockPriceState[b.ticker]?.price || b.basePrice) - (stockPriceState[a.ticker]?.price || a.basePrice)
+      if (sortBy === 'change') return (stockPriceState[b.ticker]?.change24h || 0) - (stockPriceState[a.ticker]?.change24h || 0)
+      if (sortBy === 'rating') {
+        const r = { 'STRONG BUY': 4, BUY: 3, HOLD: 2, SELL: 1 }
+        return (r[b.fundamentals.analystRating] || 0) - (r[a.fundamentals.analystRating] || 0)
+      }
+      return b.fundamentals.pe - a.fundamentals.pe
+    })
+
+  return (
+    <div>
+      {/* Market overview bar */}
+      <div style={{ background: 'rgba(0,0,0,0.35)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '10px 16px', display: 'flex', gap: 16, overflowX: 'auto', scrollbarWidth: 'none' }}>
+        <div style={{ flexShrink: 0 }}>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase', letterSpacing: '.07em' }}>AKEX Index</div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#D4AF37', letterSpacing: '-0.03em' }}>₳2,847 <span style={{ fontSize: 11, color: totalChange >= 0 ? '#4ADE80' : '#F87171', fontWeight: 600 }}>{totalChange >= 0 ? '+' : ''}{totalChange.toFixed(1)}%</span></div>
+        </div>
+        <div style={{ width: 1, background: 'rgba(255,255,255,0.07)', flexShrink: 0 }} />
+        <div style={{ flexShrink: 0 }}>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase', letterSpacing: '.07em' }}>Advancing</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#4ADE80' }}>{stocksUp} <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', fontWeight: 400 }}>of {KNOWLEDGE_COMPANIES.length}</span></div>
+        </div>
+        <div style={{ width: 1, background: 'rgba(255,255,255,0.07)', flexShrink: 0 }} />
+        <div style={{ flexShrink: 0 }}>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase', letterSpacing: '.07em' }}>My Holdings</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: myPosCount > 0 ? '#a5b4fc' : 'rgba(255,255,255,0.25)' }}>
+            {myPosCount > 0 ? `₳${fmt(myPosValue)}` : '—'} {myPosCount > 0 && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', fontWeight: 400 }}>{myPosCount} stocks</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* News strip */}
+      {marketNews.length > 0 && (
+        <div style={{ background: 'rgba(212,175,55,0.04)', borderBottom: '1px solid rgba(212,175,55,0.1)', padding: '7px 16px', display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', alignItems: 'center' }}>
+          <span style={{ fontSize: 9, fontWeight: 800, color: '#D4AF37', letterSpacing: '.1em', flexShrink: 0 }}>NEWS</span>
+          {marketNews.slice(0, 6).map(n => (
+            <div key={n.id} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '3px 10px', background: n.impact > 0 ? 'rgba(74,222,128,0.07)' : 'rgba(248,113,113,0.07)', borderRadius: 20, border: `1px solid ${n.impact > 0 ? 'rgba(74,222,128,0.2)' : 'rgba(248,113,113,0.2)'}` }}>
+              <span style={{ fontSize: 9, fontWeight: 800, color: n.impact > 0 ? '#4ADE80' : '#F87171' }}>{n.ticker || (n.sector || 'MKT').toUpperCase()}</span>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.headline}</span>
+              <span style={{ fontSize: 9, fontWeight: 700, color: n.impact > 0 ? '#4ADE80' : '#F87171' }}>{n.impact > 0 ? '+' : ''}{n.impact}%</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Filters */}
+      <div style={{ padding: '12px 16px 8px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search companies or tickers…"
+          style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10, color: '#fff', fontSize: 13, outline: 'none' }} />
+        <div style={{ display: 'flex', gap: 5, overflowX: 'auto', scrollbarWidth: 'none' }}>
+          {['all', 'sciences', 'maths', 'history', 'languages', 'arts'].map(s => (
+            <button key={s} onClick={() => setSectorFilter(s)}
+              style={{ flexShrink: 0, padding: '4px 11px', borderRadius: 20, border: `1px solid ${sectorFilter === s ? (SECTOR_COLORS[s] || '#a5b4fc') + '55' : 'rgba(255,255,255,0.08)'}`, background: sectorFilter === s ? (SECTOR_COLORS[s] || '#a5b4fc') + '15' : 'transparent', color: sectorFilter === s ? (SECTOR_COLORS[s] || '#a5b4fc') : 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize' }}>
+              {s}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {[['cap', 'P/E'], ['price', 'Price'], ['change', '24h'], ['rating', 'Rating']].map(([k, l]) => (
+            <button key={k} onClick={() => setSortBy(k)}
+              style={{ flex: 1, padding: '5px', borderRadius: 8, border: `1px solid ${sortBy === k ? 'rgba(165,180,252,0.3)' : 'rgba(255,255,255,0.06)'}`, background: sortBy === k ? 'rgba(165,180,252,0.1)' : 'transparent', color: sortBy === k ? '#a5b4fc' : 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Stock rows */}
+      <div style={{ padding: '0 16px 32px' }}>
+        {filtered.map((co, i) => {
+          const st = stockPriceState[co.ticker] || { price: co.basePrice, change24h: 0, history: [co.basePrice] }
+          const isUp = st.change24h >= 0
+          const upside = Math.round(((co.fundamentals.targetPrice - st.price) / st.price) * 100)
+          const owned = stockPositions[co.ticker]
+          const rColor = { 'STRONG BUY': '#4ADE80', BUY: '#86EFAC', HOLD: '#FCD34D', SELL: '#F87171' }[co.fundamentals.analystRating] || '#fff'
+          return (
+            <motion.div key={co.ticker} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
+              onClick={() => setSelected(co)}
+              style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 13px', marginBottom: 7, background: owned ? co.color + '08' : 'rgba(255,255,255,0.03)', border: `1px solid ${owned ? co.color + '28' : 'rgba(255,255,255,0.07)'}`, borderRadius: 14, cursor: 'pointer', position: 'relative', overflow: 'hidden' }}>
+              {owned && <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: co.color, borderRadius: '4px 0 0 4px' }} />}
+              <div style={{ width: 38, height: 38, borderRadius: 11, background: co.color + '18', border: `1px solid ${co.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, flexShrink: 0 }}>{co.emoji}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>{co.ticker}</span>
+                  <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 5, background: rColor + '18', color: rColor, border: `1px solid ${rColor}28` }}>{co.fundamentals.analystRating.replace('STRONG BUY', 'STR BUY')}</span>
+                  {owned && <span style={{ fontSize: 9, color: co.color, fontWeight: 700 }}>{owned.shares}sh</span>}
+                </div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 2 }}>{co.name}</div>
+                <div style={{ fontSize: 9, color: SECTOR_COLORS[co.sector], fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em' }}>
+                  {co.sector}{upside > 0 && <span style={{ color: '#4ADE80', marginLeft: 6 }}>+{upside}% upside</span>}
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#D4AF37', letterSpacing: '-0.03em' }}>₳{st.price}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: isUp ? '#4ADE80' : '#F87171', display: 'flex', alignItems: 'center', gap: 2 }}>
+                  {isUp ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}{isUp ? '+' : ''}{st.change24h}%
+                </div>
+                <Sparkline data={st.history} color={isUp ? '#4ADE80' : '#F87171'} width={44} height={18} />
+              </div>
+            </motion.div>
+          )
+        })}
+      </div>
+
+      <AnimatePresence>
+        {selected && (
+          <CompanyResearch company={selected} priceState={stockPriceState}
+            position={stockPositions[selected.ticker] || null} onClose={() => setSelected(null)} />
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 /* ── Main Component ───────────────────────────────────────────── */
 const TABS = [
   { id: 'portfolio',  label: 'Portfolio',  icon: BarChart2 },
@@ -1272,7 +1651,7 @@ const TABS = [
   { id: 'syndicates', label: 'Syndicates', icon: Users },
   { id: 'players',     label: 'Players',     icon: Activity },
   { id: 'callstreet', label: 'Call St.',    icon: TrendingUp },
-  { id: 'market',     label: 'Market',      icon: BarChart2 },
+  { id: 'stocks',     label: 'Stocks',      icon: Activity },
 ]
 
 export default function CoinMarket({ onClose }) {
@@ -1353,7 +1732,7 @@ export default function CoinMarket({ onClose }) {
           {tab === 'syndicates' && <motion.div key="s" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><SyndicatesTab /></motion.div>}
           {tab === 'players'    && <motion.div key="pl" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><PlayersTab /></motion.div>}
           {tab === 'callstreet' && <motion.div key="cs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><CallStreet /></motion.div>}
-          {tab === 'market'     && <motion.div key="m" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><MarketTab /></motion.div>}
+          {tab === 'stocks'     && <motion.div key="stocks" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><StocksTab /></motion.div>}
         </AnimatePresence>
       </div>
     </motion.div>
