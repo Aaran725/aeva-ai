@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { useCoinStore } from './coinStore'
 
 // ── Company definitions ───────────────────────────────────────────
-const COMPANIES_DEF = [
+export const COMPANIES_DEF = [
   { id: 'nova-ai',     name: 'NovaAI',    ticker: 'NOVA',  sector: 'tech',        emoji: '🤖', desc: 'AI assistants for enterprise and education',         basePrice: 120, _revGrowth: 0.40, _profitMargin: 0.25,  _debtRatio: 0.10, _founderScore: 0.88, _rdSpend: 0.80,
     ceo: { name: 'Sam Xu', rating: 'A+', quote: 'Every model we ship makes the last one look like a prototype.', background: 'Former DeepMind researcher, sold two AI startups before 30. Holds 18% of NOVA personally.' },
     analystRating: 'STRONG BUY', targetPrice: 185, pe: 38, beta: 0.9, marketCap: '1.4B' },
@@ -32,7 +32,7 @@ const COMPANIES_DEF = [
     analystRating: 'HOLD', targetPrice: 80, pe: 22, beta: 0.6, marketCap: '590M' },
 ]
 
-const STARTUPS_DEF = [
+export const STARTUPS_DEF = [
   { id: 'quantum-q',  name: 'QuantumQ',  ticker: 'QQ',   sector: 'tech',      emoji: '⚛️', desc: 'Quantum computing — pre-revenue moonshot', basePrice: 20, _revGrowth: 0.0,  _profitMargin: -0.80, _debtRatio: 0.30, _founderScore: 0.92, _rdSpend: 1.0,  isStartup: true, _volatility: 0.25,
     ceo: { name: 'Dr. Ben Kim', rating: 'A+', quote: 'Classical computers are a local maximum. We are building past it.', background: 'MIT quantum physics PhD. Pre-revenue but holds 3 breakthrough patents. Legendary in research circles.' },
     analystRating: 'SPECULATIVE', targetPrice: 55, pe: null, beta: 3.2, marketCap: '180M' },

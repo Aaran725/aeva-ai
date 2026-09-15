@@ -1,7 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, Bell, Lock, Star, TrendingUp, TrendingDown, Bookmark } from 'lucide-react'
-import { useCallStreetStore, calcModeOverlay } from './callStreetStore'
+import { useCallStreetStore, calcModeOverlay, COMPANIES_DEF, STARTUPS_DEF } from './callStreetStore'
+
+const ALL_DEFS = [...COMPANIES_DEF, ...STARTUPS_DEF]
+function withStaticData(company) {
+  const def = ALL_DEFS.find(d => d.id === company.id)
+  return def ? { ...company, ceo: def.ceo, pe: def.pe, analystRating: def.analystRating, targetPrice: def.targetPrice, beta: def.beta, marketCap: def.marketCap } : company
+}
 import { useCoinStore } from './coinStore'
 
 function fmt(n) { return Math.round(n).toLocaleString() }
@@ -1671,9 +1677,9 @@ export default function CallStreet() {
   }
 
   if (selected) {
-    const company = companies.find(c => c.id === selected)
+    const company = withStaticData(companies.find(c => c.id === selected) || {})
     const holding = portfolio.find(p => p.companyId === selected)
-    if (company) return (
+    if (company?.id) return (
       <div style={{ position: 'relative', minHeight: '100%' }}>
         <CompanyDetail company={company} holding={holding} mode={mode} onBack={() => setSelected(null)} />
         <AnimatePresence>
@@ -2065,7 +2071,8 @@ export default function CallStreet() {
           )}
         </div>
 
-        {visibleCompanies.map((co, i) => {
+        {visibleCompanies.map((rawCo, i) => {
+          const co = withStaticData(rawCo)
           const holding = portfolio.find(p => p.companyId === co.id)
           const change = pctChange(co.priceHistory)
           const up = change >= 0
