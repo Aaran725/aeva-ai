@@ -5393,7 +5393,7 @@ function ChatBubble({ msg, deepDiveCards, onDismissCard, isLight = false, isWidg
                 style={{ display: 'block', maxWidth: 220, maxHeight: 220, borderRadius: 12, objectFit: 'cover', marginBottom: msg.text ? 10 : 0, border: '1px solid rgba(255,255,255,0.15)' }}
               />
             )}
-            {msg.text && <span style={{ fontSize: 15, lineHeight: 1.65, whiteSpace: 'pre-wrap', fontWeight: 400 }}>{msg.text}</span>}
+            {msg.text && <span style={{ fontSize: 15, lineHeight: 1.65, whiteSpace: 'pre-wrap', fontWeight: 400 }}>{msg.text.replace(/\n\n\[Node:.*?\]$/s, '')}</span>}
           </div>
         ) : (
           <>
@@ -6119,6 +6119,7 @@ function ChatView({ onBack }) {
   const socraticExchangeRef = useRef(0)
   const [feynmanOpen, setFeynmanOpen] = useState(false)
   const [toolsMenuOpen, setToolsMenuOpen] = useState(false)
+  const [mobileOverflowOpen, setMobileOverflowOpen] = useState(false)
 
   // ── Calibration state ─────────────────────────────────────────────────────
   const calibrationStore = useCalibrationStore()
@@ -7729,7 +7730,12 @@ Rules:
     if (/\bexample\b|\bshow me\b|\bgive me a\b|\binstance\b|\bfor instance\b/i.test(userText)) bumpLearningStyle('exampleFirst')
     if (/^\s*why\b/i.test(userText) || /\bwhy\b.{0,20}(does|is|do|would|should)/i.test(userText)) bumpLearningStyle('conceptual')
 
-    const userMsg = { role: 'user', text: userText }
+    // Inject node topic into every user turn during node sessions — prevents AI drift
+    const activeNodeNow = useRoadmapStore.getState().activeNodeSession
+    const injectSuffix = activeNodeNow && !userText.includes('[Node:')
+      ? `\n\n[Node: "${activeNodeNow.topic}"]`
+      : ''
+    const userMsg = { role: 'user', text: userText + injectSuffix }
     const allMessages = [...messages, userMsg]
     // Fix 3: cap history at 20 messages — older context is captured by session memory
     const history = allMessages.slice(-20)
@@ -8915,8 +8921,8 @@ If no clear changes: {"changes":[]}`
           )}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, overflow: 'visible', maxWidth: isMobile ? '60%' : 'none' }}>
-            {/* Live adaptation pill (tutor mode) */}
-            {!isMission && (() => {
+            {/* Live adaptation pill (tutor mode) — desktop only */}
+            {!isMission && !isMobile && (() => {
               const DIMS = ['analogical', 'visual', 'structural', 'exampleFirst', 'conceptual']
               const confidence = Math.min(100, Math.round((learningStyleTotal / 15) * 100))
               const dom = DIMS.reduce((best, d) => (learningStyle[d] > (learningStyle[best] || 0) ? d : best), DIMS[0])
@@ -8941,8 +8947,72 @@ If no clear changes: {"changes":[]}`
               )
             })()}
 
-            {/* ── Tools pill — consolidates Socratic, Library, Study Guide, Feynman ── */}
-            {!isMission && (
+            {/* Mobile: ··· overflow button consolidates Tools + History + Settings */}
+            {!isMission && isMobile && (
+              <div style={{ position: 'relative' }}>
+                {mobileOverflowOpen && (
+                  <div onClick={() => setMobileOverflowOpen(false)}
+                    style={{ position: 'fixed', inset: 0, zIndex: 9996 }} />
+                )}
+                <motion.button
+                  whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }}
+                  onClick={() => setMobileOverflowOpen(v => !v)}
+                  style={{ width: 32, height: 32, borderRadius: 10, background: mobileOverflowOpen ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.14)', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 800, letterSpacing: '-0.04em' }}
+                >
+                  ···
+                </motion.button>
+                <AnimatePresence>
+                  {mobileOverflowOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -6, scale: 0.94 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -4, scale: 0.94 }}
+                      transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                      style={{ position: 'fixed', top: 52, right: 12, zIndex: 9997, background: 'rgba(8,9,24,0.97)', border: '1px solid rgba(255,255,255,0.11)', borderRadius: 16, padding: 6, backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)', boxShadow: '0 16px 48px rgba(0,0,0,0.65)', minWidth: 210, fontFamily: "'Inter', system-ui, sans-serif" }}
+                    >
+                      {/* Tools section */}
+                      <div style={{ padding: '6px 10px 3px', fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.10em', textTransform: 'uppercase' }}>Tools</div>
+                      <button onClick={() => { toggleSocratic(); setMobileOverflowOpen(false) }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, cursor: 'pointer', border: 'none', background: socraticActive ? 'rgba(167,139,250,0.14)' : 'transparent' }}>
+                        <Brain size={13} color={socraticActive ? '#C4B5FD' : 'rgba(255,255,255,0.40)'} />
+                        <span style={{ fontSize: 12.5, fontWeight: 700, color: socraticActive ? '#C4B5FD' : 'rgba(255,255,255,0.80)' }}>Socratic</span>
+                        {socraticActive && <div style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: '50%', background: '#C4B5FD' }} />}
+                      </button>
+                      <button onClick={() => { setLibraryOpen(true); setMobileOverflowOpen(false) }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, cursor: 'pointer', border: 'none', background: 'transparent' }}>
+                        <BookOpen size={13} color="rgba(167,139,250,0.60)" />
+                        <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.80)' }}>Library</span>
+                      </button>
+                      <button onClick={() => { setStudyGuideOpen(true); setMobileOverflowOpen(false) }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, cursor: 'pointer', border: 'none', background: 'transparent' }}>
+                        <FileText size={13} color="rgba(255,255,255,0.38)" />
+                        <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.80)' }}>Study Guide</span>
+                      </button>
+                      <button onClick={() => { setFeynmanOpen(true); setMobileOverflowOpen(false) }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, cursor: 'pointer', border: 'none', background: 'transparent' }}>
+                        <Zap size={13} color="rgba(245,158,11,0.65)" />
+                        <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.80)' }}>Feynman</span>
+                      </button>
+                      <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '4px 8px' }} />
+                      {/* History + Settings */}
+                      <button onClick={() => { setHistoryOpen(true); setMobileOverflowOpen(false) }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, cursor: 'pointer', border: 'none', background: 'transparent' }}>
+                        <Clock size={13} color="rgba(255,255,255,0.40)" />
+                        <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.80)' }}>History</span>
+                      </button>
+                      <button onClick={() => { setChatAppSettingsOpen(true); setMobileOverflowOpen(false) }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, cursor: 'pointer', border: 'none', background: 'transparent' }}>
+                        <Settings size={13} color="rgba(255,255,255,0.40)" />
+                        <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.80)' }}>Settings</span>
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+
+            {/* ── Tools pill — desktop only; mobile uses ··· overflow ── */}
+            {!isMission && !isMobile && (
               <div style={{ position: 'relative' }}>
                 {/* Backdrop: click outside to close */}
                 {toolsMenuOpen && (
@@ -9116,8 +9186,8 @@ If no clear changes: {"changes":[]}`
                 </AnimatePresence>
               </div>
             )}
-            {/* History button */}
-            {!isMission && (
+            {/* History button — desktop only */}
+            {!isMission && !isMobile && (
               <motion.button
                 data-spotlight-id="chat-history"
                 whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }}
@@ -9135,8 +9205,8 @@ If no clear changes: {"changes":[]}`
               </motion.button>
             )}
 
-            {/* Widget layout toggle and theme moved to Settings (⚙) → Chat layout section */}
-            {/* Appearance gear */}
+            {/* Appearance gear — desktop only */}
+            {!isMobile && (
             <motion.button
               whileHover={{ scale: 1.08, rotate: 45 }} whileTap={{ scale: 0.94 }}
               onClick={() => setChatAppSettingsOpen(true)}
@@ -9144,6 +9214,7 @@ If no clear changes: {"changes":[]}`
             >
               <Settings size={12} />
             </motion.button>
+            )}
             <div style={{ width: 24, height: 24, borderRadius: 8, background: 'linear-gradient(135deg, #2D308E 0%, #E9A364 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(45,48,142,0.45)' }}>
               <Star size={11} color="white" fill="white" />
             </div>
@@ -9396,7 +9467,10 @@ If no clear changes: {"changes":[]}`
                     >
                       <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.10em', textTransform: 'uppercase' }}>Pick up where you left off</div>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-                        {Object.entries(calibrationStore.results).map(([subject, result]) => {
+                        {(isMobile
+                          ? Object.entries(calibrationStore.results).slice(0, 1)
+                          : Object.entries(calibrationStore.results)
+                        ).map(([subject, result]) => {
                           const icon = SUBJECT_ICONS[subject] || '📚'
                           const label = SUBJECT_LABELS[subject] || subject
                           const nextNode = result.nextTopic ? CALIBRATION_MAP[subject]?.[result.nextTopic] : null
@@ -9422,6 +9496,17 @@ If no clear changes: {"changes":[]}`
                             </motion.button>
                           )
                         })}
+                        {/* On mobile show count badge instead of all chips */}
+                        {isMobile && Object.keys(calibrationStore.results).length > 1 && (
+                          <motion.button
+                            whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.96 }}
+                            onClick={() => setCalibSubjectPicker(true)}
+                            style={{ padding: '9px 14px', borderRadius: 99, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.35)', fontSize: 12, fontWeight: 600 }}
+                          >
+                            +{Object.keys(calibrationStore.results).length - 1} more
+                          </motion.button>
+                        )}
+                        {!isMobile && (
                         <motion.button
                           whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.96 }}
                           onClick={() => setCalibSubjectPicker(true)}
@@ -9429,6 +9514,7 @@ If no clear changes: {"changes":[]}`
                         >
                           + Add subject
                         </motion.button>
+                        )}
                       </div>
                     </motion.div>
                   )}
