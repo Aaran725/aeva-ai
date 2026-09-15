@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, createContext, useContext, lazy, Suspense } from 'react'
+import ErrorBoundary from './ErrorBoundary'
+import { buildNodeSessionPrompt } from './promptEngine'
 import { GROQ_KEYS, GROQ_URL, nextGroqKey } from './groqClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import katex from 'katex'
@@ -7974,8 +7976,23 @@ Rules:
             handleCalibCriticResult(understanding)
           }
         } else {
-          // nodeCtx first so it's never truncated — it's the most critical context in a node session
-          systemPrompt = nodeCtx + feedbackPrefix + orbPrefix + buildAevaPrompt(sessionState, criticResult, name, null, fullMemory + roadmapCtx, extras, T.aevaLanguageDirective, detectedSubject)
+          const activeNode = useRoadmapStore.getState().activeNodeSession
+          const activeRm   = useRoadmapStore.getState().getActive()
+          const daysLeft   = activeRm?.examDate
+            ? Math.max(0, Math.ceil((new Date(activeRm.examDate) - Date.now()) / 86400000))
+            : 0
+
+          if (activeNode) {
+            // Node session: use lean focused prompt — no 9000-char general prompt competing with it
+            systemPrompt = feedbackPrefix + buildNodeSessionPrompt(
+              activeNode, name, activeRm?.title || '', daysLeft, recallBlock
+            )
+          } else {
+            systemPrompt = feedbackPrefix + orbPrefix + buildAevaPrompt(
+              sessionState, criticResult, name, null,
+              fullMemory + roadmapCtx, extras, T.aevaLanguageDirective, detectedSubject
+            )
+          }
         }
 
         if (socraticActive && !calibMode) {
@@ -11752,26 +11769,27 @@ export default function App() {
       <ChaosEventBanner />
       <ProTipBanner />
       {/* Global hubs — rendered at root so they work from both dashboard AND chat */}
-      <ArcadeHub />
-      <LabHub />
-      <RoadmapHub />
+      <ErrorBoundary label="Arcade"><ArcadeHub /></ErrorBoundary>
+      <ErrorBoundary label="Lab"><LabHub /></ErrorBoundary>
+      <ErrorBoundary label="Roadmap"><RoadmapHub /></ErrorBoundary>
       {/* Study With Me — always mounted so timer survives navigation */}
-      <StudyWithMe />
+      <ErrorBoundary label="Study With Me"><StudyWithMe /></ErrorBoundary>
       {/* Exam Simulator — always mounted so it can intercept aeva:open-exam events */}
-      <ExamSimulator />
+      <ErrorBoundary label="Exam Simulator"><ExamSimulator /></ErrorBoundary>
 
       {/* Calibration overlays are rendered inside ChatView (where calibTick etc. are in scope) */}
       {/* Study Room — always mounted so live session survives navigation */}
       <StudyRoom />
       <AnimatePresence mode="wait" initial={false}>
         {view === 'dashboard'
-          ? <DashboardView
-              key="dashboard"
-              onChatOpen={() => setView('chat')}
-              onSignOut={() => supabase.auth.signOut()}
-              onCalibrate={() => setView('calibration')}
-              onTextbook={() => setView('textbook')}
-            />
+          ? <ErrorBoundary key="dashboard" label="Dashboard">
+              <DashboardView
+                onChatOpen={() => setView('chat')}
+                onSignOut={() => supabase.auth.signOut()}
+                onCalibrate={() => setView('calibration')}
+                onTextbook={() => setView('textbook')}
+              />
+            </ErrorBoundary>
           : view === 'calibration'
             ? <CalibrationHub
                 key="calibration"
