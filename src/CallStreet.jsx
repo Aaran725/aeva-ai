@@ -1121,31 +1121,61 @@ function CompanyDetail({ company, holding, mode, onBack }) {
           </div>
         )}
 
-        {/* Research report — radar chart */}
-        <div style={{ position: 'relative', marginBottom: 12 }}>
-          <div style={{ background: 'rgba(74,222,128,0.04)', border: `1px solid ${company.reportUnlocked ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.07)'}`, borderRadius: 12, padding: '12px 12px 8px' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: company.reportUnlocked ? '#4ADE80' : 'rgba(255,255,255,0.2)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
-              <Star size={11} /> Analyst Report — {company.name}
-            </div>
-            {company.reportUnlocked && (
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', marginBottom: 4, textAlign: 'center' }}>
-                {company._founderScore > 0.75 && company._revGrowth > 0.2 ? '🟢 Recommendation: BUY' : company._profitMargin < -0.1 ? '🔴 Recommendation: CAUTION' : '🟡 Recommendation: HOLD'}
+        {/* CEO Card */}
+        {company.ceo && (
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '13px 14px', marginBottom: 10 }}>
+            <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.25)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 10 }}>Executive Leadership</div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 11, marginBottom: 10 }}>
+              <div style={{ width: 42, height: 42, borderRadius: 12, background: theme.bg, border: `1px solid ${theme.glow}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, flexShrink: 0 }}>{company.emoji}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginBottom: 4 }}>{company.ceo.name}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {(() => {
+                    const rc = { 'A+': '#4ADE80', A: '#86EFAC', 'A-': '#BEF264', 'B+': '#FCD34D', B: '#FBBF24' }[company.ceo.rating] || '#fff'
+                    return <span style={{ fontSize: 10, fontWeight: 800, color: rc, background: rc + '18', border: `1px solid ${rc}33`, borderRadius: 6, padding: '2px 8px' }}>CEO {company.ceo.rating}</span>
+                  })()}
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)' }}>Chief Executive Officer</span>
+                </div>
               </div>
-            )}
-            <RadarChart company={company} unlocked={company.reportUnlocked} />
+            </div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', lineHeight: 1.65, marginBottom: 10 }}>{company.ceo.background}</div>
+            <div style={{ padding: '9px 12px', background: theme.bg, border: `1px solid ${theme.glow}`, borderRadius: 10, borderLeft: `3px solid ${theme.accent}` }}>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontStyle: 'italic', lineHeight: 1.6 }}>"{company.ceo.quote}"</div>
+            </div>
           </div>
-          {!company.reportUnlocked && (
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRadius: 12, backdropFilter: 'blur(2px)' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#D4AF37', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
-                <Lock size={13} /> Fundamentals locked
+        )}
+
+        {/* Fundamentals grid — always visible, no paywall */}
+        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '13px 14px', marginBottom: 10 }}>
+          <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.25)', letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 10 }}>Key Fundamentals</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 7 }}>
+            {[
+              { l: 'P/E Ratio',    v: company.pe != null ? `${company.pe}×` : 'N/A (loss)', c: company.pe != null && company.pe < 50 ? '#4ADE80' : '#FBBF24' },
+              { l: 'Rev. Growth',  v: `+${Math.round((company._revGrowth || 0) * 100)}%`, c: (company._revGrowth || 0) > 0.25 ? '#4ADE80' : (company._revGrowth || 0) > 0.1 ? '#FBBF24' : '#F87171' },
+              { l: 'Profit Margin',v: company._profitMargin >= 0 ? `+${Math.round(company._profitMargin * 100)}%` : `${Math.round(company._profitMargin * 100)}%`, c: company._profitMargin > 0.1 ? '#4ADE80' : company._profitMargin > 0 ? '#FBBF24' : '#F87171' },
+              { l: 'Debt Ratio',   v: `${Math.round((company._debtRatio || 0) * 100)}%`, c: (company._debtRatio || 0) < 0.3 ? '#4ADE80' : (company._debtRatio || 0) < 0.5 ? '#FBBF24' : '#F87171' },
+              { l: 'Analyst Target', v: company.targetPrice ? `₳${company.targetPrice}` : '—', c: company.targetPrice > company.price ? '#4ADE80' : '#F87171' },
+              { l: 'Beta',         v: company.beta ?? '—', c: (company.beta || 1) > 1.8 ? '#F87171' : (company.beta || 1) > 1.2 ? '#FBBF24' : '#94a3b8' },
+            ].map(m => (
+              <div key={m.l} style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 9, padding: '7px 9px' }}>
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.28)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 3 }}>{m.l}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: m.c, letterSpacing: '-0.02em' }}>{m.v}</div>
               </div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Hold 5 days to unlock free</div>
-              <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={handleResearch}
-                style={{ padding: '10px 22px', borderRadius: 10, border: '1px solid rgba(212,175,55,0.5)', background: 'rgba(212,175,55,0.18)', color: '#D4AF37', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>
-                Unlock for ₳25
-              </motion.button>
-            </div>
-          )}
+            ))}
+          </div>
+          {/* Analyst rating badge */}
+          {company.analystRating && (() => {
+            const rc = { 'STRONG BUY': '#4ADE80', BUY: '#86EFAC', HOLD: '#FCD34D', SELL: '#F87171', SPECULATIVE: '#F472B6' }[company.analystRating] || '#fff'
+            const upside = company.targetPrice ? Math.round(((company.targetPrice - company.price) / company.price) * 100) : null
+            return (
+              <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 11, fontWeight: 800, color: rc, background: rc + '15', border: `1px solid ${rc}30`, borderRadius: 8, padding: '4px 12px', letterSpacing: '.04em' }}>
+                  {company.analystRating}
+                </span>
+                {upside !== null && <span style={{ fontSize: 11, color: upside >= 0 ? '#4ADE80' : '#F87171', fontWeight: 600 }}>{upside >= 0 ? '+' : ''}{upside}% to target</span>}
+              </div>
+            )
+          })()}
         </div>
 
         {/* Company news — Aeva lesson inline below each item */}
@@ -2063,40 +2093,38 @@ export default function CallStreet() {
                   style={{ position: 'absolute', inset: 0, borderRadius: 12, background: flashMap[co.id] === 'up' ? 'rgba(74,222,128,0.22)' : 'rgba(248,113,113,0.22)', pointerEvents: 'none' }}
                 />
               )}
-              <span style={{ fontSize: 20, flexShrink: 0 }}>{co.emoji}</span>
+              <div style={{ width: 38, height: 38, borderRadius: 11, background: SECTOR_THEME[co.sector]?.bg || 'rgba(255,255,255,0.06)', border: `1px solid ${SECTOR_THEME[co.sector]?.glow || 'rgba(255,255,255,0.1)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>{co.emoji}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{co.name}</span>
-                  {co.isStartup && <span style={{ fontSize: 9, color: '#fb923c', fontWeight: 700, padding: '1px 5px', background: 'rgba(251,146,60,0.12)', borderRadius: 4 }}>STARTUP</span>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>{co.ticker}</span>
+                  {co.analystRating && (() => {
+                    const rc = { 'STRONG BUY': '#4ADE80', BUY: '#86EFAC', HOLD: '#FCD34D', SELL: '#F87171', SPECULATIVE: '#F472B6' }[co.analystRating] || '#fff'
+                    return <span style={{ fontSize: 8, fontWeight: 800, color: rc, background: rc + '18', border: `1px solid ${rc}28`, borderRadius: 5, padding: '1px 5px', letterSpacing: '.04em' }}>{co.analystRating.replace('STRONG BUY', 'STR BUY')}</span>
+                  })()}
+                  {co.isStartup && <span style={{ fontSize: 8, color: '#fb923c', fontWeight: 800, padding: '1px 5px', background: 'rgba(251,146,60,0.12)', borderRadius: 4 }}>STARTUP</span>}
                   {isHot && <span style={{ fontSize: 9, color: SECTOR_THEME[co.sector]?.accent || '#D4AF37', fontWeight: 700 }}>🔥</span>}
                   {co._lastFundamentalEvent?.season === season && (
-                    <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: co._lastFundamentalEvent.positive ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)', color: co._lastFundamentalEvent.positive ? '#4ADE80' : '#F87171' }}>
+                    <span style={{ fontSize: 8, fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: co._lastFundamentalEvent.positive ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)', color: co._lastFundamentalEvent.positive ? '#4ADE80' : '#F87171' }}>
                       {co._lastFundamentalEvent.positive ? '↑' : '↓'} {co._lastFundamentalEvent.label}
                     </span>
                   )}
                 </div>
-                {overlay ? (
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span>{overlay.label}: {overlay.value}</span>
-                    <span style={{ color: overlay.note?.includes('Undervalued') ? '#4ADE80' : overlay.note?.includes('Pricey') || overlay.note?.includes('Slow') ? '#F87171' : 'rgba(255,255,255,0.35)' }}>· {overlay.note}</span>
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 1 }}>{co.ticker} · {co.sector}</div>
-                )}
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.38)', marginBottom: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.name}</div>
+                <div style={{ fontSize: 9, color: SECTOR_THEME[co.sector]?.accent || 'rgba(255,255,255,0.25)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em' }}>
+                  {co.sector}{co.targetPrice && co.price && <span style={{ color: co.targetPrice > co.price ? '#4ADE80' : '#F87171', marginLeft: 6 }}>{co.targetPrice > co.price ? '+' : ''}{Math.round(((co.targetPrice - co.price) / co.price) * 100)}% to target</span>}
+                </div>
               </div>
-              <div style={{ flexShrink: 0, marginRight: 2 }}>
+              <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#D4AF37', letterSpacing: '-0.03em' }}>₳{fmt(co.price)}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: up ? '#4ADE80' : '#F87171' }}>
+                  {up ? '▲' : '▼'}{Math.abs(change)}%
+                </div>
                 <Spark history={co.priceHistory} />
               </div>
               <button onClick={e => { e.stopPropagation(); toggleWatchlist(co.id) }}
                 style={{ padding: '4px', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
                 <Star size={12} fill={isWatched ? '#D4AF37' : 'none'} color={isWatched ? '#D4AF37' : 'rgba(255,255,255,0.18)'} />
               </button>
-              <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 800, color: '#D4AF37' }}>₳{fmt(co.price)}</div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: up ? '#4ADE80' : '#F87171' }}>
-                  {up ? '▲' : '▼'}{Math.abs(change)}%
-                </div>
-              </div>
             </motion.div>
           )
         })}
