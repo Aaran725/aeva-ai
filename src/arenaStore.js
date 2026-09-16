@@ -870,7 +870,7 @@ export const useArenaStore = create((set, get) => ({
       : ''
 
     // ── Main question generation ─────────────────────────────────────────────────
-    const prompt = `Generate ${settings.questionCount} multiple choice quiz questions about "${settings.topic}". Difficulty: ${diffDesc}. Rate your confidence that each answer is factually correct (0.0=uncertain, 1.0=certain).${contextBlock}Return ONLY a JSON array, no markdown:\n[{"q":"...","choices":["A","B","C","D"],"correct":0,"explain":"one concise sentence","confidence":0.9,"category":"Biology"}]`
+    const prompt = `${diffDesc}\n\nNow generate exactly ${settings.questionCount} multiple choice quiz questions about "${settings.topic}" at the difficulty level described above. You MUST strictly follow the difficulty instructions — do not make questions harder or easier than specified. Rate your confidence that each answer is factually correct (0.0=uncertain, 1.0=certain).${contextBlock}Return ONLY a JSON array, no markdown, no explanation:\n[{"q":"...","choices":["A","B","C","D"],"correct":0,"explain":"one concise sentence","confidence":0.9,"category":"${settings.topic}"}]`
 
     let questions   = []
     let rawResponse = null
