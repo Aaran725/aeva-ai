@@ -879,7 +879,10 @@ export const useArenaStore = create((set, get) => ({
       const res = await fetch(GROQ_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
-        body: JSON.stringify({ model: 'qwen/qwen3.8-27b', messages: [{ role: 'user', content: prompt }], temperature: 0.7, max_tokens: 4000 }),
+        body: JSON.stringify({ model: 'qwen/qwen3.8-27b', messages: [
+          { role: 'system', content: `You are a quiz question generator. You MUST obey two absolute rules:\n1. TOPIC: Every question must be directly about "${settings.topic}". Do not go off-topic, do not use the topic as a minor detail in a question about something else.\n2. DIFFICULTY: ${diffDesc}\nDo not deviate from these rules under any circumstances. If the difficulty says Easy, make it easy. If it says Hard, make it hard but still about the topic.` },
+          { role: 'user', content: prompt }
+        ], temperature: 0.7, max_tokens: 4000 }),
       })
       const d    = await res.json()
       rawResponse = d
