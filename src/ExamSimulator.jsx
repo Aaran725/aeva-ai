@@ -21,7 +21,7 @@ import {
 import { useExamStore, predictGrade, calcMarkLoss } from './examStore'
 import { useRoadmapStore, calcGrade, GRADE_THRESHOLDS } from './roadmapStore'
 import { useAevaControlStore } from './aevaControlStore'
-import { GROQ_URL, nextGroqKey } from './groqClient'
+import { GROQ_URL, nextGroqKey , MODEL_FAST, MODEL_SMART, MODEL_VISION } from './groqClient'
 
 /* ── Groq helpers ──────────────────────────────────────────────────────────── */
 
@@ -59,7 +59,7 @@ Return ONLY valid JSON — no markdown, no extra text:
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
     body: JSON.stringify({
-      model: 'qwen/qwen3.8-27b',
+      model: MODEL_SMART,
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.7,
       max_tokens: 3000,
@@ -100,7 +100,7 @@ Return ONLY valid JSON:
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
     body: JSON.stringify({
-      model: 'qwen/qwen3.8-27b',
+      model: MODEL_SMART,
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.1,
       max_tokens: 500,

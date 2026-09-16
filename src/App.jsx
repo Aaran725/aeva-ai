@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, createContext, useContext, lazy, Suspense } from 'react'
 import ErrorBoundary from './ErrorBoundary'
 import { buildNodeSessionPrompt } from './promptEngine'
-import { GROQ_KEYS, GROQ_URL, nextGroqKey } from './groqClient'
+import { GROQ_KEYS, GROQ_URL, nextGroqKey , MODEL_FAST, MODEL_SMART, MODEL_VISION } from './groqClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
@@ -193,7 +193,7 @@ async function runCalibCritic(questionText, userAnswer) {
   try {
     const res = await groqFetch({
       body: JSON.stringify({
-        model: 'qwen/qwen3.8-27b',
+        model: MODEL_SMART,
         messages: [
           {
             role: 'system',
@@ -259,7 +259,7 @@ async function verifyCriticNone(questionText, userAnswer) {
   try {
     const res = await groqFetch({
       body: JSON.stringify({
-        model: 'qwen/qwen3.8-27b',
+        model: MODEL_SMART,
         messages: [
           {
             role: 'system',
@@ -303,7 +303,7 @@ async function runCalibCriticRubric(questionText, userAnswer) {
   try {
     const res = await groqFetch({
       body: JSON.stringify({
-        model: 'qwen/qwen3.8-27b',
+        model: MODEL_SMART,
         messages: [
           {
             role: 'system',
@@ -377,7 +377,7 @@ Write exactly 3 insights. Each must be ONE sentence. Rules:
 Return ONLY valid JSON: {"insights":["...","...","..."]}`
 
     const res = await groqFetch({
-      body: JSON.stringify({ model: 'qwen/qwen3.8-27b', messages: [{ role: 'user', content: prompt }], temperature: 0.45, max_tokens: 420, response_format: { type: 'json_object' } }),
+      body: JSON.stringify({ model: MODEL_SMART, messages: [{ role: 'user', content: prompt }], temperature: 0.45, max_tokens: 420, response_format: { type: 'json_object' } }),
     })
     if (!res.ok) return []
     const json   = await res.json()
@@ -395,7 +395,7 @@ async function runCritic(history, userMessage) {
 
     const res = await groqFetch({
       body: JSON.stringify({
-        model: 'groq/compound-mini',
+        model: MODEL_FAST,
         messages: [
           {
             role: 'system',
@@ -952,7 +952,7 @@ async function analyzeForOrders(messages, struggleZones, addOrder, setOrderToast
 
     const res = await groqFetch({
       body: JSON.stringify({
-        model: 'groq/compound-mini',
+        model: MODEL_FAST,
         messages: [{
           role: 'user',
           content: `Analyze this tutoring conversation and identify ONE specific knowledge gap worth drilling.
@@ -1057,7 +1057,7 @@ async function summariseSessionBackground(messages, userName, topics, addMemory)
 
     const res = await groqFetch({
       body: JSON.stringify({
-        model: 'groq/compound-mini',
+        model: MODEL_FAST,
         messages: [{
           role: 'user',
           content: `Analyse this tutoring session. Return ONLY valid JSON, no markdown.
@@ -1109,7 +1109,7 @@ async function generateSessionSummary(messages, userName, concepts) {
 
     const res = await groqFetch({
       body: JSON.stringify({
-        model: 'groq/compound-mini',
+        model: MODEL_FAST,
         messages: [{
           role: 'user',
           content: `Analyse this tutoring session and return ONLY valid JSON.
@@ -1154,7 +1154,7 @@ async function generateWorksheet(messages, userName, sessionConcepts) {
 
   const res = await groqFetch({
     body: JSON.stringify({
-      model: 'qwen/qwen3.8-27b',
+      model: MODEL_SMART,
       messages: [{
         role: 'user',
         content: `You are generating a printable student practice worksheet based on a tutoring session.
@@ -1245,7 +1245,7 @@ async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _at
   ]
 
   const body = {
-    model: opts.model || 'qwen/qwen3.8-27b',
+    model: opts.model || MODEL_SMART,
     messages,
     stream: true,
     temperature:       opts.temperature       ?? 0.75,
@@ -1306,7 +1306,7 @@ async function streamGroq(history, systemPrompt, onChunk, signal, opts = {}, _at
 }
 
 /* ── Vision streaming — image + text → llama-4-scout ─────────────────────── */
-const VISION_MODEL = 'qwen/qwen3.8-27b'
+const VISION_MODEL = MODEL_VISION
 
 async function streamGroqVision(base64, mimeType, userText, systemPrompt, onChunk, signal) {
   const key = nextGroqKey()
@@ -4024,7 +4024,7 @@ SYNTAX RULES:
       await streamGroq([], prompt, chunk => {
         raw += chunk
         setDrillText(raw)
-      }, controller.signal, { model: 'qwen/qwen3.8-27b', maxTokens: 300, temperature: 0.5 })
+      }, controller.signal, { model: MODEL_SMART, maxTokens: 300, temperature: 0.5 })
     } catch { /* silent fail */ }
     finally { setLoading(false) }
   }
@@ -4901,7 +4901,7 @@ ${conversationText}`
 
     groqFetch({
       body: JSON.stringify({
-        model: 'groq/compound-mini',
+        model: MODEL_FAST,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.2,
         max_tokens: 700,
@@ -7144,7 +7144,7 @@ Rules:
     try {
       const res = await groqFetch({
         body: JSON.stringify({
-          model: 'groq/compound-mini',
+          model: MODEL_FAST,
           messages: [
             {
               role: 'system',
@@ -7317,7 +7317,7 @@ Rules:
     try {
       const res = await groqFetch({
         body: JSON.stringify({
-          model: 'groq/compound-mini',
+          model: MODEL_FAST,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userMsg },
@@ -8016,7 +8016,7 @@ Rules:
       const streamOpts = isMission
         ? (MISSION_OPTS[activeMode] || {})
         : calibModeRef.current
-          ? { model: 'groq/compound-mini', maxTokens: 20, temperature: 0.4 }  // ack only — tiny + fast
+          ? { model: MODEL_FAST, maxTokens: 20, temperature: 0.4 }  // ack only — tiny + fast
           : {}
 
       await streamGroq(
@@ -8336,7 +8336,7 @@ If no clear changes: {"changes":[]}`
 
             const extractRes = await groqFetch({
               body: JSON.stringify({
-                model: 'groq/compound-mini',
+                model: MODEL_FAST,
                 messages: [{ role: 'user', content: extractionPrompt }],
                 response_format: { type: 'json_object' },
                 temperature: 0,

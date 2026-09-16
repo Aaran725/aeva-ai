@@ -10,6 +10,11 @@ export const GROQ_KEYS = [
 
 export const GROQ_URL = '/api/groq'
 
+// Canonical model names — use these everywhere, never inline strings
+export const MODEL_FAST   = 'llama-3.1-8b-instant'       // quick tasks: acks, commentary, short analysis
+export const MODEL_SMART  = 'llama-3.3-70b-versatile'     // complex reasoning: grading, question gen, analysis
+export const MODEL_VISION = 'meta-llama/llama-4-scout-17b-16e-instruct' // image/vision tasks
+
 let _idx = 0
 export function nextGroqKey() {
   const key = GROQ_KEYS[_idx % GROQ_KEYS.length]

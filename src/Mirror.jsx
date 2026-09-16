@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
+import { MODEL_FAST, MODEL_SMART, MODEL_VISION } from './groqClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Send, Brain, Sparkles, ChevronRight, TrendingUp } from 'lucide-react'
 import { useBrainStore, masteryColor, masteryLabel, SUBJECT_COLORS, categorize } from './brainStore'
@@ -278,7 +279,7 @@ export default function Mirror({ onClose, name }) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
         signal: ab.signal,
         body: JSON.stringify({
-          model: 'qwen/qwen3.8-27b',
+          model: MODEL_SMART,
           messages: [{ role: 'system', content: systemPrompt }, ...history],
           temperature: 0.82,
           max_tokens: 500,

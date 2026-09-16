@@ -5,7 +5,7 @@
  */
 import { create } from 'zustand'
 import { supabase } from './supabase'
-import { nextGroqKey, GROQ_URL } from './groqClient'
+import { nextGroqKey, GROQ_URL , MODEL_FAST, MODEL_SMART, MODEL_VISION } from './groqClient'
 import { useXPStore } from './xpStore'
 
 const TAB_ID = Math.random().toString(36).slice(2, 7)
@@ -948,7 +948,7 @@ Return ONLY a JSON array (same length as input):
         const res  = await fetch(GROQ_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
-          body: JSON.stringify({ model: 'qwen/qwen3.8-27b', messages: [{ role: 'user', content: expertPrompt }], temperature: 0.7, max_tokens: 3000 }),
+          body: JSON.stringify({ model: MODEL_SMART, messages: [{ role: 'user', content: expertPrompt }], temperature: 0.7, max_tokens: 3000 }),
         })
         const d   = await res.json()
         const raw = d.choices[0]?.message?.content?.trim() || '[]'
@@ -1139,7 +1139,7 @@ Return ONLY a JSON array (same length as input):
       const r   = await fetch(GROQ_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
-        body: JSON.stringify({ model: 'qwen/qwen3.8-27b', messages: [{ role: 'user', content: `You are Aeva, a sharp and slightly ruthless quiz host. ${ctx}.${histCtx} One sentence, max 12 words, no emojis, no quotes. Reference a player's history if it's ironic or savage.` }], max_tokens: 40, temperature: 1.0 }),
+        body: JSON.stringify({ model: MODEL_FAST, messages: [{ role: 'user', content: `You are Aeva, a sharp and slightly ruthless quiz host. ${ctx}.${histCtx} One sentence, max 12 words, no emojis, no quotes. Reference a player's history if it's ironic or savage.` }], max_tokens: 40, temperature: 1.0 }),
       })
       const d   = await r.json()
       aevaLine  = d.choices[0]?.message?.content?.trim() || ''

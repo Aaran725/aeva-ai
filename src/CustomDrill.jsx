@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { MODEL_FAST, MODEL_SMART, MODEL_VISION } from './groqClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ArrowRight, CheckCircle, BookOpen, ChevronRight } from 'lucide-react'
 import { useLibraryStore } from './libraryStore'
@@ -274,7 +275,7 @@ export default function CustomDrill({ onClose, preloadedSession = null }) {
         signal: abortRef.current.signal,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
         body: JSON.stringify({
-          model: 'qwen/qwen3.8-27b',
+          model: MODEL_SMART,
           temperature: 0.2,
           max_tokens: 900,
           messages: [{ role: 'user', content: buildPrompt(text) }],

@@ -11,7 +11,7 @@ import { useSRStore } from './srStore'
 import { supabase } from './supabase'
 import { useXPStore } from './xpStore'
 import { useAevaControlStore } from './aevaControlStore'
-import { nextGroqKey as gKey, GROQ_URL, GROQ_KEYS } from './groqClient'
+import { nextGroqKey as gKey, GROQ_URL, GROQ_KEYS , MODEL_FAST, MODEL_SMART, MODEL_VISION } from './groqClient'
 
 async function groqFetch(init, attempt = 0) {
   const MAX = GROQ_KEYS.length * 2
@@ -98,7 +98,7 @@ ORDER: strict prerequisites — foundational concepts always before applications
 
   const res = await groqFetch({
     body: JSON.stringify({
-      model: 'qwen/qwen3.8-27b',
+      model: MODEL_SMART,
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
       temperature: 0.3,
@@ -1139,7 +1139,7 @@ Rules: 2-4 tasks. Focus on current topic. If weak areas exist, add a review task
 
   const res = await groqFetch({
     body: JSON.stringify({
-      model: 'groq/compound-mini',
+      model: MODEL_FAST,
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
       temperature: 0.4, max_tokens: 400,
@@ -1990,7 +1990,7 @@ function GapAnalysisPanel({ nodes, drillHistory, onDrill, onRelearn }) {
 async function generateGateQuestions(topic, difficulty = 2) {
   const res = await groqFetch({
     body: JSON.stringify({
-      model: 'groq/compound-mini',
+      model: MODEL_FAST,
       messages: [{ role: 'user', content: `Write exactly 3 multiple-choice questions to check understanding of "${topic}". Vary the difficulty: first easy (${Math.max(1,difficulty-1)}/5), then medium (${difficulty}/5), then harder (${Math.min(5,difficulty+1)}/5).
 Return ONLY valid JSON: { "questions": [ { "q": "Question text?", "options": ["A","B","C","D"], "answer": 0, "explanation": "One sentence why correct." }, ... ] }
 Rules: answer is 0-based index. Options under 14 words each. No markdown. Make each question test a different aspect of the topic.` }],
@@ -2329,7 +2329,7 @@ async function generateExamQuestion(topic, roadmapTitle, difficulty = 2) {
 
   const res = await groqFetch({
     body: JSON.stringify({
-      model: 'groq/compound-mini',
+      model: MODEL_FAST,
       messages: [{ role: 'user', content: `Write one exam-style question on "${topic}" for ${roadmapTitle}. Command word: "${cmd}". Marks: ${marks}. Make it specific — include numbers, context, or a scenario where appropriate. No multiple choice. Return ONLY valid JSON: { "question": "Full question text here.", "marks": ${marks}, "markScheme": ["Mark scheme point 1 (1 mark)", "Mark scheme point 2 (1 mark)", "Mark scheme point 3 (1 mark)"] }. Include exactly ${marks} mark scheme bullet points. Keep question under 60 words.` }],
       response_format: { type: 'json_object' },
       temperature: 0.5,
@@ -2343,7 +2343,7 @@ async function generateExamQuestion(topic, roadmapTitle, difficulty = 2) {
 async function gradeExamAnswer(question, marks, markScheme, studentAnswer) {
   const res = await groqFetch({
     body: JSON.stringify({
-      model: 'qwen/qwen3.8-27b',
+      model: MODEL_SMART,
       messages: [{ role: 'user', content: `You are an exam marker. Grade this student answer strictly against the mark scheme.
 
 Question: ${question}

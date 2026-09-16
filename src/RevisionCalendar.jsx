@@ -6,8 +6,8 @@ import { useRoadmapStore } from './roadmapStore'
 import { useUITheme } from './uiThemeStore'
 import { useAevaControlStore } from './aevaControlStore'
 import { useExamStore } from './examStore'
-import { nextGroqKey as gKey, GROQ_URL } from './groqClient'
-import { GROQ_KEYS } from './groqClient'
+import { nextGroqKey as gKey, GROQ_URL , MODEL_FAST, MODEL_SMART, MODEL_VISION } from './groqClient'
+import { GROQ_KEYS , MODEL_FAST, MODEL_SMART, MODEL_VISION } from './groqClient'
 
 async function groqFetch(init, attempt = 0) {
   const MAX = GROQ_KEYS.length * 2
@@ -114,7 +114,7 @@ function AIEditBar({ schedule, weekStart, onApplyEdit }) {
     try {
       const res = await groqFetch({
         body: JSON.stringify({
-          model: 'groq/compound-mini',
+          model: MODEL_FAST,
           messages: [{ role: 'user', content: `Parse this revision schedule edit request into actions.
 
 Current week schedule:

@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ArrowRight, Check, RefreshCw } from 'lucide-react'
-import { nextGroqKey, GROQ_URL, GROQ_KEYS } from './groqClient'
+import { nextGroqKey, GROQ_URL, GROQ_KEYS , MODEL_FAST, MODEL_SMART, MODEL_VISION } from './groqClient'
 
 async function groqFetch(init, attempt = 0) {
   const MAX = GROQ_KEYS.length * 2
@@ -378,7 +378,7 @@ export default function SOSMode({ onClose }) {
         signal: ac.signal,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
         body: JSON.stringify({
-          model: 'qwen/qwen3.8-27b',
+          model: MODEL_SMART,
           messages: [
             { role: 'system', content: 'You are Aeva, an expert tutor. Explain clearly and concisely. Use simple, plain language. Give one analogy if it helps. Be direct — no intro fluff, no "Great question!". Max 180 words.' },
             { role: 'user', content: `Explain "${t}" simply. I genuinely don't understand it.` },
@@ -411,7 +411,7 @@ export default function SOSMode({ onClose }) {
       // Generate 3 questions
       const qRes = await groqFetch({
         body: JSON.stringify({
-          model: 'groq/compound-mini',
+          model: MODEL_FAST,
           messages: [{
             role: 'user',
             content: `Based on this explanation of "${t}":\n\n${text}\n\nGenerate exactly 3 multiple choice questions. Return ONLY valid JSON:\n{"questions":[{"q":"question","options":["A) opt","B) opt","C) opt","D) opt"],"correct":0}]}\ncorrect is the 0-based index. Make questions progressively harder.`,

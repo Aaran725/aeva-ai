@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useStudyRoomStore, SLOT_COLORS } from './studyRoomStore'
 import { useXPStore } from './xpStore'
 import { supabase } from './supabase'
-import { GROQ_URL, nextGroqKey } from './groqClient'
+import { GROQ_URL, nextGroqKey , MODEL_FAST, MODEL_SMART, MODEL_VISION } from './groqClient'
 import {
   X, Users, Zap, Clock, Copy, Check, Star, Send,
   Minimize2, ArrowLeft, Trophy, Brain, Flame, Eye,
@@ -1458,7 +1458,7 @@ function StatsScreen() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
           body: JSON.stringify({
-            model: 'groq/compound-mini',
+            model: MODEL_FAST,
             messages: [{ role: 'user', content:
               `You are Aeva. Write a 2-sentence session verdict. Be direct, no emojis.
 Mode: ${modeInfo?.label}. Focus: ${focusPct}%. XP: ${totalXP}. Subject: ${subject || 'mixed'}.

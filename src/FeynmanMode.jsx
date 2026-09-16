@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { MODEL_FAST, MODEL_SMART, MODEL_VISION } from './groqClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, Send, X } from 'lucide-react'
 import { useNeuralStore } from './neuralStore'
@@ -74,7 +75,7 @@ Be precise. Generic feedback is useless.`
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
       body: JSON.stringify({
-        model: 'groq/compound-mini',
+        model: MODEL_FAST,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.15,
         max_tokens: 500,
@@ -112,7 +113,7 @@ async function streamStudentResponse(history, topic, onChunk, signal) {
     method: 'POST', signal,
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
-      model: 'qwen/qwen3.8-27b',
+      model: MODEL_SMART,
       messages,
       stream: true,
       temperature: 0.88,

@@ -6,6 +6,7 @@
  *   quiz        — 3 MCQ questions on a topic, need 2/3 to pass
  */
 import { useState, useEffect, useRef } from 'react'
+import { MODEL_FAST, MODEL_SMART, MODEL_VISION } from './groqClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Star, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 import { useAevaControlStore } from './aevaControlStore'
@@ -32,7 +33,7 @@ Rules: questions should be challenging but fair. correct is the 0-based index of
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
-      model: 'groq/compound-mini',
+      model: MODEL_FAST,
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
       temperature: 0.5,

@@ -8,7 +8,7 @@
 
 import React, { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { GROQ_URL, nextGroqKey } from './groqClient'
+import { GROQ_URL, nextGroqKey , MODEL_FAST, MODEL_SMART, MODEL_VISION } from './groqClient'
 import { useXPStore } from './xpStore'
 
 /* ── Constants ────────────────────────────────────────────────────────────── */
@@ -127,7 +127,7 @@ async function groqJSON(prompt, maxTokens = 1400) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${nextGroqKey()}` },
     body: JSON.stringify({
-      model: 'qwen/qwen3.8-27b',
+      model: MODEL_SMART,
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.78,
       max_tokens: maxTokens,

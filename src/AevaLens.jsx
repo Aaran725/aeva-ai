@@ -7,13 +7,14 @@
  *              hotspots, expert tip, alternative approach)
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { MODEL_FAST, MODEL_SMART, MODEL_VISION } from './groqClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Crop, Scan, CheckCircle, Plus, ChevronRight, Send, RotateCcw, Zap, BookOpen } from 'lucide-react'
 import { useLibraryStore } from './libraryStore'
 
 const GROQ_KEY  = import.meta.env.VITE_GROQ_API_KEY
 const GROQ_URL  = 'https://api.groq.com/openai/v1/chat/completions'
-const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct'
+const VISION_MODEL = MODEL_VISION
 
 /* ─── SOLVE prompt ─────────────────────────────────────────────────────────── */
 const SOLVE_PROMPT = `You are Aeva Lens — the best maths and science tutor in the world. Solve this problem completely with full step-by-step working.
@@ -463,7 +464,7 @@ function FollowUpChat({ context, topic }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
         body: JSON.stringify({
-          model: 'qwen/qwen3.8-27b',
+          model: MODEL_SMART,
           messages: [
             {
               role: 'system',

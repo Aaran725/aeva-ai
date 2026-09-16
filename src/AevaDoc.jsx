@@ -14,7 +14,7 @@ import {
   X, Upload, FileText, Send, Loader,
   Star, AlertCircle, RotateCcw, ChevronDown, Palette,
 } from 'lucide-react'
-import { nextGroqKey as gKey, GROQ_URL } from './groqClient'
+import { nextGroqKey as gKey, GROQ_URL , MODEL_FAST, MODEL_SMART, MODEL_VISION } from './groqClient'
 import { CHAT_THEMES } from './chatThemes'
 import * as pdfjsLib from 'pdfjs-dist'
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).href
@@ -22,8 +22,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mi
 // ─── Doc context — passes AI annotation fetch down to equation components ─────
 const DocCtx = createContext(null)
 
-const VISION = 'meta-llama/llama-4-scout-17b-16e-instruct'
-const TEXT   = 'qwen/qwen3.8-27b'
+const VISION = MODEL_VISION
+const TEXT   = MODEL_SMART
 
 // ─── PDF text extraction ──────────────────────────────────────────────────────
 async function extractPDFText(file) {

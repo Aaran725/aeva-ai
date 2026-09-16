@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { MODEL_FAST, MODEL_SMART, MODEL_VISION } from './groqClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, TrendingUp, Sigma, GitBranch, Clock3, Table2, HelpCircle,
@@ -26,7 +27,7 @@ async function canvasExplain(changes, topic) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify({
-        model: 'groq/compound-mini',
+        model: MODEL_FAST,
         messages: [{
           role: 'user',
           content: `Topic: "${topic}". Parameter changed: ${changes.join(', ')}. Write exactly ONE sentence under 20 words explaining what this change means visually or mathematically. Be specific with the numbers. No fluff.`,

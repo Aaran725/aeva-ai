@@ -10,7 +10,7 @@ import { X, Play, Pause, Square, Music, Music2, ChevronUp, ChevronDown } from 'l
 import { useStudyModeStore } from './useStudyModeStore'
 import { useRoadmapStore } from './roadmapStore'
 import { useUITheme } from './uiThemeStore'
-import { GROQ_URL, nextGroqKey } from './groqClient'
+import { GROQ_URL, nextGroqKey , MODEL_FAST, MODEL_SMART, MODEL_VISION } from './groqClient'
 
 /* ── Module-level audio element (one instance, lives forever) ───────────── */
 // Using SomaFM Groove Salad — ambient/chill, always-on, no auth needed
@@ -46,7 +46,7 @@ async function generateBreakQuestion(topic) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
       body: JSON.stringify({
-        model: 'groq/compound-mini',
+        model: MODEL_FAST,
         messages: [
           { role: 'system', content: 'Generate ONE short quiz question to test recall. Output ONLY the question. No preamble, no quotes.' },
           { role: 'user',   content: `Topic: ${topic}. Give a sharp one-sentence recall question.` },
@@ -65,7 +65,7 @@ async function checkAnswer(question, answer, topic) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
       body: JSON.stringify({
-        model: 'groq/compound-mini',
+        model: MODEL_FAST,
         messages: [
           { role: 'system', content: 'Evaluate the student answer in ONE line. Start with ✅, ⚠️, or ❌ then a max 15-word verdict or correction. Nothing else.' },
           { role: 'user',   content: `Topic: ${topic}\nQuestion: ${question}\nAnswer: ${answer}` },

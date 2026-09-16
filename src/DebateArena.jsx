@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { MODEL_FAST, MODEL_SMART, MODEL_VISION } from './groqClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, Send, AlertTriangle, Zap, Shield, X, FileText } from 'lucide-react'
 import { useArcadeStore } from './arcadeStore'
@@ -139,7 +140,7 @@ Be specific, honest, and reference actual arguments made.`
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
-      model: 'groq/compound-mini',
+      model: MODEL_FAST,
       temperature: 0.25,
       max_tokens: 500,
       messages: [{ role: 'user', content: prompt }],
@@ -843,7 +844,7 @@ export default function DebateArena({ onBack }) {
         signal: abortRef.current.signal,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
         body: JSON.stringify({
-          model: 'qwen/qwen3.8-27b',
+          model: MODEL_SMART,
           temperature: activeCfg.level === 'advanced' ? 0.70 : 0.75,
           max_tokens: 280,
           stream: true,

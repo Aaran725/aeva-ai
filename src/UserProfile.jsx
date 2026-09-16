@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { MODEL_FAST, MODEL_SMART, MODEL_VISION } from './groqClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ChevronLeft } from 'lucide-react'
 import { useNeuralStore } from './neuralStore'
@@ -195,7 +196,7 @@ Write a 3-paragraph psychological learning profile of ${name} in second person (
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
       body: JSON.stringify({
-        model: 'qwen/qwen3.8-27b',
+        model: MODEL_SMART,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.78,
         max_tokens: 320,

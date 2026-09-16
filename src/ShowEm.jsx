@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from 'react'
+import { MODEL_FAST, MODEL_SMART, MODEL_VISION } from './groqClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Star, Zap, Flame, Brain, BookOpen, TrendingUp, Award, Printer, MessageSquare, Layers, Send, Loader } from 'lucide-react'
 import { useNeuralStore } from './neuralStore'
@@ -73,7 +74,7 @@ async function callGroqParent(systemPrompt, history) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
-      model: 'qwen/qwen3.8-27b',
+      model: MODEL_SMART,
       messages: [{ role: 'system', content: systemPrompt }, ...history],
       max_tokens: 220,
       temperature: 0.65,
