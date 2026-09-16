@@ -77,25 +77,25 @@ const SHOP_DURATION = 25  // seconds
 // 6.4: Difficulty slider (0-100) → question complexity + time limit
 export function difficultyFromSlider(val) {
   if (val <= 15)  return { key: 'easy',      label: 'Easy',       emoji: '😊', timer: 22, multiplier: 0.8,  color: '#4ADE80',
-    prompt: 'Generate very easy trivia-style questions anyone would know. Topics should be common everyday knowledge — things taught in primary school or that appear in pop culture. Wrong answers must be clearly and obviously wrong, not tricky at all. Questions should be short, simple sentences. Example difficulty: "What is the capital of France?" or "How many sides does a triangle have?"',
+    prompt: 'EASY — Questions must be so simple that almost anyone would know the answer immediately. Short, clear sentences. Wrong answers must be obviously wrong. Example for topic "types of food": "Which of these is a fruit? A) Apple B) Rock C) Shoe D) Table".',
     sabotageFreq: 0.3 }
   if (val <= 30)  return { key: 'normal',    label: 'Normal',     emoji: '🙂', timer: 21, multiplier: 1.0,  color: '#86EFAC',
-    prompt: 'Generate normal difficulty questions that a reasonably informed person would get right if they have basic familiarity with the topic. Wrong answers should be related to the topic but clearly distinguishable from the correct answer. No tricks, no obscure details. Think GCSE / high-school level understanding.',
+    prompt: 'NORMAL — Questions a person with casual knowledge of the topic would usually get right. No tricks, no obscure details. Wrong answers are clearly wrong if you know the topic at all. Example for topic "types of food": "What type of food is sushi traditionally made with? A) Rice B) Pasta C) Bread D) Couscous".',
     sabotageFreq: 0.5 }
   if (val <= 50)  return { key: 'hard',      label: 'Hard',       emoji: '😤', timer: 18, multiplier: 1.3,  color: '#FCD34D',
-    prompt: 'Generate hard questions that require solid knowledge of the topic — beyond casual familiarity. Test specific facts, processes, and relationships that someone would know from studying the subject properly. Wrong answers should be plausible enough that guessing is risky. Think A-level / introductory university level.',
+    prompt: 'HARD — Questions that need solid, studied knowledge of the topic. Test specific facts someone who has studied the topic would know. Wrong answers are plausible but the correct answer is clearly right to someone knowledgeable. Example for topic "types of food": "What distinguishes an Emmental cheese from a Gruyere? A) Emmental has larger holes B) Gruyere is softer C) Emmental is blue-veined D) Gruyere is always smoked".',
     sabotageFreq: 0.7 }
   if (val <= 65)  return { key: 'expert',    label: 'Expert',     emoji: '🧠', timer: 20, multiplier: 1.6,  color: '#FB923C',
-    prompt: 'Generate expert-level questions requiring advanced knowledge. Ask about specific mechanisms, edge cases, precise terminology, and deeper conceptual understanding. Wrong answers should be plausible enough to fool someone with only surface-level knowledge. Think undergraduate final exam or professional certification level.',
+    prompt: 'EXPERT — Questions requiring deep knowledge. Wrong answers are highly plausible and would fool a casual learner. Only someone who has seriously studied the topic would reliably get these right. Test precise facts, technical terms, and specific distinctions within the topic.',
     sabotageFreq: 0.85 }
   if (val <= 80)  return { key: 'savage',    label: 'Savage',     emoji: '💀', timer: 22, multiplier: 2.0,  color: '#F87171',
-    prompt: 'Generate savage difficulty questions requiring deep specialist knowledge. Focus on obscure specific details, counterintuitive facts, precise technical distinctions. Wrong answers should be close enough to the correct answer that only genuine experts can reliably tell them apart. Most people who "know the subject well" should still struggle.',
+    prompt: 'SAVAGE — Questions that would stump most experts. Highly specific obscure details, counterintuitive facts, fine distinctions that only true specialists know. Wrong answers are extremely close to correct — differ by one key detail.',
     sabotageFreq: 1.0 }
   if (val <= 92)  return { key: 'nightmare', label: 'NIGHTMARE',  emoji: '🔥', timer: 24, multiplier: 2.5,  color: '#EF4444',
-    prompt: 'Generate nightmare difficulty questions. These require PhD-level or deep specialist mastery. Exploit nuances that even knowledgeable people get wrong — exceptions to rules, highly specific numerical facts, subtle distinctions between near-identical concepts. Every wrong answer should be something a confident expert might choose.',
+    prompt: 'NIGHTMARE — PhD-level mastery required. Questions exploit edge cases, exceptions to rules, and highly specific technical knowledge that even experts often get wrong. Every wrong answer should be something a confident specialist might defend.',
     sabotageFreq: 1.0 }
   return             { key: 'impossible', label: 'IMPOSSIBLE', emoji: '☠️', timer: 26, multiplier: 3.0,  color: '#DC2626',
-    prompt: 'Generate impossible difficulty questions. Hyper-specific obscure details that only the world\'s leading experts would know. Wrong answers should differ from the correct answer by a single precise word or number, making them nearly indistinguishable without exact specialist knowledge. Getting even one right should feel like an achievement.',
+    prompt: 'IMPOSSIBLE — Hyper-specific details only the world\'s leading authorities would know. Wrong answers differ from the correct answer by a single precise word or figure. Getting even one right is an achievement.',
     sabotageFreq: 1.0 }
 }
 
@@ -870,7 +870,16 @@ export const useArenaStore = create((set, get) => ({
       : ''
 
     // ── Main question generation ─────────────────────────────────────────────────
-    const prompt = `${diffDesc}\n\nNow generate exactly ${settings.questionCount} multiple choice quiz questions about "${settings.topic}" at the difficulty level described above. You MUST strictly follow the difficulty instructions — do not make questions harder or easier than specified. Rate your confidence that each answer is factually correct (0.0=uncertain, 1.0=certain).${contextBlock}Return ONLY a JSON array, no markdown, no explanation:\n[{"q":"...","choices":["A","B","C","D"],"correct":0,"explain":"one concise sentence","confidence":0.9,"category":"${settings.topic}"}]`
+    const systemMsg = `You are a quiz question generator. Follow these two rules without exception:
+1. TOPIC: Every single question must be specifically and directly about "${settings.topic}". Do not drift into tangentially related subjects.
+2. DIFFICULTY: ${diffDesc}
+Return ONLY a valid JSON array. No markdown, no explanation, no extra text.`
+
+    const userMsg = `Generate exactly ${settings.questionCount} multiple choice questions about the topic "${settings.topic}".
+Difficulty level: ${diffDesc.split('—')[0].trim()}
+${contextBlock}
+Each question must be directly about "${settings.topic}". Return ONLY this JSON array:
+[{"q":"question text","choices":["A","B","C","D"],"correct":0,"explain":"one sentence","confidence":0.9,"category":"${settings.topic}"}]`
 
     let questions   = []
     let rawResponse = null
@@ -879,10 +888,10 @@ export const useArenaStore = create((set, get) => ({
       const res = await fetch(GROQ_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nextGroqKey()}` },
-        body: JSON.stringify({ model: 'qwen/qwen3.8-27b', messages: [
-          { role: 'system', content: `You are a quiz question generator. You MUST obey two absolute rules:\n1. TOPIC: Every question must be directly about "${settings.topic}". Do not go off-topic, do not use the topic as a minor detail in a question about something else.\n2. DIFFICULTY: ${diffDesc}\nDo not deviate from these rules under any circumstances. If the difficulty says Easy, make it easy. If it says Hard, make it hard but still about the topic.` },
-          { role: 'user', content: prompt }
-        ], temperature: 0.7, max_tokens: 4000 }),
+        body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [
+          { role: 'system', content: systemMsg },
+          { role: 'user',   content: userMsg },
+        ], temperature: 0.3, max_tokens: 4000 }),
       })
       const d    = await res.json()
       rawResponse = d
