@@ -76,26 +76,26 @@ const SHOP_DURATION = 25  // seconds
 
 // 6.4: Difficulty slider (0-100) → question complexity + time limit
 export function difficultyFromSlider(val) {
-  if (val <= 15)  return { key: 'easy',      label: 'Easy',       emoji: '😊', timer: 18, multiplier: 0.8,  color: '#4ADE80',
-    prompt: 'Generate EASY questions suitable for complete beginners. Questions must test simple recall of well-known facts. Wrong answers must be obviously incorrect — common misconceptions or clearly unrelated terms. No trick questions, no ambiguity. A 10-year-old with basic knowledge should get most correct.',
+  if (val <= 15)  return { key: 'easy',      label: 'Easy',       emoji: '😊', timer: 22, multiplier: 0.8,  color: '#4ADE80',
+    prompt: 'Generate very easy trivia-style questions anyone would know. Topics should be common everyday knowledge — things taught in primary school or that appear in pop culture. Wrong answers must be clearly and obviously wrong, not tricky at all. Questions should be short, simple sentences. Example difficulty: "What is the capital of France?" or "How many sides does a triangle have?"',
     sabotageFreq: 0.3 }
-  if (val <= 30)  return { key: 'normal',    label: 'Normal',     emoji: '🙂', timer: 17, multiplier: 1.0,  color: '#86EFAC',
-    prompt: 'Generate NORMAL difficulty questions. Test genuine understanding, not just surface recall. Wrong answers should be plausible — related terms or common misconceptions — but still distinguishable by someone with solid knowledge. Avoid trick questions.',
+  if (val <= 30)  return { key: 'normal',    label: 'Normal',     emoji: '🙂', timer: 21, multiplier: 1.0,  color: '#86EFAC',
+    prompt: 'Generate normal difficulty questions that a reasonably informed person would get right if they have basic familiarity with the topic. Wrong answers should be related to the topic but clearly distinguishable from the correct answer. No tricks, no obscure details. Think GCSE / high-school level understanding.',
     sabotageFreq: 0.5 }
-  if (val <= 50)  return { key: 'hard',      label: 'Hard',       emoji: '😤', timer: 14, multiplier: 1.3,  color: '#FCD34D',
-    prompt: 'Generate HARD questions that require deep understanding of the topic. Test specific details, cause-and-effect relationships, exceptions to rules, and conceptual distinctions. Wrong answers must be highly plausible — things a casual learner might easily confuse for the correct answer. Someone who "knows the basics" should frequently get these wrong.',
+  if (val <= 50)  return { key: 'hard',      label: 'Hard',       emoji: '😤', timer: 18, multiplier: 1.3,  color: '#FCD34D',
+    prompt: 'Generate hard questions that require solid knowledge of the topic — beyond casual familiarity. Test specific facts, processes, and relationships that someone would know from studying the subject properly. Wrong answers should be plausible enough that guessing is risky. Think A-level / introductory university level.',
     sabotageFreq: 0.7 }
-  if (val <= 65)  return { key: 'expert',    label: 'Expert',     emoji: '🧠', timer: 16, multiplier: 1.6,  color: '#FB923C',
-    prompt: 'Generate EXPERT-LEVEL questions. Focus on obscure but real details, subtle distinctions between closely related concepts, and nuanced edge cases. ALL wrong answers must be dangerously plausible — only someone with expert-level mastery should reliably distinguish them. Questions should feel hard even for people who know the subject well.',
+  if (val <= 65)  return { key: 'expert',    label: 'Expert',     emoji: '🧠', timer: 20, multiplier: 1.6,  color: '#FB923C',
+    prompt: 'Generate expert-level questions requiring advanced knowledge. Ask about specific mechanisms, edge cases, precise terminology, and deeper conceptual understanding. Wrong answers should be plausible enough to fool someone with only surface-level knowledge. Think undergraduate final exam or professional certification level.',
     sabotageFreq: 0.85 }
-  if (val <= 80)  return { key: 'savage',    label: 'Savage',     emoji: '💀', timer: 18, multiplier: 2.0,  color: '#F87171',
-    prompt: 'Generate SAVAGE difficulty questions. These must be genuinely brutal — obscure specifics, counterintuitive facts, precise technical distinctions that only deep domain experts would know. Wrong answers should differ from the correct answer by only a single word, number, or subtle qualifier. Include questions where the obvious-seeming answer is wrong. Expect most players to fail every question.',
+  if (val <= 80)  return { key: 'savage',    label: 'Savage',     emoji: '💀', timer: 22, multiplier: 2.0,  color: '#F87171',
+    prompt: 'Generate savage difficulty questions requiring deep specialist knowledge. Focus on obscure specific details, counterintuitive facts, precise technical distinctions. Wrong answers should be close enough to the correct answer that only genuine experts can reliably tell them apart. Most people who "know the subject well" should still struggle.',
     sabotageFreq: 1.0 }
-  if (val <= 92)  return { key: 'nightmare', label: 'NIGHTMARE',  emoji: '🔥', timer: 20, multiplier: 2.5,  color: '#EF4444',
-    prompt: 'Generate NIGHTMARE difficulty questions. PhD-level specialist knowledge required. Questions must exploit common expert misconceptions, highly specific numerical facts, exceptions within exceptions, and content that contradicts intuition even for experts. Every wrong answer must be something a genuine expert might defend as correct. Questions should feel almost unfair.',
+  if (val <= 92)  return { key: 'nightmare', label: 'NIGHTMARE',  emoji: '🔥', timer: 24, multiplier: 2.5,  color: '#EF4444',
+    prompt: 'Generate nightmare difficulty questions. These require PhD-level or deep specialist mastery. Exploit nuances that even knowledgeable people get wrong — exceptions to rules, highly specific numerical facts, subtle distinctions between near-identical concepts. Every wrong answer should be something a confident expert might choose.',
     sabotageFreq: 1.0 }
-  return             { key: 'impossible', label: 'IMPOSSIBLE', emoji: '☠️', timer: 22, multiplier: 3.0,  color: '#DC2626',
-    prompt: 'Generate IMPOSSIBLE difficulty questions. These must be the hardest questions imaginable on this topic — hyper-specific obscure details, adversarial distractors that differ by one technical word, questions designed to trick even the world\'s leading experts. Every answer choice should seem correct until deeply scrutinized. Getting even one right should feel like an achievement. No mercy, no obvious choices.',
+  return             { key: 'impossible', label: 'IMPOSSIBLE', emoji: '☠️', timer: 26, multiplier: 3.0,  color: '#DC2626',
+    prompt: 'Generate impossible difficulty questions. Hyper-specific obscure details that only the world\'s leading experts would know. Wrong answers should differ from the correct answer by a single precise word or number, making them nearly indistinguishable without exact specialist knowledge. Getting even one right should feel like an achievement.',
     sabotageFreq: 1.0 }
 }
 
